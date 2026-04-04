@@ -859,8 +859,9 @@ body.hideChatAvatars.ripplestyle .mes .mes_block {
         padding-left: 16px;
     }
 
-    body.whisperstyle .mes::before {
-        width: min(58%, 220px);
+    body.whisperstyle .mes::before,
+    body.hushstyle .mes::before {
+        width: min(45%, 180px);
         height: 134px;
     }
 
@@ -940,9 +941,43 @@ body.hideChatAvatars.ripplestyle .mes .mes_block {
         gap: 4px 10px;
         padding: 12px 14px 0;
     }
+
+    /* Word wrapping for all chat styles */
+    body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) .mes .mes_text {
+        overflow-wrap: break-word;
+        word-break: break-word;
+        min-width: 0;
+    }
+
+    /* Ensure media containers don't overflow */
+    .mes .mes_media_wrapper,
+    .mes .mes_img_container,
+    .mes .mes_video_container {
+        max-width: 100%;
+        min-width: 0;
+    }
 }
 
 @media screen and (max-width: 620px) {
+    body.echostyle .mes .mes_text {
+        padding-left: calc(clamp(64px, 24vw, 100px) + 14px);
+    }
+
+    body.echostyle .mes .mes_text::before {
+        width: clamp(64px, 24vw, 100px);
+    }
+
+    body.echostyle .mes[is_user='true'] .mes_text {
+        padding-right: calc(clamp(64px, 24vw, 100px) + 14px);
+        padding-left: 14px;
+    }
+
+    body.whisperstyle .mes::before,
+    body.hushstyle .mes::before {
+        width: min(38%, 140px);
+        height: 120px;
+    }
+
     body.ripplestyle .mes .mesAvatarWrapper {
         grid-template-columns: 52px minmax(0, 1fr);
         grid-template-areas:
@@ -962,6 +997,27 @@ body.hideChatAvatars.ripplestyle .mes .mes_block {
     body.ripplestyle .mes .tokenCounterDisplay,
     body.ripplestyle .mes .mes_timer {
         font-size: calc(var(--mainFontSize) * 0.78);
+    }
+}
+
+@media screen and (max-width: 450px) {
+    body.echostyle .mes .mes_text {
+        padding-left: calc(clamp(60px, 22vw, 90px) + 12px);
+    }
+
+    body.echostyle .mes .mes_text::before {
+        width: clamp(60px, 22vw, 90px);
+    }
+
+    body.echostyle .mes[is_user='true'] .mes_text {
+        padding-right: calc(clamp(60px, 22vw, 90px) + 12px);
+        padding-left: 12px;
+    }
+
+    body.whisperstyle .mes::before,
+    body.hushstyle .mes::before {
+        width: min(32%, 120px);
+        height: 110px;
     }
 }
 

@@ -99,6 +99,62 @@
         backdrop-filter: blur(2px);
     }
 
+    /* Reduce mobile nav spacing */
+    #sb-mobile-nav {
+        padding: 10px;
+    }
+
+    #sb-mobile-nav-content {
+        padding: 14px 12px 20px;
+        gap: 12px;
+    }
+
+    .sb-mobile-section {
+        gap: 8px;
+    }
+
+    .sb-mobile-section-list {
+        gap: 8px;
+    }
+
+    .sb-nav-item {
+        padding: 12px 14px;
+    }
+
+    /* Settings panel spacing */
+    #right-nav-panel .drawer-content,
+    #left-nav-panel .drawer-content {
+        padding: 12px;
+    }
+
+    .range-block {
+        margin-bottom: 10px;
+    }
+
+    .range-block-title {
+        margin-bottom: 6px;
+    }
+
+    /* Input area mobile optimization */
+    #send_textarea {
+        min-height: calc(var(--bottomFormBlockSize) * 1.2);
+        padding: 8px;
+    }
+
+    #send_form .mes_stop {
+        font-size: calc(var(--mainFontSize) * 1.5);
+        padding-right: 4px;
+    }
+
+    #send_form .mes_stop i {
+        font-size: 1.2em;
+    }
+
+    /* Ensure stop button is properly sized */
+    #rightSendForm {
+        min-height: calc(var(--bottomFormBlockSize) * 1.2);
+    }
+
     .bg_folder_tile .jg-button {
         width: 30px;
         height: 30px;
@@ -672,5 +728,33 @@
 
     #horde_model {
         height: unset;
+    }
+}
+
+@media screen and (max-width: 620px) {
+    /* Tighter mobile nav spacing for small phones */
+    #sb-mobile-nav {
+        padding: 8px;
+    }
+
+    #sb-mobile-nav-content {
+        padding: 12px 10px 16px;
+        gap: 10px;
+    }
+
+    .sb-nav-item {
+        padding: 10px 12px;
+        gap: 10px;
+    }
+
+    /* Input area optimization for small phones */
+    #send_textarea {
+        min-height: calc(var(--bottomFormBlockSize) * 1.4);
+        padding: 10px;
+        font-size: calc(var(--mainFontSize) * 1.05);
+    }
+
+    #send_form .mes_stop {
+        font-size: calc(var(--mainFontSize) * 1.6);
     }
 }
