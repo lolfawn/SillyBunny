@@ -864,18 +864,66 @@ body.hideChatAvatars.ripplestyle .mes .mes_block {
         height: 134px;
     }
 
-    body.ripplestyle .mes {
-        display: flex;
-    }
-
     body.ripplestyle .mes .mesAvatarWrapper {
-        flex-basis: var(--sb-ripple-avatar-mobile-width);
-        width: var(--sb-ripple-avatar-mobile-width);
-        min-width: var(--sb-ripple-avatar-mobile-width);
+        display: grid;
+        grid-template-columns: 64px repeat(2, minmax(0, max-content));
+        grid-template-areas:
+            "avatar id tokens"
+            "avatar timer timer";
+        align-items: center;
+        justify-content: start;
+        column-gap: 10px;
+        row-gap: 4px;
+        width: auto;
+        min-width: 0;
+        padding: 12px 14px 0;
+        background: none;
     }
 
     body.ripplestyle .mes .avatar {
-        min-height: calc(var(--sb-ripple-avatar-mobile-width) * var(--sb-ripple-avatar-ratio));
+        grid-area: avatar;
+        width: 64px;
+        height: 64px;
+        min-height: 64px;
+        border-radius: calc(var(--sb-message-radius) - 8px);
+    }
+
+    body.ripplestyle .mes .avatar img {
+        height: 100%;
+    }
+
+    body.ripplestyle .mes {
+        display: block;
+    }
+
+    body.ripplestyle .mes .mesIDDisplay,
+    body.ripplestyle .mes .tokenCounterDisplay,
+    body.ripplestyle .mes .mes_timer {
+        margin: 0;
+        width: auto;
+        min-width: 0;
+        justify-self: start;
+        text-align: left;
+        line-height: 1.15;
+    }
+
+    body.ripplestyle .mes .mesIDDisplay {
+        grid-area: id;
+        align-self: end;
+    }
+
+    body.ripplestyle .mes .tokenCounterDisplay {
+        grid-area: tokens;
+        align-self: end;
+    }
+
+    body.ripplestyle .mes .mes_timer {
+        grid-area: timer;
+        font-size: calc(var(--mainFontSize) * 0.82);
+    }
+
+    body.ripplestyle .mes .mes_block {
+        padding: 10px 14px 14px;
     }
 
     body.tidestyle #chat {
@@ -884,6 +932,36 @@ body.hideChatAvatars.ripplestyle .mes .mes_block {
 
     body.tidestyle .mes .mes_text {
         max-width: 100%;
+    }
+
+    body.hideChatAvatars.ripplestyle .mes .mesAvatarWrapper {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        padding: 12px 14px 0;
+    }
+}
+
+@media screen and (max-width: 620px) {
+    body.ripplestyle .mes .mesAvatarWrapper {
+        grid-template-columns: 52px minmax(0, 1fr);
+        grid-template-areas:
+            "avatar id"
+            "avatar timer"
+            "avatar tokens";
+        column-gap: 8px;
+    }
+
+    body.ripplestyle .mes .avatar {
+        width: 52px;
+        height: 52px;
+        min-height: 52px;
+    }
+
+    body.ripplestyle .mes .mesIDDisplay,
+    body.ripplestyle .mes .tokenCounterDisplay,
+    body.ripplestyle .mes .mes_timer {
+        font-size: calc(var(--mainFontSize) * 0.78);
     }
 }
 
