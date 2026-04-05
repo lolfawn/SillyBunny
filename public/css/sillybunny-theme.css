@@ -458,6 +458,16 @@ select.text_pole {
         height: 42px !important;
     }
 
+    /* Override any theme-specific sizing */
+    #leftSendForm > *,
+    #rightSendForm > *:not(.mes_stop) {
+        width: 42px !important;
+        min-width: 42px !important;
+        height: 42px !important;
+        max-width: 42px !important;
+        max-height: 42px !important;
+    }
+
     #send_form .mes_stop {
         width: 52px;
         min-width: 52px;

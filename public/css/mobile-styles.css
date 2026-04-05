@@ -808,6 +808,33 @@
         height: 32px;
         font-size: 18px;
     }
+
+    /* Force hide original user settings drawer on mobile */
+    #user-settings-button.sb-drawer-host,
+    #user-settings-button.sb-embedded-drawer {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    /* Ensure Select2 search input is visible and usable on mobile */
+    .select2-search--dropdown .select2-search__field {
+        display: block !important;
+        width: 100% !important;
+        padding: 10px !important;
+        font-size: 16px !important; /* Prevents zoom on iOS */
+        -webkit-appearance: none;
+        appearance: none;
+    }
+
+    .select2-dropdown {
+        z-index: 9999 !important;
+    }
+
+    .select2-container--open .select2-dropdown {
+        border: 1px solid var(--SmartThemeBorderColor);
+    }
 }
 
 @media screen and (max-width: 620px) {

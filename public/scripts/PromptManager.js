@@ -1947,6 +1947,21 @@ class PromptManager {
         $('#' + this.configuration.prefix + 'prompt_manager_popup').first()
             .slideDown(200, 'swing')
             .addClass('openDrawer');
+
+        // Scroll to top of edit form on mobile
+        if (window.matchMedia('(max-width: 768px)').matches) {
+            setTimeout(() => {
+                const popup = document.getElementById(this.configuration.prefix + 'prompt_manager_popup');
+                if (popup) {
+                    popup.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Also scroll the parent container to top
+                    const shellScroller = popup.closest('.sb-shell-scroller');
+                    if (shellScroller) {
+                        shellScroller.scrollTop = 0;
+                    }
+                }
+            }, 250); // Wait for slideDown animation
+        }
     }
 
     /**

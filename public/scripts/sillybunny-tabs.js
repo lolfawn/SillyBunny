@@ -745,6 +745,12 @@ function prepareEmbeddedDrawer(drawerId) {
     drawerContent.classList.remove('openDrawer', 'closedDrawer', 'fillLeft', 'fillRight', 'pinnedOpen');
     drawerContent.classList.add('sb-managed', 'sb-shell-embedded-content');
 
+    // Clean up any persistent inline styles or state
+    drawerContent.removeAttribute('style');
+    drawer.style.display = '';
+    drawer.style.visibility = '';
+    drawer.style.opacity = '';
+
     if (drawerId === 'WI-SP-button') {
         drawer.querySelector('#WI_panel_pin_div')?.classList.add('sb-shell-hidden-control');
     }

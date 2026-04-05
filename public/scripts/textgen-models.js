@@ -1083,6 +1083,7 @@ export function initTextGenModels() {
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
         templateResult: getMancerModelTemplate,
     });
     $('#model_togetherai_select').select2({
@@ -1090,6 +1091,7 @@ export function initTextGenModels() {
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
         templateResult: getTogetherModelTemplate,
     });
     $('#ollama_model').select2({
@@ -1097,12 +1099,14 @@ export function initTextGenModels() {
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
     });
     $('#tabby_model').select2({
         placeholder: t`[Currently loaded]`,
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
         allowClear: true,
     });
     $('#llamacpp_model').select2({
@@ -1110,6 +1114,7 @@ export function initTextGenModels() {
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
         allowClear: true,
     });
     $('#model_infermaticai_select').select2({
@@ -1117,6 +1122,7 @@ export function initTextGenModels() {
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
         templateResult: getInfermaticAIModelTemplate,
     });
     $('#model_dreamgen_select').select2({
@@ -1124,6 +1130,7 @@ export function initTextGenModels() {
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
         templateResult: getDreamGenModelTemplate,
     });
     $('#openrouter_model').select2({
@@ -1131,6 +1138,7 @@ export function initTextGenModels() {
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
         templateResult: getOpenRouterModelTemplate,
         matcher: textValueMatcher,
     });
@@ -1139,6 +1147,7 @@ export function initTextGenModels() {
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
         templateResult: getVllmModelTemplate,
     });
     $('#aphrodite_model').select2({
@@ -1146,6 +1155,7 @@ export function initTextGenModels() {
         searchInputPlaceholder: t`Search models...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
         templateResult: getAphroditeModelTemplate,
     });
     $('.openrouter_quantizations').select2({
@@ -1154,6 +1164,7 @@ export function initTextGenModels() {
         searchInputCssClass: 'text_pole',
         searchInputPlaceholder: t`Search quantizations...`,
         width: '100%',
+        minimumResultsForSearch: 0,
     });
     providersSelect.select2({
         sorter: data => data.sort((a, b) => a.text.localeCompare(b.text)),
@@ -1161,6 +1172,7 @@ export function initTextGenModels() {
         searchInputPlaceholder: t`Search providers...`,
         searchInputCssClass: 'text_pole',
         width: '100%',
+        minimumResultsForSearch: 0,
         closeOnSelect: false,
     });
     providersSelect.on('select2:select', function (/** @type {any} */ evt) {
