@@ -288,6 +288,25 @@ function isMobileViewport() {
     return window.matchMedia(SB_MOBILE_MEDIA_QUERY).matches;
 }
 
+function ensureShellReady(shellKey) {
+    if (getShellState(shellKey)) {
+        return true;
+    }
+
+    buildShell(shellKey);
+    return Boolean(getShellState(shellKey));
+}
+
+function ensureMobileNavReady() {
+    const existingOverlay = document.getElementById('sb-mobile-nav');
+    if (existingOverlay instanceof HTMLElement) {
+        return existingOverlay;
+    }
+
+    buildMobileNav();
+    return document.getElementById('sb-mobile-nav');
+}
+
 function clearShellSearch(shellKey) {
     const shellState = getShellState(shellKey);
     if (!shellState) {
@@ -583,6 +602,7 @@ function closeCharacterPanel() {
 
 function toggleCharacterPanel() {
     closeMobileNav();
+    injectCharacterCloseButton();
 
     if (isCharacterPanelOpen()) {
         closeCharacterPanel();
@@ -608,6 +628,10 @@ function toggleCharacterPanel() {
 }
 
 function toggleShellPanel(shellKey, tabId = null) {
+    if (!ensureShellReady(shellKey)) {
+        return;
+    }
+
     if (tabId ? isShellTabOpen(shellKey, tabId) : isShellOpen(shellKey)) {
         closeShell(shellKey);
         return;
@@ -1592,6 +1616,14 @@ function buildMobileNav() {
 
     const sections = [
         {
+            label: 'Quick Actions',
+            items: [
+                { action: 'home', icon: 'fa-house', label: 'Home' },
+                { action: 'characters', icon: 'fa-address-card', label: 'Characters' },
+                { shell: 'right', tab: 'settings', icon: 'fa-sliders', label: 'Settings' },
+            ],
+        },
+        {
             label: 'Workspace',
             items: [
                 { shell: 'left', tab: 'presets', icon: 'fa-sliders', label: 'Presets' },
@@ -1599,6 +1631,14 @@ function buildMobileNav() {
                 { shell: 'left', tab: 'advanced-formatting', icon: 'fa-font', label: 'Advanced Formatting' },
                 { shell: 'left', tab: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
                 { shell: 'left', tab: 'agents', icon: 'fa-robot', label: 'Agents' },
+            ],
+        },
+        {
+            label: 'Customize',
+            items: [
+                { shell: 'right', tab: 'extensions', icon: 'fa-cubes', label: 'Extensions' },
+                { shell: 'right', tab: 'persona', icon: 'fa-face-smile', label: 'Persona' },
+                { shell: 'right', tab: 'background', icon: 'fa-panorama', label: 'Background' },
             ],
         },
     ];
@@ -1686,7 +1726,7 @@ function buildMobileNav() {
 }
 
 function setMobileNavOpenState(isOpen) {
-    const overlay = document.getElementById('sb-mobile-nav');
+    const overlay = ensureMobileNavReady();
     const button = document.getElementById('sb-hamburger');
     const shouldOpen = Boolean(isOpen) && isMobileViewport();
 
@@ -1710,7 +1750,7 @@ function setMobileNavOpenState(isOpen) {
 }
 
 function toggleMobileNav() {
-    const overlay = document.getElementById('sb-mobile-nav');
+    const overlay = ensureMobileNavReady();
 
     if (!(overlay instanceof HTMLElement)) {
         return;
@@ -1883,11 +1923,11 @@ function initAll() {
     hideHostToggles();
     forceDrawerState(leftShellRoot, false, getShellConfig('left').hostIconSelector);
     forceDrawerState(rightShellRoot, false, getShellConfig('right').hostIconSelector);
-    buildTopBar();
     buildShell('left');
     buildShell('right');
     buildMobileNav();
     injectCharacterCloseButton();
+    buildTopBar();
     interceptDrawerOpeners();
     bindWorldInfoRoute();
     initAgentOverview();
