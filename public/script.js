@@ -244,7 +244,7 @@ import {
     isPersonaPanelOpen,
 } from './scripts/personas.js';
 import { getBackgrounds, initBackgrounds, loadBackgroundSettings, background_settings } from './scripts/backgrounds.js';
-import { loader } from './scripts/action-loader.js';
+import { cleanupActionLoaderArtifacts, loader } from './scripts/action-loader.js';
 import { BulkEditOverlay } from './scripts/BulkEditOverlay.js';
 import { initTextGenModels } from './scripts/textgen-models.js';
 import { appendFileContent, hasPendingFileAttachment, populateFileAttachment, decodeStyleTags, encodeStyleTags, isExternalMediaAllowed, preserveNeutralChat, restoreNeutralChat, formatCreatorNotes, initChatUtilities, addDOMPurifyHooks } from './scripts/chats.js';
@@ -689,6 +689,12 @@ export async function pingServer() {
 
 //MARK: firstLoadInit
 async function firstLoadInit() {
+    const scheduleStartupLoaderCleanup = (reason) => {
+        cleanupActionLoaderArtifacts({ removePreloader: true, reason });
+        requestAnimationFrame(() => cleanupActionLoaderArtifacts({ removePreloader: true, reason: `${reason} (raf)` }));
+        window.setTimeout(() => cleanupActionLoaderArtifacts({ removePreloader: true, reason: `${reason} (timeout)` }), 250);
+    };
+
     const initLoaderOverlay = loader.createOverlay();
     initLoaderOverlay.classList.add('splash-screen');
 
@@ -710,6 +716,18 @@ async function firstLoadInit() {
         toastMode: loader.ToastMode.NONE,
         overlayContent: initLoaderOverlay,
     });
+    let startupLoaderReleased = false;
+
+    const releaseStartupLoader = async (reason) => {
+        if (startupLoaderReleased) return;
+        startupLoaderReleased = true;
+        if (initLoaderHandle.isActive) {
+            await initLoaderHandle.hide().catch((error) => {
+                console.error('Failed to hide startup loader.', error);
+            });
+        }
+        scheduleStartupLoaderCleanup(reason);
+    };
 
     try {
         const tokenResponse = await fetch('/csrf-token');
@@ -747,6 +765,7 @@ async function firstLoadInit() {
         initDynamicStyles();
         initTags();
         initBookmarks();
+        await releaseStartupLoader('startup loader release');
         await getUserAvatars(true, user_avatar);
         await getCharacters();
         await getBackgrounds();
@@ -777,19 +796,15 @@ async function firstLoadInit() {
         addDebugFunctions();
         doDailyExtensionUpdatesCheck();
         await eventSource.emit(event_types.APP_INITIALIZED);
-        await initLoaderHandle.hide();
         await fixViewport();
         await eventSource.emit(event_types.APP_READY);
+        scheduleStartupLoaderCleanup('app ready');
     } catch (error) {
         console.error('Application initialization failed.', error);
         toastr.error(t`SillyBunny couldn't finish starting. Please refresh the page.`, t`Startup Error`, { timeOut: 0, extendedTimeOut: 0, preventDuplicates: true });
         throw error;
     } finally {
-        if (initLoaderHandle.isActive) {
-            await initLoaderHandle.hide().catch((error) => {
-                console.error('Failed to hide startup loader.', error);
-            });
-        }
+        await releaseStartupLoader('startup finally');
     }
 }
 

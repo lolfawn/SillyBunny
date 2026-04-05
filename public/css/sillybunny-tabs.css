@@ -1578,9 +1578,14 @@
 }
 
 /* Force character panel visibility on mobile when open.
- * The panel may be clipped or invisible due to parent overflow or stacking context.
- * Clicks still reach it via the fixed positioning, but visual rendering needs help. */
+ * iOS Safari clips position:fixed descendants inside overflow:hidden ancestors.
+ * Override the sb-drawer-host overflow to let the panel escape. */
 @media screen and (max-width: 1000px) {
+    #rightNavHolder:has(.openDrawer) {
+        overflow: visible !important;
+        width: auto !important;
+    }
+
     #right-nav-panel.openDrawer {
         display: flex !important;
         opacity: 1 !important;
