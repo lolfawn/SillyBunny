@@ -570,3 +570,29 @@ function yoinkPreloader() {
 // ============================================================================
 // End internal overlay management
 // ============================================================================
+
+/**
+ * Forcefully removes any lingering loader overlay artifacts from the DOM.
+ * Used as a safety net when the normal hide() chain may not complete.
+ * @param {object} [options]
+ * @param {boolean} [options.removePreloader=false] Whether to remove the initial HTML preloader too
+ * @param {string} [options.reason='cleanup'] Debug label for the cleanup path
+ */
+export function cleanupActionLoaderArtifacts({ removePreloader = false, reason = 'cleanup' } = {}) {
+    document.getElementById('loader')?.remove();
+
+    // Close and remove any open loader dialog overlays
+    for (const dlg of document.querySelectorAll('dialog[open]')) {
+        if (dlg.querySelector('#loader, .splash-screen, #load-spinner')) {
+            try { dlg.close(); } catch {}
+            dlg.remove();
+        }
+    }
+
+    if (removePreloader) {
+        yoinkPreloader();
+    }
+
+    // Remove dialog polyfill overlay if present
+    document.querySelector('._poly_dialog_overlay')?.remove();
+}
