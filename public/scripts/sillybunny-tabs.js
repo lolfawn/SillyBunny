@@ -3102,28 +3102,11 @@ function buildMobileNav() {
         {
             label: 'Quick Actions',
             items: [
-                { action: 'home', icon: 'fa-house', label: 'Home' },
-                { action: 'chat-tools', icon: 'fa-comments', label: 'Chats' },
-                { action: 'characters', icon: 'fa-address-card', label: 'Characters' },
-                { shell: 'right', tab: 'settings', icon: 'fa-sliders', label: 'Settings' },
-            ],
-        },
-        {
-            label: 'Workspace',
-            items: [
                 { shell: 'left', tab: 'presets', icon: 'fa-sliders', label: 'Presets' },
                 { shell: 'left', tab: 'api', icon: 'fa-plug', label: 'API' },
                 { shell: 'left', tab: 'advanced-formatting', icon: 'fa-font', label: 'Advanced Formatting' },
                 { shell: 'left', tab: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
                 { shell: 'left', tab: 'agents', icon: 'fa-robot', label: 'Agents' },
-            ],
-        },
-        {
-            label: 'Customize',
-            items: [
-                { shell: 'right', tab: 'extensions', icon: 'fa-cubes', label: 'Extensions' },
-                { shell: 'right', tab: 'persona', icon: 'fa-face-smile', label: 'Persona' },
-                { shell: 'right', tab: 'background', icon: 'fa-panorama', label: 'Background' },
             ],
         },
     ];
