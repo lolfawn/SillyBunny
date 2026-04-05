@@ -1872,7 +1872,15 @@ function initAll() {
     }
 
     sbState.initialized = true;
-    document.body.classList.add('sb-shell-initialized');
+
+    // Safari-compatible: Use requestAnimationFrame to ensure class changes apply after paint
+    // Remove initializing class first, then add initialized class on next frame
+    requestAnimationFrame(() => {
+        document.body.classList.remove('sb-shell-initializing');
+        requestAnimationFrame(() => {
+            document.body.classList.add('sb-shell-initialized');
+        });
+    });
 
     hideHostToggles();
     buildTopBar();
@@ -1916,4 +1924,10 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAll);
 } else {
     window.setTimeout(initAll, 80);
+}
+
+// Add initializing class immediately to enable pointer-events blocking
+// This runs synchronously before initAll() to ensure Safari applies the CSS rule
+if (isMobileViewport()) {
+    document.body.classList.add('sb-shell-initializing');
 }
