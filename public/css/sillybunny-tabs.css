@@ -176,7 +176,9 @@
     width: 0;
     min-width: 0;
     flex: 0 0 auto;
-    overflow: visible;
+    overflow: hidden;
+    visibility: hidden;
+    pointer-events: none;
 }
 
 #top-settings-holder {

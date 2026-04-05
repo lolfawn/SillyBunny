@@ -445,25 +445,22 @@ select.text_pole {
     #leftSendForm > div,
     #rightSendForm > div:not(.mes_stop),
     #options_button {
-        width: 42px;
-        min-width: 42px;
-        height: 42px;
-    }
-
-    /* Ensure hamburger menu matches other buttons */
-    #leftSendForm > div,
-    #rightSendForm > div {
         width: 42px !important;
         min-width: 42px !important;
         height: 42px !important;
+        min-height: 42px !important;
+        max-width: 42px !important;
+        max-height: 42px !important;
     }
 
-    /* Override any theme-specific sizing */
+    /* Override any theme-specific sizing (Moonlit Echoes etc.) */
     #leftSendForm > *,
-    #rightSendForm > *:not(.mes_stop) {
+    #rightSendForm > *:not(.mes_stop),
+    #form_sheld #options_button {
         width: 42px !important;
         min-width: 42px !important;
         height: 42px !important;
+        min-height: 42px !important;
         max-width: 42px !important;
         max-height: 42px !important;
     }
@@ -560,7 +557,12 @@ input[type='range']::-moz-range-thumb {
     border-radius: 14px;
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 88%, transparent);
     box-shadow: 0 18px 32px color-mix(in srgb, var(--SmartThemeShadowColor) 18%, transparent);
-    overflow: hidden;
+    overflow: visible;
+}
+
+.select2-container--default .select2-results {
+    max-height: 300px;
+    overflow-y: auto;
 }
 
 .select2-container--default .select2-selection--single {
