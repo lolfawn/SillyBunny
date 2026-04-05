@@ -15,6 +15,134 @@ The goal is to keep the familiar SillyTavern workflow, data habits, and compatib
 - Native Agent Mode is built into the app instead of being bolted on as a separate orchestration layer
 - SillyTavern workflow and data compatibility remain a priority inside a Bun-only runtime
 
+## Quick start
+
+Requirements:
+
+- A Git clone is recommended if you want launcher-based auto-updates
+- Bun `1.3.0` or newer only if you plan to launch SillyBunny directly with `bun`; the included start scripts can install it automatically
+
+Clone and enter the repo:
+
+```bash
+git clone https://github.com/platberlitz/SillyBunny.git
+cd SillyBunny
+```
+
+Launch it with the script that matches your platform:
+
+Linux and other Unix shells:
+
+```bash
+./start.sh
+```
+
+macOS from Terminal:
+
+```bash
+./Start.command
+```
+
+macOS from Finder:
+
+- Double-click `Start.command`
+- If Gatekeeper warns on first launch, right-click it and choose `Open`
+
+Windows:
+
+```powershell
+.\Start.bat
+```
+
+Launcher behavior:
+
+- `start.sh`, `Start.command`, `Start.bat`, `UpdateAndStart.bat`, and `UpdateForkAndStart.bat` all perform an automatic self-update check before launch when you are running from a clean Git clone with an upstream branch configured
+- Bun is installed automatically when it is missing
+- Git is installed automatically when a launcher needs it and the platform has a supported installation path
+- Project packages are installed automatically before the server starts
+- ZIP downloads can still be started, but they cannot auto-update until you switch to a Git clone
+
+If you already have Bun set up and prefer direct runtime commands, `bun run start` and friends still work as usual.
+
+### macOS notes
+
+- Recommended Terminal launch:
+
+```bash
+cd /path/to/SillyBunny
+./Start.command
+```
+
+- `Start.command` changes into the repo folder, makes the launcher scripts executable, then runs the same bootstrap flow as `./start.sh`
+- If Finder is more convenient, you can double-click `Start.command`; if Gatekeeper blocks the first launch, right-click it, choose `Open`, then confirm once
+- If the launcher window opens and closes too quickly, rerun it from Terminal with `./Start.command` so you can keep the output visible
+- On a Git clone, if macOS does not already have Git available, the launcher will trigger the Apple Command Line Tools installer with `xcode-select --install`
+- After the Command Line Tools install finishes, close that installer if needed and rerun `./Start.command`
+- If you downloaded a ZIP and macOS added quarantine metadata, remove it with:
+
+```bash
+xattr -dr com.apple.quarantine "/path/to/SillyBunny"
+```
+
+- If your unzip tool stripped execute permissions, restore them with:
+
+```bash
+chmod +x Start.command start.sh scripts/*.sh
+```
+
+- `Start.command` forwards launcher flags too, so update-only runs work on Mac:
+
+```bash
+./Start.command --self-update-only
+./Start.command --self-update
+```
+
+- Auto-update only works for Git clones with a tracked branch. ZIP installs can still be launched, but updating them still means downloading a fresh copy manually
+- To stop the server from Terminal, press `Ctrl+C`
+
+### Auto-update controls
+
+On Unix-like systems, the launcher checks the tracked Git branch before launch by default:
+
+```bash
+./start.sh
+```
+
+To force a non-optional update pass:
+
+```bash
+./start.sh --self-update
+```
+
+To update without starting the server:
+
+```bash
+./start.sh --self-update-only
+```
+
+Use `./start.sh --skip-self-update` to bypass the automatic check for a single launch.
+
+You can also disable the automatic check through the environment:
+
+```bash
+SILLYBUNNY_AUTO_UPDATE=0 ./start.sh
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:SILLYBUNNY_AUTO_UPDATE = '0'
+.\Start.bat
+```
+
+Open `http://127.0.0.1:8000`.
+
+For lower-memory or phone-style environments:
+
+```bash
+bun run start:mobile
+```
+
 ## Current features
 
 ### Bun-first runtime
@@ -80,106 +208,6 @@ Current Agent Mode limitations:
 - It currently runs only with an active chat
 - It currently targets the chat-completions pipeline
 - The first implementation is intentionally lightweight and service-oriented
-
-## Quick start
-
-Requirements:
-
-- A Git clone is recommended if you want launcher-based auto-updates
-- Bun `1.3.0` or newer only if you plan to launch SillyBunny directly with `bun`; the included start scripts can install it automatically
-
-Clone and enter the repo:
-
-```bash
-git clone https://github.com/platberlitz/SillyBunny.git
-cd SillyBunny
-```
-
-Launch it with the script that matches your platform:
-
-Linux and other Unix shells:
-
-```bash
-./start.sh
-```
-
-macOS from Terminal:
-
-```bash
-./Start.command
-```
-
-macOS from Finder:
-
-- Double-click `Start.command`
-- If Gatekeeper warns on first launch, right-click it and choose `Open`
-
-Windows:
-
-```powershell
-.\Start.bat
-```
-
-Launcher behavior:
-
-- `start.sh`, `Start.command`, `Start.bat`, `UpdateAndStart.bat`, and `UpdateForkAndStart.bat` all perform an automatic self-update check before launch when you are running from a clean Git clone with an upstream branch configured
-- Bun is installed automatically when it is missing
-- Git is installed automatically when a launcher needs it and the platform has a supported installation path
-- Project packages are installed automatically before the server starts
-- ZIP downloads can still be started, but they cannot auto-update until you switch to a Git clone
-
-If you already have Bun set up and prefer direct runtime commands, `bun run start` and friends still work as usual.
-
-### macOS notes
-
-- `Start.command` is the easiest option for Mac users because it opens in Terminal and runs the same bootstrap flow as `start.sh`
-- If Git is missing on a Git-based install, the launcher will ask macOS to install the Apple Command Line Tools. Finish that install, then run `Start.command` again
-- If you downloaded a ZIP and macOS adds quarantine metadata, you may need to run `xattr -dr com.apple.quarantine /path/to/SillyBunny`
-- If your unzip tool strips executable bits, restore them with `chmod +x Start.command start.sh scripts/*.sh`
-- Auto-update only works for Git clones. ZIP installs are launchable, but updating them still means downloading a fresh copy manually
-
-### Auto-update controls
-
-On Unix-like systems, the launcher checks the tracked Git branch before launch by default:
-
-```bash
-./start.sh
-```
-
-To force a non-optional update pass:
-
-```bash
-./start.sh --self-update
-```
-
-To update without starting the server:
-
-```bash
-./start.sh --self-update-only
-```
-
-Use `./start.sh --skip-self-update` to bypass the automatic check for a single launch.
-
-You can also disable the automatic check through the environment:
-
-```bash
-SILLYBUNNY_AUTO_UPDATE=0 ./start.sh
-```
-
-On Windows PowerShell:
-
-```powershell
-$env:SILLYBUNNY_AUTO_UPDATE = '0'
-.\Start.bat
-```
-
-Open `http://127.0.0.1:8000`.
-
-For lower-memory or phone-style environments:
-
-```bash
-bun run start:mobile
-```
 
 ## Docker
 
