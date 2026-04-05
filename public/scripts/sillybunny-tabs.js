@@ -1674,6 +1674,37 @@ function syncMobileViewportState() {
     }
 }
 
+function reinitSelect2AfterShell() {
+    const select2Defaults = { dropdownParent: $(document.body), minimumResultsForSearch: 0 };
+    const selectors = [
+        '#mancer_model',
+        '#model_togetherai_select',
+        '#ollama_model',
+        '#tabby_model',
+        '#llamacpp_model',
+        '#model_infermaticai_select',
+        '#model_dreamgen_select',
+        '#openrouter_model',
+        '#vllm_model',
+        '#aphrodite_model',
+        '.openrouter_quantizations',
+        '.openrouter_providers',
+    ];
+
+    for (const selector of selectors) {
+        const $el = $(selector);
+        if ($el.length && $el.data('select2')) {
+            try {
+                const config = $el.data('select2').options.options;
+                $el.select2('destroy');
+                $el.select2({ ...select2Defaults, ...config });
+            } catch {
+                // Element may not have been initialized yet
+            }
+        }
+    }
+}
+
 function initAll() {
     if (sbState.initialized) {
         return;
@@ -1704,6 +1735,10 @@ function initAll() {
 
     window.addEventListener('resize', syncMobileViewportState, { passive: true });
     window.addEventListener('orientationchange', syncMobileViewportState);
+
+    // Reinitialize Select2 widgets after shell reparents DOM elements.
+    // Select2 bindings break when elements are moved in the DOM.
+    reinitSelect2AfterShell();
 
     window.SillyBunnyShell = {
         openTab(shellKey, tabId) {
