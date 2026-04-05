@@ -47,7 +47,7 @@ done
 
 if (( self_update_requested )); then
     bash "$SCRIPT_DIR/scripts/self-update.sh"
-elif (( ! skip_auto_update )) && is_truthy "${SILLYBUNNY_AUTO_UPDATE:-0}"; then
+elif (( ! skip_auto_update )) && is_truthy "${SILLYBUNNY_AUTO_UPDATE:-1}"; then
     bash "$SCRIPT_DIR/scripts/self-update.sh" --optional
 fi
 
@@ -67,4 +67,5 @@ export NODE_ENV=production
 bun install --frozen-lockfile --production
 
 echo "Entering SillyBunny..."
+export NODE_NO_WARNINGS=1
 bun server.js "${server_args[@]}"

@@ -1675,8 +1675,7 @@ function syncMobileViewportState() {
 }
 
 function reinitSelect2AfterShell() {
-    const select2Defaults = { dropdownParent: $(document.body), minimumResultsForSearch: 0 };
-    const selectors = [
+    const modelSelectors = [
         '#mancer_model',
         '#model_togetherai_select',
         '#ollama_model',
@@ -1687,22 +1686,76 @@ function reinitSelect2AfterShell() {
         '#openrouter_model',
         '#vllm_model',
         '#aphrodite_model',
-        '.openrouter_quantizations',
-        '.openrouter_providers',
     ];
 
-    for (const selector of selectors) {
-        const $el = $(selector);
-        if ($el.length && $el.data('select2')) {
-            try {
-                const config = $el.data('select2').options.options;
-                $el.select2('destroy');
-                $el.select2({ ...select2Defaults, ...config });
-            } catch {
-                // Element may not have been initialized yet
+    if (isMobileViewport()) {
+        // On mobile, destroy Select2 (doesn't work on iOS Safari) and add native filter inputs
+        for (const selector of modelSelectors) {
+            const $el = $(selector);
+            if ($el.length && $el.data('select2')) {
+                try {
+                    $el.select2('destroy');
+                } catch {
+                    // Ignore
+                }
+            }
+            injectModelFilterInput($el);
+        }
+    } else {
+        // On desktop, reinitialize Select2 after DOM reparenting
+        const select2Defaults = { dropdownParent: $(document.body), minimumResultsForSearch: 0 };
+        const allSelectors = [...modelSelectors, '.openrouter_quantizations', '.openrouter_providers'];
+        for (const selector of allSelectors) {
+            const $el = $(selector);
+            if ($el.length && $el.data('select2')) {
+                try {
+                    const config = $el.data('select2').options.options;
+                    $el.select2('destroy');
+                    $el.select2({ ...select2Defaults, ...config });
+                } catch {
+                    // Element may not have been initialized yet
+                }
             }
         }
     }
+}
+
+function injectModelFilterInput($select) {
+    if (!$select.length || $select.prev('.sb-model-filter').length) {
+        return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'sb-model-filter text_pole';
+    input.placeholder = 'Filter models...';
+
+    // Store all options for filtering
+    const allOptions = Array.from($select[0].options).map(opt => ({
+        value: opt.value,
+        text: opt.textContent,
+        selected: opt.selected,
+    }));
+
+    input.addEventListener('input', () => {
+        const query = input.value.toLowerCase().trim();
+        const select = $select[0];
+        const currentValue = select.value;
+
+        // Rebuild options filtered by query
+        select.innerHTML = '';
+        for (const opt of allOptions) {
+            if (!query || opt.text.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query)) {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.text;
+                option.selected = opt.value === currentValue;
+                select.appendChild(option);
+            }
+        }
+    });
+
+    $select.before(input);
 }
 
 function initAll() {
