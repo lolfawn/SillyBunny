@@ -190,6 +190,16 @@
     pointer-events: auto;
 }
 
+#left-nav-panel select {
+    position: relative;
+    z-index: 1;
+    touch-action: auto;
+    -moz-appearance: auto !important;
+    -webkit-appearance: auto !important;
+    appearance: auto !important;
+    background-image: none !important;
+}
+
 .sb-hidden-toggle,
 .sb-legacy-search-hidden,
 .sb-shell-hidden-control {
@@ -1455,6 +1465,17 @@
         -webkit-backdrop-filter: none !important;
         pointer-events: auto !important;
         transform: translateZ(0);
+    }
+
+    #left-nav-panel.openDrawer {
+        transform: none !important;
+        -webkit-overflow-scrolling: auto !important;
+    }
+
+    #left-nav-panel > .scrollableInner,
+    #left-nav-panel > .scrollableInnerFull,
+    #left-nav-panel .sb-shell-panel-scroller {
+        -webkit-overflow-scrolling: auto !important;
     }
 
     #left-nav-panel .sb-shell-frame,

@@ -267,16 +267,14 @@ function createSectionRow(sectionId, title, sectionName, isOpen) {
     row.className = `nemo-sb-section-row ${isOpen ? '' : 'is-collapsed'}`.trim();
     row.dataset.sectionId = sectionId;
     row.dataset.sectionName = sectionName;
-    row.tabIndex = 0;
-    row.setAttribute('role', 'button');
-    row.setAttribute('aria-expanded', String(isOpen));
-    row.setAttribute('aria-label', `Toggle ${title}`);
     row.innerHTML = `
-        <button class="nemo-sb-section-toggle" type="button" aria-label="Toggle section">
-            <i class="fa-solid ${isOpen ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
+        <button class="nemo-sb-section-trigger" type="button" aria-expanded="${String(isOpen)}" aria-label="Toggle ${title}">
+            <span class="nemo-sb-section-toggle" aria-hidden="true">
+                <i class="fa-solid ${isOpen ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
+            </span>
+            <span class="nemo-sb-section-title"></span>
+            <span class="nemo-sb-section-count"></span>
         </button>
-        <span class="nemo-sb-section-title"></span>
-        <span class="nemo-sb-section-count"></span>
     `;
     row.querySelector('.nemo-sb-section-title').textContent = title;
     const toggleSection = () => {
@@ -287,19 +285,46 @@ function createSectionRow(sectionId, title, sectionName, isOpen) {
         schedulePromptRefresh();
     };
 
-    row.querySelector('.nemo-sb-section-toggle').addEventListener('click', event => {
-        event.preventDefault();
+    const trigger = row.querySelector('.nemo-sb-section-trigger');
+    let lastToggleAt = 0;
+    const canToggleAgain = () => {
+        const now = Date.now();
+        if (now - lastToggleAt < 180) {
+            return false;
+        }
+
+        lastToggleAt = now;
+        return true;
+    };
+    const stopTriggerPropagation = event => {
+        event.stopImmediatePropagation();
         event.stopPropagation();
+    };
+    const activateTrigger = event => {
+        event.preventDefault();
+        stopTriggerPropagation(event);
+
+        if (!canToggleAgain()) {
+            return;
+        }
+
         toggleSection();
+    };
+
+    ['pointerdown', 'mousedown', 'mouseup', 'touchstart', 'touchend'].forEach(eventName => {
+        trigger.addEventListener(eventName, stopTriggerPropagation);
     });
-    row.addEventListener('click', toggleSection);
-    row.addEventListener('keydown', event => {
+
+    ['pointerup', 'mouseup', 'touchend', 'click'].forEach(eventName => {
+        trigger.addEventListener(eventName, activateTrigger);
+    });
+
+    trigger.addEventListener('keydown', event => {
         if (event.key !== 'Enter' && event.key !== ' ') {
             return;
         }
 
-        event.preventDefault();
-        toggleSection();
+        activateTrigger(event);
     });
     return row;
 }
@@ -384,6 +409,7 @@ function refreshPromptSections() {
             section.row.querySelector('.nemo-sb-section-count').textContent = `${enabledCount}/${section.prompts.length}`;
             section.row.style.display = query.length === 0 || titleMatches || matchedCount > 0 ? '' : 'none';
             section.row.classList.toggle('is-collapsed', !section.isOpen && query.length === 0);
+            section.row.querySelector('.nemo-sb-section-trigger')?.setAttribute('aria-expanded', String(section.isOpen || query.length > 0));
 
             const icon = section.row.querySelector('.nemo-sb-section-toggle i');
             icon.className = `fa-solid ${section.isOpen || query.length > 0 ? 'fa-chevron-down' : 'fa-chevron-right'}`;

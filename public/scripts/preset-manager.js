@@ -101,6 +101,7 @@ export function getPresetManager(apiId = '') {
 function registerPresetManagers() {
     $('select[data-preset-manager-for]').each((_, e) => {
         const forData = $(e).data('preset-manager-for');
+
         for (const apiId of forData.split(',')) {
             console.debug(`Registering preset manager for API: ${apiId}`);
             presetManagers[apiId] = new PresetManager($(e), apiId);
