@@ -1,3 +1,6 @@
+@import url('/lib/dialog-polyfill.css');
+@import url('./popup-safari-fix.css');
+
 dialog {
     color: var(--SmartThemeBodyColor);
 }

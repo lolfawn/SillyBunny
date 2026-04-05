@@ -14,7 +14,6 @@
 import { t } from './i18n.js';
 import { stopGeneration } from '../script.js';
 import { Popup, POPUP_RESULT, POPUP_TYPE } from './popup.js';
-import { removeFromArray } from './utils.js';
 
 /**
  * Enum representing the toast display mode for the action loader.
@@ -47,7 +46,6 @@ let loaderIdCounter = 0;
 
 /** @type {Set<ActionLoaderHandle>} Set of all active loader handles */
 const activeHandles = new Set();
-const LOADER_POPUP_CLASS = 'action-loader-overlay-popup';
 
 /**
  * Generates a unique loader ID.
@@ -480,60 +478,6 @@ function isOverlayDisplayed() {
 }
 
 /**
- * Removes any stale loader popup/dialog artifacts that could keep blocking input.
- * This intentionally targets only loader-owned overlays so regular popups stay intact.
- *
- * @param {object} [options={}]
- * @param {Popup|null} [options.popup=null] Specific popup instance to clean up
- * @param {boolean} [options.removePreloader=false] Whether to remove the initial HTML preloader too
- * @param {string} [options.reason='cleanup'] Debug label for the cleanup path
- * @returns {boolean} True if any loader artifacts were removed
- */
-export function cleanupActionLoaderArtifacts({ popup = null, removePreloader = false, reason = 'cleanup' } = {}) {
-    const popupDialogs = popup?.dlg
-        ? [popup.dlg]
-        : Array.from(document.querySelectorAll(`dialog.${LOADER_POPUP_CLASS}`));
-    const hadArtifacts = popupDialogs.length > 0 || Boolean(document.getElementById('loader'));
-
-    document.getElementById('loader')?.remove();
-
-    for (const dialog of popupDialogs) {
-        dialog.removeAttribute('opening');
-        dialog.removeAttribute('closing');
-        if (dialog.hasAttribute('open')) {
-            try {
-                dialog.close();
-            } catch {
-                // If the dialog is already in a bad state, removing it is enough to unblock the UI.
-            }
-        }
-        dialog.remove();
-    }
-
-    const loaderPopups = popup
-        ? [popup]
-        : Popup.util.popups.filter(candidate => candidate?.dlg?.classList?.contains(LOADER_POPUP_CLASS));
-
-    for (const loaderPopupEntry of loaderPopups) {
-        removeFromArray(Popup.util.popups, loaderPopupEntry);
-    }
-
-    if (!Popup.util.popups.some(candidate => candidate?.dlg?.hasAttribute('open'))) {
-        document.querySelector('._poly_dialog_overlay')?.remove();
-    }
-
-    if (removePreloader) {
-        yoinkPreloader();
-    }
-
-    if (hadArtifacts) {
-        console.debug(`Cleaned up lingering loader overlay artifacts during ${reason}.`);
-    }
-
-    return hadArtifacts;
-}
-
-/**
  * Shows the blocking loader overlay.
  * Internal function - use showActionLoader() instead.
  * @param {HTMLElement|string|null} [customContent] - Custom content for the overlay
@@ -544,20 +488,18 @@ function showOverlay(customContent = null) {
 
     const content = getOverlayContent(customContent);
 
-    const popup = new Popup(content, POPUP_TYPE.DISPLAY, null, {
+    loaderPopup = new Popup(content, POPUP_TYPE.DISPLAY, null, {
         allowEscapeClose: false,
         transparent: true,
         animation: 'none',
         wide: true,
         large: true,
     });
-    popup.dlg.classList.add(LOADER_POPUP_CLASS);
 
     // No close button, loaders are not closable
-    popup.closeButton.style.display = 'none';
+    loaderPopup.closeButton.style.display = 'none';
 
-    loaderPopup = popup;
-    popup.show();
+    loaderPopup.show();
 }
 
 /**
@@ -570,16 +512,13 @@ async function hideOverlay() {
         return Promise.resolve();
     }
 
-    const popupToClose = loaderPopup;
-    loaderPopup = null;
-
     return new Promise((resolve) => {
         const loaderElement = $('#loader');
         const spinner = $('#load-spinner');
 
         if (!loaderElement.length) {
             console.warn('Loader element not found, skipping animation');
-            void finalizeCleanup('missing loader element');
+            cleanup();
             return;
         }
 
@@ -591,28 +530,23 @@ async function hideOverlay() {
             Promise.race([
                 new Promise((r) => setTimeout(r, 500)), // Fallback timeout
                 new Promise((r) => loaderElement.one('transitionend webkitTransitionEnd oTransitionEnd MSTransitionEnd', r)),
-            ]).finally(() => void finalizeCleanup('transition end'));
+            ]).finally(cleanup);
         } else {
-            void finalizeCleanup('no transition');
+            cleanup();
         }
 
-        async function finalizeCleanup(reason) {
+        function cleanup() {
             loaderElement.remove();
             // Yoink preloader entirely; it only exists to cover up unstyled content while loading JS
             // If it's present, we remove it once and then it's gone.
             yoinkPreloader();
 
-            await Promise.race([
-                popupToClose.complete(POPUP_RESULT.AFFIRMATIVE)
-                    .catch((err) => console.error('Error completing loaderPopup:', err)),
-                new Promise((r) => setTimeout(r, 500)),
-            ]);
-
-            if (popupToClose.dlg.isConnected || popupToClose.dlg.hasAttribute('open')) {
-                cleanupActionLoaderArtifacts({ popup: popupToClose, reason, removePreloader: false });
-            }
-
-            resolve();
+            loaderPopup.complete(POPUP_RESULT.AFFIRMATIVE)
+                .catch((err) => console.error('Error completing loaderPopup:', err))
+                .finally(() => {
+                    loaderPopup = null;
+                    resolve();
+                });
         }
 
         // Apply the blur styles to the entire loader element

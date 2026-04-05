@@ -138,18 +138,11 @@ export function getParsedUA() {
 
 /**
  * Checks if the device is a mobile device.
- * Uses media query for more reliable detection, especially on Safari iOS.
  * @returns {boolean} - True if the device is a mobile device, false otherwise.
  */
 export function isMobile() {
-    // Use media query for reliable mobile detection (Safari-compatible)
-    const mobileMediaQuery = window.matchMedia('(max-width: 768px)');
-    if (mobileMediaQuery.matches) {
-        return true;
-    }
-
-    // Fallback to UA parsing for edge cases
     const mobileTypes = ['mobile', 'tablet'];
+
     return mobileTypes.includes(getParsedUA()?.platform?.type);
 }
 

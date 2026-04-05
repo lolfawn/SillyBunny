@@ -1,19 +1,3 @@
-function safeGetItem(key) {
-    try {
-        return localStorage.getItem(key);
-    } catch {
-        return null;
-    }
-}
-
-function safeSetItem(key, value) {
-    try {
-        localStorage.setItem(key, value);
-    } catch {
-        // Safari private browsing or quota exceeded — silently ignore
-    }
-}
-
 const SB_STORAGE_KEYS = Object.freeze({
     leftTab: 'sb-left-tab',
     rightTab: 'sb-right-tab',
@@ -181,17 +165,10 @@ const SB_SEARCH_TARGET_SELECTOR = [
 
 const sbState = {
     initialized: false,
-    isMobileViewport: null,
-    theme: normalizeTheme(safeGetItem(SB_STORAGE_KEYS.theme)),
-    surfaceTransparency: normalizeSurfaceTransparency(safeGetItem(SB_STORAGE_KEYS.surfaceTransparency)),
+    theme: normalizeTheme(localStorage.getItem(SB_STORAGE_KEYS.theme)),
+    surfaceTransparency: normalizeSurfaceTransparency(localStorage.getItem(SB_STORAGE_KEYS.surfaceTransparency)),
     shells: {},
 };
-
-const SB_TOP_DRAWER_IDS = Object.freeze([
-    SB_SHELLS.left.rootPanelId,
-    SB_SHELLS.right.rootPanelId,
-    'right-nav-panel',
-]);
 
 function normalizeTheme(themeId) {
     return SB_THEMES.some(theme => theme.id === themeId) ? themeId : 'modern-glass';
@@ -319,133 +296,6 @@ function clearShellSearch(shellKey) {
     }
 }
 
-function getDrawerElements(drawerRootOrId) {
-    const drawerRoot = typeof drawerRootOrId === 'string'
-        ? document.getElementById(drawerRootOrId)
-        : drawerRootOrId;
-
-    if (!(drawerRoot instanceof HTMLElement)) {
-        return {
-            drawerRoot: null,
-            hostDrawer: null,
-            hostToggle: null,
-            hostIcon: null,
-        };
-    }
-
-    const hostDrawer = drawerRoot.closest('.drawer');
-    const hostToggle = hostDrawer?.querySelector(':scope > .drawer-toggle') ?? null;
-    const hostIcon = hostToggle?.querySelector('.drawer-icon') ?? null;
-
-    return {
-        drawerRoot,
-        hostDrawer,
-        hostToggle,
-        hostIcon,
-    };
-}
-
-function syncDrawerMetadata(drawerRoot, isOpen = drawerRoot?.classList.contains('openDrawer')) {
-    if (!(drawerRoot instanceof HTMLElement)) {
-        return;
-    }
-
-    drawerRoot.dataset.sbDrawerState = isOpen ? 'open' : 'closed';
-    drawerRoot.setAttribute('aria-hidden', String(!isOpen));
-}
-
-function forceDrawerState(drawerRootOrId, shouldOpen) {
-    const { drawerRoot, hostIcon } = getDrawerElements(drawerRootOrId);
-
-    if (!(drawerRoot instanceof HTMLElement)) {
-        return;
-    }
-
-    const isOpen = Boolean(shouldOpen);
-
-    drawerRoot.classList.toggle('openDrawer', isOpen);
-    drawerRoot.classList.toggle('closedDrawer', !isOpen);
-
-    if (!isOpen) {
-        drawerRoot.classList.remove('pinnedOpen');
-
-        for (const [shellKey, shellConfig] of Object.entries(SB_SHELLS)) {
-            if (shellConfig.rootPanelId === drawerRoot.id) {
-                clearShellSearch(shellKey);
-            }
-        }
-    }
-
-    syncDrawerMetadata(drawerRoot, isOpen);
-
-    if (hostIcon instanceof HTMLElement) {
-        hostIcon.classList.toggle('openIcon', isOpen);
-        hostIcon.classList.toggle('closedIcon', !isOpen);
-
-        if (!isOpen) {
-            hostIcon.classList.remove('drawerPinnedOpen');
-        }
-    }
-}
-
-function normalizeTopDrawerState({ reason = 'startup', keepOpen = [] } = {}) {
-    const keepOpenSet = new Set(
-        keepOpen.filter(drawerId => typeof drawerId === 'string' && drawerId.length > 0),
-    );
-
-    for (const drawerId of SB_TOP_DRAWER_IDS) {
-        forceDrawerState(drawerId, keepOpenSet.has(drawerId));
-    }
-
-    if (reason) {
-        document.body.dataset.sbDrawerNormalizeReason = reason;
-    }
-}
-
-function runStartupDrawerSanityCheck() {
-    const openDrawers = SB_TOP_DRAWER_IDS
-        .map(drawerId => document.getElementById(drawerId))
-        .filter(drawerRoot => drawerRoot instanceof HTMLElement && drawerRoot.classList.contains('openDrawer'))
-        .map(drawerRoot => drawerRoot.id);
-
-    const shouldReset = openDrawers.length > 1 || (isLandingPageVisible() && openDrawers.length > 0);
-
-    if (shouldReset) {
-        normalizeTopDrawerState({ reason: 'sanity-check' });
-        return;
-    }
-
-    for (const drawerId of SB_TOP_DRAWER_IDS) {
-        const drawerRoot = document.getElementById(drawerId);
-
-        if (!(drawerRoot instanceof HTMLElement)) {
-            continue;
-        }
-
-        syncDrawerMetadata(drawerRoot);
-        forceDrawerState(drawerRoot, drawerRoot.classList.contains('openDrawer'));
-    }
-}
-
-function bindStartupDrawerSanityCheck() {
-    const deferredCheck = () => {
-        window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(runStartupDrawerSanityCheck);
-        });
-    };
-
-    window.addEventListener('pageshow', deferredCheck, { passive: true });
-    window.addEventListener('load', deferredCheck, { once: true });
-
-    const context = getSillyTavernContext();
-    const eventSource = context?.eventSource;
-    const eventTypes = context?.eventTypes ?? context?.event_types;
-
-    if (eventSource && eventTypes?.APP_READY) {
-        eventSource.on(eventTypes.APP_READY, deferredCheck);
-    }
-}
-
 function getThemeOption(themeId) {
     return SB_THEMES.find(theme => theme.id === themeId) ?? SB_THEMES[0];
 }
@@ -493,7 +343,7 @@ function setShellTheme(themeId, { persist = true } = {}) {
     document.documentElement.dataset.sbTheme = nextTheme;
 
     if (persist) {
-        safeSetItem(SB_STORAGE_KEYS.theme, nextTheme);
+        localStorage.setItem(SB_STORAGE_KEYS.theme, nextTheme);
     }
 
     updateThemePickerUi();
@@ -519,7 +369,7 @@ function setSurfaceTransparency(value, { persist = true } = {}) {
     document.documentElement.style.setProperty('--sb-page-overlay-opacity', overlayOpacity.toFixed(2));
 
     if (persist) {
-        safeSetItem(SB_STORAGE_KEYS.surfaceTransparency, String(nextTransparency));
+        localStorage.setItem(SB_STORAGE_KEYS.surfaceTransparency, String(nextTransparency));
     }
 
     updateThemePickerUi();
@@ -662,15 +512,7 @@ function isCharacterPanelOpen() {
 function closeCharacterPanel() {
     if (isCharacterPanelOpen()) {
         triggerDrawerToggle('#rightNavHolder > .drawer-toggle');
-        window.requestAnimationFrame(() => {
-            if (isCharacterPanelOpen()) {
-                forceDrawerState('right-nav-panel', false);
-            }
-        });
-        return;
     }
-
-    forceDrawerState('right-nav-panel', false);
 }
 
 function toggleCharacterPanel() {
@@ -684,13 +526,6 @@ function toggleCharacterPanel() {
     closeShell('left');
     closeShell('right');
     triggerDrawerToggle('#rightNavHolder > .drawer-toggle');
-
-    // Fallback: if the jQuery drawer-toggle handler didn't fire, force-open
-    window.requestAnimationFrame(() => {
-        if (!isCharacterPanelOpen()) {
-            forceDrawerState('right-nav-panel', true);
-        }
-    });
 }
 
 function toggleShellPanel(shellKey, tabId = null) {
@@ -1235,7 +1070,7 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
     }
 
     shellState.activeTabId = tabId;
-    safeSetItem(shellConfig.storageKey, tabId);
+    localStorage.setItem(shellConfig.storageKey, tabId);
 
     for (const [currentTabId, tabState] of shellState.tabs.entries()) {
         const isActive = currentTabId === tabId;
@@ -1272,15 +1107,7 @@ function openShell(shellKey, tabId = null) {
 
     if (!shellRoot.classList.contains('openDrawer')) {
         triggerDrawerToggle(shellConfig.hostToggleSelector);
-        window.requestAnimationFrame(() => {
-            if (!shellRoot.classList.contains('openDrawer')) {
-                forceDrawerState(shellRoot, true);
-            }
-        });
-        return;
     }
-
-    forceDrawerState(shellRoot, true);
 }
 
 function closeShell(shellKey) {
@@ -1290,15 +1117,7 @@ function closeShell(shellKey) {
     if (shellRoot instanceof HTMLElement && shellRoot.classList.contains('openDrawer')) {
         clearShellSearch(shellKey);
         triggerDrawerToggle(shellConfig.hostToggleSelector);
-        window.requestAnimationFrame(() => {
-            if (shellRoot.classList.contains('openDrawer')) {
-                forceDrawerState(shellRoot, false);
-            }
-        });
-        return;
     }
-
-    forceDrawerState(shellRoot, false);
 }
 
 function buildShell(shellKey) {
@@ -1376,12 +1195,10 @@ function buildShell(shellKey) {
     };
 
     sbState.shells[shellKey] = shellState;
-    syncDrawerMetadata(shellRoot);
 
     let wasOpen = shellRoot.classList.contains('openDrawer');
     new MutationObserver(() => {
         const isOpen = shellRoot.classList.contains('openDrawer');
-        syncDrawerMetadata(shellRoot, isOpen);
 
         if (isOpen === wasOpen) {
             return;
@@ -1421,7 +1238,7 @@ function buildShell(shellKey) {
 
     panelBody.append(...Array.from(shellState.tabs.values()).map(tabState => tabState.panel));
 
-    const storedTabId = safeGetItem(shellConfig.storageKey);
+    const storedTabId = localStorage.getItem(shellConfig.storageKey);
     const nextActiveTab = shellState.tabs.has(storedTabId) ? storedTabId : shellConfig.defaultTabId;
     setActiveTab(shellKey, nextActiveTab);
 
@@ -1852,121 +1669,9 @@ function applyDefaultDrawerStates() {
 }
 
 function syncMobileViewportState() {
-    const mobileViewport = isMobileViewport();
-
-    if (!mobileViewport) {
+    if (!isMobileViewport()) {
         closeMobileNav();
     }
-
-    if (sbState.isMobileViewport === mobileViewport) {
-        return;
-    }
-
-    sbState.isMobileViewport = mobileViewport;
-    reinitSelect2AfterShell();
-}
-
-function readModelFilterOptions(select) {
-    return Array.from(select.options).map(opt => ({
-        value: opt.value,
-        text: opt.textContent,
-        disabled: opt.disabled,
-        selected: opt.selected,
-    }));
-}
-
-function renderModelFilterOptions(select, options, query) {
-    const normalizedQuery = query.toLowerCase().trim();
-    const currentValue = select.value;
-
-    select.__sbModelFilterApplying = true;
-
-    try {
-        select.innerHTML = '';
-
-        for (const opt of options) {
-            const matchesQuery = !normalizedQuery
-                || opt.value === currentValue
-                || opt.text.toLowerCase().includes(normalizedQuery)
-                || opt.value.toLowerCase().includes(normalizedQuery);
-
-            if (!matchesQuery) {
-                continue;
-            }
-
-            const option = document.createElement('option');
-            option.value = opt.value;
-            option.textContent = opt.text;
-            option.disabled = opt.disabled;
-            option.selected = opt.value === currentValue;
-            select.appendChild(option);
-        }
-    } finally {
-        select.__sbModelFilterApplying = false;
-    }
-}
-
-function observeModelFilterInput(select) {
-    if (select.__sbModelFilterObserver) {
-        return;
-    }
-
-    const observer = new MutationObserver(() => {
-        if (select.__sbModelFilterApplying) {
-            return;
-        }
-
-        syncModelFilterInput($(select));
-    });
-
-    observer.observe(select, { childList: true, subtree: true, characterData: true });
-    select.__sbModelFilterObserver = observer;
-}
-
-function syncModelFilterInput($select, { preserveQuery = true } = {}) {
-    const select = $select[0];
-
-    if (!(select instanceof HTMLSelectElement)) {
-        return;
-    }
-
-    const input = select.__sbModelFilterInput;
-
-    if (!(input instanceof HTMLInputElement)) {
-        return;
-    }
-
-    if (!preserveQuery) {
-        input.value = '';
-    }
-
-    select.__sbModelFilterOptions = readModelFilterOptions(select);
-    renderModelFilterOptions(select, select.__sbModelFilterOptions, input.value);
-}
-
-function removeModelFilterInput($select) {
-    const select = $select[0];
-
-    if (!(select instanceof HTMLSelectElement)) {
-        return;
-    }
-
-    if (Array.isArray(select.__sbModelFilterOptions)) {
-        renderModelFilterOptions(select, select.__sbModelFilterOptions, '');
-    }
-
-    if (select.__sbModelFilterObserver) {
-        select.__sbModelFilterObserver.disconnect();
-        delete select.__sbModelFilterObserver;
-    }
-
-    if (select.__sbModelFilterInput instanceof HTMLInputElement) {
-        select.__sbModelFilterInput.remove();
-        delete select.__sbModelFilterInput;
-    }
-
-    delete select.__sbModelFilterOptions;
-    delete select.__sbModelFilterApplying;
 }
 
 function reinitSelect2AfterShell() {
@@ -1981,7 +1686,6 @@ function reinitSelect2AfterShell() {
         '#openrouter_model',
         '#vllm_model',
         '#aphrodite_model',
-        '#model_custom_select',
     ];
 
     if (isMobileViewport()) {
@@ -2003,7 +1707,6 @@ function reinitSelect2AfterShell() {
         const allSelectors = [...modelSelectors, '.openrouter_quantizations', '.openrouter_providers'];
         for (const selector of allSelectors) {
             const $el = $(selector);
-            removeModelFilterInput($el);
             if ($el.length && $el.data('select2')) {
                 try {
                     const config = $el.data('select2').options.options;
@@ -2018,60 +1721,41 @@ function reinitSelect2AfterShell() {
 }
 
 function injectModelFilterInput($select) {
-    const select = $select[0];
-
-    if (!(select instanceof HTMLSelectElement)) {
+    if (!$select.length || $select.prev('.sb-model-filter').length) {
         return;
     }
 
-    if (!(select.__sbModelFilterInput instanceof HTMLInputElement)) {
-        const input = document.createElement('input');
-        input.type = 'search';
-        input.className = 'sb-model-filter text_pole';
-        input.placeholder = 'Search models...';
-        input.addEventListener('input', () => {
-            renderModelFilterOptions(select, select.__sbModelFilterOptions || readModelFilterOptions(select), input.value);
-        });
+    const input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'sb-model-filter text_pole';
+    input.placeholder = 'Filter models...';
 
-        select.__sbModelFilterInput = input;
-        $select.before(input);
-    }
+    // Store all options for filtering
+    const allOptions = Array.from($select[0].options).map(opt => ({
+        value: opt.value,
+        text: opt.textContent,
+        selected: opt.selected,
+    }));
 
-    observeModelFilterInput(select);
-    syncModelFilterInput($select);
-}
+    input.addEventListener('input', () => {
+        const query = input.value.toLowerCase().trim();
+        const select = $select[0];
+        const currentValue = select.value;
 
-function deferUntilAppReady(callback) {
-    const context = getSillyTavernContext();
-    const eventSource = context?.eventSource;
-    const eventTypes = context?.eventTypes ?? context?.event_types;
-
-    if (eventSource && eventTypes?.APP_READY) {
-        eventSource.on(eventTypes.APP_READY, () => {
-            window.requestAnimationFrame(callback);
-        });
-        return;
-    }
-
-    // Fallback: poll until SillyTavern context is available
-    let attempts = 0;
-    const MAX_ATTEMPTS = 50; // 50 * 200ms = 10s
-    const poll = () => {
-        attempts++;
-        const ctx = getSillyTavernContext();
-        const es = ctx?.eventSource;
-        const et = ctx?.eventTypes ?? ctx?.event_types;
-
-        if (es && et?.APP_READY) {
-            es.on(et.APP_READY, () => window.requestAnimationFrame(callback));
-        } else if (attempts < MAX_ATTEMPTS) {
-            window.setTimeout(poll, 200);
-        } else {
-            console.warn('[SillyBunny Shell] APP_READY never fired, running deferred init anyway');
-            window.requestAnimationFrame(callback);
+        // Rebuild options filtered by query
+        select.innerHTML = '';
+        for (const opt of allOptions) {
+            if (!query || opt.text.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query)) {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.text;
+                option.selected = opt.value === currentValue;
+                select.appendChild(option);
+            }
         }
-    };
-    window.setTimeout(poll, 200);
+    });
+
+    $select.before(input);
 }
 
 function initAll() {
@@ -2086,31 +1770,28 @@ function initAll() {
         return;
     }
 
-    normalizeTopDrawerState({ reason: 'init-start' });
     sbState.initialized = true;
 
-    // Safari-compatible: Use requestAnimationFrame to ensure class changes apply after paint
-    // Remove initializing class first, then add initialized class on next frame
-    requestAnimationFrame(() => {
-        document.body.classList.remove('sb-shell-initializing');
-        requestAnimationFrame(() => {
-            document.body.classList.add('sb-shell-initialized');
-        });
-    });
-
-    // Phase 1: Structural DOM work (no dependency on loaded app data)
     hideHostToggles();
     buildTopBar();
     buildShell('left');
     buildShell('right');
     buildMobileNav();
     injectCharacterCloseButton();
+    interceptDrawerOpeners();
+    bindWorldInfoRoute();
+    initAgentOverview();
+    applyDefaultDrawerStates();
     syncMobileViewportState();
     setShellTheme(sbState.theme, { persist: false });
     setSurfaceTransparency(sbState.surfaceTransparency, { persist: false });
 
     window.addEventListener('resize', syncMobileViewportState, { passive: true });
     window.addEventListener('orientationchange', syncMobileViewportState);
+
+    // Reinitialize Select2 widgets after shell reparents DOM elements.
+    // Select2 bindings break when elements are moved in the DOM.
+    reinitSelect2AfterShell();
 
     window.SillyBunnyShell = {
         openTab(shellKey, tabId) {
@@ -2131,29 +1812,10 @@ function initAll() {
             return sbState.surfaceTransparency;
         },
     };
-
-    // Phase 2: Deferred until app data is loaded (settings, characters, extensions)
-    deferUntilAppReady(() => {
-        interceptDrawerOpeners();
-        bindWorldInfoRoute();
-        bindStartupDrawerSanityCheck();
-        initAgentOverview();
-        applyDefaultDrawerStates();
-
-        window.requestAnimationFrame(() => {
-            normalizeTopDrawerState({ reason: 'post-init-frame' });
-        });
-    });
 }
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAll);
 } else {
-    window.setTimeout(initAll, 80);
-}
-
-// Add initializing class immediately to enable pointer-events blocking
-// This runs synchronously before initAll() to ensure Safari applies the CSS rule
-if (isMobileViewport()) {
-    document.body.classList.add('sb-shell-initializing');
+    window.setTimeout(initAll, 120);
 }

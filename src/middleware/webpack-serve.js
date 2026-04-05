@@ -20,7 +20,6 @@ export default function getWebpackServeMiddleware() {
         const parsedPath = path.parse(req.path);
 
         if (req.method === 'GET' && parsedPath.dir === '/' && parsedPath.base === outputFile) {
-            res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
             return res.sendFile(outputFile, { root: outputPath });
         }
 

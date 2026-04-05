@@ -244,7 +244,7 @@ import {
     isPersonaPanelOpen,
 } from './scripts/personas.js';
 import { getBackgrounds, initBackgrounds, loadBackgroundSettings, background_settings } from './scripts/backgrounds.js';
-import { cleanupActionLoaderArtifacts, loader } from './scripts/action-loader.js';
+import { loader } from './scripts/action-loader.js';
 import { BulkEditOverlay } from './scripts/BulkEditOverlay.js';
 import { initTextGenModels } from './scripts/textgen-models.js';
 import { appendFileContent, hasPendingFileAttachment, populateFileAttachment, decodeStyleTags, encodeStyleTags, isExternalMediaAllowed, preserveNeutralChat, restoreNeutralChat, formatCreatorNotes, initChatUtilities, addDOMPurifyHooks } from './scripts/chats.js';
@@ -253,9 +253,11 @@ import { evaluateMacros, getLastMessageId, initMacros } from './scripts/macros.j
 import { currentUser, setUserControls } from './scripts/user.js';
 import { POPUP_RESULT, POPUP_TYPE, Popup, callGenericPopup, fixToastrForDialogs } from './scripts/popup.js';
 import { renderTemplate, renderTemplateAsync } from './scripts/templates.js';
+import { initScrapers } from './scripts/scrapers.js';
 import { initCustomSelectedSamplers, validateDisabledSamplers } from './scripts/samplerSelect.js';
 import { DragAndDropHandler } from './scripts/dragdrop.js';
 import { INTERACTABLE_CONTROL_CLASS, initKeyboard } from './scripts/keyboard.js';
+import { initDynamicStyles } from './scripts/dynamic-styles.js';
 import { initInputMarkdown } from './scripts/input-md-formatting.js';
 import { AbortReason } from './scripts/util/AbortReason.js';
 import { initSystemPrompts } from './scripts/sysprompt.js';
@@ -263,14 +265,18 @@ import { registerExtensionSlashCommands as initExtensionSlashCommands } from './
 import { ToolManager } from './scripts/tool-calling.js';
 import { addShowdownPatch } from './scripts/util/showdown-patch.js';
 import { applyBrowserFixes } from './scripts/browser-fixes.js';
+import { initServerHistory } from './scripts/server-history.js';
 import { initSettingsSearch } from './scripts/setting-search.js';
+import { initBulkEdit } from './scripts/bulk-edit.js';
 import { getContext } from './scripts/st-context.js';
 import { extractReasoningFromData, extractReasoningSignatureFromData, initReasoning, parseReasoningInSwipes, PromptReasoning, ReasoningHandler, removeReasoningFromString, updateReasoningUI } from './scripts/reasoning.js';
 import { accountStorage } from './scripts/util/AccountStorage.js';
 import { initWelcomeScreen, openPermanentAssistantChat, openPermanentAssistantCard, getPermanentAssistantAvatar } from './scripts/welcome-screen.js';
+import { initDataMaid } from './scripts/data-maid.js';
 import { clearItemizedPrompts, deleteItemizedPromptForMessage, deleteItemizedPrompts, findItemizedPromptSet, initItemizedPrompts, itemizedParams, itemizedPrompts, loadItemizedPrompts, promptItemize, replaceItemizedPromptText, saveItemizedPrompts, swapItemizedPrompts } from './scripts/itemized-prompts.js';
 import { getSystemMessageByType, initSystemMessages, SAFETY_CHAT, sendSystemMessage, system_message_types, system_messages } from './scripts/system-messages.js';
 import { event_types, eventSource } from './scripts/events.js';
+import { initAccessibility } from './scripts/a11y.js';
 import { applyStreamFadeIn } from './scripts/util/stream-fadein.js';
 import { initDomHandlers } from './scripts/dom-handlers.js';
 import { SimpleMutex } from './scripts/util/SimpleMutex.js';
@@ -328,154 +334,15 @@ export {
 };
 
 /**
- * Wait for the DOM to be ready before continuing app initialization.
- * Avoid blocking startup on late asset loads, which can hang on Safari/iOS.
+ * Wait for page to load before continuing the app initialization.
  */
 await new Promise((resolve) => {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', resolve, { once: true });
-        return;
+    if (document.readyState === 'complete') {
+        resolve();
+    } else {
+        window.addEventListener('load', resolve);
     }
-
-    resolve();
 });
-
-function createDeferredModuleLoader(specifier) {
-    let modulePromise;
-    return () => modulePromise ??= import(specifier);
-}
-
-function scheduleLowPriorityWork(callback, { timeout = 2000 } = {}) {
-    if (typeof window.requestIdleCallback === 'function') {
-        window.requestIdleCallback(() => {
-            void callback();
-        }, { timeout });
-        return;
-    }
-
-    window.setTimeout(() => {
-        void callback();
-    }, 0);
-}
-
-function scheduleDeferredInitializers(initializers) {
-    const queue = [...initializers];
-
-    const runNext = () => {
-        const initializer = queue.shift();
-
-        if (!initializer) {
-            return;
-        }
-
-        scheduleLowPriorityWork(async () => {
-            try {
-                await initializer();
-            } catch (error) {
-                console.error('Deferred feature initialization failed.', error);
-            } finally {
-                runNext();
-            }
-        });
-    };
-
-    runNext();
-}
-
-const STARTUP_STAGE_TIMEOUTS = Object.freeze({
-    clientVersion: 5000,
-    csrfTokenRequest: 7000,
-    initLocales: 8000,
-    initPresetManager: 8000,
-    initSecrets: 10000,
-    initSystemMessages: 10000,
-    loadSettings: 30000,
-    readSecretState: 6000,
-    settingsRequest: 10000,
-    globalInit: 60000,
-});
-
-function createTimeoutError(operationName, timeoutMs) {
-    const error = new Error(`${operationName} timed out after ${timeoutMs}ms`);
-    error.name = 'TimeoutError';
-    error.operationName = operationName;
-    error.timeoutMs = timeoutMs;
-    return error;
-}
-
-/**
- * Wraps a promise with a timeout to prevent indefinite hangs.
- * @param {Promise} promise - The promise to wrap
- * @param {number} timeoutMs - Timeout in milliseconds
- * @param {*} fallbackValue - Value to resolve with on timeout
- * @param {string} operationName - Name for logging
- * @param {{ rejectOnTimeout?: boolean }} [options] - Timeout behavior
- * @returns {Promise} Promise that resolves with result or fallback
- */
-function withTimeout(promise, timeoutMs, fallbackValue, operationName, { rejectOnTimeout = false } = {}) {
-    let timeoutId = null;
-    const wrappedPromise = Promise.resolve(promise);
-    const timeoutPromise = new Promise((resolve, reject) => {
-        timeoutId = window.setTimeout(() => {
-            const timeoutError = createTimeoutError(operationName, timeoutMs);
-            console.warn(timeoutError.message);
-
-            if (rejectOnTimeout) {
-                reject(timeoutError);
-                return;
-            }
-
-            resolve(fallbackValue);
-        }, timeoutMs);
-    });
-
-    return Promise.race([wrappedPromise, timeoutPromise]).finally(() => {
-        if (timeoutId !== null) {
-            window.clearTimeout(timeoutId);
-        }
-    });
-}
-
-async function runStartupStage(stageName, action, { timeoutMs = 0 } = {}) {
-    const startedAt = performance.now();
-    const stageLabel = `[Startup] ${stageName}`;
-    console.debug(`${stageLabel} started`);
-
-    try {
-        const pendingStage = Promise.resolve().then(action);
-        const result = timeoutMs > 0
-            ? await withTimeout(pendingStage, timeoutMs, undefined, stageName, { rejectOnTimeout: true })
-            : await pendingStage;
-
-        console.debug(`${stageLabel} completed in ${Math.round(performance.now() - startedAt)}ms`);
-        return result;
-    } catch (error) {
-        if (!error.startupStage) {
-            error.startupStage = stageName;
-        }
-
-        console.error(`${stageLabel} failed after ${Math.round(performance.now() - startedAt)}ms`, error);
-        throw error;
-    }
-}
-
-const loadDynamicStylesModule = createDeferredModuleLoader('./scripts/dynamic-styles.js');
-const loadServerHistoryModule = createDeferredModuleLoader('./scripts/server-history.js');
-const loadBulkEditModule = createDeferredModuleLoader('./scripts/bulk-edit.js');
-const loadScrapersModule = createDeferredModuleLoader('./scripts/scrapers.js');
-const loadDataMaidModule = createDeferredModuleLoader('./scripts/data-maid.js');
-const loadAccessibilityModule = createDeferredModuleLoader('./scripts/a11y.js');
-
-function syncPageVisibilityState() {
-    const isBackgrounded = document.hidden;
-    document.documentElement.dataset.pageVisibility = isBackgrounded ? 'hidden' : 'visible';
-    document.body.classList.toggle('app-backgrounded', isBackgrounded);
-}
-
-document.addEventListener('visibilitychange', syncPageVisibilityState);
-window.addEventListener('pageshow', syncPageVisibilityState);
-window.addEventListener('pagehide', syncPageVisibilityState);
-syncPageVisibilityState();
 
 // Configure toast library:
 toastr.options = {
@@ -822,12 +689,6 @@ export async function pingServer() {
 
 //MARK: firstLoadInit
 async function firstLoadInit() {
-    const scheduleStartupLoaderCleanup = (reason) => {
-        cleanupActionLoaderArtifacts({ removePreloader: true, reason });
-        requestAnimationFrame(() => cleanupActionLoaderArtifacts({ removePreloader: true, reason: `${reason} (raf)` }));
-        window.setTimeout(() => cleanupActionLoaderArtifacts({ removePreloader: true, reason: `${reason} (timeout)` }), 250);
-    };
-
     const initLoaderOverlay = loader.createOverlay();
     initLoaderOverlay.classList.add('splash-screen');
 
@@ -849,56 +710,10 @@ async function firstLoadInit() {
         toastMode: loader.ToastMode.NONE,
         overlayContent: initLoaderOverlay,
     });
-    let startupLoaderReleased = false;
-
-    const releaseStartupLoader = async (reason) => {
-        if (startupLoaderReleased) {
-            return;
-        }
-
-        startupLoaderReleased = true;
-
-        if (initLoaderHandle.isActive) {
-            await initLoaderHandle.hide().catch((error) => {
-                console.error('Failed to hide startup loader.', error);
-            });
-        }
-
-        scheduleStartupLoaderCleanup(reason);
-    };
 
     try {
-        // Global failsafe: force-remove splash if init hangs beyond this threshold.
-        // Bypasses the Popup hide() chain entirely — on iOS WebKit, dialog.close()
-        // or transition events can hang, so we nuke overlays from DOM directly.
-        const globalTimeoutId = window.setTimeout(() => {
-            console.error(`[Startup] Global init timeout after ${STARTUP_STAGE_TIMEOUTS.globalInit}ms — forcing loader release`);
-            startupLoaderReleased = true;
-            cleanupActionLoaderArtifacts({ removePreloader: true, reason: 'global timeout failsafe' });
-            toastr.warning(
-                t`Some features may not have loaded. Please refresh if the app is unresponsive.`,
-                t`Slow startup detected`,
-                { timeOut: 0, extendedTimeOut: 0 },
-            );
-        }, STARTUP_STAGE_TIMEOUTS.globalInit);
-
-        const clearGlobalTimeout = () => window.clearTimeout(globalTimeoutId);
-
-        const tokenData = await runStartupStage('load CSRF token', async () => {
-            const tokenResponse = await withTimeout(
-                fetch('/csrf-token'),
-                STARTUP_STAGE_TIMEOUTS.csrfTokenRequest,
-                null,
-                'csrf-token request',
-                { rejectOnTimeout: true },
-            );
-
-            if (!tokenResponse.ok) {
-                throw new Error(`Failed to load CSRF token: ${tokenResponse.status} ${tokenResponse.statusText}`);
-            }
-
-            return tokenResponse.json();
-        });
+        const tokenResponse = await fetch('/csrf-token');
+        const tokenData = await tokenResponse.json();
         token = tokenData.token;
 
         registerPromptManagerMigration();
@@ -909,10 +724,10 @@ async function firstLoadInit() {
         addDOMPurifyHooks();
         reloadMarkdownProcessor();
         applyBrowserFixes();
-        await runStartupStage('load client version', () => getClientVersion(), { timeoutMs: STARTUP_STAGE_TIMEOUTS.clientVersion });
-        await runStartupStage('initialize secrets', () => initSecrets(), { timeoutMs: STARTUP_STAGE_TIMEOUTS.initSecrets });
-        await runStartupStage('read secret state', () => readSecretState(), { timeoutMs: STARTUP_STAGE_TIMEOUTS.readSecretState });
-        await runStartupStage('initialize locales', () => initLocales(), { timeoutMs: STARTUP_STAGE_TIMEOUTS.initLocales });
+        await getClientVersion();
+        await initSecrets();
+        await readSecretState();
+        await initLocales();
         initChatUtilities();
         initDefaultSlashCommands();
         initTextGenModels();
@@ -924,44 +739,17 @@ async function firstLoadInit() {
         initExtensions();
         initExtensionSlashCommands();
         ToolManager.initToolSlashCommands();
-        await runStartupStage('initialize preset manager', () => initPresetManager(), { timeoutMs: STARTUP_STAGE_TIMEOUTS.initPresetManager });
-        await runStartupStage('initialize system messages', () => initSystemMessages(), { timeoutMs: STARTUP_STAGE_TIMEOUTS.initSystemMessages });
-        await runStartupStage('load settings', () => getSettings(initLoaderHandle, { requestTimeoutMs: STARTUP_STAGE_TIMEOUTS.settingsRequest }), { timeoutMs: STARTUP_STAGE_TIMEOUTS.loadSettings });
+        await initPresetManager();
+        await initSystemMessages();
+        await getSettings(initLoaderHandle);
         initAgents();
         initKeyboard();
+        initDynamicStyles();
         initTags();
         initBookmarks();
-        await releaseStartupLoader('startup loader release');
-        await Promise.all([
-            withTimeout(
-                getUserAvatars(true, user_avatar),
-                5000,
-                [],
-                'getUserAvatars',
-            ).catch(error => {
-                console.error('getUserAvatars failed, continuing with empty avatars', error);
-                return [];
-            }),
-            withTimeout(
-                getCharacters(),
-                8000,
-                undefined,
-                'getCharacters',
-            ).catch(error => {
-                console.error('getCharacters failed, continuing with empty character list', error);
-                characters.splice(0, characters.length);
-                return undefined;
-            }),
-            withTimeout(
-                getBackgrounds(),
-                5000,
-                undefined,
-                'getBackgrounds',
-            ).catch(error => {
-                console.error('getBackgrounds failed, continuing with default background', error);
-                return undefined;
-            }),
-        ]);
+        await getUserAvatars(true, user_avatar);
+        await getCharacters();
+        await getBackgrounds();
         await initTokenizers();
         initBackgrounds();
         initAuthorsNote();
@@ -975,49 +763,33 @@ async function firstLoadInit() {
         initCfg();
         initLogprobs();
         initInputMarkdown();
+        initServerHistory();
         initSettingsSearch();
+        initBulkEdit();
         initReasoning();
         initWelcomeScreen();
+        await initScrapers();
         initCustomSelectedSamplers();
+        initDataMaid();
         initItemizedPrompts();
+        initAccessibility();
         initSwipePicker();
         addDebugFunctions();
+        doDailyExtensionUpdatesCheck();
         await eventSource.emit(event_types.APP_INITIALIZED);
+        await initLoaderHandle.hide();
         await fixViewport();
         await eventSource.emit(event_types.APP_READY);
-        window.__clearStartupFailsafe?.();
-        scheduleStartupLoaderCleanup('app ready');
-        scheduleLowPriorityWork(async () => {
-            try {
-                await doDailyExtensionUpdatesCheck();
-            } catch (error) {
-                console.error('Deferred extension update check failed.', error);
-            }
-        });
-        scheduleDeferredInitializers([
-            async () => (await loadDynamicStylesModule()).initDynamicStyles(),
-            async () => (await loadServerHistoryModule()).initServerHistory(),
-            async () => (await loadBulkEditModule()).initBulkEdit(),
-            async () => (await loadScrapersModule()).initScrapers(),
-            async () => (await loadDataMaidModule()).initDataMaid(),
-            async () => (await loadAccessibilityModule()).initAccessibility(),
-        ]);
     } catch (error) {
         console.error('Application initialization failed.', error);
-        const failedStage = error?.startupStage;
-        const message = failedStage
-            ? `SillyBunny couldn't finish starting during ${failedStage}. Please refresh the page.`
-            : t`SillyBunny couldn't finish starting. Please refresh the page.`;
-        toastr.error(message, t`Startup Error`, { timeOut: 0, extendedTimeOut: 0, preventDuplicates: true });
+        toastr.error(t`SillyBunny couldn't finish starting. Please refresh the page.`, t`Startup Error`, { timeOut: 0, extendedTimeOut: 0, preventDuplicates: true });
         throw error;
     } finally {
-        clearGlobalTimeout();
-        await releaseStartupLoader('startup finally');
-
-        // Guaranteed cleanup after 500ms — remove preloader AND any stuck loader dialogs
-        setTimeout(() => {
-            cleanupActionLoaderArtifacts({ removePreloader: true, reason: 'finally timeout failsafe' });
-        }, 500);
+        if (initLoaderHandle.isActive) {
+            await initLoaderHandle.hide().catch((error) => {
+                console.error('Failed to hide startup loader.', error);
+            });
+        }
     }
 }
 
@@ -1247,9 +1019,7 @@ export async function printCharacters(fullRefresh = false) {
 
     const entities = getEntitiesList({ doFilter: true });
 
-    // Mobile optimization: reduce page size for better performance
-    const defaultPageSize = isMobile() ? 25 : per_page_default;
-    const pageSize = Number(accountStorage.getItem(storageKey)) || defaultPageSize;
+    const pageSize = Number(accountStorage.getItem(storageKey)) || per_page_default;
     const sizeChangerOptions = [10, 25, 50, 100, 250, 500, 1000];
     $('#rm_print_characters_pagination').pagination({
         dataSource: entities,
@@ -1273,40 +1043,21 @@ export async function printCharacters(fullRefresh = false) {
                 const emptyBlock = await getEmptyBlock();
                 $(listId).append(emptyBlock);
             }
-
-            // Mobile optimization: use DocumentFragment for batched DOM insertion
-            const useBatchedRendering = isMobile() && data.length > 10;
-            const fragment = useBatchedRendering ? document.createDocumentFragment() : null;
-
             let displayCount = 0;
             for (const i of data) {
-                let block;
                 switch (i.type) {
                     case 'character':
-                        block = getCharacterBlock(i.item, i.id);
+                        $(listId).append(getCharacterBlock(i.item, i.id));
                         displayCount++;
                         break;
                     case 'group':
-                        block = getGroupBlock(i.item);
+                        $(listId).append(getGroupBlock(i.item));
                         displayCount++;
                         break;
                     case 'tag':
-                        block = getTagBlock(i.item, i.entities, i.hidden, i.isUseless);
+                        $(listId).append(getTagBlock(i.item, i.entities, i.hidden, i.isUseless));
                         break;
                 }
-
-                if (block) {
-                    if (useBatchedRendering) {
-                        fragment.appendChild(block[0]);
-                    } else {
-                        $(listId).append(block);
-                    }
-                }
-            }
-
-            // Append all at once on mobile (single reflow)
-            if (useBatchedRendering) {
-                $(listId)[0].appendChild(fragment);
             }
 
             const hidden = (characters.length + groups.length) - displayCount;
@@ -1553,41 +1304,16 @@ export async function getCharacters() {
         const previousAvatar = this_chid !== undefined ? characters[this_chid]?.avatar : null;
         characters.splice(0, characters.length);
         const getData = await response.json();
+        for (let i = 0; i < getData.length; i++) {
+            characters[i] = getData[i];
+            characters[i].name = DOMPurify.sanitize(characters[i].name);
 
-        // Mobile optimization: chunk character processing to avoid blocking main thread
-        if (isMobile() && getData.length > 50) {
-            // Process in chunks of 50 with setTimeout(0) to yield to browser
-            for (let start = 0; start < getData.length; start += 50) {
-                const end = Math.min(start + 50, getData.length);
-                for (let i = start; i < end; i++) {
-                    characters[i] = getData[i];
-                    characters[i].name = DOMPurify.sanitize(characters[i].name);
-
-                    // For dropped-in cards
-                    if (!characters[i].chat) {
-                        characters[i].chat = `${characters[i].name} - ${humanizedDateTime()}`;
-                    }
-
-                    characters[i].chat = String(characters[i].chat);
-                }
-                // Yield to browser after each chunk (except last)
-                if (end < getData.length) {
-                    await new Promise(resolve => setTimeout(resolve, 0));
-                }
+            // For dropped-in cards
+            if (!characters[i].chat) {
+                characters[i].chat = `${characters[i].name} - ${humanizedDateTime()}`;
             }
-        } else {
-            // Desktop: process synchronously as before
-            for (let i = 0; i < getData.length; i++) {
-                characters[i] = getData[i];
-                characters[i].name = DOMPurify.sanitize(characters[i].name);
 
-                // For dropped-in cards
-                if (!characters[i].chat) {
-                    characters[i].chat = `${characters[i].name} - ${humanizedDateTime()}`;
-                }
-
-                characters[i].chat = String(characters[i].chat);
-            }
+            characters[i].chat = String(characters[i].chat);
         }
 
         if (previousAvatar) {
@@ -8111,16 +7837,13 @@ function reloadLoop() {
 
 //MARK: getSettings()
 ///////////////////////////////////////////
-export async function getSettings(initLoaderHandle = null, { requestTimeoutMs = 0 } = {}) {
-    const settingsRequest = fetch('/api/settings/get', {
+export async function getSettings(initLoaderHandle = null) {
+    const response = await fetch('/api/settings/get', {
         method: 'POST',
         headers: getRequestHeaders(),
         body: JSON.stringify({}),
         cache: 'no-cache',
     });
-    const response = requestTimeoutMs > 0
-        ? await withTimeout(settingsRequest, requestTimeoutMs, null, 'settings request', { rejectOnTimeout: true })
-        : await settingsRequest;
 
     if (!response.ok) {
         reloadLoop();

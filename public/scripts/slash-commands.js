@@ -103,22 +103,12 @@ export {
     executeSlashCommands, executeSlashCommandsWithOptions, getSlashCommandsHelp, registerSlashCommand,
 };
 
-export let parser = null;
-
-function getParser() {
-    if (!(parser instanceof SlashCommandParser)) {
-        parser = new SlashCommandParser();
-    }
-
-    return parser;
-}
+export const parser = new SlashCommandParser();
 /**
  * @deprecated Use SlashCommandParser.addCommandObject() instead
  */
-function registerSlashCommand(...args) {
-    return SlashCommandParser.addCommand(...args);
-}
-const getSlashCommandsHelp = () => getParser().getHelpString();
+const registerSlashCommand = SlashCommandParser.addCommand.bind(SlashCommandParser);
+const getSlashCommandsHelp = parser.getHelpString.bind(parser);
 
 /**
  * Converts a SlashCommandClosure to a filter function that returns a boolean.
@@ -233,7 +223,6 @@ function setupConnectAPIMap() {
 }
 
 export function initDefaultSlashCommands() {
-    getParser();
     eventSource.on(event_types.CHAT_CHANGED, processChatSlashCommands);
     setupConnectAPIMap();
 
@@ -7072,7 +7061,7 @@ async function executeSlashCommandsWithOptions(text, options = {}) {
 
     let closure;
     try {
-        closure = getParser().parse(text, true, options.parserFlags, options.abortController ?? new SlashCommandAbortController());
+        closure = parser.parse(text, true, options.parserFlags, options.abortController ?? new SlashCommandAbortController());
         closure.scope.parent = options.scope;
         closure.onProgress = options.onProgress;
         closure.debugController = options.debugController;
