@@ -380,6 +380,26 @@ function scheduleDeferredInitializers(initializers) {
     runNext();
 }
 
+/**
+ * Wraps a promise with a timeout to prevent indefinite hangs.
+ * @param {Promise} promise - The promise to wrap
+ * @param {number} timeoutMs - Timeout in milliseconds
+ * @param {*} fallbackValue - Value to resolve with on timeout
+ * @param {string} operationName - Name for logging
+ * @returns {Promise} Promise that resolves with result or fallback
+ */
+function withTimeout(promise, timeoutMs, fallbackValue, operationName) {
+    return Promise.race([
+        promise,
+        new Promise((resolve) => {
+            setTimeout(() => {
+                console.warn(`${operationName} timed out after ${timeoutMs}ms, using fallback`);
+                resolve(fallbackValue);
+            }, timeoutMs);
+        })
+    ]);
+}
+
 const loadDynamicStylesModule = createDeferredModuleLoader('./scripts/dynamic-styles.js');
 const loadServerHistoryModule = createDeferredModuleLoader('./scripts/server-history.js');
 const loadBulkEditModule = createDeferredModuleLoader('./scripts/bulk-edit.js');
@@ -824,9 +844,34 @@ async function firstLoadInit() {
         initTags();
         initBookmarks();
         await releaseStartupLoader('startup loader release');
-        await getUserAvatars(true, user_avatar);
-        await getCharacters();
-        await getBackgrounds();
+        await withTimeout(
+            getUserAvatars(true, user_avatar),
+            5000,
+            [],
+            'getUserAvatars'
+        ).catch(error => {
+            console.error('getUserAvatars failed, continuing with empty avatars', error);
+            return [];
+        });
+        await withTimeout(
+            getCharacters(),
+            8000,
+            undefined,
+            'getCharacters'
+        ).catch(error => {
+            console.error('getCharacters failed, continuing with empty character list', error);
+            characters.splice(0, characters.length); // Ensure empty array
+            return undefined;
+        });
+        await withTimeout(
+            getBackgrounds(),
+            5000,
+            undefined,
+            'getBackgrounds'
+        ).catch(error => {
+            console.error('getBackgrounds failed, continuing with default background', error);
+            return undefined;
+        });
         await initTokenizers();
         initBackgrounds();
         initAuthorsNote();
@@ -872,6 +917,16 @@ async function firstLoadInit() {
         throw error;
     } finally {
         await releaseStartupLoader('startup finally');
+
+        // Guaranteed cleanup after 500ms if loader still visible
+        setTimeout(() => {
+            const preloader = document.getElementById('preloader');
+            if (preloader && preloader.style.display !== 'none') {
+                console.warn('Force-removing stuck loader');
+                preloader.style.display = 'none';
+                preloader.remove();
+            }
+        }, 500);
     }
 }
 
@@ -1101,7 +1156,9 @@ export async function printCharacters(fullRefresh = false) {
 
     const entities = getEntitiesList({ doFilter: true });
 
-    const pageSize = Number(accountStorage.getItem(storageKey)) || per_page_default;
+    // Mobile optimization: reduce page size for better performance
+    const defaultPageSize = isMobile() ? 25 : per_page_default;
+    const pageSize = Number(accountStorage.getItem(storageKey)) || defaultPageSize;
     const sizeChangerOptions = [10, 25, 50, 100, 250, 500, 1000];
     $('#rm_print_characters_pagination').pagination({
         dataSource: entities,
@@ -1125,21 +1182,40 @@ export async function printCharacters(fullRefresh = false) {
                 const emptyBlock = await getEmptyBlock();
                 $(listId).append(emptyBlock);
             }
+
+            // Mobile optimization: use DocumentFragment for batched DOM insertion
+            const useBatchedRendering = isMobile() && data.length > 10;
+            const fragment = useBatchedRendering ? document.createDocumentFragment() : null;
+
             let displayCount = 0;
             for (const i of data) {
+                let block;
                 switch (i.type) {
                     case 'character':
-                        $(listId).append(getCharacterBlock(i.item, i.id));
+                        block = getCharacterBlock(i.item, i.id);
                         displayCount++;
                         break;
                     case 'group':
-                        $(listId).append(getGroupBlock(i.item));
+                        block = getGroupBlock(i.item);
                         displayCount++;
                         break;
                     case 'tag':
-                        $(listId).append(getTagBlock(i.item, i.entities, i.hidden, i.isUseless));
+                        block = getTagBlock(i.item, i.entities, i.hidden, i.isUseless);
                         break;
                 }
+
+                if (block) {
+                    if (useBatchedRendering) {
+                        fragment.appendChild(block[0]);
+                    } else {
+                        $(listId).append(block);
+                    }
+                }
+            }
+
+            // Append all at once on mobile (single reflow)
+            if (useBatchedRendering) {
+                $(listId)[0].appendChild(fragment);
             }
 
             const hidden = (characters.length + groups.length) - displayCount;
@@ -1386,16 +1462,41 @@ export async function getCharacters() {
         const previousAvatar = this_chid !== undefined ? characters[this_chid]?.avatar : null;
         characters.splice(0, characters.length);
         const getData = await response.json();
-        for (let i = 0; i < getData.length; i++) {
-            characters[i] = getData[i];
-            characters[i].name = DOMPurify.sanitize(characters[i].name);
 
-            // For dropped-in cards
-            if (!characters[i].chat) {
-                characters[i].chat = `${characters[i].name} - ${humanizedDateTime()}`;
+        // Mobile optimization: chunk character processing to avoid blocking main thread
+        if (isMobile() && getData.length > 50) {
+            // Process in chunks of 50 with setTimeout(0) to yield to browser
+            for (let start = 0; start < getData.length; start += 50) {
+                const end = Math.min(start + 50, getData.length);
+                for (let i = start; i < end; i++) {
+                    characters[i] = getData[i];
+                    characters[i].name = DOMPurify.sanitize(characters[i].name);
+
+                    // For dropped-in cards
+                    if (!characters[i].chat) {
+                        characters[i].chat = `${characters[i].name} - ${humanizedDateTime()}`;
+                    }
+
+                    characters[i].chat = String(characters[i].chat);
+                }
+                // Yield to browser after each chunk (except last)
+                if (end < getData.length) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
             }
+        } else {
+            // Desktop: process synchronously as before
+            for (let i = 0; i < getData.length; i++) {
+                characters[i] = getData[i];
+                characters[i].name = DOMPurify.sanitize(characters[i].name);
 
-            characters[i].chat = String(characters[i].chat);
+                // For dropped-in cards
+                if (!characters[i].chat) {
+                    characters[i].chat = `${characters[i].name} - ${humanizedDateTime()}`;
+                }
+
+                characters[i].chat = String(characters[i].chat);
+            }
         }
 
         if (previousAvatar) {

@@ -921,13 +921,21 @@
 
     /*
      * Prevent original ST drawers from flashing on mobile before the
-     * SillyBunny shell system initializes (~120ms after page load).
+     * SillyBunny shell system initializes (~80ms after page load).
      * Uses opacity instead of display so the shell can still find and
      * reparent the content. Once the shell adds data-sb-shell-ready
      * or sb-shell-root, the drawer becomes visible through its own rules.
+     *
+     * Progressive enhancement: Only block pointer events during initial
+     * shell initialization (body:not(.sb-shell-initialized)). After that,
+     * buttons work even if shell hasn't fully completed.
      */
     #top-settings-holder .drawer-content:not([data-sb-shell-ready]):not(.sb-managed):not(.sb-shell-embedded-content) {
         opacity: 0 !important;
+    }
+
+    /* Only block pointer events during initial shell initialization */
+    body:not(.sb-shell-initialized) #top-settings-holder .drawer-content:not([data-sb-shell-ready]):not(.sb-managed):not(.sb-shell-embedded-content) {
         pointer-events: none !important;
     }
 

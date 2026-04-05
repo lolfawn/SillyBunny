@@ -1872,6 +1872,7 @@ function initAll() {
     }
 
     sbState.initialized = true;
+    document.body.classList.add('sb-shell-initialized');
 
     hideHostToggles();
     buildTopBar();
@@ -1914,5 +1915,5 @@ function initAll() {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAll);
 } else {
-    window.setTimeout(initAll, 120);
+    window.setTimeout(initAll, 80);
 }
