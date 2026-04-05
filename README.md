@@ -32,6 +32,8 @@ bun run start:global
 bun run start:no-csrf
 ```
 
+Those direct Bun commands are still useful if you already manage Bun, Git, and dependency updates yourself. The OS launchers below are the recommended path because they now handle prerequisite bootstrapping and auto-update checks before starting the server.
+
 ### Better UI
 
 SillyBunny keeps the core SillyTavern workspace, but replaces the surrounding UI with a more opinionated shell focused on faster navigation and cleaner visuals.
@@ -83,25 +85,68 @@ Current Agent Mode limitations:
 
 Requirements:
 
-- Bun `1.3.0` or newer if you want to launch SillyBunny directly with `bun`; the included start scripts can install it automatically
+- A Git clone is recommended if you want launcher-based auto-updates
+- Bun `1.3.0` or newer only if you plan to launch SillyBunny directly with `bun`; the included start scripts can install it automatically
 
-Install and run:
+Clone and enter the repo:
 
 ```bash
 git clone https://github.com/platberlitz/SillyBunny.git
 cd SillyBunny
+```
+
+Launch it with the script that matches your platform:
+
+Linux and other Unix shells:
+
+```bash
 ./start.sh
 ```
 
-On Windows, use:
+macOS from Terminal:
+
+```bash
+./Start.command
+```
+
+macOS from Finder:
+
+- Double-click `Start.command`
+- If Gatekeeper warns on first launch, right-click it and choose `Open`
+
+Windows:
 
 ```powershell
 .\Start.bat
 ```
 
-Those launchers install Bun automatically when it is missing, then install the project packages before starting the server. On Windows, `UpdateAndStart.bat` and `UpdateForkAndStart.bat` now bootstrap missing Git too when a supported package manager is available. If you already have Bun set up, `bun run start` still works as usual.
+Launcher behavior:
 
-On Unix-like systems, `start.sh` can also update the tracked Git branch before launch:
+- `start.sh`, `Start.command`, `Start.bat`, `UpdateAndStart.bat`, and `UpdateForkAndStart.bat` all perform an automatic self-update check before launch when you are running from a clean Git clone with an upstream branch configured
+- Bun is installed automatically when it is missing
+- Git is installed automatically when a launcher needs it and the platform has a supported installation path
+- Project packages are installed automatically before the server starts
+- ZIP downloads can still be started, but they cannot auto-update until you switch to a Git clone
+
+If you already have Bun set up and prefer direct runtime commands, `bun run start` and friends still work as usual.
+
+### macOS notes
+
+- `Start.command` is the easiest option for Mac users because it opens in Terminal and runs the same bootstrap flow as `start.sh`
+- If Git is missing on a Git-based install, the launcher will ask macOS to install the Apple Command Line Tools. Finish that install, then run `Start.command` again
+- If you downloaded a ZIP and macOS adds quarantine metadata, you may need to run `xattr -dr com.apple.quarantine /path/to/SillyBunny`
+- If your unzip tool strips executable bits, restore them with `chmod +x Start.command start.sh scripts/*.sh`
+- Auto-update only works for Git clones. ZIP installs are launchable, but updating them still means downloading a fresh copy manually
+
+### Auto-update controls
+
+On Unix-like systems, the launcher checks the tracked Git branch before launch by default:
+
+```bash
+./start.sh
+```
+
+To force a non-optional update pass:
 
 ```bash
 ./start.sh --self-update
@@ -113,13 +158,20 @@ To update without starting the server:
 ./start.sh --self-update-only
 ```
 
-To check for updates on every launch without failing startup when Git is unavailable or the repo is not updateable:
+Use `./start.sh --skip-self-update` to bypass the automatic check for a single launch.
+
+You can also disable the automatic check through the environment:
 
 ```bash
-SILLYBUNNY_AUTO_UPDATE=1 ./start.sh
+SILLYBUNNY_AUTO_UPDATE=0 ./start.sh
 ```
 
-Use `./start.sh --skip-self-update` to bypass the automatic check for a single launch.
+On Windows PowerShell:
+
+```powershell
+$env:SILLYBUNNY_AUTO_UPDATE = '0'
+.\Start.bat
+```
 
 Open `http://127.0.0.1:8000`.
 

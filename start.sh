@@ -45,17 +45,33 @@ while (($#)); do
     shift
 done
 
+auto_update_enabled=0
+if (( self_update_requested )); then
+    auto_update_enabled=1
+elif (( ! skip_auto_update )) && is_truthy "${SILLYBUNNY_AUTO_UPDATE:-1}"; then
+    auto_update_enabled=1
+fi
+
+prereq_args=()
+if (( self_update_only )); then
+    prereq_args+=(--skip-bun)
+fi
+
+if (( auto_update_enabled )) && [[ -d "$SCRIPT_DIR/.git" ]]; then
+    prereq_args+=(--require-git)
+fi
+
+bash "$SCRIPT_DIR/scripts/install-prerequisites.sh" "${prereq_args[@]}"
+
 if (( self_update_requested )); then
     bash "$SCRIPT_DIR/scripts/self-update.sh"
-elif (( ! skip_auto_update )) && is_truthy "${SILLYBUNNY_AUTO_UPDATE:-1}"; then
+elif (( auto_update_enabled )); then
     bash "$SCRIPT_DIR/scripts/self-update.sh" --optional
 fi
 
 if (( self_update_only )); then
     exit 0
 fi
-
-bash "$SCRIPT_DIR/scripts/install-prerequisites.sh"
 
 export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
 if [[ -d "$BUN_INSTALL/bin" ]]; then
