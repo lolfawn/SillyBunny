@@ -1,5 +1,7 @@
 # SillyBunny
 
+Currently based on **SillyTavern 1.17.0 stable**.
+
 SillyBunny is a fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern) with a better UI and a Bun-first runtime.
 
 The goal is to keep the familiar SillyTavern workflow, data habits, and compatibility story, while shipping a more polished frontend shell, faster Bun-based startup, and native agent features directly in the app.
@@ -99,6 +101,26 @@ chmod +x Start.command start.sh scripts/*.sh
 
 - Auto-update only works for Git clones with a tracked branch. ZIP installs can still be launched, but updating them still means downloading a fresh copy manually
 - To stop the server from Terminal, press `Ctrl+C`
+
+### Termux notes
+
+- Recommended Android setup from a current Termux install:
+
+```bash
+pkg update && pkg upgrade -y
+pkg install -y git curl unzip
+git clone https://github.com/platberlitz/SillyBunny.git
+cd SillyBunny
+bash start.sh
+```
+
+- `start.sh` will install Bun automatically if it is missing, install project packages, then launch SillyBunny
+- If you want to browse or import files from Android shared storage, run `termux-setup-storage` once before starting
+- For lower-memory phones or tablet-style environments, you can also use:
+
+```bash
+bun run start:mobile
+```
 
 ### Auto-update controls
 
