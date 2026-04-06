@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
   pull-requests: write
 
 jobs:
@@ -27,7 +28,20 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Check GitHub App Configuration
+        id: app-config
+        env:
+          ST_BOT_APP_ID: ${{ vars.ST_BOT_APP_ID }}
+          ST_BOT_PRIVATE_KEY: ${{ secrets.ST_BOT_PRIVATE_KEY }}
+        run: |
+          if [ -n "$ST_BOT_APP_ID" ] && [ -n "$ST_BOT_PRIVATE_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Mint App Token
+        if: steps.app-config.outputs.enabled == 'true'
         id: app
         # Create a GitHub App token
         # https://github.com/marketplace/actions/create-github-app-token
@@ -42,7 +56,7 @@ jobs:
         # https://github.com/marketplace/actions/pull-request-size-labeler
         uses: codelytv/pr-size-labeler@4ec67706cd878fbc1c8db0a5dcd28b6bb412e85a # v1.10.3
         with:
-          GITHUB_TOKEN: ${{ steps.app.outputs.token }}
+          GITHUB_TOKEN: ${{ steps.app.outputs.token || github.token }}
           xs_label: '🟩 ⬤○○○○'
           xs_max_size: '20'
           s_label: '🟩 ⬤⬤○○○'
@@ -64,7 +78,20 @@ jobs:
     if: always() && (github.event.action == 'opened' || (github.event.action == 'synchronize' && github.event.changes.base))
 
     steps:
+      - name: Check GitHub App Configuration
+        id: app-config
+        env:
+          ST_BOT_APP_ID: ${{ vars.ST_BOT_APP_ID }}
+          ST_BOT_PRIVATE_KEY: ${{ secrets.ST_BOT_PRIVATE_KEY }}
+        run: |
+          if [ -n "$ST_BOT_APP_ID" ] && [ -n "$ST_BOT_PRIVATE_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Mint App Token
+        if: steps.app-config.outputs.enabled == 'true'
         id: app
         # Create a GitHub App token
         # https://github.com/marketplace/actions/create-github-app-token
@@ -85,7 +112,7 @@ jobs:
         uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9 # v5.0.0
         with:
           configuration-path: .github/pr-auto-labels-by-branch.yml
-          repo-token: ${{ steps.app.outputs.token }}
+          repo-token: ${{ steps.app.outputs.token || github.token }}
 
   label-by-files:
     name: 🏷️ Label PR by Files
@@ -95,7 +122,20 @@ jobs:
     if: always() && (github.event.action == 'opened' || github.event.action == 'synchronize')
 
     steps:
+      - name: Check GitHub App Configuration
+        id: app-config
+        env:
+          ST_BOT_APP_ID: ${{ vars.ST_BOT_APP_ID }}
+          ST_BOT_PRIVATE_KEY: ${{ secrets.ST_BOT_PRIVATE_KEY }}
+        run: |
+          if [ -n "$ST_BOT_APP_ID" ] && [ -n "$ST_BOT_PRIVATE_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Mint App Token
+        if: steps.app-config.outputs.enabled == 'true'
         id: app
         # Create a GitHub App token
         # https://github.com/marketplace/actions/create-github-app-token
@@ -115,10 +155,10 @@ jobs:
         # https://github.com/marketplace/actions/labeler
         uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9 # v5.0.0
         env:
-          GITHUB_TOKEN: ${{ steps.app.outputs.token }} # labeler action needs some handholding
+          GITHUB_TOKEN: ${{ steps.app.outputs.token || github.token }} # labeler action needs some handholding
         with:
           configuration-path: .github/pr-auto-labels-by-files.yml
-          repo-token: ${{ steps.app.outputs.token }}
+          repo-token: ${{ steps.app.outputs.token || github.token }}
 
   label-copilot-prs:
     name: 🏷️ Label Copilot PRs as Vibe Coded
@@ -129,7 +169,20 @@ jobs:
       github.event.pull_request.user.login == 'Copilot'
 
     steps:
+      - name: Check GitHub App Configuration
+        id: app-config
+        env:
+          ST_BOT_APP_ID: ${{ vars.ST_BOT_APP_ID }}
+          ST_BOT_PRIVATE_KEY: ${{ secrets.ST_BOT_PRIVATE_KEY }}
+        run: |
+          if [ -n "$ST_BOT_APP_ID" ] && [ -n "$ST_BOT_PRIVATE_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Mint App Token
+        if: steps.app-config.outputs.enabled == 'true'
         id: app
         # Create a GitHub App token
         # https://github.com/marketplace/actions/create-github-app-token
@@ -145,7 +198,7 @@ jobs:
         uses: actions-cool/issues-helper@a610082f8ac0cf03e357eb8dd0d5e2ba075e017e # v3.6.0
         with:
           actions: 'add-labels'
-          token: ${{ steps.app.outputs.token }}
+          token: ${{ steps.app.outputs.token || github.token }}
           issue-number: ${{ github.event.pull_request.number }}
           labels: '✨ Vibe Coded'
 
@@ -163,8 +216,20 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Check GitHub App Configuration
+        id: app-config
+        env:
+          ST_BOT_APP_ID: ${{ vars.ST_BOT_APP_ID }}
+          ST_BOT_PRIVATE_KEY: ${{ secrets.ST_BOT_PRIVATE_KEY }}
+        run: |
+          if [ -n "$ST_BOT_APP_ID" ] && [ -n "$ST_BOT_PRIVATE_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Mint App Token
-        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        if: github.event.pull_request.head.repo.full_name == github.repository && steps.app-config.outputs.enabled == 'true'
         id: app
         # Only run if the PR is from the same repository
         # This action runs on comments, which will not receive the env vars for this
@@ -245,7 +310,20 @@ jobs:
     if: always() && (github.event_name == 'pull_request_target')
 
     steps:
+      - name: Check GitHub App Configuration
+        id: app-config
+        env:
+          ST_BOT_APP_ID: ${{ vars.ST_BOT_APP_ID }}
+          ST_BOT_PRIVATE_KEY: ${{ secrets.ST_BOT_PRIVATE_KEY }}
+        run: |
+          if [ -n "$ST_BOT_APP_ID" ] && [ -n "$ST_BOT_PRIVATE_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Mint App Token
+        if: steps.app-config.outputs.enabled == 'true'
         id: app
         # Create a GitHub App token
         # https://github.com/marketplace/actions/create-github-app-token
@@ -266,7 +344,7 @@ jobs:
         uses: peaceiris/actions-label-commenter@f0dbbef043eb1b150b566db36b0bdc8b7f505579 # v1.10.0
         with:
           config_file: .github/pr-auto-comments.yml
-          github_token: ${{ steps.app.outputs.token }}
+          github_token: ${{ steps.app.outputs.token || github.token }}
 
   # This runs on merged PRs to staging, reading the PR body and directly linked issues. Check `issues-updates-on-merge.yml`:`update-linked-issues` for commit-based updates.
   update-linked-issues:
@@ -285,7 +363,20 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Check GitHub App Configuration
+        id: app-config
+        env:
+          ST_BOT_APP_ID: ${{ vars.ST_BOT_APP_ID }}
+          ST_BOT_PRIVATE_KEY: ${{ secrets.ST_BOT_PRIVATE_KEY }}
+        run: |
+          if [ -n "$ST_BOT_APP_ID" ] && [ -n "$ST_BOT_PRIVATE_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Mint App Token
+        if: steps.app-config.outputs.enabled == 'true'
         id: app
         # Create a GitHub App token
         # https://github.com/marketplace/actions/create-github-app-token
@@ -307,7 +398,7 @@ jobs:
           PR_NUMBER=${{ github.event.pull_request.number }}
           REPO=${{ github.repository }}
           API_URL="https://api.github.com/repos/$REPO/pulls/$PR_NUMBER/issues"
-          ISSUES=$(curl -s -H "Authorization: token ${{ steps.app.outputs.token }}" "$API_URL" | jq -r '.[].number' | jq -R -s -c 'split("\n")[:-1]')
+          ISSUES=$(curl -s -H "Authorization: token ${{ steps.app.outputs.token || github.token }}" "$API_URL" | jq -r '.[].number' | jq -R -s -c 'split("\n")[:-1]')
           echo "linked_issues=$ISSUES" >> $GITHUB_ENV
 
       - name: Merge Issue Lists
@@ -319,7 +410,7 @@ jobs:
       - name: Label Linked Issues
         id: label_linked_issues
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ steps.app.outputs.token || github.token }}
         run: |
           for ISSUE in $(echo $final_issues | jq -r '.[]'); do
             gh issue edit $ISSUE -R ${{ github.repository }} --add-label "✅ Done (staging)" --remove-label "🧑‍💻 In Progress"
