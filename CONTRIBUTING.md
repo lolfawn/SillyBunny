@@ -48,6 +48,12 @@ Repository automation can run either with the built-in Actions token or with an 
 
 If you are maintaining the repo or updating workflow files, see [docs/github-automation.md](docs/github-automation.md) for the current setup, required repository settings, and the optional App-based configuration.
 
+### Agentic experiments on `staging`
+
+If you are using `staging` to push SillyBunny toward more autonomous, Aventuras-style behavior, use the workflow docs in [docs/agentic/README.md](docs/agentic/README.md).
+
+Keep those experiments narrow, reversible, and documented before moving them toward `main` or `release`.
+
 ### Make contributions small and testable
 
 To make sure that your contribution remains testable and reviewable, try not to exceed a soft limit of **200 lines of code** (both additions and deletions) per pull request. If you have more to contribute, split it into multiple pull requests.
