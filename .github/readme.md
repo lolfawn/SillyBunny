@@ -2,7 +2,7 @@
 
 # SillyBunny
 
-Current release: **v1.1.0**.
+Current release: **v1.2.0**.
 
 Currently based on **SillyTavern 1.17.0 stable**.
 
@@ -14,6 +14,16 @@ The goal is to keep the familiar SillyTavern workflow, data habits, and compatib
 > SillyBunny is an active fork. Expect ongoing UI iteration, Bun compatibility work, and occasional upstream sync churn.
 
 ## Changelog
+
+### v1.2.0 - 2026-04-07
+
+- Added a new Server tools area inside Customize so you can edit `config.yaml`, check for updates, run updates from the app, and restart automatically after update flows without leaving the UI.
+- Added easier migration paths for less technical users, including visible import controls for pulling in an existing SillyTavern folder or a backup ZIP directly from Settings.
+- Expanded the built-in starter pack with bundled Geechan roleplay presets, TheLonelyDevil's card conversion preset, new starter cards and links, and extra default bundled themes pulled from the preset collection while excluding the `Pura*` chat-completion preset files.
+- Reworked the top shell and chat info bars with hide/show controls, drag behavior for the chat info bar, extra API shortcuts, stronger opacity on glass-style surfaces, and more responsive desktop/mobile scaling for Navigate and Customize.
+- Fixed a long list of shell, preset, and drawer persistence bugs, including dropdowns snapping back after toggles, prompt manager focus/visibility issues, advanced formatting placement regressions, and the new Server Config drawer layout in chat completions.
+- Polished Moonlit Echoes and the wider UI with darker checkbox states, better theme-aware button contrast, cleaner spacing/alignment across low-resolution layouts, tighter mobile button sizing, and Moonlit Echoes disabled by default for fresh installs.
+- Improved bundled extension and admin plumbing so default bundled extensions stop falsely reporting stale updates, server-side admin routes are available for the new in-app tools, and the app identifies itself consistently as `SillyBunny v1.2.0`.
 
 ### v1.1.0 - 2026-04-06
 
