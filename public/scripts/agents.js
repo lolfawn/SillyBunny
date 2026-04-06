@@ -22,7 +22,7 @@ import { chat_completion_sources, createGenerationParameters, getChatCompletionM
 import { extension_settings, saveMetadataDebounced } from './extensions.js';
 import { t } from './i18n.js';
 import { Popup } from './popup.js';
-import { debounce, getCharaFilename, onlyUnique, uuidv4 } from './utils.js';
+import { debounce, getCharaFilename, onlyUnique, parseJsonFile, uuidv4 } from './utils.js';
 import {
     METADATA_KEY as WORLD_INFO_METADATA_KEY,
     createWorldInfoEntry,
@@ -50,6 +50,49 @@ const MAX_LORE_CHANGE_CONTENT_LENGTH = 2400;
 const LORE_MATCH_SCORE_THRESHOLD = 0.14;
 const MAX_TURN_UX_SUGGESTIONS = 5;
 const MAX_TURN_UX_RECAP_SECTIONS = 4;
+
+const AGENT_PRESET_SETTING_ALIASES = Object.freeze({
+    temperature: 'temp_openai',
+    frequency_penalty: 'freq_pen_openai',
+    presence_penalty: 'pres_pen_openai',
+    top_p: 'top_p_openai',
+    top_k: 'top_k_openai',
+    min_p: 'min_p_openai',
+    top_a: 'top_a_openai',
+    repetition_penalty: 'repetition_penalty_openai',
+});
+
+const AGENT_PRESET_NUMERIC_SETTINGS = new Set([
+    'temp_openai',
+    'freq_pen_openai',
+    'pres_pen_openai',
+    'top_p_openai',
+    'top_k_openai',
+    'min_p_openai',
+    'top_a_openai',
+    'repetition_penalty_openai',
+    'openai_max_tokens',
+    'seed',
+]);
+
+const AGENT_PRESET_BOOLEAN_SETTINGS = new Set([
+    'show_thoughts',
+    'enable_web_search',
+    'use_sysprompt',
+]);
+
+const AGENT_PRESET_STRING_SETTINGS = new Set([
+    'reasoning_effort',
+    'verbosity',
+    'assistant_prefill',
+    'assistant_impersonation',
+]);
+
+const AGENT_PRESET_SETTING_KEYS = new Set([
+    ...AGENT_PRESET_NUMERIC_SETTINGS,
+    ...AGENT_PRESET_BOOLEAN_SETTINGS,
+    ...AGENT_PRESET_STRING_SETTINGS,
+]);
 
 const agent_director_phases = {
     PRE_GENERATION: 'pre_generation',
@@ -112,6 +155,10 @@ const DEFAULT_GLOBAL_AGENT_SETTINGS = Object.freeze({
         [agent_service_ids.RETRIEVAL]: { maxSteps: 4, resultLimit: 6 },
         [agent_service_ids.MEMORY]: { maxSteps: 1, resultLimit: 6 },
         [agent_service_ids.LOREBOOK]: { maxSteps: 4, resultLimit: 4 },
+    },
+    preset: {
+        name: '',
+        settings_overrides: {},
     },
     profiles: {
         [agent_service_ids.RETRIEVAL]: { use_main: true, chat_completion_source: chat_completion_sources.OPENAI, model: '', reverse_proxy: '', temp_openai: 0.4, openai_max_tokens: 500 },
@@ -178,6 +225,63 @@ function cloneDefaultGlobalSettings() {
     return structuredClone(DEFAULT_GLOBAL_AGENT_SETTINGS);
 }
 
+function cloneDefaultAgentPreset() {
+    return structuredClone(DEFAULT_GLOBAL_AGENT_SETTINGS.preset);
+}
+
+function normalizeAgentPresetValue(key, value) {
+    if (AGENT_PRESET_NUMERIC_SETTINGS.has(key)) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number : undefined;
+    }
+
+    if (AGENT_PRESET_BOOLEAN_SETTINGS.has(key)) {
+        return Boolean(value);
+    }
+
+    if (AGENT_PRESET_STRING_SETTINGS.has(key)) {
+        return String(value ?? '').trim();
+    }
+
+    return undefined;
+}
+
+function normalizeAgentPresetSettingsOverrides(overrides) {
+    if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) {
+        return {};
+    }
+
+    const normalized = {};
+
+    for (const [rawKey, rawValue] of Object.entries(overrides)) {
+        const key = AGENT_PRESET_SETTING_ALIASES[rawKey] ?? rawKey;
+        if (!AGENT_PRESET_SETTING_KEYS.has(key)) {
+            continue;
+        }
+
+        const value = normalizeAgentPresetValue(key, rawValue);
+        if (value !== undefined) {
+            normalized[key] = value;
+        }
+    }
+
+    return normalized;
+}
+
+function normalizeAgentPresetConfig(preset) {
+    const defaults = cloneDefaultAgentPreset();
+
+    if (!preset || typeof preset !== 'object' || Array.isArray(preset)) {
+        return defaults;
+    }
+
+    return {
+        ...defaults,
+        name: String(preset.name ?? defaults.name).trim(),
+        settings_overrides: normalizeAgentPresetSettingsOverrides(preset.settings_overrides),
+    };
+}
+
 function ensureAgentSettings() {
     if (!extension_settings.agentMode || typeof extension_settings.agentMode !== 'object') {
         extension_settings.agentMode = cloneDefaultGlobalSettings();
@@ -189,6 +293,7 @@ function ensureAgentSettings() {
         ...defaults.services,
         ...(extension_settings.agentMode.services ?? {}),
     };
+    extension_settings.agentMode.preset = normalizeAgentPresetConfig(extension_settings.agentMode.preset);
     extension_settings.agentMode.profiles = {
         ...defaults.profiles,
         ...(extension_settings.agentMode.profiles ?? {}),
@@ -1136,6 +1241,10 @@ function getProfileModelSettingKey(source) {
     return MODEL_SETTING_KEYS[source] ?? MODEL_SETTING_KEYS[chat_completion_sources.OPENAI];
 }
 
+function getGlobalAgentPreset() {
+    return getGlobalAgentSettings().preset;
+}
+
 function applyProfileModel(agentSettings, source, model) {
     const modelKey = getProfileModelSettingKey(source);
     if (typeof model === 'string' && model.trim().length > 0) {
@@ -1146,6 +1255,11 @@ function applyProfileModel(agentSettings, source, model) {
 function buildAgentSettings(serviceId) {
     const profile = getServiceProfile(serviceId);
     const agentSettings = structuredClone(oai_settings);
+    const preset = getGlobalAgentPreset();
+
+    if (preset && Object.keys(preset.settings_overrides).length > 0) {
+        Object.assign(agentSettings, structuredClone(preset.settings_overrides));
+    }
 
     if (!profile.use_main) {
         agentSettings.chat_completion_source = profile.chat_completion_source || agentSettings.chat_completion_source;
@@ -1156,8 +1270,6 @@ function buildAgentSettings(serviceId) {
     agentSettings.stream_openai = false;
     agentSettings.function_calling = false;
     agentSettings.n = 1;
-    agentSettings.show_thoughts = false;
-    agentSettings.enable_web_search = false;
     agentSettings.request_images = false;
     agentSettings.temp_openai = Number(profile.temp_openai ?? agentSettings.temp_openai);
     agentSettings.openai_max_tokens = Number(profile.openai_max_tokens ?? agentSettings.openai_max_tokens);
@@ -2765,6 +2877,8 @@ function renderAgentPanel() {
     const state = getAgentChatState();
     const available = isAgentModeAvailable();
     const hasChat = Boolean(getCurrentChatId());
+    const preset = getGlobalAgentPreset();
+    const presetOverrideKeys = Object.keys(preset.settings_overrides ?? {});
 
     $('#agent_mode_enabled').prop('checked', Boolean(state.enabled));
     $('#agent_service_retrieval').prop('checked', Boolean(state.services[agent_service_ids.RETRIEVAL]?.enabled));
@@ -2784,6 +2898,11 @@ function renderAgentPanel() {
             ? t`Agent mode currently runs only through chat-completions providers.`
             : `${t`The turn director runs retrieval before the next reply, then updates durable memory, story state, and lorebook context after the reply is saved.`}${loreReviewText}`;
     $('#agent_mode_status_hint').text(availabilityText);
+    $('#agent_preset_status').text(
+        preset.name
+            ? `Agent preset: ${preset.name} (${presetOverrideKeys.length} compatible tuning override${presetOverrideKeys.length === 1 ? '' : 's'})`
+            : 'Agent preset: none imported',
+    );
 
     for (const serviceId of Object.values(agent_service_ids)) {
         const profile = getServiceProfile(serviceId);
@@ -2830,6 +2949,102 @@ function copyMainProfileToAllAgents() {
     renderAgentPanelDebounced();
 }
 
+function getAgentPresetFileBaseName(fileName) {
+    return String(fileName ?? '').replace(/\.(json|settings)$/i, '').trim();
+}
+
+function buildImportedAgentPreset(rawPreset, fallbackName = '') {
+    if (!rawPreset || typeof rawPreset !== 'object' || Array.isArray(rawPreset)) {
+        throw new Error('The selected preset file does not contain a JSON object.');
+    }
+
+    const extractedSettings = normalizeAgentPresetSettingsOverrides(rawPreset);
+    const presetName = String(rawPreset.name ?? fallbackName).trim();
+    const settingsOverrides = { ...extractedSettings };
+    const importedTemp = settingsOverrides.temp_openai;
+    const importedMaxTokens = settingsOverrides.openai_max_tokens;
+
+    if (Object.keys(settingsOverrides).length === 0 && importedTemp === undefined && importedMaxTokens === undefined) {
+        throw new Error('No agent-compatible tuning fields were found in that preset.');
+    }
+
+    return {
+        preset: {
+            name: presetName,
+            settings_overrides: settingsOverrides,
+        },
+        temp_openai: importedTemp,
+        openai_max_tokens: importedMaxTokens,
+    };
+}
+
+function applyImportedAgentPreset(importedPreset) {
+    const settings = getGlobalAgentSettings();
+    settings.preset = normalizeAgentPresetConfig(importedPreset.preset);
+
+    for (const serviceId of Object.values(agent_service_ids)) {
+        const profile = getServiceProfile(serviceId);
+
+        if (importedPreset.temp_openai !== undefined) {
+            profile.temp_openai = Number(importedPreset.temp_openai);
+        }
+
+        if (importedPreset.openai_max_tokens !== undefined) {
+            profile.openai_max_tokens = Number(importedPreset.openai_max_tokens);
+        }
+    }
+
+    saveSettingsDebounced();
+    renderAgentPanelDebounced();
+}
+
+async function importAgentPresetFromFileInput(event) {
+    const input = event.target;
+    const file = input instanceof HTMLInputElement ? input.files?.[0] : null;
+
+    if (!file) {
+        return;
+    }
+
+    try {
+        const rawPreset = await parseJsonFile(file);
+        const importedPreset = buildImportedAgentPreset(rawPreset, getAgentPresetFileBaseName(file.name));
+        applyImportedAgentPreset(importedPreset);
+        toastr.success(`Applied ${importedPreset.preset.name || 'chat preset'} to all agents.`, t`Agent Mode`);
+    } catch (error) {
+        console.error('Failed to import agent preset', error);
+        toastr.error(summarizeError(error), t`Failed to import agent preset`);
+    } finally {
+        if (input instanceof HTMLInputElement) {
+            input.value = '';
+        }
+    }
+}
+
+async function clearImportedAgentPreset() {
+    const settings = getGlobalAgentSettings();
+    const hasPreset = Boolean(settings.preset?.name) || Object.keys(settings.preset?.settings_overrides ?? {}).length > 0;
+
+    if (!hasPreset) {
+        toastr.info(t`There is no imported agent preset to clear.`, t`Agent Mode`);
+        return;
+    }
+
+    const confirmation = await Popup.show.confirm(
+        t`Clear the imported agent preset?`,
+        t`This removes the shared tuning overlay from agent requests. Per-agent temperature and max token fields stay as currently set.`,
+    );
+
+    if (!confirmation) {
+        return;
+    }
+
+    settings.preset = cloneDefaultAgentPreset();
+    saveSettingsDebounced();
+    renderAgentPanelDebounced();
+    toastr.success(t`Removed the imported agent preset overlay.`, t`Agent Mode`);
+}
+
 function bindAgentPanel() {
     $('#agent_mode_enabled').on('input', function () {
         setAgentModeEnabled($(this).prop('checked'));
@@ -2865,6 +3080,9 @@ function bindAgentPanel() {
     });
 
     $('#agent_copy_main_profile').on('click', copyMainProfileToAllAgents);
+    $('#agent_import_preset').on('click', () => $('#agent_preset_import_file').trigger('click'));
+    $('#agent_preset_import_file').on('change', event => void importAgentPresetFromFileInput(event));
+    $('#agent_clear_preset').on('click', () => void clearImportedAgentPreset());
     $('#agent_clear_memory').on('click', () => void clearAgentMemoryFromUi());
     $('#agent_run_lorebook').on('click', () => void runLorebookSyncFromUi());
     $('#agent_apply_lore_review').on('click', () => void applyPendingLoreReviewFromUi());

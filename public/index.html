@@ -4927,6 +4927,14 @@
                                         <i class="fa-solid fa-copy"></i>
                                         <span data-i18n="Copy Main Profile To Agents">Copy Main Profile To Agents</span>
                                     </div>
+                                    <div id="agent_import_preset" class="menu_button menu_button_icon">
+                                        <i class="fa-solid fa-file-import"></i>
+                                        <span data-i18n="Apply Chat Preset To Agents">Apply Chat Preset To Agents</span>
+                                    </div>
+                                    <div id="agent_clear_preset" class="menu_button menu_button_icon">
+                                        <i class="fa-solid fa-rotate-left"></i>
+                                        <span data-i18n="Clear Agent Preset">Clear Agent Preset</span>
+                                    </div>
                                     <div id="agent_run_lorebook" class="menu_button menu_button_icon">
                                         <i class="fa-solid fa-book-open"></i>
                                         <span data-i18n="Run Lorebook Sync">Run Lorebook Sync</span>
@@ -4936,6 +4944,8 @@
                                         <span data-i18n="Clear Agent Memory">Clear Agent Memory</span>
                                     </div>
                                 </div>
+                                <input type="file" id="agent_preset_import_file" accept=".json,.settings" hidden>
+                                <small id="agent_preset_status"></small>
                                 <div class="flex-container flexFlowColumn flexNoGap">
                                     <strong data-i18n="Memory Summary">Memory Summary</strong>
                                     <textarea id="agent_memory_summary" class="text_pole textarea_compact" rows="4" readonly></textarea>
