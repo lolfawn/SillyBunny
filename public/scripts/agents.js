@@ -36,6 +36,10 @@ const AGENT_METADATA_KEY = 'agent_mode';
 const AGENT_CONTEXT_PROMPT_KEY = 'agent_mode_context';
 const AGENT_BLACKLIST_FIELD = 'agentBlacklisted';
 const AGENT_DIRECTOR_LABEL = 'Director';
+const MAX_MEMORY_FACTS = 12;
+const MAX_MEMORY_THREADS = 12;
+const MAX_MEMORY_CHAPTERS = 8;
+const MAX_MEMORY_CHAPTER_SUMMARY_LENGTH = 500;
 
 const agent_director_phases = {
     PRE_GENERATION: 'pre_generation',
@@ -117,6 +121,7 @@ const DEFAULT_CHAT_AGENT_STATE = Object.freeze({
         summary: '',
         facts: [],
         unresolved_threads: [],
+        chapters: [],
         updated_at: null,
     },
     last_runs: {},
@@ -203,6 +208,12 @@ function ensureAgentChatState() {
         };
     }
 
+    chat_metadata[AGENT_METADATA_KEY].memory.summary = String(chat_metadata[AGENT_METADATA_KEY].memory.summary ?? '').trim();
+    chat_metadata[AGENT_METADATA_KEY].memory.facts = normalizeStringArray(chat_metadata[AGENT_METADATA_KEY].memory.facts).slice(0, MAX_MEMORY_FACTS);
+    chat_metadata[AGENT_METADATA_KEY].memory.unresolved_threads = normalizeStringArray(chat_metadata[AGENT_METADATA_KEY].memory.unresolved_threads).slice(0, MAX_MEMORY_THREADS);
+    chat_metadata[AGENT_METADATA_KEY].memory.chapters = normalizeMemoryChapters(chat_metadata[AGENT_METADATA_KEY].memory.chapters);
+    chat_metadata[AGENT_METADATA_KEY].memory.updated_at = normalizeMemoryTimestamp(chat_metadata[AGENT_METADATA_KEY].memory.updated_at);
+
     return chat_metadata[AGENT_METADATA_KEY];
 }
 
@@ -234,9 +245,17 @@ function setAgentModeEnabled(enabled) {
 
 function setAgentMemory(memoryPatch) {
     const state = getAgentChatState();
-    state.memory = {
+    const nextMemory = {
         ...state.memory,
         ...memoryPatch,
+    };
+    state.memory = {
+        ...nextMemory,
+        summary: String(nextMemory.summary ?? '').trim(),
+        facts: normalizeStringArray(nextMemory.facts).slice(0, MAX_MEMORY_FACTS),
+        unresolved_threads: normalizeStringArray(nextMemory.unresolved_threads).slice(0, MAX_MEMORY_THREADS),
+        chapters: normalizeMemoryChapters(nextMemory.chapters),
+        updated_at: normalizeMemoryTimestamp(nextMemory.updated_at),
     };
 }
 
@@ -511,6 +530,63 @@ function normalizeStringArray(value) {
         .map(item => String(item ?? '').trim())
         .filter(Boolean)
         .filter(onlyUnique);
+}
+
+function normalizeMemoryTimestamp(value) {
+    return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function normalizeChapterTitle(value, fallbackIndex = 0) {
+    const title = String(value ?? '').trim();
+    return title.length > 0 ? truncateText(title, 80) : `Chapter ${fallbackIndex + 1}`;
+}
+
+function normalizeChapterSummary(value) {
+    return truncateText(value, MAX_MEMORY_CHAPTER_SUMMARY_LENGTH);
+}
+
+function normalizeMemoryChapters(value) {
+    const seen = new Set();
+
+    return toArray(value)
+        .map((item, index) => {
+            const chapter = item && typeof item === 'object' ? item : { summary: item };
+            const title = normalizeChapterTitle(chapter.title, index);
+            const summary = normalizeChapterSummary(chapter.summary);
+            const keywords = normalizeStringArray(chapter.keywords).slice(0, 8);
+
+            if (!summary) {
+                return null;
+            }
+
+            const dedupeKey = `${title.toLowerCase()}::${summary.toLowerCase()}`;
+            if (seen.has(dedupeKey)) {
+                return null;
+            }
+
+            seen.add(dedupeKey);
+            return {
+                title,
+                summary,
+                keywords,
+            };
+        })
+        .filter(Boolean)
+        .slice(-MAX_MEMORY_CHAPTERS);
+}
+
+function formatMemoryChaptersForPrompt(chapters) {
+    const normalizedChapters = normalizeMemoryChapters(chapters);
+    if (!normalizedChapters.length) {
+        return '(none)';
+    }
+
+    return normalizedChapters
+        .map((chapter, index) => {
+            const keywords = chapter.keywords.length > 0 ? chapter.keywords.join(', ') : '(none)';
+            return `${index + 1}. ${chapter.title}\nSummary: ${chapter.summary}\nKeywords: ${keywords}`;
+        })
+        .join('\n\n');
 }
 
 function getProfileModelSettingKey(source) {
@@ -821,6 +897,10 @@ async function runRetrievalAgent() {
     const worldEntries = await getAccessibleWorldEntries();
     const chatCorpus = buildChatSearchCorpus();
     const memory = getCurrentMemoryState();
+    const chapterCorpus = normalizeMemoryChapters(memory.chapters).map((chapter, index) => ({
+        ...chapter,
+        index,
+    }));
     const resultLimit = getServiceRuntimeConfig(agent_service_ids.RETRIEVAL).resultLimit;
     const worldFuse = new Fuse(worldEntries, {
         keys: ['comment', 'content', 'key', 'keysecondary', 'bookName'],
@@ -832,6 +912,13 @@ async function runRetrievalAgent() {
         threshold: 0.35,
         ignoreLocation: true,
     });
+    const chapterFuse = chapterCorpus.length > 0
+        ? new Fuse(chapterCorpus, {
+            keys: ['title', 'summary', 'keywords'],
+            threshold: 0.32,
+            ignoreLocation: true,
+        })
+        : null;
 
     const tools = [
         createAgentTool(
@@ -877,8 +964,32 @@ async function runRetrievalAgent() {
             },
         ),
         createAgentTool(
+            'search_memory_chapters',
+            'Search durable chapter summaries for older events, arcs, and long-horizon context.',
+            {
+                type: 'object',
+                properties: {
+                    query: { type: 'string' },
+                    limit: { type: 'integer', minimum: 1, maximum: 10 },
+                },
+                required: ['query'],
+            },
+            async ({ query, limit = resultLimit }) => {
+                if (!chapterFuse) {
+                    return [];
+                }
+
+                return chapterFuse.search(String(query ?? ''), { limit: Number(limit) || resultLimit }).map(({ item }) => ({
+                    index: item.index,
+                    title: item.title,
+                    keywords: item.keywords,
+                    summary: truncateText(item.summary, 400),
+                }));
+            },
+        ),
+        createAgentTool(
             'read_memory',
-            'Read the current durable memory for this chat.',
+            'Read the current durable memory for this chat, including summary, facts, open threads, and chapter index info.',
             {
                 type: 'object',
                 properties: {},
@@ -887,6 +998,8 @@ async function runRetrievalAgent() {
                 summary: memory.summary,
                 facts: normalizeStringArray(memory.facts),
                 unresolved_threads: normalizeStringArray(memory.unresolved_threads),
+                chapter_count: chapterCorpus.length,
+                chapter_titles: chapterCorpus.map(chapter => chapter.title),
             }),
         ),
         createAgentTool(
@@ -910,11 +1023,13 @@ async function runRetrievalAgent() {
 
     const recentMessages = chatCorpus.slice(-8).map(item => `${item.name}: ${truncateText(item.content, 180)}`).join('\n');
     const memorySummary = memory.summary || 'No durable memory saved yet.';
+    const chapterTitles = chapterCorpus.map(chapter => chapter.title).join(', ');
 
     const systemPrompt = [
         'You are the Retrieval Agent for a roleplay/chat application.',
         'Use tools to gather only the most relevant background needed for the assistant to answer the current turn well.',
         'Prefer precise lore and recent unresolved context over broad summaries.',
+        'When recent chat is not enough, inspect durable chapter summaries before pulling large amounts of older context.',
         'Never invent facts.',
         'When done, call finish_retrieval with:',
         '- a short summary',
@@ -924,7 +1039,9 @@ async function runRetrievalAgent() {
     const userPrompt = [
         `Current user: ${name1}`,
         `Current character: ${getCurrentCharacterName()}`,
-        `Current durable memory:\n${memorySummary}`,
+        `Current durable memory summary:\n${memorySummary}`,
+        `Saved chapter summaries: ${chapterCorpus.length}`,
+        `Chapter titles:\n${chapterTitles || '(none)'}`,
         `Recent messages:\n${recentMessages || '(no recent chat found)'}`,
         `World info entries available: ${worldEntries.length}`,
         'Retrieve only what is likely to matter for the next reply.',
@@ -946,25 +1063,39 @@ async function runRetrievalAgent() {
 
 async function runMemoryAgent() {
     const memory = getCurrentMemoryState();
+    const existingChapters = normalizeMemoryChapters(memory.chapters);
     const recentMessages = buildChatSearchCorpus().slice(-12).map(item => `${item.name}: ${truncateText(item.content, 220)}`).join('\n');
 
     const tools = [
         createAgentTool(
             'finish_memory_update',
-            'Finish the memory update with a compact durable summary and short lists of lasting facts and unresolved threads.',
+            'Finish the memory update with a compact durable summary, short lists of lasting facts and unresolved threads, and chapter summaries for older arcs.',
             {
                 type: 'object',
                 properties: {
                     summary: { type: 'string' },
                     facts: { type: 'array', items: { type: 'string' } },
                     unresolved_threads: { type: 'array', items: { type: 'string' } },
+                    chapters: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                title: { type: 'string' },
+                                summary: { type: 'string' },
+                                keywords: { type: 'array', items: { type: 'string' } },
+                            },
+                            required: ['summary'],
+                        },
+                    },
                 },
                 required: ['summary'],
             },
-            async ({ summary, facts = [], unresolved_threads = [] }) => ({
+            async ({ summary, facts, unresolved_threads, chapters }) => ({
                 summary: String(summary ?? ''),
-                facts: normalizeStringArray(facts).slice(0, 8),
-                unresolved_threads: normalizeStringArray(unresolved_threads).slice(0, 8),
+                facts: facts === undefined ? normalizeStringArray(memory.facts) : normalizeStringArray(facts).slice(0, MAX_MEMORY_FACTS),
+                unresolved_threads: unresolved_threads === undefined ? normalizeStringArray(memory.unresolved_threads) : normalizeStringArray(unresolved_threads).slice(0, MAX_MEMORY_THREADS),
+                chapters: chapters === undefined ? existingChapters : normalizeMemoryChapters(chapters),
             }),
             { terminal: true },
         ),
@@ -973,6 +1104,8 @@ async function runMemoryAgent() {
     const systemPrompt = [
         'You are the Memory Agent for a roleplay/chat application.',
         'Capture only durable facts that should persist across future turns.',
+        'Maintain three layers of memory: an overall summary, short durable fact/thread lists, and chapter summaries for older arcs or major transitions.',
+        'Prefer refreshing or merging chapter summaries over creating many tiny entries.',
         'Do not store chain-of-thought, transient phrasing, or one-off stylistic details.',
         'When done, call finish_memory_update.',
     ].join('\n');
@@ -981,7 +1114,9 @@ async function runMemoryAgent() {
         `Existing memory summary:\n${memory.summary || '(empty)'}`,
         `Existing facts:\n${normalizeStringArray(memory.facts).join('\n') || '(none)'}`,
         `Existing unresolved threads:\n${normalizeStringArray(memory.unresolved_threads).join('\n') || '(none)'}`,
+        `Existing chapter summaries:\n${formatMemoryChaptersForPrompt(existingChapters)}`,
         `Recent conversation:\n${recentMessages || '(no recent chat found)'}`,
+        `Keep at most ${MAX_MEMORY_CHAPTERS} concise chapter summaries with keywords for retrieval.`,
         'Update the durable memory for this chat.',
     ].join('\n\n');
 
@@ -990,12 +1125,14 @@ async function runMemoryAgent() {
         summary: result.text || memory.summary || '',
         facts: normalizeStringArray(memory.facts),
         unresolved_threads: normalizeStringArray(memory.unresolved_threads),
+        chapters: existingChapters,
     };
 
     setAgentMemory({
         summary: terminalResult.summary,
         facts: terminalResult.facts,
         unresolved_threads: terminalResult.unresolved_threads,
+        chapters: terminalResult.chapters,
         updated_at: new Date().toISOString(),
     });
     await eventSource.emit(event_types.AGENT_MEMORY_UPDATED, { memory: getCurrentMemoryState() });
@@ -1314,6 +1451,7 @@ async function clearAgentMemoryFromUi() {
         summary: '',
         facts: [],
         unresolved_threads: [],
+        chapters: [],
         updated_at: null,
     });
     recordAgentRun(agent_service_ids.MEMORY, { status: 'cleared', summary: '', steps: 0, error: null });
