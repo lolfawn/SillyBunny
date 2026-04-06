@@ -40,6 +40,11 @@ const MAX_MEMORY_FACTS = 12;
 const MAX_MEMORY_THREADS = 12;
 const MAX_MEMORY_CHAPTERS = 8;
 const MAX_MEMORY_CHAPTER_SUMMARY_LENGTH = 500;
+const MAX_STORY_STATE_CHARACTERS = 10;
+const MAX_STORY_STATE_LOCATIONS = 8;
+const MAX_STORY_STATE_INVENTORY = 12;
+const MAX_STORY_STATE_PLOT_THREADS = 10;
+const MAX_STORY_STATE_FIELD_LENGTH = 220;
 
 const agent_director_phases = {
     PRE_GENERATION: 'pre_generation',
@@ -124,6 +129,15 @@ const DEFAULT_CHAT_AGENT_STATE = Object.freeze({
         chapters: [],
         updated_at: null,
     },
+    story_state: {
+        current_location: '',
+        current_time: '',
+        characters: [],
+        locations: [],
+        inventory: [],
+        plot_threads: [],
+        updated_at: null,
+    },
     last_runs: {},
     director: {
         last_turn: null,
@@ -192,6 +206,10 @@ function ensureAgentChatState() {
             ...defaults.memory,
             ...(chat_metadata[AGENT_METADATA_KEY].memory ?? {}),
         },
+        story_state: {
+            ...defaults.story_state,
+            ...(chat_metadata[AGENT_METADATA_KEY].story_state ?? {}),
+        },
         last_runs: {
             ...(chat_metadata[AGENT_METADATA_KEY].last_runs ?? {}),
         },
@@ -213,6 +231,7 @@ function ensureAgentChatState() {
     chat_metadata[AGENT_METADATA_KEY].memory.unresolved_threads = normalizeStringArray(chat_metadata[AGENT_METADATA_KEY].memory.unresolved_threads).slice(0, MAX_MEMORY_THREADS);
     chat_metadata[AGENT_METADATA_KEY].memory.chapters = normalizeMemoryChapters(chat_metadata[AGENT_METADATA_KEY].memory.chapters);
     chat_metadata[AGENT_METADATA_KEY].memory.updated_at = normalizeMemoryTimestamp(chat_metadata[AGENT_METADATA_KEY].memory.updated_at);
+    chat_metadata[AGENT_METADATA_KEY].story_state = normalizeStoryState(chat_metadata[AGENT_METADATA_KEY].story_state);
 
     return chat_metadata[AGENT_METADATA_KEY];
 }
@@ -257,6 +276,15 @@ function setAgentMemory(memoryPatch) {
         chapters: normalizeMemoryChapters(nextMemory.chapters),
         updated_at: normalizeMemoryTimestamp(nextMemory.updated_at),
     };
+}
+
+function setAgentStoryState(storyStatePatch) {
+    const state = getAgentChatState();
+    const nextStoryState = {
+        ...state.story_state,
+        ...storyStatePatch,
+    };
+    state.story_state = normalizeStoryState(nextStoryState);
 }
 
 function recordAgentRun(serviceId, patch) {
@@ -589,6 +617,181 @@ function formatMemoryChaptersForPrompt(chapters) {
         .join('\n\n');
 }
 
+function normalizeStoryStateText(value, maxLength = MAX_STORY_STATE_FIELD_LENGTH) {
+    return truncateText(value, maxLength);
+}
+
+function normalizeStoryStateCharacters(value) {
+    const seen = new Set();
+
+    return toArray(value)
+        .map(item => {
+            const character = item && typeof item === 'object' ? item : { name: item };
+            const name = normalizeStoryStateText(character.name, 80);
+            const role = normalizeStoryStateText(character.role, 120);
+            const status = normalizeStoryStateText(character.status, 140);
+            const goal = normalizeStoryStateText(character.goal, 160);
+
+            if (!name) {
+                return null;
+            }
+
+            const dedupeKey = name.toLowerCase();
+            if (seen.has(dedupeKey)) {
+                return null;
+            }
+
+            seen.add(dedupeKey);
+            return {
+                name,
+                role,
+                status,
+                goal,
+            };
+        })
+        .filter(Boolean)
+        .slice(0, MAX_STORY_STATE_CHARACTERS);
+}
+
+function normalizeStoryStateLocations(value) {
+    const seen = new Set();
+
+    return toArray(value)
+        .map(item => {
+            const location = item && typeof item === 'object' ? item : { name: item };
+            const name = normalizeStoryStateText(location.name, 90);
+            const summary = normalizeStoryStateText(location.summary, 180);
+
+            if (!name) {
+                return null;
+            }
+
+            const dedupeKey = name.toLowerCase();
+            if (seen.has(dedupeKey)) {
+                return null;
+            }
+
+            seen.add(dedupeKey);
+            return {
+                name,
+                summary,
+            };
+        })
+        .filter(Boolean)
+        .slice(0, MAX_STORY_STATE_LOCATIONS);
+}
+
+function normalizeStoryStateInventory(value) {
+    const seen = new Set();
+
+    return toArray(value)
+        .map(item => {
+            const inventoryItem = item && typeof item === 'object' ? item : { name: item };
+            const name = normalizeStoryStateText(inventoryItem.name, 90);
+            const holder = normalizeStoryStateText(inventoryItem.holder, 90);
+            const summary = normalizeStoryStateText(inventoryItem.summary, 160);
+
+            if (!name) {
+                return null;
+            }
+
+            const dedupeKey = `${name.toLowerCase()}::${holder.toLowerCase()}`;
+            if (seen.has(dedupeKey)) {
+                return null;
+            }
+
+            seen.add(dedupeKey);
+            return {
+                name,
+                holder,
+                summary,
+            };
+        })
+        .filter(Boolean)
+        .slice(0, MAX_STORY_STATE_INVENTORY);
+}
+
+function normalizeStoryStatePlotThreads(value) {
+    const seen = new Set();
+
+    return toArray(value)
+        .map(item => {
+            const plotThread = item && typeof item === 'object' ? item : { title: item };
+            const title = normalizeStoryStateText(plotThread.title, 100);
+            const status = normalizeStoryStateText(plotThread.status, 80);
+            const summary = normalizeStoryStateText(plotThread.summary, 180);
+
+            if (!title) {
+                return null;
+            }
+
+            const dedupeKey = title.toLowerCase();
+            if (seen.has(dedupeKey)) {
+                return null;
+            }
+
+            seen.add(dedupeKey);
+            return {
+                title,
+                status,
+                summary,
+            };
+        })
+        .filter(Boolean)
+        .slice(0, MAX_STORY_STATE_PLOT_THREADS);
+}
+
+function normalizeStoryState(value) {
+    const storyState = value && typeof value === 'object' ? value : {};
+
+    return {
+        current_location: normalizeStoryStateText(storyState.current_location, 120),
+        current_time: normalizeStoryStateText(storyState.current_time, 120),
+        characters: normalizeStoryStateCharacters(storyState.characters),
+        locations: normalizeStoryStateLocations(storyState.locations),
+        inventory: normalizeStoryStateInventory(storyState.inventory),
+        plot_threads: normalizeStoryStatePlotThreads(storyState.plot_threads),
+        updated_at: normalizeMemoryTimestamp(storyState.updated_at),
+    };
+}
+
+function formatStoryStateCollectionForPrompt(title, entries, formatter) {
+    if (!entries.length) {
+        return `${title}:\n(none)`;
+    }
+
+    return `${title}:\n${entries.map((entry, index) => `${index + 1}. ${formatter(entry)}`).join('\n')}`;
+}
+
+function formatStoryStateForPrompt(storyState) {
+    const normalizedStoryState = normalizeStoryState(storyState);
+
+    return [
+        `Current location: ${normalizedStoryState.current_location || '(unknown)'}`,
+        `Current time: ${normalizedStoryState.current_time || '(unspecified)'}`,
+        formatStoryStateCollectionForPrompt('Characters', normalizedStoryState.characters, character => [
+            character.name,
+            character.role ? `role: ${character.role}` : '',
+            character.status ? `status: ${character.status}` : '',
+            character.goal ? `goal: ${character.goal}` : '',
+        ].filter(Boolean).join(' | ')),
+        formatStoryStateCollectionForPrompt('Locations', normalizedStoryState.locations, location => [
+            location.name,
+            location.summary ? `summary: ${location.summary}` : '',
+        ].filter(Boolean).join(' | ')),
+        formatStoryStateCollectionForPrompt('Inventory', normalizedStoryState.inventory, inventoryItem => [
+            inventoryItem.name,
+            inventoryItem.holder ? `holder: ${inventoryItem.holder}` : '',
+            inventoryItem.summary ? `summary: ${inventoryItem.summary}` : '',
+        ].filter(Boolean).join(' | ')),
+        formatStoryStateCollectionForPrompt('Plot threads', normalizedStoryState.plot_threads, plotThread => [
+            plotThread.title,
+            plotThread.status ? `status: ${plotThread.status}` : '',
+            plotThread.summary ? `summary: ${plotThread.summary}` : '',
+        ].filter(Boolean).join(' | ')),
+    ].join('\n\n');
+}
+
 function getProfileModelSettingKey(source) {
     return MODEL_SETTING_KEYS[source] ?? MODEL_SETTING_KEYS[chat_completion_sources.OPENAI];
 }
@@ -624,6 +827,10 @@ function buildAgentSettings(serviceId) {
 
 function getCurrentMemoryState() {
     return getAgentChatState().memory;
+}
+
+function getCurrentStoryState() {
+    return getAgentChatState().story_state;
 }
 
 function buildChatSearchCorpus() {
@@ -897,6 +1104,7 @@ async function runRetrievalAgent() {
     const worldEntries = await getAccessibleWorldEntries();
     const chatCorpus = buildChatSearchCorpus();
     const memory = getCurrentMemoryState();
+    const storyState = getCurrentStoryState();
     const chapterCorpus = normalizeMemoryChapters(memory.chapters).map((chapter, index) => ({
         ...chapter,
         index,
@@ -1003,6 +1211,15 @@ async function runRetrievalAgent() {
             }),
         ),
         createAgentTool(
+            'read_story_state',
+            'Read the current structured story state for this chat, including location, time, characters, inventory, and plot threads.',
+            {
+                type: 'object',
+                properties: {},
+            },
+            async () => normalizeStoryState(storyState),
+        ),
+        createAgentTool(
             'finish_retrieval',
             'Finish retrieval and provide a concise context block that can be injected into the next assistant prompt.',
             {
@@ -1024,11 +1241,19 @@ async function runRetrievalAgent() {
     const recentMessages = chatCorpus.slice(-8).map(item => `${item.name}: ${truncateText(item.content, 180)}`).join('\n');
     const memorySummary = memory.summary || 'No durable memory saved yet.';
     const chapterTitles = chapterCorpus.map(chapter => chapter.title).join(', ');
+    const storyStateSummary = [
+        storyState.current_location ? `location: ${storyState.current_location}` : '',
+        storyState.current_time ? `time: ${storyState.current_time}` : '',
+        storyState.characters.length ? `${storyState.characters.length} characters` : '',
+        storyState.inventory.length ? `${storyState.inventory.length} inventory items` : '',
+        storyState.plot_threads.length ? `${storyState.plot_threads.length} plot threads` : '',
+    ].filter(Boolean).join(', ');
 
     const systemPrompt = [
         'You are the Retrieval Agent for a roleplay/chat application.',
         'Use tools to gather only the most relevant background needed for the assistant to answer the current turn well.',
         'Prefer precise lore and recent unresolved context over broad summaries.',
+        'Prefer structured story state for current location, cast, inventory, quest, and time context when available.',
         'When recent chat is not enough, inspect durable chapter summaries before pulling large amounts of older context.',
         'Never invent facts.',
         'When done, call finish_retrieval with:',
@@ -1042,6 +1267,7 @@ async function runRetrievalAgent() {
         `Current durable memory summary:\n${memorySummary}`,
         `Saved chapter summaries: ${chapterCorpus.length}`,
         `Chapter titles:\n${chapterTitles || '(none)'}`,
+        `Structured story state snapshot:\n${storyStateSummary || '(none yet)'}`,
         `Recent messages:\n${recentMessages || '(no recent chat found)'}`,
         `World info entries available: ${worldEntries.length}`,
         'Retrieve only what is likely to matter for the next reply.',
@@ -1063,13 +1289,15 @@ async function runRetrievalAgent() {
 
 async function runMemoryAgent() {
     const memory = getCurrentMemoryState();
+    const storyState = getCurrentStoryState();
     const existingChapters = normalizeMemoryChapters(memory.chapters);
+    const existingStoryState = normalizeStoryState(storyState);
     const recentMessages = buildChatSearchCorpus().slice(-12).map(item => `${item.name}: ${truncateText(item.content, 220)}`).join('\n');
 
     const tools = [
         createAgentTool(
             'finish_memory_update',
-            'Finish the memory update with a compact durable summary, short lists of lasting facts and unresolved threads, and chapter summaries for older arcs.',
+            'Finish the memory update with a compact durable summary, short lists of lasting facts and unresolved threads, chapter summaries for older arcs, and updated structured story state.',
             {
                 type: 'object',
                 properties: {
@@ -1088,14 +1316,70 @@ async function runMemoryAgent() {
                             required: ['summary'],
                         },
                     },
+                    story_state: {
+                        type: 'object',
+                        properties: {
+                            current_location: { type: 'string' },
+                            current_time: { type: 'string' },
+                            characters: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        name: { type: 'string' },
+                                        role: { type: 'string' },
+                                        status: { type: 'string' },
+                                        goal: { type: 'string' },
+                                    },
+                                    required: ['name'],
+                                },
+                            },
+                            locations: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        name: { type: 'string' },
+                                        summary: { type: 'string' },
+                                    },
+                                    required: ['name'],
+                                },
+                            },
+                            inventory: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        name: { type: 'string' },
+                                        holder: { type: 'string' },
+                                        summary: { type: 'string' },
+                                    },
+                                    required: ['name'],
+                                },
+                            },
+                            plot_threads: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        title: { type: 'string' },
+                                        status: { type: 'string' },
+                                        summary: { type: 'string' },
+                                    },
+                                    required: ['title'],
+                                },
+                            },
+                        },
+                    },
                 },
                 required: ['summary'],
             },
-            async ({ summary, facts, unresolved_threads, chapters }) => ({
+            async ({ summary, facts, unresolved_threads, chapters, story_state }) => ({
                 summary: String(summary ?? ''),
                 facts: facts === undefined ? normalizeStringArray(memory.facts) : normalizeStringArray(facts).slice(0, MAX_MEMORY_FACTS),
                 unresolved_threads: unresolved_threads === undefined ? normalizeStringArray(memory.unresolved_threads) : normalizeStringArray(unresolved_threads).slice(0, MAX_MEMORY_THREADS),
                 chapters: chapters === undefined ? existingChapters : normalizeMemoryChapters(chapters),
+                story_state: story_state === undefined ? existingStoryState : normalizeStoryState(story_state),
             }),
             { terminal: true },
         ),
@@ -1105,7 +1389,9 @@ async function runMemoryAgent() {
         'You are the Memory Agent for a roleplay/chat application.',
         'Capture only durable facts that should persist across future turns.',
         'Maintain three layers of memory: an overall summary, short durable fact/thread lists, and chapter summaries for older arcs or major transitions.',
+        'Also maintain structured story state for current location, time, important characters, relevant locations, inventory, and plot threads.',
         'Prefer refreshing or merging chapter summaries over creating many tiny entries.',
+        'Prefer updating existing story-state entries over creating duplicates with slightly different wording.',
         'Do not store chain-of-thought, transient phrasing, or one-off stylistic details.',
         'When done, call finish_memory_update.',
     ].join('\n');
@@ -1115,8 +1401,10 @@ async function runMemoryAgent() {
         `Existing facts:\n${normalizeStringArray(memory.facts).join('\n') || '(none)'}`,
         `Existing unresolved threads:\n${normalizeStringArray(memory.unresolved_threads).join('\n') || '(none)'}`,
         `Existing chapter summaries:\n${formatMemoryChaptersForPrompt(existingChapters)}`,
+        `Existing structured story state:\n${formatStoryStateForPrompt(existingStoryState)}`,
         `Recent conversation:\n${recentMessages || '(no recent chat found)'}`,
         `Keep at most ${MAX_MEMORY_CHAPTERS} concise chapter summaries with keywords for retrieval.`,
+        `Keep at most ${MAX_STORY_STATE_CHARACTERS} characters, ${MAX_STORY_STATE_LOCATIONS} locations, ${MAX_STORY_STATE_INVENTORY} inventory items, and ${MAX_STORY_STATE_PLOT_THREADS} plot threads.`,
         'Update the durable memory for this chat.',
     ].join('\n\n');
 
@@ -1126,6 +1414,7 @@ async function runMemoryAgent() {
         facts: normalizeStringArray(memory.facts),
         unresolved_threads: normalizeStringArray(memory.unresolved_threads),
         chapters: existingChapters,
+        story_state: existingStoryState,
     };
 
     setAgentMemory({
@@ -1133,6 +1422,10 @@ async function runMemoryAgent() {
         facts: terminalResult.facts,
         unresolved_threads: terminalResult.unresolved_threads,
         chapters: terminalResult.chapters,
+        updated_at: new Date().toISOString(),
+    });
+    setAgentStoryState({
+        ...terminalResult.story_state,
         updated_at: new Date().toISOString(),
     });
     await eventSource.emit(event_types.AGENT_MEMORY_UPDATED, { memory: getCurrentMemoryState() });
@@ -1442,7 +1735,7 @@ async function runLorebookSyncFromUi() {
 }
 
 async function clearAgentMemoryFromUi() {
-    const confirmation = await Popup.show.confirm(t`Clear agent memory for this chat?`, t`This only removes agent memory, not your chat history.`);
+    const confirmation = await Popup.show.confirm(t`Clear agent memory and story state for this chat?`, t`This removes agent-generated memory and story state, but not your chat history.`);
     if (!confirmation) {
         return;
     }
@@ -1452,6 +1745,15 @@ async function clearAgentMemoryFromUi() {
         facts: [],
         unresolved_threads: [],
         chapters: [],
+        updated_at: null,
+    });
+    setAgentStoryState({
+        current_location: '',
+        current_time: '',
+        characters: [],
+        locations: [],
+        inventory: [],
+        plot_threads: [],
         updated_at: null,
     });
     recordAgentRun(agent_service_ids.MEMORY, { status: 'cleared', summary: '', steps: 0, error: null });
@@ -1529,6 +1831,74 @@ function renderStatusList() {
     }
 }
 
+function renderStoryStateValue(selector, value, emptyText = '(none)') {
+    const $container = $(selector);
+    if ($container.length === 0) {
+        return;
+    }
+
+    $container.empty().text(String(value ?? '').trim() || emptyText);
+}
+
+function renderStoryStateEntries(selector, entries, buildEntry) {
+    const $container = $(selector);
+    if ($container.length === 0) {
+        return;
+    }
+
+    $container.empty();
+
+    if (!entries.length) {
+        $container.append($('<small class="sb-agent-state-empty"></small>').text('(none)'));
+        return;
+    }
+
+    for (const entry of entries) {
+        const { title, detail } = buildEntry(entry);
+        const row = $('<div class="sb-agent-state-entry"></div>');
+        row.append($('<strong class="sb-agent-state-entry-title"></strong>').text(title));
+
+        if (detail) {
+            row.append($('<small class="sb-agent-state-entry-detail"></small>').text(detail));
+        }
+
+        $container.append(row);
+    }
+}
+
+function renderStoryStatePanel(storyState) {
+    const normalizedStoryState = normalizeStoryState(storyState);
+
+    renderStoryStateValue('#agent_story_state_current_location', normalizedStoryState.current_location, '(unknown)');
+    renderStoryStateValue('#agent_story_state_current_time', normalizedStoryState.current_time, '(unspecified)');
+    renderStoryStateEntries('#agent_story_state_characters', normalizedStoryState.characters, character => ({
+        title: character.name,
+        detail: [
+            character.role,
+            character.status,
+            character.goal ? `Goal: ${character.goal}` : '',
+        ].filter(Boolean).join(' | '),
+    }));
+    renderStoryStateEntries('#agent_story_state_locations', normalizedStoryState.locations, location => ({
+        title: location.name,
+        detail: location.summary,
+    }));
+    renderStoryStateEntries('#agent_story_state_inventory', normalizedStoryState.inventory, inventoryItem => ({
+        title: inventoryItem.name,
+        detail: [
+            inventoryItem.holder ? `Holder: ${inventoryItem.holder}` : '',
+            inventoryItem.summary,
+        ].filter(Boolean).join(' | '),
+    }));
+    renderStoryStateEntries('#agent_story_state_plot_threads', normalizedStoryState.plot_threads, plotThread => ({
+        title: plotThread.title,
+        detail: [
+            plotThread.status,
+            plotThread.summary,
+        ].filter(Boolean).join(' | '),
+    }));
+}
+
 function renderAgentPanel() {
     if ($('#agent_mode_panel').length === 0) {
         return;
@@ -1546,12 +1916,13 @@ function renderAgentPanel() {
     $('#agent_service_memory').prop('checked', Boolean(state.services[agent_service_ids.MEMORY]?.enabled));
     $('#agent_service_lorebook').prop('checked', Boolean(state.services[agent_service_ids.LOREBOOK]?.enabled));
     $('#agent_memory_summary').val(state.memory.summary || '');
+    renderStoryStatePanel(state.story_state);
 
     const availabilityText = !hasChat
         ? t`Open a chat to configure per-chat agent mode.`
         : !available
             ? t`Agent mode currently runs only through chat-completions providers.`
-            : t`The turn director runs retrieval before the next reply, then memory and lorebook after the reply is saved.`;
+            : t`The turn director runs retrieval before the next reply, then updates durable memory, story state, and lorebook context after the reply is saved.`;
     $('#agent_mode_status_hint').text(availabilityText);
 
     for (const serviceId of Object.values(agent_service_ids)) {

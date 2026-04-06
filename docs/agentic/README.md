@@ -49,3 +49,4 @@ See:
 - [experiment-template.md](/run/media/platinum/HDD/SillyBunny/docs/agentic/experiment-template.md)
 - [experiments/001-director-layer.md](/run/media/platinum/HDD/SillyBunny/docs/agentic/experiments/001-director-layer.md)
 - [experiments/002-durable-memory.md](/run/media/platinum/HDD/SillyBunny/docs/agentic/experiments/002-durable-memory.md)
+- [experiments/003-structured-story-state.md](/run/media/platinum/HDD/SillyBunny/docs/agentic/experiments/003-structured-story-state.md)

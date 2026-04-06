@@ -8,27 +8,28 @@ This is the repo-grounded map of where agentic behavior lives today.
   Calls `runPreGenerationAgents()` before chat-completions generation.
 - [public/script.js](/run/media/platinum/HDD/SillyBunny/public/script.js)
   Calls `runPostGenerationAgents()` after generation.
-- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:1047)
+- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:1686)
   Handles pre-generation retrieval injection.
-- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:1062)
+- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:1707)
   Handles post-generation memory and lorebook runs.
 
 ## Current agent services
 
-- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:619)
+- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:1103)
   `runRetrievalAgent()` searches lorebook entries, chat history, and saved memory, then injects a context block.
-- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:745)
-  `runMemoryAgent()` writes a compact summary, facts, and unresolved threads into chat metadata.
-- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:807)
+- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:1290)
+  `runMemoryAgent()` writes durable memory plus structured story state into chat metadata.
+- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:1440)
   `runLorebookAgent()` can search, create, and update lore entries in active world books.
 
 ## Current storage model
 
-- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:95)
+- [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js:118)
   Chat-scoped agent state currently stores:
   - enabled flags
   - service toggles
-  - memory summary/facts/unresolved threads
+  - durable memory summary/facts/unresolved threads/chapters
+  - structured story state for location, time, characters, locations, inventory, and plot threads
   - last run status
 - [public/scripts/world-info.js](/run/media/platinum/HDD/SillyBunny/public/scripts/world-info.js:4011)
   World info entries already support `agentBlacklisted`.
@@ -42,10 +43,10 @@ This is the repo-grounded map of where agentic behavior lives today.
 
 ## Current gaps versus Aventuras-style behavior
 
-- No explicit "director" or planner that decides which services should run and why.
-- No structured story-state model for characters, locations, inventory, quests, relationships, or time.
-- Memory is durable but still lightweight; there is no chapter model or retrieval over chapter summaries.
-- Lore autonomy exists, but it is not yet tied to a stronger world-state layer.
+- The director exists, but it still follows a fixed service schedule instead of making richer plan-time decisions.
+- Story state now exists in a first-pass schema, but it still lacks relationships, stronger state transitions, and dedicated review/update tooling.
+- Durable memory is stronger now, but retrieval still has room to get smarter about when to use summaries versus structured state versus raw chat.
+- Lore autonomy exists, but it is not yet tightly coupled to story-state diffs or reviewable proposed changes.
 - No dedicated narrative action suggestion mode or adventure-mode turn structure.
 
 ## Best first extension points
