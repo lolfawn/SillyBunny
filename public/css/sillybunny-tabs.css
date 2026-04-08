@@ -2572,23 +2572,36 @@ body:not(.movingUI) .drawer-content.maximized {
     .sb-shell-nav {
         width: 100%;
         min-width: 0;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 118px), 1fr));
-        overflow: visible;
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        scroll-snap-type: x proximity;
         gap: 4px;
         padding: 6px 6px 4px;
         border-right: 0;
         border-bottom: 1px solid color-mix(in srgb, var(--sb-shell-border) 80%, transparent);
     }
 
+    .sb-shell-nav::-webkit-scrollbar {
+        display: none;
+    }
+
     .sb-shell-tab {
-        width: 100%;
-        min-width: 0;
+        flex: 0 0 clamp(188px, 60vw, 272px);
+        width: auto;
+        min-width: clamp(188px, 60vw, 272px);
+        max-width: calc(100vw - 24px);
         min-height: 46px;
         padding: 8px 10px;
         border-radius: 12px;
         gap: 6px;
         align-items: center;
+        scroll-snap-align: start;
     }
 
     .sb-shell-tab i {
@@ -2890,13 +2903,14 @@ body:not(.movingUI) .drawer-content.maximized {
     }
 
     .sb-shell-nav {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 4px;
-        padding: 4px;
+        padding: 4px 4px 6px;
     }
 
     .sb-shell-tab {
-        min-width: 0;
+        flex-basis: clamp(164px, 72vw, 212px);
+        min-width: clamp(164px, 72vw, 212px);
+        max-width: calc(100vw - 16px);
         min-height: 44px;
         padding: 7px 8px;
         gap: 5px;
