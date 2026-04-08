@@ -26,9 +26,28 @@ done
 
 OS_NAME="$(uname -s 2>/dev/null || echo unknown)"
 BUN_INSTALL_DIR="${BUN_INSTALL:-$HOME/.bun}"
+TERMUX_PREFIX_DEFAULT='/data/data/com.termux/files/usr'
+TERMUX_PREFIX="${PREFIX:-$TERMUX_PREFIX_DEFAULT}"
+TERMUX_BUN_WRAPPER_MARKER='SillyBunny Termux Bun wrapper'
 
 have_command() {
     command -v "$1" >/dev/null 2>&1
+}
+
+is_termux() {
+    if [[ -n "${TERMUX_VERSION:-}" ]]; then
+        return 0
+    fi
+
+    if [[ "${PREFIX:-}" == "$TERMUX_PREFIX_DEFAULT" ]]; then
+        return 0
+    fi
+
+    if [[ "$HOME" == /data/data/com.termux/files/home* && -x "$TERMUX_PREFIX_DEFAULT/bin/pkg" ]]; then
+        return 0
+    fi
+
+    return 1
 }
 
 have_working_bun() {
@@ -57,6 +76,9 @@ add_to_path() {
 
 refresh_known_paths() {
     add_to_path "$BUN_INSTALL_DIR/bin"
+    if is_termux; then
+        add_to_path "$TERMUX_PREFIX/bin"
+    fi
     add_to_path /opt/homebrew/bin
     add_to_path /usr/local/bin
 }
@@ -139,6 +161,107 @@ ensure_download_tool() {
     esac
 }
 
+termux_glibc_runner_path() {
+    if have_command grun; then
+        command -v grun
+        return 0
+    fi
+
+    if [[ -x "$TERMUX_PREFIX/bin/grun" ]]; then
+        printf '%s\n' "$TERMUX_PREFIX/bin/grun"
+        return 0
+    fi
+
+    return 1
+}
+
+install_termux_glibc_runner() {
+    if ! is_termux; then
+        return 0
+    fi
+
+    if termux_glibc_runner_path >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo "Termux detected. Installing glibc support for Bun..."
+    if have_command pkg; then
+        pkg install -y glibc-repo
+        pkg install -y glibc-runner
+    else
+        install_linux_packages glibc-repo
+        install_linux_packages glibc-runner
+    fi
+    refresh_known_paths
+
+    if ! termux_glibc_runner_path >/dev/null 2>&1; then
+        echo "Termux glibc support installation finished, but 'grun' is still unavailable in this session." >&2
+        exit 1
+    fi
+}
+
+is_termux_bun_wrapper() {
+    local bun_path="$BUN_INSTALL_DIR/bin/bun"
+
+    [[ -f "$bun_path" ]] && grep -aq "$TERMUX_BUN_WRAPPER_MARKER" "$bun_path"
+}
+
+configure_termux_bun_wrapper() {
+    local bin_dir="$BUN_INSTALL_DIR/bin"
+    local bun_path="$bin_dir/bun"
+    local bun_real_path="$bin_dir/buno"
+    local glibc_runner
+
+    if ! is_termux; then
+        return 1
+    fi
+
+    glibc_runner="$(termux_glibc_runner_path)" || return 1
+
+    mkdir -p "$bin_dir"
+
+    if [[ -x "$bun_path" ]] && ! is_termux_bun_wrapper; then
+        mv -f "$bun_path" "$bun_real_path"
+    fi
+
+    if [[ ! -x "$bun_real_path" ]]; then
+        return 1
+    fi
+
+    cat >"$bun_path" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+# $TERMUX_BUN_WRAPPER_MARKER
+REAL_BUN="$bun_real_path"
+GLIBC_RUNNER="$glibc_runner"
+
+if [[ ! -x "\$REAL_BUN" ]]; then
+    echo "SillyBunny could not find the Termux Bun runtime at '\$REAL_BUN'." >&2
+    exit 1
+fi
+
+if [[ ! -x "\$GLIBC_RUNNER" ]]; then
+    echo "SillyBunny could not find Termux glibc-runner at '\$GLIBC_RUNNER'." >&2
+    exit 1
+fi
+
+exec "\$GLIBC_RUNNER" "\$REAL_BUN" "\$@"
+EOF
+    chmod +x "$bun_path"
+}
+
+repair_termux_bun() {
+    if ! is_termux; then
+        return 1
+    fi
+
+    install_termux_glibc_runner
+    configure_termux_bun_wrapper || return 1
+    refresh_known_paths
+    have_working_bun
+}
+
 install_git() {
     if have_working_git; then
         return
@@ -186,9 +309,17 @@ install_bun() {
         return
     fi
 
+    if repair_termux_bun; then
+        return
+    fi
+
     echo "Bun was not found. Installing it automatically..."
 
     ensure_download_tool
+
+    if is_termux; then
+        install_termux_glibc_runner
+    fi
 
     if have_command curl; then
         curl -fsSL https://bun.sh/install | bash
@@ -198,8 +329,17 @@ install_bun() {
 
     refresh_known_paths
 
+    if is_termux; then
+        configure_termux_bun_wrapper || true
+        refresh_known_paths
+    fi
+
     if ! have_working_bun; then
         echo "Bun installation finished, but 'bun' is still unavailable in this session." >&2
+        if is_termux; then
+            echo "Termux needs Bun to run through glibc-runner. The launcher tried to install and wire that up automatically." >&2
+            echo "If it still fails, verify 'pkg install glibc-repo glibc-runner' works in this Termux session, then rerun the launcher." >&2
+        fi
         echo "Install Bun manually from https://bun.sh/" >&2
         exit 1
     fi

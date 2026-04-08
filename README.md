@@ -115,6 +115,7 @@ bash start.sh
 ```
 
 - `start.sh` will install Bun automatically if it is missing, install project packages, then launch SillyBunny
+- On native Termux, the launcher also installs `glibc-repo` and `glibc-runner` when needed, then wraps Bun through that compatibility layer automatically
 - If you want to browse or import files from Android shared storage, run `termux-setup-storage` once before starting
 - For lower-memory phones or tablet-style environments, you can also use:
 

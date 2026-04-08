@@ -19,6 +19,24 @@ is_truthy() {
     esac
 }
 
+is_termux() {
+    [[ -n "${TERMUX_VERSION:-}" || "${PREFIX:-}" == /data/data/com.termux/files/usr ]]
+}
+
+resolve_bun_command() {
+    if command -v bun >/dev/null 2>&1; then
+        command -v bun
+        return 0
+    fi
+
+    if [[ -x "$BUN_INSTALL/bin/bun" ]]; then
+        printf '%s\n' "$BUN_INSTALL/bin/bun"
+        return 0
+    fi
+
+    return 1
+}
+
 self_update_requested=0
 self_update_only=0
 skip_auto_update=0
@@ -85,14 +103,25 @@ if [[ -d "$BUN_INSTALL/bin" ]]; then
     export PATH="$BUN_INSTALL/bin:$PATH"
 fi
 
+if is_termux; then
+    export TMPDIR="${TMPDIR:-${PREFIX:-/data/data/com.termux/files/usr}/tmp}"
+    mkdir -p "$TMPDIR"
+fi
+
+BUN_CMD="$(resolve_bun_command)"
+
 echo "Installing Bun packages..."
 export NODE_ENV=production
-bun install --frozen-lockfile --production
+bun_install_args=(install --frozen-lockfile --production)
+if is_termux; then
+    bun_install_args+=(--backend=copyfile)
+fi
+"$BUN_CMD" "${bun_install_args[@]}"
 
 echo "Entering SillyBunny..."
 export NODE_NO_WARNINGS=1
 if (( ${#server_args[@]} )); then
-    bun server.js "${server_args[@]}"
+    "$BUN_CMD" server.js "${server_args[@]}"
 else
-    bun server.js
+    "$BUN_CMD" server.js
 fi
