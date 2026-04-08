@@ -6,6 +6,12 @@ export function isBunRuntime() {
     return typeof Bun !== 'undefined' || Boolean(process.versions?.bun);
 }
 
+export function isNativeTermuxEnvironment() {
+    return Boolean(process.env.TERMUX_VERSION)
+        || process.env.PREFIX === '/data/data/com.termux/files/usr'
+        || (typeof process.env.HOME === 'string' && process.env.HOME.startsWith('/data/data/com.termux/files/home'));
+}
+
 export function getRuntimeName() {
     if (isBunRuntime()) {
         return 'Bun';

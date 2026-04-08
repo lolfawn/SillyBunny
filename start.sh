@@ -23,7 +23,36 @@ is_termux() {
     [[ -n "${TERMUX_VERSION:-}" || "${PREFIX:-}" == /data/data/com.termux/files/usr ]]
 }
 
-resolve_bun_command() {
+prefer_node_runtime() {
+    if ! is_termux; then
+        return 1
+    fi
+
+    case "${SILLYBUNNY_TERMUX_RUNTIME:-auto}" in
+        bun)
+            return 1
+            ;;
+        auto|node|'')
+            return 0
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
+resolve_runtime_command() {
+    local runtime_kind="${1:-bun}"
+
+    if [[ "$runtime_kind" == node ]]; then
+        if command -v node >/dev/null 2>&1; then
+            command -v node
+            return 0
+        fi
+
+        return 1
+    fi
+
     if command -v bun >/dev/null 2>&1; then
         command -v bun
         return 0
@@ -35,6 +64,21 @@ resolve_bun_command() {
     fi
 
     return 1
+}
+
+resolve_package_manager_command() {
+    local runtime_kind="${1:-bun}"
+
+    if [[ "$runtime_kind" == node ]]; then
+        if command -v npm >/dev/null 2>&1; then
+            command -v npm
+            return 0
+        fi
+
+        return 1
+    fi
+
+    resolve_runtime_command bun
 }
 
 self_update_requested=0
@@ -78,6 +122,12 @@ if (( self_update_only )); then
     prereq_args+=(--skip-bun)
 fi
 
+runtime_kind=bun
+if (( ! self_update_only )) && prefer_node_runtime; then
+    runtime_kind=node
+    prereq_args+=(--require-node-runtime --skip-bun)
+fi
+
 if (( auto_update_enabled )) && [[ -d "$SCRIPT_DIR/.git" ]]; then
     prereq_args+=(--require-git)
 fi
@@ -108,20 +158,39 @@ if is_termux; then
     mkdir -p "$TMPDIR"
 fi
 
-BUN_CMD="$(resolve_bun_command)"
+RUNTIME_CMD="$(resolve_runtime_command "$runtime_kind")"
+PACKAGE_MANAGER_CMD="$(resolve_package_manager_command "$runtime_kind")"
 
-echo "Installing Bun packages..."
-export NODE_ENV=production
-bun_install_args=(install --frozen-lockfile --production)
-if is_termux; then
-    bun_install_args+=(--backend=copyfile)
+if [[ "$runtime_kind" == node ]]; then
+    echo "Installing Node.js packages for native Termux..."
+else
+    echo "Installing Bun packages..."
 fi
-"$BUN_CMD" "${bun_install_args[@]}"
+
+export NODE_ENV=production
+install_args=()
+if [[ "$runtime_kind" == node ]]; then
+    install_args=(install --no-audit --no-fund --omit=dev)
+else
+    install_args=(install --frozen-lockfile --production)
+    if is_termux; then
+        install_args+=(--backend=copyfile)
+    fi
+fi
+"$PACKAGE_MANAGER_CMD" "${install_args[@]}"
 
 echo "Entering SillyBunny..."
 export NODE_NO_WARNINGS=1
 if (( ${#server_args[@]} )); then
-    "$BUN_CMD" server.js "${server_args[@]}"
+    if [[ "$runtime_kind" == node ]]; then
+        "$RUNTIME_CMD" --no-warnings server.js "${server_args[@]}"
+    else
+        "$RUNTIME_CMD" server.js "${server_args[@]}"
+    fi
 else
-    "$BUN_CMD" server.js
+    if [[ "$runtime_kind" == node ]]; then
+        "$RUNTIME_CMD" --no-warnings server.js
+    else
+        "$RUNTIME_CMD" server.js
+    fi
 fi

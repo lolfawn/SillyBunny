@@ -9,7 +9,7 @@ import { sync as writeFileAtomicSync } from 'write-file-atomic';
 import { sync as commandExistsSync } from 'command-exists';
 import { CheckRepoActions, default as simpleGit } from 'simple-git';
 
-import { APP_NAME, formatRuntimeLabel, isBunRuntime } from '../runtime.js';
+import { APP_NAME, formatRuntimeLabel, isBunRuntime, isNativeTermuxEnvironment } from '../runtime.js';
 import { getServerLogSnapshot } from '../server-log-buffer.js';
 import { serverDirectory } from '../server-directory.js';
 import { requireAdminMiddleware } from '../users.js';
@@ -224,8 +224,9 @@ async function runCommand(command, args, options = {}) {
 function getInstallCommand() {
     const bunLockPath = path.join(serverDirectory, 'bun.lock');
     const packageLockPath = path.join(serverDirectory, 'package-lock.json');
+    const preferNodeInstall = isNativeTermuxEnvironment() && !isBunRuntime();
 
-    if ((isBunRuntime() || fs.existsSync(bunLockPath)) && commandExistsSync('bun')) {
+    if (!preferNodeInstall && (isBunRuntime() || fs.existsSync(bunLockPath)) && commandExistsSync('bun')) {
         return {
             command: 'bun',
             args: ['install'],

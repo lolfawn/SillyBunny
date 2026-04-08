@@ -4,11 +4,15 @@ set -euo pipefail
 
 require_bun=1
 require_git=0
+require_node_runtime=0
 
 while (($#)); do
     case "$1" in
         --require-git)
             require_git=1
+            ;;
+        --require-node-runtime|--require-node|--node-runtime)
+            require_node_runtime=1
             ;;
         --skip-bun|--no-bun)
             require_bun=0
@@ -56,6 +60,10 @@ have_working_bun() {
 
 have_working_git() {
     have_command git && git --version >/dev/null 2>&1
+}
+
+have_working_node_runtime() {
+    have_command node && node --version >/dev/null 2>&1 && have_command npm && npm --version >/dev/null 2>&1
 }
 
 add_to_path() {
@@ -304,6 +312,49 @@ install_git() {
     fi
 }
 
+install_node_runtime() {
+    if ! (( require_node_runtime )); then
+        return
+    fi
+
+    if have_working_node_runtime; then
+        return
+    fi
+
+    echo "Node.js was not found. Installing it automatically..."
+
+    case "$OS_NAME" in
+        Linux|GNU/Linux)
+            if is_termux; then
+                if have_command pkg; then
+                    pkg install -y nodejs-lts
+                else
+                    install_linux_packages nodejs-lts
+                fi
+            else
+                install_linux_packages nodejs npm
+            fi
+            ;;
+        Darwin)
+            echo "Automatic Node.js installation is not supported on this platform by this launcher." >&2
+            echo "Install Node.js manually, then rerun the launcher." >&2
+            exit 1
+            ;;
+        *)
+            echo "Automatic Node.js installation is not supported on this platform." >&2
+            echo "Install Node.js manually, then rerun the launcher." >&2
+            exit 1
+            ;;
+    esac
+
+    refresh_known_paths
+
+    if ! have_working_node_runtime; then
+        echo "Node.js installation finished, but 'node' and 'npm' are still unavailable in this session." >&2
+        exit 1
+    fi
+}
+
 install_bun() {
     if have_working_bun; then
         return
@@ -349,6 +400,10 @@ refresh_known_paths
 
 if (( require_git )); then
     install_git
+fi
+
+if (( require_node_runtime )); then
+    install_node_runtime
 fi
 
 if (( require_bun )); then
