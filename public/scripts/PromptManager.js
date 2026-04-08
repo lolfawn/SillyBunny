@@ -12,6 +12,7 @@ import { renderTemplateAsync } from './templates.js';
 import { Popup } from './popup.js';
 import { t } from './i18n.js';
 import { isMobile } from './RossAscends-mods.js';
+import { accountStorage } from './util/AccountStorage.js';
 
 function debouncePromise(func, delay) {
     let timeoutId;
@@ -417,6 +418,57 @@ class PromptManager {
 
         /** Debounced version of render */
         this.renderDebounced = debounce(this.render.bind(this), debounce_timeout.relaxed);
+    }
+
+    getDrawerStorageKey() {
+        const scope = String(this.configuration.containerIdentifier || this.configuration.prefix || 'default').trim() || 'default';
+        return `PromptManager_DrawerExpanded_${scope}`;
+    }
+
+    getStoredDrawerExpanded() {
+        const storedValue = accountStorage.getItem(this.getDrawerStorageKey());
+        return storedValue === null ? false : storedValue === 'true';
+    }
+
+    setStoredDrawerExpanded(expanded) {
+        accountStorage.setItem(this.getDrawerStorageKey(), String(Boolean(expanded)));
+    }
+
+    applyDrawerExpandedState(drawer, expanded) {
+        if (!(drawer instanceof HTMLElement)) {
+            return;
+        }
+
+        const icon = drawer.querySelector(':scope > .inline-drawer-header .inline-drawer-icon');
+        const content = drawer.querySelector(':scope > .inline-drawer-content');
+
+        if (!(icon instanceof HTMLElement) || !(content instanceof HTMLElement)) {
+            return;
+        }
+
+        icon.classList.toggle('down', !expanded);
+        icon.classList.toggle('fa-circle-chevron-down', !expanded);
+        icon.classList.toggle('up', expanded);
+        icon.classList.toggle('fa-circle-chevron-up', expanded);
+        content.style.display = expanded ? 'block' : 'none';
+    }
+
+    bindDrawerPersistence() {
+        const drawer = this.containerElement?.querySelector(`#${this.configuration.prefix}prompt_manager_drawer`);
+        if (!(drawer instanceof HTMLElement)) {
+            return;
+        }
+
+        this.applyDrawerExpandedState(drawer, this.getStoredDrawerExpanded());
+
+        drawer.addEventListener('inline-drawer-toggle', () => {
+            const icon = drawer.querySelector(':scope > .inline-drawer-header .inline-drawer-icon');
+            if (!(icon instanceof HTMLElement)) {
+                return;
+            }
+
+            this.setStoredDrawerExpanded(icon.classList.contains('up'));
+        });
     }
 
 
@@ -1630,13 +1682,17 @@ class PromptManager {
                 selectedPromptIndex = 0;
             }
 
-            const rangeBlockDiv = promptManagerDiv.querySelector('.range-block');
-            const headerDiv = promptManagerDiv.querySelector('.completion_prompt_manager_header');
             const footerHtml = await renderTemplateAsync('promptManagerFooter', { promptsHtml, prefix: this.configuration.prefix });
-            headerDiv.insertAdjacentHTML('afterend', footerHtml);
-            rangeBlockDiv.querySelector('#prompt-manager-reset-character').addEventListener('click', this.handleCharacterReset);
+            const footerSlot = promptManagerDiv.querySelector(`.${this.configuration.prefix}prompt_manager_footer_slot`);
+            footerSlot?.insertAdjacentHTML('beforeend', footerHtml);
 
-            const footerDiv = rangeBlockDiv.querySelector(`.${this.configuration.prefix}prompt_manager_footer`);
+            const footerDiv = promptManagerDiv.querySelector(`.${this.configuration.prefix}prompt_manager_footer`);
+            if (!(footerDiv instanceof HTMLElement)) {
+                this.bindDrawerPersistence();
+                return;
+            }
+
+            footerDiv?.querySelector('#prompt-manager-reset-character')?.addEventListener('click', this.handleCharacterReset);
             footerDiv.querySelector('.menu_button:nth-child(2)').addEventListener('click', this.handleAppendPrompt);
             footerDiv.querySelector('.caution').addEventListener('click', this.handleDeletePrompt);
             footerDiv.querySelector('.menu_button:last-child').addEventListener('click', this.handleNewPrompt);
@@ -1646,6 +1702,8 @@ class PromptManager {
             footerDiv.querySelector('#prompt-manager-import').addEventListener('click', this.handleImport);
             footerDiv.querySelector('#prompt-manager-export').addEventListener('click', this.handleFullExport);
         }
+
+        this.bindDrawerPersistence();
     }
 
     /**

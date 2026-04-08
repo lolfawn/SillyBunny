@@ -46,7 +46,7 @@
     <link rel="stylesheet" type="text/css" href="css/select2-overrides.css">
     <link rel="stylesheet" type="text/css" href="css/mobile-styles.css">
     <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260407i">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260407f">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260408b">
     <link rel="stylesheet" type="text/css" href="css/macros.css">
     <link rel="stylesheet" type="text/css" href="css/user.css">
     <link rel="icon" type="image/png" href="img/sillybunny-pixel-logo.png">
@@ -4855,6 +4855,18 @@
                 </div>
                 <div id="user-settings-block-content" class="flex-container spaceEvenly">
                     <div name="UserSettingsFirstColumn" id="UI-Theme-Block" class="flex-container flexFlowColumn wide100p flex1">
+                        <div id="SillyTavernImportSection" class="inline-drawer wide100p flexFlowColumn sb-settings-subdrawer">
+                            <div class="inline-drawer-toggle inline-drawer-header settings-section-header" title="Import characters, chats, themes, and other SillyTavern data from a folder path or backup ZIP.">
+                                <b><i class="fa-solid fa-file-import"></i> <span>Import &amp; Restore</span></b>
+                                <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
+                            </div>
+                            <div class="inline-drawer-content flex-container flexFlowColumn sb-settings-subdrawer-body" style="display:none">
+                                <div class="sb-settings-subdrawer-toolbar">
+                                    <small>Bring over a full SillyTavern setup from a folder path or backup ZIP without manually moving files.</small>
+                                </div>
+                                <div id="sb-import-tools-outlet" class="flex-container flexFlowColumn"></div>
+                            </div>
+                        </div>
                         <div class="inline-drawer wide100p flexFlowColumn">
                             <div class="inline-drawer-toggle inline-drawer-header settings-section-header">
                                 <b><i class="fa-solid fa-palette"></i> <span data-i18n="Appearance">Appearance</span></b>
@@ -8410,7 +8422,7 @@
     <script type="module" src="lib/eventemitter.js"></script>
     <script type="module" src="scripts/i18n.js"></script>
     <script type="module" src="script.js"></script>
-    <script src="scripts/sillybunny-tabs.js?v=20260407g" defer></script>
+    <script src="scripts/sillybunny-tabs.js?v=20260408b" defer></script>
     <script>
         window.addEventListener('load', (event) => {
             const documentHeight = () => {

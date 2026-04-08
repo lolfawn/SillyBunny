@@ -136,17 +136,14 @@ function populateTabContent(tabs, tabContents, settings, firstSectionAlwaysExpan
             sectionToggle.classList.add('moonlit-section-toggle');
 
             const sectionTitle = document.createElement('h4');
-            sectionTitle.style.margin = '0';
-            sectionTitle.style.display = 'flex';
-            sectionTitle.style.justifyContent = 'space-between';
-            sectionTitle.style.alignItems = 'center';
+            sectionTitle.classList.add('moonlit-section-title');
 
             const titleText = document.createElement('span');
+            titleText.classList.add('moonlit-section-title-text');
             titleText.textContent = getCategoryDisplayName(category);
 
             const toggleIcon = document.createElement('i');
-            toggleIcon.classList.add('fa', 'fa-chevron-down');
-            toggleIcon.style.transition = 'transform 0.3s ease';
+            toggleIcon.classList.add('fa', 'fa-chevron-down', 'moonlit-section-chevron');
 
             if (isFirstSection && firstSectionAlwaysExpanded) {
                 sectionContainer.classList.add('expanded');
@@ -338,23 +335,25 @@ function addCollapsibleSectionStyles() {
     styleElement.id = 'moonlit-section-styles';
     styleElement.textContent = `
     .moonlit-section {
-        border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 25%, transparent);
-        border-radius: 5px;
+        border: 1px solid color-mix(in srgb, var(--customThemeColor) 24%, transparent);
+        border-radius: 8px;
         margin-bottom: 18px;
         overflow: hidden;
+        background-color: var(--black30a);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--customThemeColor) 12%, transparent);
     }
 
     .moonlit-section-header {
-        background-color: color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
-        padding: 8px 12px 8px 8px;
-        border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor) 25%, transparent);
+        background-color: color-mix(in srgb, var(--black30a) 84%, transparent);
+        padding: 10px 12px 8px;
+        border-bottom: 1px solid color-mix(in srgb, var(--customThemeColor) 18%, transparent);
     }
 
     .moonlit-first-section-header {
-        padding: 12px 12px 12px 8px;
+        padding-top: 12px;
     }
 
-    .moonlit-first-section .moonlit-section-toggle h4 {
+    .moonlit-first-section .moonlit-section-title {
         font-weight: 600;
     }
 
@@ -363,27 +362,33 @@ function addCollapsibleSectionStyles() {
         user-select: none;
     }
 
-    .moonlit-section-toggle i {
-        font-size: 0.9em;
-        opacity: 0.7;
-        margin-left: 8px;
+    .moonlit-section-title-text {
+        min-width: 0;
     }
 
-    .moonlit-section.expanded .moonlit-section-toggle i {
+    .moonlit-section-chevron {
+        font-size: 0.9em;
+        opacity: 0.7;
+        margin-left: 12px;
+        flex: 0 0 auto;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    .moonlit-section.expanded .moonlit-section-chevron {
         opacity: 1;
     }
 
     .moonlit-section-content {
         max-height: 0;
         overflow: hidden;
-        padding: 0 10px;
+        padding: 0 12px;
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         opacity: 0;
     }
 
     .moonlit-section.expanded .moonlit-section-content {
         max-height: 2000px;
-        padding: 10px;
+        padding: 10px 12px 12px;
         opacity: 1;
     }
 

@@ -159,7 +159,7 @@ $env:SILLYBUNNY_AUTO_UPDATE = '0'
 .\Start.bat
 ```
 
-Open `http://127.0.0.1:8000`.
+Open `http://127.0.0.1:4444`.
 
 For lower-memory or phone-style environments:
 
@@ -232,6 +232,31 @@ Current Agent Mode limitations:
 - It currently runs only with an active chat
 - It currently targets the chat-completions pipeline
 - The first implementation is intentionally lightweight and service-oriented
+
+## Changelog
+
+### v1.2.6
+
+- Reworked the Chat Completion drawers so `Prompt Manager` now lives in its own persisted section below `Advanced & Reasoning`, while the Claude and Gemini `config.yaml` drawer moved inside `Advanced & Reasoning`.
+- Added top-bar label customization with desktop multi-part combinations for `Ctx Size`, `Character Name`, and `Custom Text`, using middle-dot separators on desktop and single-choice behavior on mobile.
+- Hooked the `Ctx Size` top-bar label into the Prompt page total token count, so the live context total can be surfaced without leaving the chat.
+- Added a `Console Logs` tab under Customize with live server output, including Bun-safe console capture and filtering for terminal control-sequence junk.
+- Fixed the local invalid CSRF token startup issue by hardening token refresh and no-cache handling during first-load and admin requests.
+- Added bundled `Assistant Nahida` alongside Bunny Guide in Launchpad, credited Geechan in the onboarding copy, and switched the bundle to import the real CCv3 card asset directly.
+- Tightened responsive UI behavior across desktop and mobile, including smaller mobile shell-tab spacing, visibility gating for desktop-only versus mobile-only settings, and improved smaller-screen flexibility in Settings and Extensions.
+- Fixed duplicated provider icons, cleaned up Prompt Manager opacity/default-open behavior, moved `Import & Restore` into its own drawer above `Appearance`, and normalized Moonlit Echoes header styling.
+- Bumped the app, client, and package version strings to `v1.2.6`.
+
+### v1.2.5
+
+- Switched the default app port to `4444` across launchers, config defaults, and Docker.
+- Added a built-in `Clear all cache` action in Settings for browser-side cache cleanup and reload.
+- Added message screenshot export for a single message or a range, including a wand-menu entry and bundled `html2canvas` loader support.
+- Fixed Claude token counting on Bun by moving the Claude path to a Bun-safe tokenizer implementation.
+- Improved Bun and Docker frontend bundling so precompiled assets can be reused cleanly and Docker/Zeabur builds no longer depend on a runtime `DATA_ROOT`.
+- Smoothed out several jarring menu transitions and tightened desktop/mobile layout symmetry, button sizing, overflow handling, top-bar behavior, and Moonlit Echoes spacing.
+- Fixed several chat workflow regressions, including branch creation edge cases, duplicate inline media icons, and Bubbles user-message divider artifacts.
+- Improved startup/import reliability, including Windows quick-start follow-through and problem spots reported around SillyTavern chat imports.
 
 ## Docker
 

@@ -25,7 +25,7 @@
                         <span>Open a quick throwaway session when you want to test without committing.</span>
                     </span>
                 </button>
-                <button class="menu_button menu_button_icon welcomeActionCard welcomeAssistantButton">
+                <button class="menu_button menu_button_icon welcomeActionCard welcomeAssistantButton welcomeActionButton" data-action="open-assistant" data-assistant-id="guide">
                     <i class="fa-solid fa-user-graduate"></i>
                     <span class="welcomeActionMeta">
                         <strong>Open Assistant</strong>
@@ -204,27 +204,53 @@
                 </div>
             </div>
 
-            <div class="welcomePromptPanel welcomeDeckPanel welcomeAssistantGuidePanel{{#if deckGuideActive}} is-active{{/if}}" data-deck-panel="guide">
-                <div class="welcomeAssistantGuideMedia">
-                    <img src="img/sillybunny-guide-assistant-portrait.png" alt="Pixel-art bunny guide portrait" class="welcomeAssistantGuideImage">
-                </div>
-                <div class="welcomePromptCopy welcomeAssistantGuideCopy">
-                    <strong>Bunny guide assistant</strong>
-                    <span>The bundled assistant is a real CCv3 character card. It can explain what an LLM is, what providers and models mean, how SillyBunny differs from stock SillyTavern, and where presets, personas, and world info fit into the flow.</span>
-                    <div class="welcomeChipRow">
-                        {{#each assistantQuestions}}
-                            <button class="menu_button menu_button_icon welcomeQuestionChip welcomeActionButton" data-action="assistant-prompt" data-action-value="{{this}}">
-                                <i class="fa-solid fa-comment-medical"></i>
-                                <span>{{this}}</span>
-                            </button>
-                        {{/each}}
+            <div class="welcomeGuidePanel welcomeDeckPanel welcomeAssistantGuidePanel{{#if deckGuideActive}} is-active{{/if}}" data-deck-panel="guide">
+                <div class="welcomeGuideHeader">
+                    <div class="welcomeGuideTitleBlock">
+                        <div class="welcomeHeroEyebrow">Bundled Guides</div>
+                        <h3>Bunny Guide + Assistant Nahida</h3>
+                        <p>Two bundled helpers live here. Bunny Guide covers plain-English onboarding, while Assistant Nahida, made by Geechan, gives you a second calm helper for prompts, settings, and workflow questions.</p>
                     </div>
                 </div>
-                <div class="welcomePromptActions">
-                    <button class="menu_button menu_button_icon welcomeAssistantButton">
-                        <i class="fa-solid fa-user-graduate"></i>
-                        <span>Chat with the guide</span>
-                    </button>
+                <div class="welcomeBundledAssistantGrid">
+                    {{#each bundledAssistants}}
+                        <article class="welcomeGuideCard welcomeBundledAssistantCard">
+                            <div class="welcomeBundledAssistantHeader">
+                                <div class="welcomeAssistantGuideMedia">
+                                    <img src="{{portrait}}" alt="{{portraitAlt}}" class="welcomeAssistantGuideImage">
+                                </div>
+                                <div class="welcomeBundledAssistantCopy">
+                                    <div class="welcomeGuideCardHeader">
+                                        <i class="fa-solid {{cardIcon}}"></i>
+                                        <strong>{{title}}</strong>
+                                    </div>
+                                    <p>{{body}}</p>
+                                    <span class="welcomeBundledAssistantCredit">{{credit}}</span>
+                                </div>
+                            </div>
+                            <div class="welcomeChipRow" data-chip-columns="{{chipColumnCount}}">
+                                {{#each chips}}
+                                    <span class="welcomeChip">{{this}}</span>
+                                {{/each}}
+                            </div>
+                            {{#if hasQuestions}}
+                                <div class="welcomeChipRow welcomeBundledAssistantQuestions">
+                                    {{#each questions}}
+                                        <button class="menu_button menu_button_icon welcomeQuestionChip welcomeActionButton" data-action="assistant-prompt" data-assistant-id="{{../id}}" data-action-value="{{this}}">
+                                            <i class="fa-solid fa-comment-medical"></i>
+                                            <span>{{this}}</span>
+                                        </button>
+                                    {{/each}}
+                                </div>
+                            {{/if}}
+                            <div class="welcomePromptActions">
+                                <button class="menu_button menu_button_icon welcomeAssistantButton welcomeActionButton" data-action="open-assistant" data-assistant-id="{{id}}">
+                                    <i class="fa-solid {{actionIcon}}"></i>
+                                    <span>{{actionLabel}}</span>
+                                </button>
+                            </div>
+                        </article>
+                    {{/each}}
                 </div>
             </div>
 

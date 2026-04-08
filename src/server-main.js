@@ -1,3 +1,5 @@
+import './server-log-buffer.js';
+
 // native node modules
 import fs from 'node:fs';
 import path from 'node:path';
@@ -160,6 +162,15 @@ if (isBunRuntime()) {
 app.use(setUserDataMiddleware);
 
 // CSRF Protection //
+function applyCsrfTokenHeaders(res) {
+    res.set({
+        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Vary': 'Cookie',
+    });
+}
+
 if (!cliArgs.disableCsrf) {
     const csrfSyncProtection = csrfSync({
         getTokenFromState: (req) => {
@@ -186,6 +197,7 @@ if (!cliArgs.disableCsrf) {
     });
 
     app.get('/csrf-token', (req, res) => {
+        applyCsrfTokenHeaders(res);
         res.json({
             'token': csrfSyncProtection.generateToken(req),
         });
@@ -199,6 +211,7 @@ if (!cliArgs.disableCsrf) {
 } else {
     console.warn('\nCSRF protection is disabled. This will make your server vulnerable to CSRF attacks.\n');
     app.get('/csrf-token', (req, res) => {
+        applyCsrfTokenHeaders(res);
         res.json({
             'token': 'disabled',
         });

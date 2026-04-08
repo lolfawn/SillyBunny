@@ -221,34 +221,64 @@
 
 #completion_prompt_manager .completion_prompt_manager_header {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: row;
     justify-content: space-between;
-    color: var(--white50a);
-    margin-top: 0.5em;
-    padding: 0 0.25em;
-    width: 100%
+    align-items: flex-start;
+    gap: 12px;
+    color: var(--SmartThemeBodyColor);
+    margin-top: 0;
+    padding: 0;
+    width: 100%;
+    min-width: 0;
 }
 
 #completion_prompt_manager .completion_prompt_manager_header div {
-    margin-top: 0.5em;
+    margin-top: 0;
     width: fit-content;
+}
+
+#completion_prompt_manager .completion_prompt_manager_drawer {
+    width: 100%;
+}
+
+#completion_prompt_manager .completion_prompt_manager_drawer > .inline-drawer-header {
+    align-items: flex-start;
+    gap: 12px;
+}
+
+#completion_prompt_manager .completion_prompt_manager_drawer_content {
+    padding-top: 0.35em;
 }
 
 #completion_prompt_manager .completion_prompt_manager_header_advanced {
     display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
     margin-right: 0.25em;
 }
 
-#completion_prompt_manager .completion_prompt_manager_header_advanced span {
-    flex-direction: column;
-    justify-content: center;
+#completion_prompt_manager .completion_prompt_manager_header_title {
+    display: block;
     margin-left: 0.25em;
+    font-weight: 600;
+    color: var(--SmartThemeBodyColor);
     transition: var(--animation-duration-2x) ease-in-out;
     filter: drop-shadow(0px 0px 2px black);
 }
 
-#completion_prompt_manager .completion_prompt_manager_header_advanced span.fa-solid {
-    display: inherit;
+#completion_prompt_manager .completion_prompt_manager_header_description {
+    margin-left: 0.25em;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor) 74%, transparent);
+    line-height: 1.35;
+}
+
+#completion_prompt_manager .completion_prompt_manager_header_tokens {
+    white-space: nowrap;
+    padding-top: 0.1em;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor) 88%, transparent);
 }
 
 #completion_prompt_manager .completion_prompt_manager_footer {
@@ -355,6 +385,15 @@
 @media screen and (max-width: 412px) {
     #completion_prompt_manager_popup {
         max-width: 100%;
+    }
+
+    #completion_prompt_manager .completion_prompt_manager_header {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    #completion_prompt_manager .completion_prompt_manager_header_tokens {
+        padding-top: 0;
     }
 
     #completion_prompt_manager #completion_prompt_manager_list li.completion_prompt_manager_prompt span span span {

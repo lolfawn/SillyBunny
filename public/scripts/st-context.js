@@ -84,7 +84,7 @@ import { addLocaleData, getCurrentLocale, t, translate } from './i18n.js';
 import { hideLoader, showLoader } from './loader.js';
 import { loader } from './action-loader.js';
 import { MacrosParser } from './macros.js';
-import { getChatCompletionModel, oai_settings } from './openai.js';
+import { getChatCompletionModel, oai_settings, promptManager } from './openai.js';
 import { callGenericPopup, Popup, POPUP_RESULT, POPUP_TYPE } from './popup.js';
 import { power_user, registerDebugFunction } from './power-user.js';
 import { getPresetManager } from './preset-manager.js';
@@ -221,6 +221,7 @@ export function getContext() {
         Popup,
         POPUP_TYPE,
         POPUP_RESULT,
+        promptManager,
         chatCompletionSettings: oai_settings,
         textCompletionSettings: textgenerationwebui_settings,
         powerUserSettings: power_user,

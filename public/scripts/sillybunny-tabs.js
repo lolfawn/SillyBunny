@@ -5,6 +5,9 @@ const SB_STORAGE_KEYS = Object.freeze({
     surfaceTransparency: 'sb-surface-transparency',
     topbarScaleDesktop: 'sb-topbar-scale-desktop',
     topbarScaleMobile: 'sb-topbar-scale-mobile',
+    topbarLabelDesktopParts: 'sb-topbar-label-desktop-parts',
+    topbarLabelMobilePart: 'sb-topbar-label-mobile-part',
+    topbarLabelCustomText: 'sb-topbar-label-custom-text',
     chatbarVisible: 'sb-chatbar-visible',
     topbarOffset: 'sb-topbar-offset',
 });
@@ -14,7 +17,9 @@ function safeGetItem(key) {
 }
 
 function safeSetItem(key, value) {
-    try { localStorage.setItem(key, value); } catch { }
+    try { localStorage.setItem(key, value); } catch {
+        // Ignore storage write failures.
+    }
 }
 
 const SB_IDLE_BRAND_LABEL = 'SillyBunny';
@@ -31,8 +36,32 @@ const SB_TOPBAR_SCALE = Object.freeze({
     step: 5,
     defaultValue: 100,
 });
+const SB_TOPBAR_LABEL_PARTS = Object.freeze([
+    {
+        id: 'ctx',
+        label: 'Ctx Size',
+        description: 'Show the current total Tokens value from the Prompt page.',
+    },
+    {
+        id: 'char',
+        label: 'Character Name',
+        description: 'Show the active character name, or the group name while a group chat is open.',
+    },
+    {
+        id: 'custom',
+        label: 'Custom Text',
+        description: 'Show your own short label in the center of the top bar.',
+    },
+]);
+const SB_TOPBAR_LABEL_PART_ORDER = Object.freeze(SB_TOPBAR_LABEL_PARTS.map(part => part.id));
+const SB_TOPBAR_LABEL_PART_IDS = new Set(SB_TOPBAR_LABEL_PART_ORDER);
+const SB_TOPBAR_LABEL_CUSTOM_TEXT_MAX_LENGTH = 48;
 const SB_TOPBAR_DRAG_X_RATIO = 0.36;
 const SB_TOPBAR_DRAG_Y_RATIO = 0.24;
+const SB_TOPBAR_CONTEXT_REFRESH_DEBOUNCE = 220;
+const SB_CONSOLE_LOG_LIMIT = 260;
+const SB_CONSOLE_LOG_REFRESH_MS = 2500;
+const SB_CONSOLE_LOG_STICKY_THRESHOLD = 28;
 const SB_CHATBAR_SEARCH_DEBOUNCE = 220;
 const SB_CHAT_SEARCH_MARK_SELECTOR = 'mark[data-sb-chat-search="true"]';
 const SB_DESKTOP_SHELL_LAYOUT = Object.freeze({
@@ -173,6 +202,12 @@ const SB_SHELLS = Object.freeze({
                 icon: 'fa-server',
                 description: 'Edit config.yaml, check Git updates, and restart SillyBunny without leaving Customize.',
             },
+            {
+                id: 'console-logs',
+                label: 'Console Logs',
+                icon: 'fa-terminal',
+                description: 'Watch the recent terminal output from the running SillyBunny process without leaving Customize.',
+            },
         ],
     },
 });
@@ -212,6 +247,20 @@ const sbState = {
         desktop: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleDesktop)),
         mobile: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.topbarScaleMobile)),
     },
+    topbarLabel: {
+        desktopParts: safeGetItem(SB_STORAGE_KEYS.topbarLabelDesktopParts) === null
+            ? ['char']
+            : normalizeTopbarLabelParts(safeGetItem(SB_STORAGE_KEYS.topbarLabelDesktopParts), []),
+        mobilePart: safeGetItem(SB_STORAGE_KEYS.topbarLabelMobilePart) === null
+            ? 'char'
+            : normalizeTopbarLabelPart(safeGetItem(SB_STORAGE_KEYS.topbarLabelMobilePart), ''),
+        customText: normalizeTopbarCustomText(safeGetItem(SB_STORAGE_KEYS.topbarLabelCustomText)),
+        contextTokens: null,
+        refreshTimer: 0,
+        refreshInFlight: false,
+        refreshPending: false,
+        refreshToken: 0,
+    },
     shells: {},
     chatbar: {
         desktop: null,
@@ -245,6 +294,18 @@ const sbState = {
         restarting: false,
         configLoaded: false,
     },
+    consoleLogs: {
+        refs: null,
+        entries: [],
+        latestId: 0,
+        captureStartedAt: 0,
+        totalBuffered: 0,
+        refreshTimer: 0,
+        busy: false,
+        paused: false,
+        lastUpdatedAt: 0,
+        lastError: '',
+    },
     importer: {
         refs: null,
         busy: false,
@@ -253,6 +314,44 @@ const sbState = {
 
 function normalizeTheme(themeId) {
     return SB_THEMES.some(theme => theme.id === themeId) ? themeId : 'modern-glass';
+}
+
+function normalizeTopbarLabelPart(value, fallback = '') {
+    const fallbackValue = SB_TOPBAR_LABEL_PART_IDS.has(fallback) ? fallback : '';
+    const normalizedValue = normalizeText(value);
+    return SB_TOPBAR_LABEL_PART_IDS.has(normalizedValue) ? normalizedValue : fallbackValue;
+}
+
+function normalizeTopbarLabelParts(value, fallback = []) {
+    let source = value;
+
+    if (typeof source === 'string') {
+        const trimmedValue = source.trim();
+        if (!trimmedValue) {
+            source = [];
+        } else {
+            try {
+                source = JSON.parse(trimmedValue);
+            } catch {
+                source = trimmedValue.split(',');
+            }
+        }
+    }
+
+    const rawParts = Array.isArray(source) ? source : [source];
+    const normalizedParts = SB_TOPBAR_LABEL_PART_ORDER.filter(
+        partId => rawParts.some(candidate => normalizeTopbarLabelPart(candidate) === partId),
+    );
+    const fallbackParts = Array.isArray(fallback)
+        ? SB_TOPBAR_LABEL_PART_ORDER.filter(partId => fallback.includes(partId))
+        : [];
+
+    return normalizedParts.length ? normalizedParts : fallbackParts;
+}
+
+function normalizeTopbarCustomText(value) {
+    const normalizedValue = String(value ?? '').replace(/\s+/g, ' ').trim();
+    return normalizedValue.slice(0, SB_TOPBAR_LABEL_CUSTOM_TEXT_MAX_LENGTH).trim();
 }
 
 function normalizeStoredBoolean(value, fallback = false) {
@@ -670,6 +769,53 @@ function setSurfaceTransparency(value, { persist = true } = {}) {
     updateThemePickerUi();
 }
 
+function setDesktopTopbarLabelPart(partId, enabled) {
+    const normalizedPart = normalizeTopbarLabelPart(partId);
+    if (!normalizedPart) {
+        return;
+    }
+
+    const nextParts = new Set(normalizeTopbarLabelParts(sbState.topbarLabel.desktopParts));
+    if (enabled) {
+        nextParts.add(normalizedPart);
+    } else {
+        nextParts.delete(normalizedPart);
+    }
+
+    sbState.topbarLabel.desktopParts = normalizeTopbarLabelParts(Array.from(nextParts), []);
+    safeSetItem(SB_STORAGE_KEYS.topbarLabelDesktopParts, JSON.stringify(sbState.topbarLabel.desktopParts));
+    updateThemePickerUi();
+    updateTopBarBrand();
+    scheduleTopbarContextRefresh(0);
+}
+
+function setMobileTopbarLabelPart(partId, enabled) {
+    const normalizedPart = normalizeTopbarLabelPart(partId);
+    const nextPart = enabled ? normalizedPart : '';
+
+    if (sbState.topbarLabel.mobilePart === nextPart) {
+        return;
+    }
+
+    sbState.topbarLabel.mobilePart = nextPart;
+    safeSetItem(SB_STORAGE_KEYS.topbarLabelMobilePart, nextPart);
+    updateThemePickerUi();
+    updateTopBarBrand();
+    scheduleTopbarContextRefresh(0);
+}
+
+function setTopbarCustomText(value) {
+    const nextText = normalizeTopbarCustomText(value);
+    if (sbState.topbarLabel.customText === nextText) {
+        return;
+    }
+
+    sbState.topbarLabel.customText = nextText;
+    safeSetItem(SB_STORAGE_KEYS.topbarLabelCustomText, nextText);
+    updateThemePickerUi();
+    updateTopBarBrand();
+}
+
 function updateThemeBadge() {
     const badge = document.getElementById('sb-theme-current-label');
     if (!badge) {
@@ -683,23 +829,172 @@ function getSillyTavernContext() {
     return globalThis.SillyTavern?.getContext?.() ?? null;
 }
 
-function getTopBarLabel() {
-    const context = getSillyTavernContext();
+function hasActiveTopBarChat(context = getSillyTavernContext()) {
+    return Boolean(context && (context.groupId || (context.characterId !== undefined && context.characterId !== null)));
+}
+
+function getTopBarCharacterLabel(context = getSillyTavernContext()) {
     if (!context) {
-        return SB_IDLE_BRAND_LABEL;
+        return '';
     }
 
     if (context.groupId) {
         const activeGroup = context.groups?.find(group => String(group?.id) === String(context.groupId));
-        return activeGroup?.name?.trim() || SB_IDLE_BRAND_LABEL;
+        return activeGroup?.name?.trim() || '';
     }
 
     if (context.characterId !== undefined && context.characterId !== null) {
         const activeCharacter = context.characters?.[context.characterId];
-        return activeCharacter?.name?.trim() || context.name2?.trim() || SB_IDLE_BRAND_LABEL;
+        return activeCharacter?.name?.trim() || context.name2?.trim() || '';
     }
 
-    return SB_IDLE_BRAND_LABEL;
+    return '';
+}
+
+function getDefaultTopBarLabel(context = getSillyTavernContext()) {
+    return getTopBarCharacterLabel(context) || SB_IDLE_BRAND_LABEL;
+}
+
+function formatTopbarContextTokens(value) {
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue)) {
+        return '';
+    }
+
+    return Math.max(0, Math.round(numericValue)).toLocaleString();
+}
+
+function getPromptManagerTokenUsage(promptManager) {
+    const directValue = Number(promptManager?.tokenUsage);
+    if (Number.isFinite(directValue)) {
+        return Math.max(0, Math.round(directValue));
+    }
+
+    const tokenHandler = promptManager?.getTokenHandler?.();
+    const total = Number(tokenHandler?.getTotal?.());
+    return Number.isFinite(total) ? Math.max(0, Math.round(total)) : null;
+}
+
+function setTopbarContextTokens(tokens) {
+    const normalizedValue = Number.isFinite(Number(tokens)) ? Math.max(0, Math.round(Number(tokens))) : null;
+    if (sbState.topbarLabel.contextTokens === normalizedValue) {
+        return;
+    }
+
+    sbState.topbarLabel.contextTokens = normalizedValue;
+    updateTopBarBrand();
+}
+
+function isTopbarContextLabelEnabled() {
+    return sbState.topbarLabel.desktopParts.includes('ctx') || sbState.topbarLabel.mobilePart === 'ctx';
+}
+
+function syncTopbarContextTokensFromPromptManager() {
+    const context = getSillyTavernContext();
+    const promptManager = context?.promptManager;
+
+    if (!hasActiveTopBarChat(context) || context?.mainApi !== 'openai') {
+        setTopbarContextTokens(null);
+        return;
+    }
+
+    setTopbarContextTokens(getPromptManagerTokenUsage(promptManager));
+}
+
+function scheduleTopbarContextRefresh(delay = SB_TOPBAR_CONTEXT_REFRESH_DEBOUNCE) {
+    window.clearTimeout(sbState.topbarLabel.refreshTimer);
+
+    if (!isTopbarContextLabelEnabled()) {
+        syncTopbarContextTokensFromPromptManager();
+        return;
+    }
+
+    sbState.topbarLabel.refreshTimer = window.setTimeout(() => {
+        void refreshTopbarContextTokens();
+    }, delay);
+}
+
+async function refreshTopbarContextTokens() {
+    const context = getSillyTavernContext();
+    const promptManager = context?.promptManager;
+
+    if (!hasActiveTopBarChat(context) || context?.mainApi !== 'openai') {
+        setTopbarContextTokens(null);
+        return;
+    }
+
+    if (!promptManager || typeof promptManager.tryGenerate !== 'function') {
+        syncTopbarContextTokensFromPromptManager();
+        return;
+    }
+
+    if (sbState.topbarLabel.refreshInFlight) {
+        sbState.topbarLabel.refreshPending = true;
+        return;
+    }
+
+    sbState.topbarLabel.refreshInFlight = true;
+    sbState.topbarLabel.refreshPending = false;
+    const refreshToken = ++sbState.topbarLabel.refreshToken;
+    syncTopbarContextTokensFromPromptManager();
+
+    try {
+        await promptManager.tryGenerate();
+    } catch {
+        // Ignore dry-run failures and keep the most recent known value.
+    } finally {
+        sbState.topbarLabel.refreshInFlight = false;
+    }
+
+    if (refreshToken !== sbState.topbarLabel.refreshToken) {
+        return;
+    }
+
+    syncTopbarContextTokensFromPromptManager();
+
+    if (sbState.topbarLabel.refreshPending) {
+        sbState.topbarLabel.refreshPending = false;
+        scheduleTopbarContextRefresh(80);
+    }
+}
+
+function getConfiguredTopbarLabelParts() {
+    if (isMobileViewport()) {
+        return sbState.topbarLabel.mobilePart ? [sbState.topbarLabel.mobilePart] : [];
+    }
+
+    return normalizeTopbarLabelParts(sbState.topbarLabel.desktopParts);
+}
+
+function getTopBarLabelPartText(partId, context = getSillyTavernContext()) {
+    switch (partId) {
+        case 'ctx':
+            if (!hasActiveTopBarChat(context) || context?.mainApi !== 'openai') {
+                return '';
+            }
+
+            return formatTopbarContextTokens(sbState.topbarLabel.contextTokens) || '...';
+        case 'char':
+            return getTopBarCharacterLabel(context);
+        case 'custom':
+            return sbState.topbarLabel.customText;
+        default:
+            return '';
+    }
+}
+
+function getTopBarLabel() {
+    const context = getSillyTavernContext();
+    const parts = getConfiguredTopbarLabelParts()
+        .map(partId => normalizeTopbarLabelPart(partId))
+        .filter(Boolean);
+    const labelParts = SB_TOPBAR_LABEL_PART_ORDER
+        .filter(partId => parts.includes(partId))
+        .map(partId => getTopBarLabelPartText(partId, context))
+        .filter(Boolean);
+
+    return labelParts.length ? labelParts.join(' · ') : getDefaultTopBarLabel(context);
 }
 
 function updateTopBarBrand() {
@@ -710,8 +1005,9 @@ function updateTopBarBrand() {
         return;
     }
 
+    const context = getSillyTavernContext();
     const label = getTopBarLabel();
-    const isActiveChat = label !== SB_IDLE_BRAND_LABEL;
+    const isActiveChat = hasActiveTopBarChat(context);
 
     title.textContent = label;
     title.title = label;
@@ -725,28 +1021,48 @@ function bindTopBarBrand() {
     const eventTypes = context?.eventTypes ?? context?.event_types;
 
     if (!eventSource || !eventTypes) {
-        window.setTimeout(updateTopBarBrand, 180);
+        window.setTimeout(() => {
+            updateTopBarBrand();
+            scheduleTopbarContextRefresh(0);
+        }, 180);
         return;
     }
 
     const refresh = () => window.requestAnimationFrame(updateTopBarBrand);
+    const refreshWithContext = () => {
+        refresh();
+        scheduleTopbarContextRefresh();
+    };
     const events = [
         eventTypes.APP_READY,
         eventTypes.CHAT_CHANGED,
         eventTypes.CHAT_CREATED,
         eventTypes.GROUP_CHAT_CREATED,
+        eventTypes.MESSAGE_EDITED,
+        eventTypes.MESSAGE_DELETED,
         eventTypes.CHARACTER_EDITED,
         eventTypes.CHARACTER_RENAMED,
         eventTypes.CHARACTER_DELETED,
         eventTypes.GROUP_UPDATED,
         eventTypes.PERSONA_CHANGED,
+        eventTypes.MAIN_API_CHANGED,
+        eventTypes.SETTINGS_UPDATED,
+        eventTypes.WORLDINFO_SETTINGS_UPDATED,
     ].filter(Boolean);
 
     for (const eventName of new Set(events)) {
-        eventSource.on(eventName, refresh);
+        eventSource.on(eventName, refreshWithContext);
+    }
+
+    if (eventTypes.CHAT_COMPLETION_PROMPT_READY) {
+        eventSource.on(eventTypes.CHAT_COMPLETION_PROMPT_READY, () => {
+            syncTopbarContextTokensFromPromptManager();
+            refresh();
+        });
     }
 
     refresh();
+    scheduleTopbarContextRefresh(0);
 }
 
 function stopProxyPointerPropagation(element) {
@@ -1074,6 +1390,37 @@ function getRequestHeadersFromContext(context = getSillyTavernContext()) {
     return {
         'Content-Type': 'application/json',
     };
+}
+
+function getCsrfTokenFromHeaders(headers) {
+    if (!headers || typeof headers !== 'object') {
+        return '';
+    }
+
+    const rawToken = headers['X-CSRF-Token'] ?? headers['x-csrf-token'] ?? '';
+    const token = String(rawToken ?? '').trim();
+
+    if (!token || token === 'undefined' || token === 'null') {
+        return '';
+    }
+
+    return token;
+}
+
+async function waitForAuthorizedRequestHeaders(timeoutMs = 15000) {
+    const timeoutAt = Date.now() + timeoutMs;
+
+    while (Date.now() < timeoutAt) {
+        const headers = getRequestHeadersFromContext();
+
+        if (getCsrfTokenFromHeaders(headers)) {
+            return headers;
+        }
+
+        await wait(50);
+    }
+
+    return getRequestHeadersFromContext();
 }
 
 function getChatUiContext() {
@@ -2916,6 +3263,233 @@ function getServerAdminRefs() {
     return getServerAdminState().refs;
 }
 
+function getConsoleLogsState() {
+    return sbState.consoleLogs;
+}
+
+function getConsoleLogsRefs() {
+    return getConsoleLogsState().refs;
+}
+
+function isConsoleLogsTabActive() {
+    return isShellTabOpen('right', 'console-logs');
+}
+
+function formatConsoleLogTime(timestamp) {
+    const date = new Date(Number(timestamp));
+    if (Number.isNaN(date.getTime())) {
+        return '00:00:00';
+    }
+
+    return date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    });
+}
+
+function formatConsoleLogDateTime(timestamp) {
+    const date = new Date(Number(timestamp));
+    if (Number.isNaN(date.getTime())) {
+        return 'Unknown';
+    }
+
+    return date.toLocaleString([], {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    });
+}
+
+function formatConsoleLogEntry(entry) {
+    const stream = String(entry?.stream ?? 'stdout').toUpperCase().padEnd(6);
+    const message = String(entry?.message ?? '');
+    return `[${formatConsoleLogTime(entry?.timestamp)}] ${stream} ${message}`;
+}
+
+function isScrolledNearBottom(element, threshold = SB_CONSOLE_LOG_STICKY_THRESHOLD) {
+    if (!(element instanceof HTMLElement)) {
+        return true;
+    }
+
+    return (element.scrollHeight - element.scrollTop - element.clientHeight) <= threshold;
+}
+
+function updateConsoleLogsInteractivity() {
+    const state = getConsoleLogsState();
+    const refs = getConsoleLogsRefs();
+
+    if (!refs) {
+        return;
+    }
+
+    refs.pauseButton.textContent = state.paused ? 'Resume Live' : 'Pause Live';
+    setButtonDisabled(refs.refreshButton, state.busy);
+}
+
+function renderConsoleLogsStatus() {
+    const state = getConsoleLogsState();
+    const refs = getConsoleLogsRefs();
+
+    if (!refs) {
+        return;
+    }
+
+    if (state.lastError) {
+        setServerAdminPill(refs.statusPill, 'Unavailable', 'danger');
+        setServerAdminMessage(refs.statusNote, state.lastError, 'danger');
+        return;
+    }
+
+    const linesShown = state.entries.length;
+    const totalBuffered = state.totalBuffered || linesShown;
+    const noteParts = [`Showing ${linesShown} of ${totalBuffered} recent console line${totalBuffered === 1 ? '' : 's'}.`];
+
+    if (state.captureStartedAt) {
+        noteParts.push(`Capture started ${formatConsoleLogDateTime(state.captureStartedAt)}.`);
+    }
+
+    if (state.lastUpdatedAt) {
+        noteParts.push(`Last updated ${formatConsoleLogTime(state.lastUpdatedAt)}.`);
+    }
+
+    noteParts.push(state.paused
+        ? 'Live polling is paused.'
+        : `Refreshes every ${(SB_CONSOLE_LOG_REFRESH_MS / 1000).toFixed(1).replace(/\.0$/, '')} seconds while this tab is open.`);
+
+    setServerAdminPill(refs.statusPill, state.busy ? 'Loading…' : state.paused ? 'Paused' : 'Live', state.paused ? 'warn' : 'good');
+    setServerAdminMessage(refs.statusNote, noteParts.join(' '), state.paused ? 'warn' : 'neutral');
+}
+
+function renderConsoleLogsOutput({ preserveScroll = true } = {}) {
+    const state = getConsoleLogsState();
+    const refs = getConsoleLogsRefs();
+    const output = refs?.output;
+
+    if (!(output instanceof HTMLElement)) {
+        return;
+    }
+
+    const shouldStickToBottom = !preserveScroll || isScrolledNearBottom(output);
+    output.textContent = state.entries.length
+        ? state.entries.map(formatConsoleLogEntry).join('\n')
+        : 'No console output has been captured yet for this server process.';
+    output.classList.toggle('is-empty', state.entries.length === 0);
+
+    if (shouldStickToBottom) {
+        output.scrollTop = output.scrollHeight;
+    }
+
+    renderConsoleLogsStatus();
+}
+
+function scheduleConsoleLogsRefresh(delay = SB_CONSOLE_LOG_REFRESH_MS) {
+    const state = getConsoleLogsState();
+    window.clearTimeout(state.refreshTimer);
+    state.refreshTimer = 0;
+
+    if (state.paused || !isConsoleLogsTabActive()) {
+        return;
+    }
+
+    state.refreshTimer = window.setTimeout(() => {
+        void refreshConsoleLogs();
+    }, delay);
+}
+
+async function refreshConsoleLogs({ forceFull = false } = {}) {
+    const state = getConsoleLogsState();
+    const refs = getConsoleLogsRefs();
+
+    if (!refs) {
+        return;
+    }
+
+    window.clearTimeout(state.refreshTimer);
+    state.refreshTimer = 0;
+
+    if (state.busy) {
+        scheduleConsoleLogsRefresh();
+        return;
+    }
+
+    state.busy = true;
+    updateConsoleLogsInteractivity();
+    renderConsoleLogsStatus();
+
+    const requestBody = {
+        limit: SB_CONSOLE_LOG_LIMIT,
+    };
+
+    if (!forceFull && state.latestId > 0) {
+        requestBody.afterId = state.latestId;
+    }
+
+    try {
+        const data = await requestServerAdmin('/api/server-admin/logs', requestBody);
+        const nextEntries = Array.isArray(data?.entries)
+            ? data.entries.map(entry => ({
+                id: Number(entry?.id ?? 0) || 0,
+                timestamp: Number(entry?.timestamp ?? 0) || 0,
+                stream: String(entry?.stream ?? 'stdout'),
+                message: String(entry?.message ?? ''),
+            })).filter(entry => entry.id > 0)
+            : [];
+
+        if (forceFull || !requestBody.afterId || data?.truncated) {
+            state.entries = nextEntries.slice(-SB_CONSOLE_LOG_LIMIT);
+        } else if (nextEntries.length > 0) {
+            const mergedEntries = new Map(state.entries.map(entry => [entry.id, entry]));
+
+            for (const entry of nextEntries) {
+                mergedEntries.set(entry.id, entry);
+            }
+
+            state.entries = Array.from(mergedEntries.values())
+                .sort((left, right) => left.id - right.id)
+                .slice(-SB_CONSOLE_LOG_LIMIT);
+        }
+
+        state.latestId = Number(data?.latestId ?? state.latestId) || state.latestId;
+        state.captureStartedAt = Number(data?.captureStartedAt ?? state.captureStartedAt) || state.captureStartedAt;
+        state.totalBuffered = Number(data?.totalBuffered ?? state.totalBuffered) || state.totalBuffered;
+        state.lastUpdatedAt = Date.now();
+        state.lastError = '';
+        renderConsoleLogsOutput();
+    } catch (error) {
+        console.error('Failed to refresh console logs panel.', error);
+        state.lastError = error.message || 'Failed to read console logs.';
+        renderConsoleLogsStatus();
+    } finally {
+        state.busy = false;
+        updateConsoleLogsInteractivity();
+        renderConsoleLogsStatus();
+        scheduleConsoleLogsRefresh();
+    }
+}
+
+function toggleConsoleLogsPolling() {
+    const state = getConsoleLogsState();
+    state.paused = !state.paused;
+
+    if (state.paused) {
+        window.clearTimeout(state.refreshTimer);
+        state.refreshTimer = 0;
+    }
+
+    updateConsoleLogsInteractivity();
+    renderConsoleLogsStatus();
+
+    if (!state.paused) {
+        void refreshConsoleLogs({ forceFull: state.latestId === 0 });
+    }
+}
+
 function getImporterState() {
     return sbState.importer;
 }
@@ -2925,9 +3499,10 @@ function getImporterRefs() {
 }
 
 async function requestServerAdmin(endpoint, body = {}) {
+    const headers = await waitForAuthorizedRequestHeaders();
     const response = await fetch(endpoint, {
         method: 'POST',
-        headers: getRequestHeadersFromContext(),
+        headers,
         body: JSON.stringify(body),
     });
 
@@ -2955,9 +3530,18 @@ function getMultipartRequestHeaders(context = getSillyTavernContext()) {
 }
 
 async function requestUserPrivateAction(endpoint, { body = {}, useFormData = false } = {}) {
+    const requestHeaders = await waitForAuthorizedRequestHeaders();
+    const headers = useFormData
+        ? (() => {
+            const multipartHeaders = { ...requestHeaders };
+            delete multipartHeaders['Content-Type'];
+            delete multipartHeaders['content-type'];
+            return multipartHeaders;
+        })()
+        : requestHeaders;
     const response = await fetch(endpoint, {
         method: 'POST',
-        headers: useFormData ? getMultipartRequestHeaders() : getRequestHeadersFromContext(),
+        headers,
         body: useFormData ? body : JSON.stringify(body),
     });
 
@@ -3516,6 +4100,71 @@ function buildServerAdminPanel() {
     };
 }
 
+function buildConsoleLogsPanel() {
+    const { panel, scroller } = createShellPanel({
+        id: 'console-logs',
+    });
+
+    const column = createElement('div', { className: 'sb-shell-column sb-console-log-column' });
+    const callout = createElement('div', { className: 'sb-shell-callout' });
+    callout.innerHTML = `
+        <strong>Console Logs</strong>
+        <p>Watch the recent terminal output from the running SillyBunny process here, without keeping a terminal window open on the side.</p>
+    `;
+
+    const card = createElement('section', { className: 'sb-admin-card sb-server-card sb-console-log-card' });
+    const header = createElement('div', { className: 'sb-admin-card-header' });
+    const copy = createElement('div', { className: 'sb-admin-card-copy' });
+    const title = createElement('strong', { text: 'Live Server Console' });
+    const description = createElement('p', { text: 'This mirrors the current process output captured from stdout and stderr. Only logs from the current SillyBunny session are available here.' });
+    const statusPill = createElement('span', { className: 'sb-server-pill', text: 'Loading…' });
+    const actions = createElement('div', { className: 'sb-server-actions sb-console-log-actions' });
+    const refreshButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Refresh Now', attrs: { type: 'button' } });
+    const pauseButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Pause Live', attrs: { type: 'button' } });
+    const statusNote = createElement('div', { className: 'sb-server-note' });
+    const output = createElement('pre', { className: 'sb-server-output sb-console-log-output' });
+
+    copy.append(title, description);
+    header.append(copy, statusPill);
+    actions.append(refreshButton, pauseButton);
+    card.append(header, actions, statusNote, output);
+    column.append(callout, card);
+    scroller.appendChild(column);
+
+    const state = getConsoleLogsState();
+    state.refs = {
+        statusPill,
+        refreshButton,
+        pauseButton,
+        statusNote,
+        output,
+    };
+
+    refreshButton.addEventListener('click', () => {
+        void refreshConsoleLogs({ forceFull: state.latestId === 0 });
+    });
+    pauseButton.addEventListener('click', toggleConsoleLogsPolling);
+
+    renderConsoleLogsOutput({ preserveScroll: false });
+    updateConsoleLogsInteractivity();
+
+    return {
+        id: 'console-logs',
+        panel,
+        button: null,
+        searchRoot: column,
+        onActivate: () => {
+            void refreshConsoleLogs({ forceFull: getConsoleLogsState().latestId === 0 });
+            scheduleConsoleLogsRefresh(0);
+        },
+        onDeactivate: () => {
+            const state = getConsoleLogsState();
+            window.clearTimeout(state.refreshTimer);
+            state.refreshTimer = 0;
+        },
+    };
+}
+
 function updateSillyTavernImportInteractivity() {
     const state = getImporterState();
     const refs = getImporterRefs();
@@ -3625,15 +4274,19 @@ async function handleSillyTavernZipImport(file) {
 }
 
 function injectSillyTavernImportCard() {
+    const importOutlet = document.getElementById('sb-import-tools-outlet');
     const themeBlock = document.getElementById('UI-presets-block');
-    if (!(themeBlock instanceof HTMLElement)) {
+    const cardHost = importOutlet instanceof HTMLElement
+        ? importOutlet
+        : themeBlock;
+    if (!(cardHost instanceof HTMLElement)) {
         return;
     }
 
     const existingCard = document.getElementById('sb-import-card');
     if (existingCard instanceof HTMLElement) {
-        if (themeBlock.firstElementChild !== existingCard) {
-            themeBlock.prepend(existingCard);
+        if (cardHost.firstElementChild !== existingCard) {
+            cardHost.prepend(existingCard);
         }
 
         return;
@@ -3663,10 +4316,11 @@ function injectSillyTavernImportCard() {
         className: 'text_pole sb-import-path-input',
         attrs: {
             type: 'text',
-            placeholder: '/path/to/SillyTavern or /path/to/SillyTavern/data/default-user',
+            placeholder: '/path/to/SillyTavern',
             'aria-label': 'SillyTavern folder path',
             autocomplete: 'off',
             spellcheck: 'false',
+            title: 'You can paste a full SillyTavern install path, its data folder, or a specific user folder.',
         },
     });
     const folderButton = createElement('button', {
@@ -3704,7 +4358,7 @@ function injectSillyTavernImportCard() {
 
     grid.append(folderPane, zipPane);
     card.append(header, hintRow, grid, note);
-    themeBlock.prepend(card);
+    cardHost.prepend(card);
 
     getImporterState().refs = {
         card,
@@ -3766,6 +4420,106 @@ function createThemeSliderGroup({ title, valueId, inputId, value, min, max, step
     return sliderGroup;
 }
 
+function createTopbarLabelOption(mode, part) {
+    const inputId = `sb-topbar-label-${mode}-${part.id}`;
+    const option = createElement('label', {
+        className: 'sb-topbar-label-option',
+        attrs: {
+            for: inputId,
+        },
+    });
+    const checkbox = createElement('input', {
+        id: inputId,
+        className: 'sb-topbar-label-checkbox',
+        attrs: {
+            type: 'checkbox',
+            'data-sb-topbar-label-mode': mode,
+            'data-sb-topbar-label-part': part.id,
+        },
+    });
+    const copy = createElement('span', { className: 'sb-topbar-label-option-copy' });
+    const title = createElement('strong', { text: part.label });
+    const description = createElement('small', { text: part.description });
+
+    checkbox.addEventListener('change', event => {
+        const input = event.currentTarget;
+        const isChecked = input instanceof HTMLInputElement ? input.checked : false;
+
+        if (mode === 'mobile') {
+            setMobileTopbarLabelPart(part.id, isChecked);
+        } else {
+            setDesktopTopbarLabelPart(part.id, isChecked);
+        }
+    });
+
+    copy.append(title, description);
+    option.append(checkbox, copy);
+    return option;
+}
+
+function createTopbarLabelSettingsGroup() {
+    const group = createElement('section', {
+        className: 'sb-theme-slider-group sb-topbar-label-group',
+    });
+    const header = createElement('div', { className: 'sb-topbar-label-header' });
+    const title = createElement('strong', { text: 'Top Bar Label' });
+    const description = createElement('p', {
+        className: 'sb-theme-slider-caption',
+        text: 'Choose what the center label shows. Desktop can mix multiple parts with a middle dot, while mobile keeps one selection at a time.',
+    });
+    const desktopSection = createElement('div', { className: 'sb-topbar-label-section sb-desktop-setting' });
+    const desktopHeading = createElement('div', { className: 'sb-topbar-label-section-heading' });
+    const desktopTitle = createElement('strong', { text: 'Desktop' });
+    const desktopDescription = createElement('small', { text: 'Pick any combination you want.' });
+    const desktopGrid = createElement('div', { className: 'sb-topbar-label-option-grid' });
+    const mobileSection = createElement('div', { className: 'sb-topbar-label-section sb-mobile-setting' });
+    const mobileHeading = createElement('div', { className: 'sb-topbar-label-section-heading' });
+    const mobileTitle = createElement('strong', { text: 'Mobile' });
+    const mobileDescription = createElement('small', { text: 'Pick one option at a time.' });
+    const mobileGrid = createElement('div', { className: 'sb-topbar-label-option-grid' });
+    const customTextField = createElement('label', {
+        className: 'sb-topbar-custom-text-field',
+        attrs: {
+            for: 'sb-topbar-custom-text-input',
+        },
+    });
+    const customTextHeading = createElement('div', { className: 'sb-topbar-label-section-heading' });
+    const customTextTitle = createElement('strong', { text: 'Custom Text Value' });
+    const customTextDescription = createElement('small', { text: 'This only appears in the top bar when the Custom Text checkbox is enabled above.' });
+    const customTextInput = createElement('input', {
+        id: 'sb-topbar-custom-text-input',
+        className: 'text_pole sb-topbar-custom-text-input',
+        attrs: {
+            type: 'text',
+            maxlength: String(SB_TOPBAR_LABEL_CUSTOM_TEXT_MAX_LENGTH),
+            placeholder: 'SillyBunny',
+            'aria-label': 'Top bar custom text',
+        },
+    });
+
+    customTextInput.addEventListener('input', event => {
+        const input = event.currentTarget;
+        setTopbarCustomText(input instanceof HTMLInputElement ? input.value : '');
+    });
+
+    header.append(title, description);
+    desktopHeading.append(desktopTitle, desktopDescription);
+    mobileHeading.append(mobileTitle, mobileDescription);
+    customTextHeading.append(customTextTitle, customTextDescription);
+
+    for (const part of SB_TOPBAR_LABEL_PARTS) {
+        desktopGrid.appendChild(createTopbarLabelOption('desktop', part));
+        mobileGrid.appendChild(createTopbarLabelOption('mobile', part));
+    }
+
+    desktopSection.append(desktopHeading, desktopGrid);
+    mobileSection.append(mobileHeading, mobileGrid);
+    customTextField.append(customTextHeading, customTextInput);
+    group.append(header, desktopSection, mobileSection, customTextField);
+
+    return group;
+}
+
 function injectThemePicker() {
     if (document.getElementById('sb-theme-card')) {
         updateThemePickerUi();
@@ -3806,6 +4560,7 @@ function injectThemePicker() {
         caption: 'Resize the desktop navigation row, search bar, and header controls without editing CSS.',
         onInput: nextValue => setTopbarScale('desktop', nextValue),
     });
+    desktopTopbarSliderGroup.classList.add('sb-desktop-setting');
     const mobileTopbarSliderGroup = createThemeSliderGroup({
         title: 'Mobile Top Bar Size',
         valueId: 'sb-topbar-scale-mobile-value',
@@ -3818,6 +4573,8 @@ function injectThemePicker() {
         caption: 'Resize the mobile one-line header and compact chat-tools panel for phones and narrow screens.',
         onInput: nextValue => setTopbarScale('mobile', nextValue),
     });
+    mobileTopbarSliderGroup.classList.add('sb-mobile-setting');
+    const topbarLabelSettingsGroup = createTopbarLabelSettingsGroup();
     header.append(title, description);
 
     for (const theme of SB_THEMES) {
@@ -3841,7 +4598,7 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
-    card.append(header, optionRow, surfaceSliderGroup, desktopTopbarSliderGroup, mobileTopbarSliderGroup);
+    card.append(header, optionRow, surfaceSliderGroup, desktopTopbarSliderGroup, mobileTopbarSliderGroup, topbarLabelSettingsGroup);
     themeBlock.prepend(card);
     updateThemePickerUi();
 }
@@ -3853,6 +4610,7 @@ function updateThemePickerUi() {
     const desktopTopbarScaleValue = document.getElementById('sb-topbar-scale-desktop-value');
     const mobileTopbarScaleInput = document.getElementById('sb-topbar-scale-mobile-input');
     const mobileTopbarScaleValue = document.getElementById('sb-topbar-scale-mobile-value');
+    const customTextInput = document.getElementById('sb-topbar-custom-text-input');
 
     for (const button of document.querySelectorAll('[data-sb-theme-option]')) {
         const themeId = button.getAttribute('data-sb-theme-option');
@@ -3883,6 +4641,25 @@ function updateThemePickerUi() {
 
     if (mobileTopbarScaleValue instanceof HTMLElement) {
         mobileTopbarScaleValue.textContent = formatTopbarScale(sbState.topbarScale.mobile);
+    }
+
+    for (const input of document.querySelectorAll('[data-sb-topbar-label-mode][data-sb-topbar-label-part]')) {
+        if (!(input instanceof HTMLInputElement)) {
+            continue;
+        }
+
+        const mode = input.getAttribute('data-sb-topbar-label-mode');
+        const partId = normalizeTopbarLabelPart(input.getAttribute('data-sb-topbar-label-part'));
+        const isChecked = mode === 'mobile'
+            ? sbState.topbarLabel.mobilePart === partId
+            : sbState.topbarLabel.desktopParts.includes(partId);
+
+        input.checked = isChecked;
+        input.closest('.sb-topbar-label-option')?.classList.toggle('is-selected', isChecked);
+    }
+
+    if (customTextInput instanceof HTMLInputElement && customTextInput.value !== sbState.topbarLabel.customText) {
+        customTextInput.value = sbState.topbarLabel.customText;
     }
 
     for (const button of document.querySelectorAll('[data-sb-message-style]')) {
@@ -4077,6 +4854,7 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
         return;
     }
 
+    const previousTab = shellState.tabs.get(shellState.activeTabId);
     shellState.activeTabId = tabId;
     safeSetItem(shellConfig.storageKey, tabId);
 
@@ -4095,6 +4873,10 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
 
     if (focusButton) {
         activeTab.button?.focus();
+    }
+
+    if (previousTab && previousTab.id !== activeTab.id) {
+        previousTab.onDeactivate?.();
     }
 
     activeTab.onActivate?.();
@@ -4136,12 +4918,14 @@ function openShell(shellKey, tabId = null) {
 
 function closeShell(shellKey) {
     const shellConfig = getShellConfig(shellKey);
+    const shellState = getShellState(shellKey);
     const shellRoot = document.getElementById(shellConfig.rootPanelId);
 
     if (!(shellRoot instanceof HTMLElement) || !shellRoot.classList.contains('openDrawer')) {
         return;
     }
 
+    shellState?.tabs.get(shellState.activeTabId)?.onDeactivate?.();
     clearShellSearch(shellKey);
 
     if (!isDrawerActuallyOpen(shellRoot)) {
@@ -4245,9 +5029,11 @@ function buildShell(shellKey) {
 
         if (isOpen) {
             closeMobileNav();
+            shellState.tabs.get(shellState.activeTabId)?.onActivate?.();
             return;
         }
 
+        shellState.tabs.get(shellState.activeTabId)?.onDeactivate?.();
         clearShellSearch(shellKey);
     }).observe(shellRoot, { attributes: true, attributeFilter: ['class'] });
 
@@ -4276,6 +5062,12 @@ function buildShell(shellKey) {
         if (customTab.id === 'server') {
             const serverPanel = buildServerAdminPanel();
             registerShellTab(shellKey, customTab, serverPanel, serverPanel.searchRoot);
+            continue;
+        }
+
+        if (customTab.id === 'console-logs') {
+            const consoleLogsPanel = buildConsoleLogsPanel();
+            registerShellTab(shellKey, customTab, consoleLogsPanel, consoleLogsPanel.searchRoot);
         }
     }
 
@@ -4378,6 +5170,7 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
         searchRoot: explicitSearchRoot ?? panelBundle.searchRoot ?? panelBundle.scroller,
         searchIndex: null,
         onActivate: panelBundle.onActivate ?? tabConfig.onActivate ?? null,
+        onDeactivate: panelBundle.onDeactivate ?? tabConfig.onDeactivate ?? null,
     });
 }
 
@@ -4726,6 +5519,8 @@ function syncMobileViewportState() {
     syncDesktopShellSizing();
     applyTopbarOffset();
     updateTopbarUtilityButtons();
+    updateTopBarBrand();
+    scheduleTopbarContextRefresh(0);
 }
 
 function reinitSelect2AfterShell() {
@@ -4871,6 +5666,7 @@ function initAll() {
         setTopbarScale(mode, value) {
             setTopbarScale(mode, value);
         },
+        setMessageStyle,
         openChatTools() {
             if (isMobileViewport()) {
                 openMobileChatTools();
@@ -4882,6 +5678,7 @@ function initAll() {
         toggleChatSidebar() {
             toggleChatSidebar();
         },
+        toggleMobileChatTools,
         toggleChatbarVisibility() {
             toggleChatbarVisibility();
         },

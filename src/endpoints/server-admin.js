@@ -10,6 +10,7 @@ import { sync as commandExistsSync } from 'command-exists';
 import { CheckRepoActions, default as simpleGit } from 'simple-git';
 
 import { APP_NAME, formatRuntimeLabel, isBunRuntime } from '../runtime.js';
+import { getServerLogSnapshot } from '../server-log-buffer.js';
 import { serverDirectory } from '../server-directory.js';
 import { requireAdminMiddleware } from '../users.js';
 import { getVersion } from '../util.js';
@@ -45,6 +46,16 @@ function createHttpError(status, message) {
 
 function toTrimmedString(value) {
     return String(value ?? '').trim();
+}
+
+function normalizeInteger(value, { min = 0, max = Number.MAX_SAFE_INTEGER, fallback = 0 } = {}) {
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue)) {
+        return fallback;
+    }
+
+    return Math.min(max, Math.max(min, Math.trunc(numericValue)));
 }
 
 function truncateOutput(value, maxLength = 6000) {
@@ -440,6 +451,18 @@ router.post('/config/chat-completions/save', requireAdminMiddleware, async (requ
     } catch (error) {
         console.error('Failed to save chat completions config settings.', error);
         response.status(error.status || 500).json({ error: error.message || 'Failed to save chat completions config settings.' });
+    }
+});
+
+router.post('/logs', requireAdminMiddleware, async (request, response) => {
+    try {
+        const limit = normalizeInteger(request.body?.limit, { min: 50, max: 600, fallback: 250 });
+        const afterId = normalizeInteger(request.body?.afterId, { min: 0, max: Number.MAX_SAFE_INTEGER, fallback: 0 });
+
+        response.json(getServerLogSnapshot({ limit, afterId }));
+    } catch (error) {
+        console.error('Failed to read server console logs.', error);
+        response.status(500).json({ error: error.message || 'Failed to read server console logs.' });
     }
 });
 

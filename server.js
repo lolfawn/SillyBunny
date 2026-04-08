@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import './src/server-log-buffer.js';
 import { CommandLineParser } from './src/command-line.js';
 import { APP_NAME, formatRuntimeLabel } from './src/runtime.js';
 import { serverDirectory } from './src/server-directory.js';

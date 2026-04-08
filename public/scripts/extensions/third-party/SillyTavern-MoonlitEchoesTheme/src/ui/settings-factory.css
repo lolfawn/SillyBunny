@@ -124,7 +124,8 @@ overflow: hidden;
     z-index: 1;
 }
 
-.moonlit-preset-manager h4 {
+.moonlit-preset-manager h4,
+.moonlit-section-title {
     margin-top: 0;
     margin-bottom: 10px;
     font-size: 1em;
@@ -133,6 +134,15 @@ overflow: hidden;
     padding: 3px;
     padding-left: 10px !important;
     border-left: 3px solid var(--customThemeColor);
+}
+
+.moonlit-section-title {
+    width: 100%;
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 .moonlit-preset-selector {

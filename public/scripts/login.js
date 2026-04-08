@@ -11,7 +11,14 @@ let discreetLogin = false;
  * @returns {Promise<string>} CSRF token
  */
 async function getCsrfToken() {
-    const response = await fetch('/csrf-token');
+    const response = await fetch('/csrf-token', {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+        },
+    });
     const data = await response.json();
     return data.token;
 }

@@ -157,6 +157,23 @@ input.extension_missing[type="checkbox"] {
     flex: 1 1 220px;
 }
 
+#rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label[for='extensions_notify_updates'] {
+    flex: 1 1 280px;
+    min-width: min(100%, 280px);
+    align-items: flex-start;
+}
+
+#rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label[for='extensions_notify_updates'] > span {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+}
+
+#rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > .menu_button,
+#rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > .menu_button_icon {
+    flex: 0 1 auto;
+}
+
 #rm_extensions_block .inline-drawer {
     width: 100%;
     margin: 0;
@@ -211,6 +228,18 @@ input.extension_missing[type="checkbox"] {
     padding: 10px 12px;
     border-radius: 18px;
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 72%, transparent);
+}
+
+@media screen and (max-width: 1360px) and (min-width: 769px) {
+    #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label[for='extensions_notify_updates'] {
+        flex-basis: 100%;
+        min-width: 100%;
+    }
+
+    #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > .menu_button,
+    #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > .menu_button_icon {
+        flex: 1 1 220px;
+    }
 }
 
 @media screen and (max-width: 1100px) {

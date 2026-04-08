@@ -133,6 +133,7 @@ const SERVER_CHAT_COMPLETION_CONFIG_DEFAULTS = Object.freeze({
         enableSystemPromptCache: false,
     }),
 });
+const OPENAI_SETTINGS_DRAWER_STATE_KEY_PREFIX = 'OpenAIDrawerState:';
 const serverChatCompletionConfigState = {
     loaded: false,
     busy: false,
@@ -2043,6 +2044,81 @@ function toggleOpenAIModelFavorite() {
     saveSettingsDebounced();
 }
 
+function getOpenAISettingsDrawerStateKey(drawerId) {
+    return `${OPENAI_SETTINGS_DRAWER_STATE_KEY_PREFIX}${drawerId}`;
+}
+
+function getStoredOpenAISettingsDrawerExpanded(drawerId) {
+    if (!drawerId) {
+        return null;
+    }
+
+    const storedValue = accountStorage.getItem(getOpenAISettingsDrawerStateKey(drawerId));
+    if (storedValue === null) {
+        return null;
+    }
+
+    return storedValue === 'true';
+}
+
+function setStoredOpenAISettingsDrawerExpanded(drawerId, expanded) {
+    if (!drawerId) {
+        return;
+    }
+
+    accountStorage.setItem(getOpenAISettingsDrawerStateKey(drawerId), String(Boolean(expanded)));
+}
+
+function applyOpenAISettingsDrawerExpandedState($drawer, expanded) {
+    const drawer = $drawer.get(0);
+    if (!(drawer instanceof HTMLElement)) {
+        return;
+    }
+
+    const icon = drawer.querySelector(':scope > .inline-drawer-header .inline-drawer-icon');
+    const content = drawer.querySelector(':scope > .inline-drawer-content');
+    if (!(icon instanceof HTMLElement) || !(content instanceof HTMLElement)) {
+        return;
+    }
+
+    if (expanded) {
+        icon.classList.remove('down', 'fa-circle-chevron-down');
+        icon.classList.add('up', 'fa-circle-chevron-up');
+        content.style.display = 'block';
+
+        if (!CSS.supports('field-sizing', 'content')) {
+            content.querySelectorAll('textarea.autoSetHeight').forEach(resetScrollHeight);
+        }
+    } else {
+        icon.classList.remove('up', 'fa-circle-chevron-up');
+        icon.classList.add('down', 'fa-circle-chevron-down');
+        content.style.display = 'none';
+    }
+}
+
+function bindOpenAISettingsDrawerPersistence($drawer) {
+    const drawerId = String($drawer.attr('id') || '').trim();
+    if (!drawerId || $drawer.data('sbDrawerPersistenceBound')) {
+        return;
+    }
+
+    $drawer.data('sbDrawerPersistenceBound', true);
+
+    const expanded = getStoredOpenAISettingsDrawerExpanded(drawerId);
+    if (expanded !== null) {
+        applyOpenAISettingsDrawerExpandedState($drawer, expanded);
+    }
+
+    $drawer.on('inline-drawer-toggle', function () {
+        const icon = this.querySelector(':scope > .inline-drawer-header .inline-drawer-icon');
+        if (!(icon instanceof HTMLElement)) {
+            return;
+        }
+
+        setStoredOpenAISettingsDrawerExpanded(drawerId, icon.classList.contains('up'));
+    });
+}
+
 function createOpenAISettingsDrawer(id, title, description) {
     const $drawer = $('<div>', {
         id,
@@ -2060,6 +2136,7 @@ function createOpenAISettingsDrawer(id, title, description) {
     $header.append($('<div>', { class: 'fa-solid fa-circle-chevron-down inline-drawer-icon down' }));
     $drawer.append($header);
     $drawer.append($('<div>', { class: 'inline-drawer-content', style: 'display:none' }));
+    bindOpenAISettingsDrawerPersistence($drawer);
 
     return $drawer;
 }
@@ -2120,7 +2197,7 @@ function groupOpenAISettingsIntoDrawers() {
         {
             id: 'sb-openai-advanced',
             title: 'Advanced & Reasoning',
-            description: 'Tools, media, reasoning, bias, and prompt manager',
+            description: 'Tools, media, reasoning, bias, and server config',
             selectors: [
                 '#openai_settings > div > .range-block:has(#openai_enable_web_search)',
                 '#openai_settings > div > .range-block:has(#openai_function_calling)',
@@ -2132,7 +2209,14 @@ function groupOpenAISettingsIntoDrawers() {
                 '#openai_settings > div > .flex-container:has(#openai_verbosity)',
                 '#openai_settings > div > .range-block:has(#claude_assistant_prefill)',
                 '#openai_settings > .range-block:has(#openai_logit_bias_preset)',
-                '#openai_settings > div > #completion_prompt_manager',
+            ],
+        },
+        {
+            id: 'sb-openai-prompt-manager',
+            title: 'Prompt Manager',
+            description: 'Inspect, reorder, toggle, and edit injected prompts',
+            selectors: [
+                '#openai_settings > div > .range-block:has(#completion_prompt_manager)',
             ],
         },
     ];
