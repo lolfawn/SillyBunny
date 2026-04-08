@@ -394,12 +394,7 @@ select.text_pole {
 
 #send_form .mes_stop {
     display: none;
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
     align-self: center;
-    border-radius: 16px;
-    font-size: calc(var(--bottomFormIconSize) * 0.68);
 }
 
 #rightSendForm > div:hover,
@@ -519,10 +514,12 @@ select.text_pole {
     }
 
     #send_form .mes_stop {
-        width: 52px;
-        min-width: 52px;
-        height: 52px;
-        font-size: calc(var(--bottomFormIconSize) * 0.8);
+        width: 42px;
+        min-width: 42px;
+        max-width: 42px;
+        height: 42px;
+        min-height: 42px;
+        max-height: 42px;
     }
 
     #send_textarea {
@@ -565,8 +562,10 @@ body.bubblechat .mes[is_user='true']::before {
     padding-left: 10px;
 }
 
+body.flatchat .mes[is_user='true'] .mes_block,
 body.bubblechat .mes[is_user='true'] .mes_block {
     border-left: 0;
+    padding-left: 0;
 }
 
 @media screen and (max-width: 1000px) {
@@ -2025,21 +2024,34 @@ input[type='range']::-moz-range-thumb {
 
 #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 12px;
-    align-items: center;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+        'title title'
+        'notify notify'
+        'manage install';
+    gap: 12px 16px;
+    align-items: start;
 }
 
 #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > h3 {
-    grid-column: 1 / -1;
+    grid-area: title;
+    margin: 0;
+    align-self: start;
 }
 
 #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label {
-    display: flex;
+    grid-area: notify;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
+    justify-content: flex-start;
+    justify-self: start;
+    gap: 8px;
+    width: fit-content;
+    max-width: 100%;
     min-width: 0;
-    padding: 10px 12px;
+    min-height: 44px;
+    margin: 0;
+    padding: 10px 16px;
     border-radius: 16px;
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 74%, transparent);
@@ -2052,21 +2064,22 @@ input[type='range']::-moz-range-thumb {
 
 #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label span {
     min-width: 0;
+    font-size: calc(var(--mainFontSize) * 0.84);
     line-height: 1.35;
     white-space: normal;
 }
 
 #rm_extensions_block label.checkbox_label.flexNoGap {
-    column-gap: 10px;
+    column-gap: 8px;
 }
 
 #rm_extensions_block label[for='extensions_notify_updates'] {
-    gap: 14px !important;
-    column-gap: 14px !important;
+    gap: 8px !important;
+    column-gap: 8px !important;
 }
 
 #rm_extensions_block #extensions_notify_updates {
-    margin-inline-end: 10px !important;
+    margin-inline-end: 0 !important;
 }
 
 #rm_extensions_block #extensions_notify_updates + span {
@@ -2076,6 +2089,16 @@ input[type='range']::-moz-range-thumb {
 #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > .menu_button,
 #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > .menu_button_icon {
     min-height: 44px;
+    width: 100%;
+    justify-self: stretch;
+}
+
+#rm_extensions_block #extensions_details {
+    grid-area: manage;
+}
+
+#rm_extensions_block #third_party_extension_button {
+    grid-area: install;
 }
 
 .sb-settings-subdrawer {
@@ -2248,6 +2271,11 @@ input[type='range']::-moz-range-thumb {
         align-items: stretch;
     }
 
+    #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label {
+        width: 100%;
+        justify-self: stretch;
+    }
+
     #PersonaManagement .persona-management-browser > #persona_search_bar,
     #PersonaManagement .persona-management-browser > #persona_pagination_container {
         grid-column: 1 / -1;
@@ -2342,9 +2370,12 @@ input[type='range']::-moz-range-thumb {
     }
 
     #send_form .mes_stop {
-        width: 48px;
-        min-width: 48px;
-        height: 48px;
+        width: 42px;
+        min-width: 42px;
+        max-width: 42px;
+        height: 42px;
+        min-height: 42px;
+        max-height: 42px;
     }
 
     #send_textarea {

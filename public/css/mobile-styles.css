@@ -143,9 +143,12 @@
     }
 
     #send_form .mes_stop {
-        min-width: 52px;
-        min-height: 52px;
-        font-size: calc(var(--mainFontSize) * 1.55);
+        width: calc(var(--bottomFormBlockSize) - 6px);
+        min-width: calc(var(--bottomFormBlockSize) - 6px);
+        height: calc(var(--bottomFormBlockSize) - 6px);
+        min-height: calc(var(--bottomFormBlockSize) - 6px);
+        flex: 0 0 calc(var(--bottomFormBlockSize) - 6px);
+        font-size: var(--bottomFormIconSize);
         padding: 0;
         align-self: center;
         display: inline-flex;
@@ -159,7 +162,7 @@
     }
 
     #send_form .mes_stop i {
-        font-size: 1.2em;
+        font-size: 1em;
         line-height: 1;
         margin: 0;
     }
@@ -942,8 +945,11 @@
     }
 
     #send_form .mes_stop {
-        min-width: 52px;
-        min-height: 52px;
-        font-size: calc(var(--mainFontSize) * 1.6);
+        width: calc(var(--bottomFormBlockSize) - 6px);
+        min-width: calc(var(--bottomFormBlockSize) - 6px);
+        height: calc(var(--bottomFormBlockSize) - 6px);
+        min-height: calc(var(--bottomFormBlockSize) - 6px);
+        flex: 0 0 calc(var(--bottomFormBlockSize) - 6px);
+        font-size: var(--bottomFormIconSize);
     }
 }

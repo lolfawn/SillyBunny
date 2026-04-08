@@ -8,6 +8,8 @@ SillyBunny is a fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern
 
 The goal is to keep the familiar SillyTavern workflow, data habits, and compatibility story, while shipping a more polished frontend shell, faster Bun-based startup, and native agent features directly in the app.
 
+Project site, presets, themes, and extras: [platberlitz.github.io](https://platberlitz.github.io/).
+
 > [!WARNING]
 > SillyBunny is an active fork. Expect ongoing UI iteration, Bun compatibility work, and occasional upstream sync churn.
 
@@ -117,13 +119,19 @@ bash start.sh
 ```
 
 - `start.sh` will install the runtime it needs automatically, install project packages, then launch SillyBunny
-- On native Termux, the launcher now prefers `node` plus `npm` automatically because Bun still has native Termux current-directory issues under `grun`
+- `bash start.sh` is the recommended Android command because it keeps the self-update check, dependency bootstrap, and launch flow together
+- On native Termux, the launcher now prefers `node` plus `npm` automatically because that path is currently more reliable than Bun under `grun`; if Node.js is missing, the launcher will install `nodejs-lts` for you
+- The package postinstall now falls back to `node post-install.js` first, so native Termux no longer needs Bun just to finish dependency installation
 - If you explicitly want to try Bun on native Termux anyway, you can override the launcher with `SILLYBUNNY_TERMUX_RUNTIME=bun bash start.sh`
+- If you use an alias or launcher on Android, point it to `cd ~/SillyBunny && bash start.sh`, not `node server.js`, so dependency bootstrap and auto-update still run
+- To update without starting on Android, run `bash start.sh --self-update-only`
+- To force an update and then launch, run `bash start.sh --self-update`
+- Auto-update only works for Git clones with a tracked branch. ZIP installs can still be launched, but they still need manual replacement downloads to update
 - If you want to browse or import files from Android shared storage, run `termux-setup-storage` once before starting
-- For lower-memory phones or tablet-style environments, you can also use:
+- For smoother Android use on lower-memory phones or tablets, keep using the launcher default instead of forcing direct runtime commands:
 
 ```bash
-bun run start:mobile
+bash start.sh
 ```
 
 ### Auto-update controls
@@ -133,6 +141,8 @@ On Unix-like systems, the launcher checks the tracked Git branch before launch b
 ```bash
 ./start.sh
 ```
+
+Calling `node server.js` or `bun server.js` directly skips that bootstrap step, so package installs and auto-update checks will not run.
 
 To force a non-optional update pass:
 
@@ -237,17 +247,19 @@ Current Agent Mode limitations:
 
 ## Changelog
 
-### v1.2.6
+### v1.2.7
 
+- Bumped the app, client, and package version strings to `v1.2.7`.
 - Reworked the Chat Completion drawers so `Prompt Manager` now lives in its own persisted section below `Advanced & Reasoning`, while the Claude and Gemini `config.yaml` drawer moved inside `Advanced & Reasoning`.
-- Added top-bar label customization with desktop multi-part combinations for `Ctx Size`, `Character Name`, and `Custom Text`, using middle-dot separators on desktop and single-choice behavior on mobile.
-- Hooked the `Ctx Size` top-bar label into the Prompt page total token count, so the live context total can be surfaced without leaving the chat.
+- Expanded top-bar customization with desktop multi-part labels, renamed `Ctx Size` to `Context Size`, hooked the live token total into the top bar, fixed hidden-top-bar persistence on mobile, and removed the dead top-bar padding strip.
 - Added a `Console Logs` tab under Customize with live server output, including Bun-safe console capture and filtering for terminal control-sequence junk.
+- Improved the Characters flow so clicking `Characters` from an active single-character chat can jump straight into that character's editor, with explicit `X` exits on desktop and mobile and cleaner toggling back to the real list drawer.
+- Improved Settings and Extensions UX with persistent drawer states, `Appearance` matching the other dropdowns, a more descriptive settings search, and cleaner `Notify on extension updates` layout and spacing.
 - Fixed the local invalid CSRF token startup issue by hardening token refresh and no-cache handling during first-load and admin requests.
-- Added bundled `Assistant Nahida` alongside Bunny Guide in Launchpad, credited Geechan in the onboarding copy, and switched the bundle to import the real CCv3 card asset directly.
-- Tightened responsive UI behavior across desktop and mobile, including smaller mobile shell-tab spacing, visibility gating for desktop-only versus mobile-only settings, and improved smaller-screen flexibility in Settings and Extensions.
+- Added bundled `Assistant Nahida` alongside Bunny Guide in Launchpad, added the Memory Sharding Quick Reply preset, refreshed the Welcome page credits for Geechan and TheLonelyDevil, and added a clear fork reminder that issues should go to `purachina` on GitHub.
+- Tightened responsive UI behavior across desktop and mobile, including stop-button sizing, flatter message divider cleanup, better smaller-screen flexibility in Settings and Extensions, and tighter mobile shell-tab spacing.
+- Improved native Termux compatibility by defaulting the Android launcher path to Node.js plus npm, falling back to `node post-install.js` before Bun, and documenting `bash start.sh` as the correct path for aliases and auto-update.
 - Fixed duplicated provider icons, cleaned up Prompt Manager opacity/default-open behavior, moved `Import & Restore` into its own drawer above `Appearance`, and normalized Moonlit Echoes header styling.
-- Bumped the app, client, and package version strings to `v1.2.6`.
 
 ### v1.2.5
 

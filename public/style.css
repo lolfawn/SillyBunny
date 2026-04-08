@@ -947,7 +947,8 @@ body .panelControlBar {
 #leftSendForm,
 #rightSendForm {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: center;
 }
 
 #leftSendForm {
@@ -965,6 +966,7 @@ body .panelControlBar {
 #leftSendForm>div {
     width: var(--bottomFormBlockSize);
     height: var(--bottomFormBlockSize);
+    flex: 0 0 var(--bottomFormBlockSize);
     margin: 0;
     border: none;
     cursor: pointer;
@@ -1001,11 +1003,17 @@ body .panelControlBar {
 #send_form .mes_stop {
     display: none;
     order: 2;
-    padding-right: 2px;
+    width: calc(var(--bottomFormBlockSize) - 6px);
+    height: calc(var(--bottomFormBlockSize) - 6px);
+    flex: 0 0 calc(var(--bottomFormBlockSize) - 6px);
+    margin: 0;
+    padding: 0;
     place-self: center;
     cursor: pointer;
     transition: var(--animation-duration-2x);
     opacity: 0.7;
+    align-items: center;
+    justify-content: center;
 }
 
 

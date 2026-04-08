@@ -180,6 +180,27 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     color: var(--welcome-muted-fg);
 }
 
+.welcomeForkNotice {
+    margin-top: 14px;
+    max-width: 64ch;
+    padding: 12px 14px;
+    border-radius: 16px;
+    font-size: calc(var(--mainFontSize) * 0.82);
+    line-height: 1.5;
+    color: var(--welcome-strong-fg);
+    background: color-mix(in srgb, var(--color-primary, #f1b285) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary, #f1b285) 28%, var(--sb-shell-border, var(--SmartThemeBorderColor)));
+    box-shadow: 0 12px 24px color-mix(in srgb, var(--SmartThemeShadowColor) 10%, transparent);
+}
+
+.welcomeForkNotice strong {
+    font-weight: 800;
+}
+
+.welcomeForkNotice a {
+    font-weight: 700;
+}
+
 .welcomePanelToggles {
     display: flex;
     align-items: center;
@@ -1408,6 +1429,7 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
 
 .welcomeStarterPackCard {
     gap: 12px;
+    container: welcome-starter-pack / inline-size;
 }
 
 .welcomeStarterPackCard .welcomeChipRow {
@@ -1434,6 +1456,12 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
     justify-content: center;
     text-align: center;
     padding: 0 8px;
+}
+
+@container welcome-starter-pack (max-width: 460px) {
+    .welcomeChipRow[data-chip-columns='4'] {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 .welcomeStarterPackActions {

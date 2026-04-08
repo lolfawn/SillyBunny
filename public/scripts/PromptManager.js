@@ -453,8 +453,31 @@ class PromptManager {
         content.style.display = expanded ? 'block' : 'none';
     }
 
+    getPromptManagerDrawer() {
+        return this.containerElement?.querySelector(`#${this.configuration.prefix}prompt_manager_drawer`) ?? null;
+    }
+
+    getDrawerExpandedState(drawer = this.getPromptManagerDrawer()) {
+        if (!(drawer instanceof HTMLElement)) {
+            return this.getStoredDrawerExpanded();
+        }
+
+        const icon = drawer.querySelector(':scope > .inline-drawer-header .inline-drawer-icon');
+        const content = drawer.querySelector(':scope > .inline-drawer-content');
+
+        if (icon instanceof HTMLElement) {
+            return icon.classList.contains('up');
+        }
+
+        if (content instanceof HTMLElement) {
+            return getComputedStyle(content).display !== 'none';
+        }
+
+        return this.getStoredDrawerExpanded();
+    }
+
     bindDrawerPersistence() {
-        const drawer = this.containerElement?.querySelector(`#${this.configuration.prefix}prompt_manager_drawer`);
+        const drawer = this.getPromptManagerDrawer();
         if (!(drawer instanceof HTMLElement)) {
             return;
         }
@@ -493,12 +516,17 @@ class PromptManager {
 
         // Enable and disable prompts
         this.handleToggle = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
             const promptID = event.target.closest('.' + this.configuration.prefix + 'prompt_manager_prompt').dataset.pmIdentifier;
             const promptOrderEntry = this.getPromptOrderEntry(this.activeCharacter, promptID);
             const counts = this.tokenHandler.getCounts();
+            const drawerExpanded = this.getDrawerExpandedState();
 
             counts[promptID] = null;
             promptOrderEntry.enabled = !promptOrderEntry.enabled;
+            this.setStoredDrawerExpanded(drawerExpanded);
             this.render();
             this.saveServiceSettings();
         };

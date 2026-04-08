@@ -683,9 +683,9 @@ function buildSiteStarterPackItem() {
 function buildGeechanStarterPackItem() {
     return buildLinkStarterPackItem({
         title: 'Geechan',
-        body: 'Geechan\'s Rentry highlights his well-written Genshin character cards, and SillyBunny now bundles his Universal Roleplay v5.0 set across Chat Completions plus the matching Text Completions context, system prompt, and instruct pieces.',
+        body: 'Geechan\'s Rentry highlights his well-written Genshin character cards and sampler guide, and he is also the one who made the bundled Assistant Nahida card. SillyBunny now includes his Universal Roleplay v5.0 set across Chat Completions plus the matching Text Completions context, system prompt, and instruct pieces.',
         icon: 'fa-leaf',
-        chips: ['Genshin cards', 'Chat preset', 'Text templates', 'Rentry'],
+        chips: ['Genshin cards', 'Assistant Nahida', 'Sampler guide', 'Rentry'],
         statusLabel: 'Preset pack',
         statusTone: 'warm',
         actionLabel: 'Visit Geechan',
@@ -696,9 +696,9 @@ function buildGeechanStarterPackItem() {
 function buildTldStarterPackItem() {
     return buildLinkStarterPackItem({
         title: 'TheLonelyDevil',
-        body: 'TheLonelyDevil\'s Chub profile is linked here, SillyBunny bundles the standalone TLD Card Conversion Preset for card-maker and conversion-focused OpenAI-style workflows, and Discord Pals is included as a GitHub link for running LLM character roleplay inside Discord.',
+        body: 'TheLonelyDevil\'s Chub profile is linked here, SillyBunny bundles the standalone TLD Card Conversion Preset for card-maker and conversion-focused OpenAI-style workflows, and he also made the bundled Memory Sharding Quick Reply prompt. For the Memory Sharding flow, use around 30k context so the shard pass has enough room to work cleanly. Discord Pals is included as a GitHub link for running LLM character roleplay inside Discord.',
         icon: 'fa-shoe-prints',
-        chips: ['Card maker', 'Chub.ai', 'Discord RP', 'Preset'],
+        chips: ['Card maker', 'Memory shards', 'Discord RP', 'Preset'],
         statusLabel: 'Bundled',
         statusTone: 'warm',
         actionLabel: 'Open Chub profile',
