@@ -245,6 +245,17 @@ Current Agent Mode limitations:
 
 ## Changelog
 
+### v1.2.8
+
+- Comprehensive CSS optimization pass across `style.css`, removing 130 lines of dead code, duplicate rules, outdated vendor prefixes, and redundant property overrides without changing any visual output.
+- Consolidated duplicate logit-bias, placeholder, and scrollbar-thumb rules into shared selectors and replaced longhand padding/margin overrides with shorthand equivalents.
+- Styled the Presets `Prompts` section to match the other Chat Completion drawer sections (Token Budget, Sampling, Output, Advanced & Reasoning) with consistent font weight, description opacity, and layout, while keeping the `Total Tokens` counter visible.
+- Added adaptive contrast text variables (`--sb-contrast-strong`, `--sb-contrast-muted`) that automatically flip between light and dark text based on the surface luminance detected by the existing WCAG-based tone system, so drawer section headings and descriptions stay readable across any theme without manual CSS edits.
+- Fixed a top-bar pointer-events leak that could let drag gestures bleed through open drawers, and added `pointer-events: auto` to Select2 dropdowns so they remain clickable under the new containment rules.
+- Added safe-area-inset padding to the top bar for notched and Dynamic Island devices.
+- Added layout and style containment hints to the chat-bar layer for smoother drag and scroll performance.
+- Fixed top-bar drag event listeners not being unbound after a drag ends, preventing stale pointermove handlers from accumulating across sessions.
+
 ### v1.2.7
 
 - Bumped the app, client, and package version strings to `v1.2.7`.

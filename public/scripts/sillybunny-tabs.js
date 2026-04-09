@@ -1481,6 +1481,26 @@ function endTopbarDrag(event) {
     const finalOffset = clampTopbarOffset(getChatbarState().renderedTopbarOffset);
     state.dragging = null;
     setTopbarOffset(finalOffset, { persist: true });
+
+    unbindTopbarDragEvents();
+}
+
+function unbindTopbarDragEvents() {
+    const state = getChatbarState();
+
+    if (!state.dragListenersBound) {
+        return;
+    }
+
+    state.dragListenersBound = false;
+    window.removeEventListener('pointermove', updateTopbarDrag);
+    window.removeEventListener('pointerup', endTopbarDrag);
+    window.removeEventListener('pointercancel', endTopbarDrag);
+    window.removeEventListener('mousemove', updateTopbarDrag);
+    window.removeEventListener('mouseup', endTopbarDrag);
+    window.removeEventListener('touchmove', updateTopbarDrag);
+    window.removeEventListener('touchend', endTopbarDrag);
+    window.removeEventListener('touchcancel', endTopbarDrag);
 }
 
 function bindTopbarDragEvents() {

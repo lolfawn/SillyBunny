@@ -134,6 +134,10 @@
     pointer-events: none !important;
 }
 
+#top-settings-holder > .drawer > .drawer-content.openDrawer {
+    pointer-events: auto;
+}
+
 #top-bar {
     position: fixed;
     top: 0;
@@ -145,7 +149,7 @@
     align-items: flex-start;
     justify-content: center;
     height: var(--sb-topbar-primary-height);
-    padding: 0 var(--sb-topbar-padding-x);
+    padding: max(env(safe-area-inset-top), 0px) var(--sb-topbar-padding-x) 0;
     overflow: visible;
 }
 
@@ -162,6 +166,7 @@ body.sb-topbar-dragging {
     display: grid;
     grid-template-rows: var(--sb-topbar-primary-height) minmax(var(--sb-chatbar-height), auto);
     gap: var(--sb-topbar-stack-gap);
+    contain: layout style;
 }
 
 #sb-chatbar-layer {
@@ -169,10 +174,13 @@ body.sb-topbar-dragging {
     width: 100%;
     transform: translate(var(--sb-topbar-offset-x, 0px), var(--sb-topbar-offset-y, 0px));
     transition: transform 180ms ease;
+    will-change: transform;
+    contain: layout style;
 }
 
 #sb-chatbar-layer.is-dragging {
     transition: none;
+    will-change: transform;
 }
 
 #sb-topbar-primary {

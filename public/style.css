@@ -71,7 +71,6 @@
     --SmartThemeEmColor: #d2beb0;
     --SmartThemeUnderlineColor: #df8e70;
     --SmartThemeQuoteColor: #f1b285;
-    /* --SmartThemeFastUIBGColor: rgba(0, 0, 0, 0.9); */
     --SmartThemeBlurTintColor: rgba(19, 15, 13, 0.92);
     --SmartThemeChatTintColor: rgba(28, 21, 18, 0.82);
     --SmartThemeUserMesBlurTintColor: rgba(77, 49, 43, 0.92);
@@ -171,8 +170,6 @@ body {
     /*fallback for JS load*/
     height: 100vh;
     height: 100dvh;
-    /*defaults as 100%, then reassigned via JS as pixels, will work on PC and Android*/
-    /*height: calc(var(--doc-height) - 1px);*/
     background-color: var(--SmartThemeBlurTintColor);
     background-repeat: no-repeat;
     background-attachment: fixed;
@@ -210,8 +207,6 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: color-mix(in srgb, var(--color-primary, #f1b285) 50%, transparent);
-    border-radius: 999px;
-    border: 2px solid transparent;
     background-clip: content-box;
 }
 
@@ -264,9 +259,7 @@ table.responsiveTable {
 }
 
 .animated {
-    -webkit-animation-duration: var(--animation-duration, 3s) !important;
     animation-duration: var(--animation-duration, 3s) !important;
-    -webkit-animation-fill-mode: both !important;
     animation-fill-mode: both !important;
     box-shadow: inset 0 0 5px var(--SmartThemeQuoteColor);
 }
@@ -447,8 +440,7 @@ input[type='checkbox']:focus-visible {
     display: block;
     border-left: 2px solid var(--reasoning-body-color);
     border-radius: 2px;
-    padding: 5px;
-    padding-left: 14px;
+    padding: 5px 5px 5px 14px;
     margin-bottom: 0.5em;
     overflow-y: auto;
     color: hsl(from var(--reasoning-body-color) h calc(s * var(--reasoning-saturation)) l);
@@ -723,12 +715,10 @@ small {
 code {
     font-family: var(--monoFontFamily);
     white-space: pre-wrap;
-    /* word-wrap: break-word; */
     border: 1px solid var(--SmartThemeBorderColor);
     border-radius: 5px;
     background-color: var(--black70a);
     padding: 0 3px;
-    /* max-width: calc(100dvw - 95px); */
     line-height: var(--mainFontSize);
     color: var(--white70a);
 }
@@ -738,7 +728,6 @@ kbd {
     padding: 2px 4px;
     font-family: var(--monoFontFamily);
     white-space: nowrap;
-    /* background-color: #eeeeee; */
     background-color: rgba(255, 255, 255, 0.9);
     color: #333;
     border: 1px solid #b4b4b4;
@@ -801,10 +790,7 @@ hr {
     height: calc(100dvh - var(--topBarBlockSize) - 1px);
     max-height: calc(100dvh - var(--topBarBlockSize) - 1px);
     overflow-x: hidden;
-    /* max-width: 50vw; */
     position: absolute;
-    left: calc((100vw - var(--sheldWidth))/2);
-    left: calc((100dvw - var(--sheldWidth))/2);
     top: var(--topBarBlockSize);
     margin: 0 auto;
     left: 0;
@@ -817,21 +803,15 @@ hr {
 
 .drag-grabber {
     position: absolute;
-    /*     width: 20px !important;
-    height: 20px !important; */
     margin: 0px 5px;
     color: var(--SmartThemeBodyColor);
     z-index: 2000;
     text-align: center;
-    /* border-radius: 5px; */
     vertical-align: middle;
     right: 0px;
     top: 0px;
     opacity: 0.5;
     cursor: grab;
-    /* border: 1px solid var(--SmartThemeBorderColor); */
-    cursor: -moz-grab;
-    cursor: -webkit-grab;
     display: none;
     filter: drop-shadow(0px 0px 0px black);
     transition: all var(--animation-duration-2x);
@@ -867,8 +847,6 @@ body .panelControlBar {
 
 #sheldheader:active {
     cursor: grabbing;
-    cursor: -moz-grabbing;
-    cursor: -webkit-grabbing;
 }
 
 .pull-tab {
@@ -889,9 +867,6 @@ body .panelControlBar {
     overflow-y: scroll;
     display: flex;
     bottom: 10px;
-    /*     border-bottom: 1px solid var(--SmartThemeBorderColor);
-    border-left: 1px solid var(--SmartThemeBorderColor);
-    border-right: 1px solid var(--SmartThemeBorderColor); */
     backdrop-filter: blur(var(--SmartThemeBlurStrength));
     background-color: var(--SmartThemeChatTintColor);
     -webkit-backdrop-filter: blur(var(--SmartThemeBlurStrength));
@@ -904,7 +879,7 @@ body .panelControlBar {
 #form_sheld {
     white-space: nowrap;
     width: 100%;
-    margin: 1px auto 0 auto;
+    margin: 1px auto 0;
     z-index: 30;
 }
 
@@ -920,16 +895,12 @@ body .panelControlBar {
     flex-wrap: wrap;
     align-items: center;
     width: 100%;
-    margin: 0 auto 0 auto;
+    margin: 0 auto;
     border: 1px solid var(--SmartThemeBorderColor);
     border-radius: 0 0 1.65rem 1.65rem;
     background-color: var(--SmartThemeBlurTintColor);
     backdrop-filter: blur(20px);
 }
-
-/* #send_form.no-connection {
-    background-color: var(--crimson70a) !important;
-} */
 
 #nonQRFormItems {
     padding: 0;
@@ -1104,7 +1075,6 @@ body .panelControlBar {
     opacity: 0.7;
     cursor: pointer;
     z-index: 2001;
-    margin-left: 0;
     padding: 0;
     transition: var(--animation-duration-2x);
     display: flex;
@@ -1184,8 +1154,7 @@ body .panelControlBar {
 .list-group .list-group-item,
 #sd_dropdown .list-group span {
     color: var(--SmartThemeBodyColor);
-    padding: 5px 5px;
-    padding-bottom: 5px;
+    padding: 5px;
     text-decoration: none;
     display: flex;
     column-gap: 10px;
@@ -1273,7 +1242,6 @@ body .panelControlBar {
 /* This has much better performance than .transform on large chats*/
 .slide {
     animation: slide calc(var(--slide-mes-x-duration, var(--animation-duration, 125ms))) ease-in-out forwards;
-    -webkit-animation: slide calc(var(--slide-mes-x-duration, var(--animation-duration, 125ms))) ease-in-out forwards;
     will-change: transform;
 }
 
@@ -1570,10 +1538,7 @@ img[src*="sillybunny-pixel-logo.png"] {
 }
 
 .mes_text {
-    padding-left: 0;
-    padding-top: 5px;
-    padding-bottom: 5px;
-    padding-right: var(--mes-right-spacing);
+    padding: 5px var(--mes-right-spacing) 5px 0;
 }
 
 .mes_text hr {
@@ -2653,7 +2618,6 @@ body[data-stscript-style] .hljs.language-stscript {
     margin: 3px;
     opacity: 0.75;
     filter: grayscale(1);
-    -webkit-transition: all var(--animation-duration-2x) ease-in-out;
     transition: all var(--animation-duration-2x) ease-in-out;
 }
 
@@ -2661,11 +2625,7 @@ body[data-stscript-style] .hljs.language-stscript {
     opacity: 1;
 }
 
-.text_pole::placeholder {
-    color: var(--SmartThemeEmColor) !important;
-    opacity: 0.7;
-}
-
+.text_pole::placeholder,
 textarea::placeholder {
     color: var(--SmartThemeEmColor) !important;
     opacity: 0.7;
@@ -3116,7 +3076,8 @@ input[type="file"] {
 }
 
 .floating_panel_maximize:hover,
-.floating_panel_close:hover {
+.floating_panel_close:hover,
+.dragClose:hover {
     cursor: pointer;
     opacity: 1;
 }
@@ -3131,11 +3092,6 @@ input[type="file"] {
     text-shadow: none;
 }
 
-.dragClose:hover {
-    cursor: pointer;
-    opacity: 1;
-}
-
 #floatingPrompt .drag-grabber {
     position: unset;
 }
@@ -3145,8 +3101,6 @@ input[type="file"] {
 /*#################################################################*/
 
 select {
-    -moz-appearance: none;
-    -webkit-appearance: none;
     appearance: none;
     padding: 3px 5px;
     background-color: var(--black30a);
@@ -3623,7 +3577,6 @@ input[type=search]:focus::-webkit-search-cancel-button {
     display: flex;
     padding: 5px;
     margin-right: 5px;
-    border-radius: 5px;
     font-weight: 500;
     color: var(--SmartThemeQuoteColor);
     border: 1px solid var(--SmartThemeBorderColor);
@@ -3657,10 +3610,6 @@ grammarly-extension {
 }
 
 .avatar_div .avatar {
-    /*     margin-left: 4px;
-    margin-right: 10px;
-    height: 70px;
-    width: 70px; */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -4158,8 +4107,7 @@ grammarly-extension {
 }
 
 .prompt_order>div {
-    padding: 5px;
-    padding-left: 30px;
+    padding: 5px 5px 5px 30px;
     width: 100%;
     border-radius: 5px;
     color: var(--SmartThemeBodyColor);
@@ -4407,6 +4355,7 @@ input[type='checkbox'].del_checkbox {
     flex-wrap: wrap;
     justify-content: space-around;
     padding: 1px;
+    gap: 10px;
 }
 
 .avatar-container .avatar {
@@ -4538,10 +4487,8 @@ input[type='checkbox'].del_checkbox {
 }
 
 .neo-range-slider {
-    -webkit-appearance: none !important;
     appearance: none !important;
-    margin: 0 !important;
-    margin-top: 7px !important;
+    margin: 7px 0 0 !important;
     padding: 0 !important;
     width: 100% !important;
     height: 5px !important;
@@ -4597,9 +4544,6 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     position: relative;
-    /*box-shadow: 0 0 5px 0 black;
-    box-shadow: inset 0 0 5px var(--black70a);*/
-    -webkit-appearance: none;
     height: 15px;
     width: 15px;
     border-radius: 50%;
@@ -5023,9 +4967,7 @@ body:is([data-generating="true"], [data-swiping="true"]) :is(
 }
 
 #character_popup h3 {
-    margin-top: 0;
-    margin-bottom: 0;
-    margin-left: 0;
+    margin: 0;
     display: inline;
 }
 
@@ -5111,10 +5053,7 @@ h5 {
     right: 0;
     top: 0;
     bottom: 0;
-    margin-top: auto;
-    margin-bottom: auto;
-    margin-left: auto;
-    margin-right: auto;
+    margin: auto;
     box-shadow: 0px 0px 20px black;
     padding: 10px;
     background-color: var(--SmartThemeBlurTintColor);
@@ -5163,7 +5102,6 @@ h5 {
 
 .swipe_picker_block {
     cursor: pointer;
-    -webkit-user-select: none;
     user-select: none;
 }
 
@@ -5206,7 +5144,6 @@ h5 {
 .PastChat_cross:not(.disabled):hover {
     color: red;
     filter: drop-shadow(0 0 2px red);
-    -webkit-animation: infinite-spinning 1s ease-out 0s infinite normal;
     animation: infinite-spinning 1s ease-out 0s infinite normal;
 }
 
@@ -5219,7 +5156,6 @@ h5 {
     cursor: default !important;
     color: inherit;
     filter: none;
-    -webkit-animation: none;
     animation: none;
     opacity: 0.2 !important;
 }
@@ -5952,8 +5888,6 @@ body:has(#character_popup.open) #top-settings-holder:has(.drawer-content.openDra
     height: 0;
     backdrop-filter: blur(calc(var(--SmartThemeBlurStrength)));
     -webkit-backdrop-filter: blur(calc(var(--SmartThemeBlurStrength)));
-    box-shadow: 0 0 15px color-mix(in srgb, var(--SmartThemeBlurTintColor) 50%, transparent);
-    transition: all 0.5s ease;
     box-shadow: 0 18px 80px rgba(2, 8, 5, 0.35);
     transition-property: height, display;
     transition-duration: 200ms;
@@ -6038,17 +5972,6 @@ body:not(.movingUI) .drawer-content.maximized {
     }
 }
 
-/*
-.fillRight #rm_print_characters_block {
-    overflow-y: hidden;
-}
-
-.fillRight.openDrawer #rm_print_characters_block {
-    overflow-y: auto;
-    animation: hide-scroll var(--animation-duration-2x) backwards;
-}
-*/
-
 .scrollableInner {
     overflow-x: hidden;
     height: 100%;
@@ -6093,7 +6016,9 @@ body:not(.movingUI) .drawer-content.maximized {
 }
 
 .openai_logit_bias_text,
-.openai_logit_bias_value {
+.openai_logit_bias_value,
+.logit_bias_text,
+.logit_bias_value {
     flex: 1;
 }
 
@@ -6109,24 +6034,7 @@ body:not(.movingUI) .drawer-content.maximized {
     text-align: center;
 }
 
-.openai_logit_bias_form {
-    display: flex;
-    flex-direction: row;
-    column-gap: 10px;
-    align-items: center;
-}
-
-.openai_logit_bias_list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.openai_logit_bias_list:empty {
-    width: 100%;
-    height: 100%;
-}
-
+.openai_logit_bias_form,
 .logit_bias_form {
     display: flex;
     flex-direction: row;
@@ -6134,22 +6042,20 @@ body:not(.movingUI) .drawer-content.maximized {
     align-items: center;
 }
 
-.logit_bias_text,
-.logit_bias_value {
-    flex: 1;
-}
-
+.openai_logit_bias_list,
 .logit_bias_list {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
+.openai_logit_bias_list:empty,
 .logit_bias_list:empty {
     width: 100%;
     height: 100%;
 }
 
+.openai_logit_bias_list:empty::before,
 .logit_bias_list:empty::before {
     display: flex;
     align-items: center;
@@ -6176,18 +6082,6 @@ body:not(.movingUI) .drawer-content.maximized {
 
 .openai_logit_bias_preset_form select {
     flex: 1;
-}
-
-.openai_logit_bias_list:empty::before {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    content: "No items";
-    font-weight: bolder;
-    width: 100%;
-    height: 100%;
-    opacity: 0.8;
-    min-height: 2.5em;
 }
 
 .openai_restorable,
@@ -6319,11 +6213,6 @@ body:not(.movingUI) .drawer-content.maximized {
     align-items: start;
 }
 
-/*why were we force hiding the close button again..?*/
-/* .zoomed_avatar .dragClose {
-    display: none;
-} */
-
 .zoomed_avatar_container {
     width: 100%;
     /* margin-inline: 10px; */
@@ -6359,14 +6248,6 @@ body:not(.movingUI) .drawer-content.maximized {
     transition: all var(--animation-duration-2x);
 }
 
-/* #groupMemberListPopout,
-#summaryExtensionPopout {
-    aspect-ratio: unset;
-    backdrop-filter: blur(var(--SmartThemeBlurStrength));
-    background-color: var(--SmartThemeBlurTintColor);
-    overflow: auto;
-} */
-
 #groupMemberListPopout {
     padding: 0;
     height: 50%;
@@ -6377,11 +6258,8 @@ body:not(.movingUI) .drawer-content.maximized {
 }
 
 #groupMemberListPopout #rm_group_members {
-    /*     background-color: var(--SmartThemeBlurTintColor); */
     margin: 0;
-    padding: 0;
-    padding-top: 20px;
-
+    padding: 20px 0 0;
 }
 
 
@@ -6617,12 +6495,6 @@ body:not(.movingUI) .drawer-content.maximized {
     margin-bottom: 5px;
 }
 
-#user_avatar_block {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
 /* Main structure for the model cards */
 .model-card {
     display: flex;
@@ -6647,8 +6519,6 @@ body:not(.movingUI) .drawer-content.maximized {
 .model-card:hover {
     transform: scale(1.01);
     background-color: #444;
-    /* Smooth transition */
-    transition: transform var(--animation-duration-2x) ease-in-out, background-color var(--animation-duration-2x) ease-in-out;
 }
 
 .model-card.selected {

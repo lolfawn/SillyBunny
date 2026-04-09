@@ -135,12 +135,15 @@ body::before {
     content: '';
     position: fixed;
     inset: 0;
+    inset-top: max(env(safe-area-inset-top), 0px);
     pointer-events: none;
     background:
         radial-gradient(circle at top left, var(--sb-ambient-a), transparent 28%),
         radial-gradient(circle at top right, var(--sb-ambient-b), transparent 32%);
     opacity: 1;
     z-index: 0;
+    will-change: auto;
+    contain: layout style paint;
 }
 
 :root[data-sb-theme='modern-glass'][data-sb-surface-tone='light'] body::before {
@@ -678,9 +681,14 @@ input[type='range']::-moz-range-thumb {
     padding-inline: 0;
 }
 
+.sb-openai-settings-drawer .inline-drawer-header b {
+    color: var(--sb-contrast-strong, var(--SmartThemeBodyColor));
+}
+
 .sb-openai-settings-drawer .sb-group-meta {
     margin-top: 2px;
-    opacity: 0.72;
+    color: var(--sb-contrast-muted, var(--SmartThemeEmColor));
+    opacity: 1;
 }
 
 .sb-openai-settings-subdrawer {
@@ -2123,7 +2131,6 @@ input[type='range']::-moz-range-thumb {
     min-height: 52px;
     gap: 12px;
     align-items: center;
-    background: linear-gradient(135deg, color-mix(in srgb, var(--sb-accent) 12%, transparent), color-mix(in srgb, var(--sb-panel-soft) 70%, transparent));
 }
 
 .sb-settings-subdrawer > .inline-drawer-header b {
@@ -2155,6 +2162,37 @@ input[type='range']::-moz-range-thumb {
 .sb-openai-settings-subdrawer > .inline-drawer-header > .flex-container > small {
     width: 100%;
     text-align: left;
+}
+
+/* Make Prompt Manager header match other openai settings drawer sections */
+.sb-openai-settings-subdrawer > .inline-drawer-header > .completion_prompt_manager_header {
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.sb-openai-settings-subdrawer .completion_prompt_manager_header_advanced {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.sb-openai-settings-subdrawer .completion_prompt_manager_header_title {
+    font-weight: bold;
+    margin-left: 0;
+    filter: none;
+    color: var(--sb-contrast-strong, var(--SmartThemeBodyColor));
+}
+
+.sb-openai-settings-subdrawer .completion_prompt_manager_header_description {
+    margin-left: 0;
+    margin-top: 2px;
+    color: var(--sb-contrast-muted, var(--SmartThemeEmColor));
+}
+
+.sb-openai-settings-subdrawer .completion_prompt_manager_header_tokens {
+    font-size: calc(var(--mainFontSize) * 0.85);
+    color: var(--sb-contrast-muted, var(--SmartThemeBodyColor));
 }
 
 .sb-settings-subdrawer-body {
@@ -2237,6 +2275,10 @@ input[type='range']::-moz-range-thumb {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+    }
+
+    body::before {
+        animation: none !important;
     }
 }
 

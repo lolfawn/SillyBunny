@@ -1223,6 +1223,8 @@ function applyLandingContrastPalette() {
     document.documentElement.dataset.sbSurfaceTone = isLightSurface ? 'light' : 'dark';
     document.documentElement.style.setProperty('--sb-landing-strong', landingStrong);
     document.documentElement.style.setProperty('--sb-landing-muted', landingMuted);
+    document.documentElement.style.setProperty('--sb-contrast-strong', landingStrong);
+    document.documentElement.style.setProperty('--sb-contrast-muted', landingMuted);
 }
 
 function applyThemeColor(type) {
