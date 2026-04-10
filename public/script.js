@@ -1456,13 +1456,13 @@ export async function replaceCurrentChat() {
             // pick existing chat
             characters[this_chid].chat = chats[0].file_name.replace('.jsonl', '');
             $('#selected_chat_pole').val(characters[this_chid].chat);
-            saveCharacterDebounced();
+            await updateRemoteChatName(this_chid, characters[this_chid].chat);
             await getChat();
         } else {
             // start new chat
             characters[this_chid].chat = `${name2} - ${humanizedDateTime()}`;
             $('#selected_chat_pole').val(characters[this_chid].chat);
-            saveCharacterDebounced();
+            await updateRemoteChatName(this_chid, characters[this_chid].chat);
             await getChat();
         }
     }
@@ -7714,9 +7714,9 @@ export async function openCharacterChat(file_name) {
     await clearChat({ clearData: true });
     characters[this_chid].chat = file_name;
     chat_metadata = {};
-    await getChat();
     $('#selected_chat_pole').val(file_name);
-    await createOrEditCharacter(new CustomEvent('newChat'));
+    await getChat();
+    await updateRemoteChatName(this_chid, file_name);
 }
 
 ////////// OPTIMZED MAIN API CHANGE FUNCTION ////////////
@@ -11190,10 +11190,11 @@ export async function doNewChat({ deleteCurrentChat = false } = {}) {
     } else {
         //RossAscends: added character name to new chat filenames and replaced Date.now() with humanizedDateTime;
         chat_metadata = {};
-        characters[this_chid].chat = `${name2} - ${humanizedDateTime()}`;
-        $('#selected_chat_pole').val(characters[this_chid].chat);
+        const newChatName = `${name2} - ${humanizedDateTime()}`;
+        characters[this_chid].chat = newChatName;
+        $('#selected_chat_pole').val(newChatName);
         await getChat();
-        await createOrEditCharacter(new CustomEvent('newChat'));
+        await updateRemoteChatName(this_chid, newChatName);
         if (deleteCurrentChat) await delChat(chat_file_for_del + '.jsonl');
     }
 }
