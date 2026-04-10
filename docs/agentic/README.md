@@ -11,6 +11,15 @@ The reference point is Aventuras:
 
 SillyBunny already has a useful baseline in [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js): retrieval, memory, and lorebook services tied into the generation loop. The goal here is to evolve that foundation instead of replacing it blindly.
 
+## Recent hotfix note
+
+### 2026-04-10 group chat recovery hotfix
+
+- Repository hotfix refresh for `v1.2.8`; this is not a new feature release.
+- Fixed stale group metadata that could point group workflows at a missing chat `.jsonl` after failed creation or rename attempts.
+- Existing on-disk group chats are now preferred during recovery, and missing references are repaired instead of trapping the UI in repeated missing-file loops.
+- This matters for agentic and metadata-heavy group sessions because chat-scoped state should no longer get stranded behind a broken active group-chat pointer.
+
 ## Rules for experiments
 
 - Build agentic features on `staging` first.

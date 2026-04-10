@@ -502,13 +502,13 @@ router.post('/save', validateAvatarUrlMiddleware, async function (request, respo
 export function getChatData(chatFilePath) {
     let chatData = [];
 
-    const chatJSON = tryReadFileSync(chatFilePath) ?? '';
-    if (chatJSON.length > 0) {
+    const chatJSON = tryReadFileSync(chatFilePath);
+    if (typeof chatJSON === 'string' && chatJSON.length > 0) {
         const lines = chatJSON.split('\n');
         // Iterate through the array of strings and parse each line as JSON
         chatData = lines.map(line => tryParse(line)).filter(x => x);
-    } else {
-        console.warn(`File not found: ${chatFilePath}. The chat does not exist or is empty.`);
+    } else if (fs.existsSync(chatFilePath)) {
+        console.warn(`Chat file is empty: ${chatFilePath}.`);
     }
 
     return chatData;
@@ -813,6 +813,10 @@ router.post('/group/info', async (request, response) => {
 
         const id = request.body.id;
         const chatFilePath = path.join(request.user.directories.groupChats, sanitize(`${id}.jsonl`));
+
+        if (!fs.existsSync(chatFilePath)) {
+            return response.status(404).send({ error: 'not_found' });
+        }
 
         const chatInfo = await getChatInfo(chatFilePath);
         return response.send(chatInfo);

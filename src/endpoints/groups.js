@@ -119,6 +119,7 @@ router.post('/all', (request, response) => {
 
     const files = fs.readdirSync(request.user.directories.groups).filter(x => path.extname(x) === '.json');
     const chats = fs.readdirSync(request.user.directories.groupChats).filter(x => path.extname(x) === '.jsonl');
+    const chatFileSet = new Set(chats);
 
     files.forEach(function (file) {
         try {
@@ -131,13 +132,40 @@ router.post('/all', (request, response) => {
 
             let chat_size = 0;
             let date_last_chat = 0;
+            let latestChatId = null;
 
-            if (Array.isArray(group.chats) && Array.isArray(chats)) {
-                for (const chat of chats) {
-                    if (group.chats.includes(path.parse(chat).name)) {
-                        const chatStat = fs.statSync(path.join(request.user.directories.groupChats, chat));
-                        chat_size += chatStat.size;
-                        date_last_chat = Math.max(date_last_chat, chatStat.mtimeMs);
+            if (Array.isArray(group.chats)) {
+                /** @type {string[]} */
+                const normalizedChats = [];
+                const seenChats = new Set();
+
+                for (const rawChatId of group.chats) {
+                    const chatId = String(rawChatId);
+                    const chatFileName = sanitize(`${chatId}.jsonl`);
+
+                    if (seenChats.has(chatId) || !chatFileSet.has(chatFileName)) {
+                        continue;
+                    }
+
+                    seenChats.add(chatId);
+                    normalizedChats.push(chatId);
+
+                    const chatStat = fs.statSync(path.join(request.user.directories.groupChats, chatFileName));
+                    chat_size += chatStat.size;
+
+                    if (chatStat.mtimeMs >= date_last_chat) {
+                        date_last_chat = chatStat.mtimeMs;
+                        latestChatId = chatId;
+                    }
+                }
+
+                // If at least one real group chat still exists, prefer the on-disk truth over
+                // stale chat IDs that were saved without a corresponding JSONL.
+                if (normalizedChats.length > 0) {
+                    group.chats = normalizedChats;
+
+                    if (!normalizedChats.includes(String(group.chat_id ?? ''))) {
+                        group.chat_id = latestChatId ?? normalizedChats[normalizedChats.length - 1];
                     }
                 }
             }

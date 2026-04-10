@@ -1739,6 +1739,10 @@ async function fetchGroupChatFiles(chatContext) {
                 });
 
                 if (!response.ok) {
+                    if (response.status === 404) {
+                        return null;
+                    }
+
                     return normalizeChatInfo({ file_name: chatId });
                 }
 
@@ -1748,7 +1752,7 @@ async function fetchGroupChatFiles(chatContext) {
             }
         }));
 
-        return sortChatFiles(chats.filter(chat => chat.fileName));
+        return sortChatFiles(chats.filter(chat => chat?.fileName));
     } catch (error) {
         console.error('Failed to fetch group chats', error);
         return [];

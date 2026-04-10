@@ -211,6 +211,33 @@ async function loadGroupChat(chatId) {
 }
 
 /**
+ * Checks whether a group chat file currently exists on the server.
+ * @param {string} chatId Chat ID
+ * @returns {Promise<'present'|'missing'|'unknown'>} Current availability state
+ */
+async function groupChatExists(chatId) {
+    if (!chatId) {
+        return 'missing';
+    }
+
+    try {
+        const response = await fetch('/api/chats/group/info', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify({ id: chatId }),
+        });
+
+        if (response.ok) {
+            return 'present';
+        }
+
+        return response.status === 404 ? 'missing' : 'unknown';
+    } catch {
+        return 'unknown';
+    }
+}
+
+/**
  * Validates a group by checking if all members exist and removing duplicates.
  * @param {Group} group Group to validate
  * @returns {Promise<void>}
@@ -231,14 +258,58 @@ async function validateGroup(group) {
         return character;
     });
 
-    // Remove duplicate chat ids
+    if (typeof group.chat_id === 'number') {
+        group.chat_id = String(group.chat_id);
+        dirty = true;
+    }
+
+    // Remove duplicate chat ids and normalize IDs to strings
     if (Array.isArray(group.chats)) {
         const lengthBefore = group.chats.length;
-        group.chats = group.chats.filter(onlyUnique);
+        group.chats = group.chats.map(chatId => String(chatId)).filter(onlyUnique);
         const lengthAfter = group.chats.length;
         if (lengthBefore !== lengthAfter) {
             dirty = true;
         }
+    }
+
+    // Recover from stale chat IDs that no longer have a JSONL on disk.
+    if (Array.isArray(group.chats) && group.chats.length) {
+        const presentChats = [];
+        const retainedChats = [];
+        const results = await Promise.allSettled(group.chats.map(chatId => groupChatExists(chatId)));
+
+        for (let i = 0; i < results.length; i++) {
+            const chatId = group.chats[i];
+            const availability = results[i].status === 'fulfilled' ? results[i].value : 'unknown';
+
+            if (availability === 'present') {
+                presentChats.push(chatId);
+                retainedChats.push(chatId);
+                continue;
+            }
+
+            if (availability !== 'missing') {
+                retainedChats.push(chatId);
+            }
+        }
+
+        if (retainedChats.length !== group.chats.length) {
+            group.chats = retainedChats;
+            dirty = true;
+        }
+
+        if (presentChats.length && !presentChats.includes(String(group.chat_id ?? ''))) {
+            group.chat_id = presentChats[presentChats.length - 1];
+            dirty = true;
+        }
+    }
+
+    if ((!Array.isArray(group.chats) || !group.chats.length) && !group.chat_id) {
+        const freshChatId = humanizedDateTime();
+        group.chat_id = freshChatId;
+        group.chats = [freshChatId];
+        dirty = true;
     }
 
     if (dirty) {
