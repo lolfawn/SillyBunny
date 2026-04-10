@@ -220,6 +220,16 @@ Current UI work includes:
   - Bubbles
   - Document
 
+### UI preview
+
+![SillyBunny workspace overview](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-workspace-v1.2.8.png)
+
+The welcome workspace keeps the new shell, assistant panel, and visible `v1.2.8` branding in one focused landing flow.
+
+![SillyBunny customization overview](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-customize-v1.2.8.png)
+
+The customization drawer highlights the built-in themes, palette presets, and shell controls that make the fork look distinct from stock SillyTavern.
+
 ### Native Agent Mode
 
 Agent Mode is built into the app as a per-chat feature set, not as a replacement backend.
@@ -269,6 +279,7 @@ Current Agent Mode limitations:
 #### v1.2.8 UI fixes (2026-04-10)
 
 - This keeps the existing `v1.2.8` version number and should be treated as a patch refresh, not a new feature release.
+- Fixed the visible SillyBunny UI version label and Horde client identifier so the app now consistently reports `v1.2.8`.
 - Added a **Reset** button next to the SillyBunny palette presets so you can restore all colors to the current theme after applying a palette without having to re-select the theme from the dropdown.
 - Blur Strength and Shadow Width sliders now show a tooltip explaining they are disabled when Fast UI Mode or No Shadows is on respectively, and applying a palette while those modes are active now shows a warning toast.
 - Fixed mobile eye toggle requiring two taps to hide the top chat bar by removing a `touchstart` stop-propagation from top-bar icon buttons that was interfering with browser touch-to-click synthesis. The same fix improves the chat info bar drag handle on mobile.
