@@ -126,7 +126,7 @@
 
     /*Top Bar Scaling Variables*/
     --topBarIconSize: calc(var(--mainFontSize) * 2);
-    --topBarBlockSize: max(calc(var(--topBarIconSize) + var(--topBarBlockPadding)), 54px);
+    --topBarBlockSize: max(calc(var(--topBarIconSize) + var(--topBarBlockPadding)), calc(54px * var(--fontScale)));
     --topBarBlockPadding: calc(var(--mainFontSize) / 3);
 
     /*styles for the color picker*/
