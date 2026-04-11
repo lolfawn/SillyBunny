@@ -2286,6 +2286,10 @@ async function sendOpenAIResponsesRequest(request, response) {
     try {
         const { input, instructions } = convertMessagesToResponsesFormat(request.body.messages);
 
+        // The Responses API only accepts: model, input, instructions, stream, store,
+        // temperature, top_p, max_output_tokens, reasoning, text, and truncation.
+        // Parameters like presence_penalty, frequency_penalty, seed, stop, logit_bias
+        // are Chat Completions-only and must NOT be sent here.
         const requestBody = {
             model: request.body.model,
             input: input,
@@ -2296,22 +2300,6 @@ async function sendOpenAIResponsesRequest(request, response) {
             stream: request.body.stream || false,
             store: false,
         };
-
-        if (request.body.presence_penalty !== undefined) {
-            requestBody.presence_penalty = request.body.presence_penalty;
-        }
-
-        if (request.body.frequency_penalty !== undefined) {
-            requestBody.frequency_penalty = request.body.frequency_penalty;
-        }
-
-        if (request.body.seed !== undefined && request.body.seed >= 0) {
-            requestBody.seed = request.body.seed;
-        }
-
-        if (Array.isArray(request.body.stop) && request.body.stop.length > 0) {
-            requestBody.stop = request.body.stop;
-        }
 
         if (request.body.reasoning_effort) {
             const reasoningEffort = OPENAI_REASONING_EFFORT_MODELS.includes(request.body.model)
@@ -2333,20 +2321,10 @@ async function sendOpenAIResponsesRequest(request, response) {
         if (/^(o1|o3|o4)/.test(model)) {
             delete requestBody.temperature;
             delete requestBody.top_p;
-            delete requestBody.presence_penalty;
-            delete requestBody.frequency_penalty;
-            delete requestBody.stop;
         } else if (/gpt-5/.test(model)) {
-            if (/gpt-5\.(1|2|3|4)/.test(model) && !/chat-latest/.test(model)) {
-                delete requestBody.frequency_penalty;
-                delete requestBody.presence_penalty;
-                delete requestBody.stop;
-            } else if (!/gpt-5-chat-latest/.test(model) && !/gpt-5\.\d/.test(model)) {
+            if (!/gpt-5-chat-latest/.test(model) && !/gpt-5\.\d/.test(model)) {
                 delete requestBody.temperature;
                 delete requestBody.top_p;
-                delete requestBody.frequency_penalty;
-                delete requestBody.presence_penalty;
-                delete requestBody.stop;
             }
         }
 
