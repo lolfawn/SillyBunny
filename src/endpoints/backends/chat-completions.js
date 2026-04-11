@@ -2013,6 +2013,341 @@ router.post('/bias', async function (request, response) {
     }
 });
 
+/**
+ * Converts Chat Completions messages array to Responses API input format.
+ * Extracts system messages as instructions and converts the rest to input items.
+ * @param {Array} messages Chat Completions messages array
+ * @returns {{ input: Array, instructions: string|undefined }}
+ */
+function convertMessagesToResponsesFormat(messages) {
+    if (!Array.isArray(messages)) {
+        return { input: String(messages), instructions: undefined };
+    }
+
+    const systemParts = [];
+    const inputItems = [];
+
+    for (const msg of messages) {
+        if (msg.role === 'system') {
+            if (typeof msg.content === 'string') {
+                systemParts.push(msg.content);
+            } else if (Array.isArray(msg.content)) {
+                for (const part of msg.content) {
+                    if (part.type === 'text') {
+                        systemParts.push(part.text);
+                    }
+                }
+            }
+        } else {
+            const inputItem = { role: msg.role === 'assistant' ? 'assistant' : 'user' };
+            if (typeof msg.content === 'string') {
+                inputItem.content = msg.content;
+            } else if (Array.isArray(msg.content)) {
+                inputItem.content = msg.content.map(part => {
+                    if (part.type === 'text') {
+                        return { type: 'input_text', text: part.text };
+                    }
+                    if (part.type === 'image_url') {
+                        return { type: 'input_image', image_url: part.image_url.url };
+                    }
+                    return part;
+                });
+            } else {
+                inputItem.content = msg.content;
+            }
+            inputItems.push(inputItem);
+        }
+    }
+
+    return {
+        input: inputItems,
+        instructions: systemParts.length > 0 ? systemParts.join('\n\n') : undefined,
+    };
+}
+
+/**
+ * Transforms a Responses API response to Chat Completions format.
+ * @param {object} data Responses API response
+ * @returns {object} Chat Completions compatible response
+ */
+function transformResponsesApiResponse(data) {
+    let content = '';
+    let reasoning_content = '';
+
+    if (Array.isArray(data.output)) {
+        for (const outputItem of data.output) {
+            if (outputItem.type === 'message' && Array.isArray(outputItem.content)) {
+                for (const part of outputItem.content) {
+                    if (part.type === 'output_text') {
+                        content += part.text;
+                    }
+                }
+            }
+            if (outputItem.type === 'reasoning' && Array.isArray(outputItem.content)) {
+                for (const part of outputItem.content) {
+                    if (part.type === 'reasoning_text') {
+                        reasoning_content += part.text;
+                    }
+                }
+            }
+        }
+    }
+
+    const choice = {
+        index: 0,
+        message: {
+            role: 'assistant',
+            content: content,
+        },
+        finish_reason: data.status === 'completed' ? 'stop' : (data.status || 'stop'),
+    };
+
+    if (reasoning_content) {
+        choice.message.reasoning_content = reasoning_content;
+    }
+
+    return {
+        id: data.id || 'resp-' + uuidv4(),
+        object: 'chat.completion',
+        created: Math.floor(Date.now() / 1000),
+        model: data.model || '',
+        choices: [choice],
+        usage: data.usage ? {
+            prompt_tokens: data.usage.input_tokens || 0,
+            completion_tokens: data.usage.output_tokens || 0,
+            total_tokens: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0),
+        } : undefined,
+    };
+}
+
+/**
+ * Transforms a Responses API SSE stream into Chat Completions SSE format.
+ * @param {import('node-fetch').Response} fetchResponse The upstream Responses API response
+ * @param {import('express').Response} expressResponse The Express response to write to
+ */
+function forwardResponsesApiStream(fetchResponse, expressResponse) {
+    let statusCode = fetchResponse.status;
+    const statusText = fetchResponse.statusText;
+
+    if (!fetchResponse.ok) {
+        console.warn(`Responses API streaming request failed with status ${statusCode} ${statusText}`);
+    }
+
+    if (statusCode === 401) {
+        statusCode = 400;
+    }
+
+    expressResponse.statusCode = statusCode;
+    expressResponse.statusMessage = statusText;
+
+    if (!fetchResponse.ok || !fetchResponse.body) {
+        fetchResponse.body?.pipe(expressResponse);
+        return;
+    }
+
+    expressResponse.setHeader('Content-Type', 'text/event-stream');
+    expressResponse.setHeader('Cache-Control', 'no-cache');
+    expressResponse.setHeader('Connection', 'keep-alive');
+
+    let buffer = '';
+
+    fetchResponse.body.on('data', (chunk) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                const dataStr = line.slice(6).trim();
+                if (!dataStr || dataStr === '[DONE]') {
+                    expressResponse.write('data: [DONE]\n\n');
+                    continue;
+                }
+
+                try {
+                    const event = JSON.parse(dataStr);
+                    const chatDelta = convertResponsesEventToChatDelta(event);
+                    if (chatDelta) {
+                        expressResponse.write(`data: ${JSON.stringify(chatDelta)}\n\n`);
+                    }
+                } catch {
+                    // Skip unparseable events
+                }
+            } else if (line.startsWith('event: ')) {
+                // The Responses API uses named events; we handle their data on the data: lines
+                const eventType = line.slice(7).trim();
+                if (eventType === 'response.completed' || eventType === 'response.done') {
+                    expressResponse.write('data: [DONE]\n\n');
+                }
+            }
+        }
+    });
+
+    fetchResponse.body.on('end', () => {
+        if (!expressResponse.writableEnded) {
+            expressResponse.write('data: [DONE]\n\n');
+            expressResponse.end();
+        }
+    });
+
+    fetchResponse.body.on('error', (err) => {
+        console.error('Responses API stream error:', err);
+        if (!expressResponse.writableEnded) {
+            expressResponse.end();
+        }
+    });
+
+    expressResponse.on('close', () => {
+        if (fetchResponse.body && typeof fetchResponse.body.destroy === 'function') {
+            fetchResponse.body.destroy();
+        }
+    });
+}
+
+/**
+ * Converts a Responses API SSE event to a Chat Completions delta chunk.
+ * @param {object} event Parsed Responses API event
+ * @returns {object|null} Chat Completions chunk or null if event should be skipped
+ */
+function convertResponsesEventToChatDelta(event) {
+    const type = event.type;
+
+    if (type === 'response.output_text.delta') {
+        return {
+            id: event.response_id || 'chatcmpl-' + uuidv4(),
+            object: 'chat.completion.chunk',
+            choices: [{
+                index: 0,
+                delta: { content: event.delta || '' },
+                finish_reason: null,
+            }],
+        };
+    }
+
+    if (type === 'response.reasoning_summary_text.delta') {
+        return {
+            id: event.response_id || 'chatcmpl-' + uuidv4(),
+            object: 'chat.completion.chunk',
+            choices: [{
+                index: 0,
+                delta: { reasoning_content: event.delta || '' },
+                finish_reason: null,
+            }],
+        };
+    }
+
+    if (type === 'response.completed' || type === 'response.done') {
+        return {
+            id: event.response?.id || 'chatcmpl-' + uuidv4(),
+            object: 'chat.completion.chunk',
+            choices: [{
+                index: 0,
+                delta: {},
+                finish_reason: 'stop',
+            }],
+        };
+    }
+
+    return null;
+}
+
+/**
+ * Sends a request to the OpenAI Responses API (/v1/responses).
+ * Transforms requests from Chat Completions format and normalizes responses back.
+ */
+async function sendOpenAIResponsesRequest(request, response) {
+    const apiUrl = new URL(request.body.reverse_proxy || API_OPENAI).toString();
+    const apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(request.user.directories, SECRET_KEYS.OPENAI);
+
+    if (!apiKey && !request.body.reverse_proxy) {
+        console.warn('OpenAI API key is missing.');
+        return response.status(400).send({ error: true });
+    }
+
+    const controller = new AbortController();
+    request.socket.removeAllListeners('close');
+    request.socket.on('close', function () {
+        controller.abort();
+    });
+
+    try {
+        const { input, instructions } = convertMessagesToResponsesFormat(request.body.messages);
+
+        const requestBody = {
+            model: request.body.model,
+            input: input,
+            instructions: instructions,
+            temperature: request.body.temperature,
+            max_output_tokens: request.body.max_tokens || request.body.max_completion_tokens,
+            top_p: request.body.top_p,
+            stream: request.body.stream || false,
+            store: false,
+        };
+
+        if (request.body.presence_penalty !== undefined) {
+            requestBody.presence_penalty = request.body.presence_penalty;
+        }
+
+        if (request.body.frequency_penalty !== undefined) {
+            requestBody.frequency_penalty = request.body.frequency_penalty;
+        }
+
+        if (request.body.seed !== undefined && request.body.seed >= 0) {
+            requestBody.seed = request.body.seed;
+        }
+
+        if (Array.isArray(request.body.stop) && request.body.stop.length > 0) {
+            requestBody.stop = request.body.stop;
+        }
+
+        if (request.body.reasoning_effort) {
+            requestBody.reasoning = {
+                effort: request.body.reasoning_effort,
+            };
+        }
+
+        const endpointUrl = `${apiUrl}/responses`;
+        const config = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + apiKey,
+            },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal,
+        };
+
+        console.debug('OpenAI Responses API request:', requestBody);
+
+        const fetchResponse = await fetch(endpointUrl, config);
+
+        if (request.body.stream) {
+            console.info('Streaming Responses API request in progress');
+            return forwardResponsesApiStream(fetchResponse, response);
+        }
+
+        if (fetchResponse.ok) {
+            const json = await fetchResponse.json();
+            console.debug('OpenAI Responses API response:', json);
+            const transformed = transformResponsesApiResponse(json);
+            return response.send(transformed);
+        } else {
+            const responseText = await fetchResponse.text();
+            const errorData = tryParse(responseText);
+            const message = fetchResponse.statusText || 'Unknown error occurred';
+            console.error('OpenAI Responses API request error: ', message, responseText);
+            if (!response.headersSent) {
+                return response.status(fetchResponse.status).send(errorData ?? { error: true });
+            }
+        }
+    } catch (error) {
+        console.error('Error communicating with OpenAI Responses API: ', error);
+        if (!response.headersSent) {
+            response.send({ error: true });
+        }
+    }
+}
+
 router.post('/generate', async function (request, response) {
     try {
         if (!request.body) return response.status(400).send({ error: true });
@@ -2043,6 +2378,7 @@ router.post('/generate', async function (request, response) {
             case CHAT_COMPLETION_SOURCES.CHUTES: return await sendChutesRequest(request, response);
             case CHAT_COMPLETION_SOURCES.ELECTRONHUB: return await sendElectronHubRequest(request, response);
             case CHAT_COMPLETION_SOURCES.AZURE_OPENAI: return await sendAzureOpenAIRequest(request, response);
+            case CHAT_COMPLETION_SOURCES.OPENAI_RESPONSES: return await sendOpenAIResponsesRequest(request, response);
         }
 
         let apiUrl;

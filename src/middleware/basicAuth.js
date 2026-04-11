@@ -1,11 +1,13 @@
 /**
  * When applied, this middleware will ensure the request contains the required header for basic authentication and only
  * allow access to the endpoint after successful authentication.
+ * Also supports session-based Bearer token authentication when sessionAuth is enabled.
  */
 import { Buffer } from 'node:buffer';
 import storage from 'node-persist';
 import { getAllUserHandles, toKey, getPasswordHash } from '../users.js';
 import { getConfigValue, safeReadFileSync } from '../util.js';
+import { validateSession, isSessionAuthEnabled } from './sessionAuth.js';
 
 const PER_USER_BASIC_AUTH = getConfigValue('perUserBasicAuth', false, 'boolean');
 const ENABLE_ACCOUNTS = getConfigValue('enableUserAccounts', false, 'boolean');
@@ -17,9 +19,21 @@ const basicAuthMiddleware = async function (request, response, callback) {
         return res.status(401).send(unauthorizedWebpage);
     };
 
+    const authHeader = request.headers.authorization;
+
+    // Check for session-based Bearer token authentication first
+    if (authHeader && isSessionAuthEnabled()) {
+        const [scheme, token] = authHeader.split(' ');
+        if (scheme === 'Bearer' && token) {
+            const session = validateSession(token);
+            if (session) {
+                return callback();
+            }
+        }
+    }
+
     const basicAuthUserName = getConfigValue('basicAuthUser.username');
     const basicAuthUserPassword = getConfigValue('basicAuthUser.password');
-    const authHeader = request.headers.authorization;
 
     if (!authHeader) {
         return unauthorizedResponse(response);

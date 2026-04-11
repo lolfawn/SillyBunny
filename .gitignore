@@ -42,6 +42,7 @@ whitelist.txt
 !.vscode/extensions.json
 .idea/
 secrets.json
+.secret_key
 /dist
 /backups/
 public/movingUI/

@@ -216,6 +216,7 @@ export const chat_completion_sources = {
     FIREWORKS: 'fireworks',
     COMETAPI: 'cometapi',
     AZURE_OPENAI: 'azure_openai',
+    OPENAI_RESPONSES: 'openai_responses',
     ZAI: 'zai',
     SILICONFLOW: 'siliconflow',
 };
@@ -3495,6 +3496,7 @@ export async function createGenerationParameters(settings, model, type, messages
     // "OpenAI-like" sources
     const gptSources = [
         chat_completion_sources.OPENAI,
+        chat_completion_sources.OPENAI_RESPONSES,
         chat_completion_sources.AZURE_OPENAI,
         chat_completion_sources.OPENROUTER,
     ];
@@ -3502,6 +3504,7 @@ export async function createGenerationParameters(settings, model, type, messages
     // Sources that support the "seed" parameter
     const seedSupportedSources = [
         chat_completion_sources.OPENAI,
+        chat_completion_sources.OPENAI_RESPONSES,
         chat_completion_sources.AZURE_OPENAI,
         chat_completion_sources.OPENROUTER,
         chat_completion_sources.MISTRALAI,
@@ -3522,6 +3525,7 @@ export async function createGenerationParameters(settings, model, type, messages
     const proxySupportedSources = [
         chat_completion_sources.CLAUDE,
         chat_completion_sources.OPENAI,
+        chat_completion_sources.OPENAI_RESPONSES,
         chat_completion_sources.MISTRALAI,
         chat_completion_sources.MAKERSUITE,
         chat_completion_sources.VERTEXAI,
@@ -6666,6 +6670,7 @@ async function onConnectButtonClick(e) {
         [chat_completion_sources.MAKERSUITE]: { key: SECRET_KEYS.MAKERSUITE, selector: '#api_key_makersuite', proxy: true },
         [chat_completion_sources.CLAUDE]: { key: SECRET_KEYS.CLAUDE, selector: '#api_key_claude', proxy: true },
         [chat_completion_sources.OPENAI]: { key: SECRET_KEYS.OPENAI, selector: '#api_key_openai', proxy: true },
+        [chat_completion_sources.OPENAI_RESPONSES]: { key: SECRET_KEYS.OPENAI, selector: '#api_key_openai', proxy: true },
         [chat_completion_sources.AI21]: { key: SECRET_KEYS.AI21, selector: '#api_key_ai21', proxy: false },
         [chat_completion_sources.MISTRALAI]: { key: SECRET_KEYS.MISTRALAI, selector: '#api_key_mistralai', proxy: true },
         [chat_completion_sources.CUSTOM]: { key: SECRET_KEYS.CUSTOM, selector: '#api_key_custom', proxy: false, keyless: true },
@@ -6722,7 +6727,7 @@ async function onConnectButtonClick(e) {
 function toggleChatCompletionForms() {
     if (oai_settings.chat_completion_source == chat_completion_sources.CLAUDE) {
         $('#model_claude_select').trigger('change');
-    } else if (oai_settings.chat_completion_source == chat_completion_sources.OPENAI) {
+    } else if (oai_settings.chat_completion_source == chat_completion_sources.OPENAI || oai_settings.chat_completion_source == chat_completion_sources.OPENAI_RESPONSES) {
         rebuildOpenAIModelSelect();
         if (oai_settings.show_external_models && (!Array.isArray(model_list) || model_list.length == 0)) {
             const hasSelectedModel = $('#model_openai_select').find(`option[value="${CSS.escape(oai_settings.openai_model)}"]`).length > 0;
@@ -6783,7 +6788,8 @@ function toggleChatCompletionForms() {
     $('[data-source]').each(function () {
         const mode = $(this).data('source-mode');
         const validSources = $(this).data('source').split(',');
-        const matchesSource = validSources.includes(oai_settings.chat_completion_source);
+        const effectiveSource = oai_settings.chat_completion_source === chat_completion_sources.OPENAI_RESPONSES ? chat_completion_sources.OPENAI : oai_settings.chat_completion_source;
+        const matchesSource = validSources.includes(oai_settings.chat_completion_source) || validSources.includes(effectiveSource);
         $(this).toggle(mode !== 'except' ? matchesSource : !matchesSource);
     });
 

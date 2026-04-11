@@ -604,6 +604,8 @@ export async function loadTextGenSettings(data, loadedSettings) {
             MANCER_SERVER = result;
         }
     });
+
+    groupTextGenSettingsIntoDrawers();
 }
 
 /**
@@ -1837,6 +1839,198 @@ export function createTextGenGenerationData(settings, model, finalPrompt = null,
         }
     }
     return params;
+}
+
+/**
+ * Creates a collapsible inline-drawer element for text gen settings grouping.
+ * @param {string} id Drawer element ID
+ * @param {string} title Drawer title
+ * @param {string} description Short description
+ * @returns {JQuery} The drawer element
+ */
+function createTextGenSettingsDrawer(id, title, description) {
+    const $drawer = $('<div>', {
+        id,
+        class: 'inline-drawer wide100p flexFlowColumn sb-textgen-settings-drawer',
+    });
+    const $header = $('<div>', { class: 'inline-drawer-toggle inline-drawer-header' });
+    const $label = $('<div>', { class: 'flex-container flexFlowColumn' })
+        .append($('<b>').text(title));
+
+    if (description) {
+        $label.append($('<small>', { class: 'sb-group-meta' }).text(description));
+    }
+
+    $header.append($label);
+    $header.append($('<div>', { class: 'fa-solid fa-circle-chevron-down inline-drawer-icon down' }));
+    $drawer.append($header);
+    $drawer.append($('<div>', { class: 'inline-drawer-content', style: 'display:none' }));
+
+    return $drawer;
+}
+
+/**
+ * Groups Text Completion settings into collapsible drawers, mirroring
+ * the Chat Completions UI pattern from groupOpenAISettingsIntoDrawers().
+ */
+function groupTextGenSettingsIntoDrawers() {
+    const $settingsBlock = $('#textgenerationwebui_api-settings');
+
+    if ($settingsBlock.length === 0 || $settingsBlock.data('sb-grouped')) {
+        return;
+    }
+
+    // Detach the toolbar (Neutralize Samplers / Sampler Select) so we can re-add it at the top
+    const $toolbar = $settingsBlock.children('.flex-container.justifyCenter').first().detach();
+
+    // Detach the main flex container that holds all the sampler sliders
+    const $samplerGrid = $settingsBlock.children('.flex-container.gap10h5v.justifyCenter').first();
+
+    const groupConfigs = [
+        {
+            id: 'sb-textgen-sampling',
+            title: 'Sampling',
+            description: 'Temperature, top-k, top-p, and probability controls',
+            selectors: [
+                '[data-tg-samplers="temp"]',
+                '[data-tg-samplers="top_k"]',
+                '[data-tg-samplers="top_p"]',
+                '[data-tg-samplers="typical_p"]',
+                '[data-tg-samplers="min_p"]',
+                '[data-tg-samplers="top_a"]',
+                '[data-tg-samplers="tfs"]',
+                '[data-tg-samplers="epsilon_cutoff"]',
+                '[data-tg-samplers="nsigma"]',
+                '[data-tg-samplers="min_keep"]',
+                '[data-tg-samplers="eta_cutoff"]',
+                '[data-tg-samplers="skew"]',
+            ],
+            container: $samplerGrid,
+        },
+        {
+            id: 'sb-textgen-penalties',
+            title: 'Penalties & Repetition',
+            description: 'Repetition, frequency, and presence penalties',
+            selectors: [
+                '[data-tg-samplers="rep_pen"]',
+                '[data-tg-samplers="rep_pen_range"]',
+                '[data-tg-samplers="rep_pen_slope"]',
+                '[data-tg-samplers="rep_pen_decay"]',
+                '[data-tg-samplers="encoder_rep_pen"]',
+                '[data-tg-samplers="freq_pen"]',
+                '[data-tg-samplers="presence_pen"]',
+                '[data-tg-samplers="no_repeat_ngram_size"]',
+            ],
+            container: $samplerGrid,
+        },
+        {
+            id: 'sb-textgen-advanced-algorithms',
+            title: 'Advanced Algorithms',
+            description: 'Dynamic temperature, mirostat, XTC, DRY, smoothing',
+            selectors: [
+                '#dynatemp_block_ooba',
+                '#mirostat_block_ooba',
+                '#xtc_block',
+                '#dryBlock',
+                '#smoothingBlock',
+                '#adaptive_p_block',
+                '#contrastiveSearchBlock',
+                '#beamSearchBlock',
+            ],
+            container: $settingsBlock,
+        },
+        {
+            id: 'sb-textgen-token-control',
+            title: 'Token Control',
+            description: 'Seed, banned tokens, logit bias, token toggles',
+            selectors: [
+                '[data-tg-samplers="n"]',
+                '[data-tg-samplers="min_length"]',
+                '[data-tg-samplers="max_tokens_second"]',
+                '[data-tg-samplers="seed"]',
+                '#banned_tokens_block_ooba',
+                '#logit_bias_block_ooba',
+            ],
+            container: null, // mixed containers
+        },
+        {
+            id: 'sb-textgen-output',
+            title: 'Output & Generation',
+            description: 'Grammar, JSON schema, CFG, token flags, sampler order',
+            selectors: [
+                '#cfg_block_ooba',
+                '#grammar_block_ooba',
+                '#json_schema_block',
+                '#sampler_order_block_kcpp',
+                '#sampler_order_block_lcpp',
+                '#sampler_priority_block_ooba',
+                '#sampler_priority_block_aphrodite',
+            ],
+            container: $settingsBlock,
+        },
+    ];
+
+    // Collect checkbox toggles row (do_sample, add_bos_token, etc.)
+    const $checkboxRow = $settingsBlock.children('.flex-container.justifyCenter').filter(function () {
+        return $(this).find('#do_sample_textgenerationwebui').length > 0;
+    }).first();
+
+    // Build grouped drawers
+    const $drawerContainer = $('<div>', { class: 'sb-textgen-drawers' });
+
+    groupConfigs.forEach(group => {
+        const $drawer = createTextGenSettingsDrawer(group.id, group.title, group.description);
+        const $content = $drawer.children('.inline-drawer-content');
+
+        // Wrap matching sampler items in a flex grid inside the drawer
+        const $innerGrid = $('<div>', { class: 'flex-container gap10h5v justifyCenter' });
+        let hasContent = false;
+
+        group.selectors.forEach(selector => {
+            // Search in the sampler grid first, then the settings block, then globally within the block
+            let $el = $samplerGrid.children(selector).first();
+            if ($el.length === 0) {
+                $el = $settingsBlock.children(selector).first();
+            }
+            if ($el.length === 0) {
+                $el = $settingsBlock.find(selector).first();
+                // Only detach direct or near-direct children, not deeply nested
+                if ($el.length > 0 && !$el.parent().is($samplerGrid) && !$el.parent().is($settingsBlock)) {
+                    // This is a nested element; get its top-level parent within settings block
+                    const $parent = $el.closest('#textgenerationwebui_api-settings > *');
+                    if ($parent.length > 0) {
+                        $el = $parent;
+                    }
+                }
+            }
+            if ($el.length > 0) {
+                $el.detach();
+                $innerGrid.append($el);
+                hasContent = true;
+            }
+        });
+
+        if (hasContent) {
+            $content.append($innerGrid);
+            $drawerContainer.append($drawer);
+        }
+    });
+
+    // Handle the checkbox toggles row - add to Token Control drawer
+    if ($checkboxRow.length > 0) {
+        $checkboxRow.detach();
+        const $tokenDrawer = $drawerContainer.find('#sb-textgen-token-control .inline-drawer-content');
+        if ($tokenDrawer.length > 0) {
+            $tokenDrawer.append($checkboxRow);
+        }
+    }
+
+    // Rebuild the settings block: toolbar at top, then drawers
+    $settingsBlock.empty();
+    $settingsBlock.append($toolbar);
+    $settingsBlock.append($drawerContainer);
+
+    $settingsBlock.data('sb-grouped', true);
 }
 
 export async function getTextGenGenerationData(finalPrompt, maxTokens, isImpersonate, isContinue, cfgValues, type) {

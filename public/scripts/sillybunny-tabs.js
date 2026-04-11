@@ -3908,9 +3908,12 @@ function renderServerAdminStatus(data) {
     let pillTone = 'neutral';
 
     if (repository?.supported && repository?.isRepo) {
-        if (repository?.hasLocalChanges) {
+        if (repository?.hasLocalChanges && !repository?.autoStash) {
             pillLabel = 'Update Blocked';
             pillTone = 'danger';
+        } else if (repository?.hasLocalChanges && repository?.autoStash) {
+            pillLabel = (repository?.behind ?? 0) > 0 ? 'Update Ready (Auto-stash)' : 'Auto-stash Enabled';
+            pillTone = 'warn';
         } else if ((repository?.behind ?? 0) > 0) {
             pillLabel = 'Update Ready';
             pillTone = 'warn';
@@ -3936,6 +3939,10 @@ function renderServerAdminStatus(data) {
     }
 
     setServerAdminMessage(refs.statusNote, noteParts.join('\n'), pillTone);
+
+    if (refs.autoStashCheckbox) {
+        refs.autoStashCheckbox.checked = Boolean(repository?.autoStash);
+    }
     updateServerAdminInteractivity();
 }
 
@@ -4183,6 +4190,10 @@ async function handleServerAdminUpdate() {
 
         renderServerAdminStatus(nextStatus);
 
+        if (result?.stashPopWarning) {
+            toastr.warning(result.stashPopWarning, 'Auto-stash warning', { timeOut: 10000 });
+        }
+
         if (result?.install?.stdout || result?.install?.stderr) {
             refs.updateOutput.hidden = false;
             refs.updateOutput.textContent = [result.install.command, result.install.stdout, result.install.stderr]
@@ -4253,12 +4264,16 @@ function buildServerAdminPanel() {
     const updateButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action menu_button_primary', text: 'Update & Restart', attrs: { type: 'button' } });
     const restartButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Restart server', attrs: { type: 'button' } });
     const updateNote = createElement('div', { className: 'sb-server-note', text: 'Fast-forward updates restart automatically after the pull finishes.' });
+    const autoStashLabel = createElement('label', { className: 'checkbox_label' });
+    const autoStashCheckbox = createElement('input', { attrs: { type: 'checkbox', id: 'auto_stash_before_pull' } });
+    const autoStashText = createElement('small', { text: 'Auto-stash local changes before pulling' });
+    autoStashLabel.append(autoStashCheckbox, autoStashText);
     const updateOutput = createElement('pre', { className: 'sb-server-output' });
     updateOutput.hidden = true;
     updateCopy.append(updateTitle, updateDescription);
     updateActions.append(refreshButton, updateButton, restartButton);
     updateHeader.append(updateCopy);
-    updateCard.append(updateHeader, updateActions, updateNote, updateOutput);
+    updateCard.append(updateHeader, updateActions, autoStashLabel, updateNote, updateOutput);
 
     const configCard = createElement('section', { className: 'sb-admin-card sb-server-card' });
     const configHeader = createElement('div', { className: 'sb-admin-card-header' });
@@ -4300,6 +4315,7 @@ function buildServerAdminPanel() {
         restartButton,
         updateNote,
         updateOutput,
+        autoStashCheckbox,
         configPath,
         configState,
         configEditor,
@@ -4319,6 +4335,18 @@ function buildServerAdminPanel() {
         updateServerConfigDirtyState();
         updateServerAdminInteractivity();
     });
+    autoStashCheckbox.addEventListener('change', function () {
+        const refs = getServerAdminRefs();
+        if (!refs?.configEditor) return;
+        const yaml = refs.configEditor.value;
+        const newValue = this.checked ? 'true' : 'false';
+        if (/^autoStashBeforePull:\s*(true|false)/m.test(yaml)) {
+            refs.configEditor.value = yaml.replace(/^(autoStashBeforePull:\s*)(true|false)/m, `$1${newValue}`);
+        } else {
+            refs.configEditor.value = yaml + `\nautoStashBeforePull: ${newValue}\n`;
+        }
+        refs.configEditor.dispatchEvent(new Event('input'));
+    });
 
     window.requestAnimationFrame(() => {
         void refreshServerAdminPanel({ includeConfig: true, forceConfig: true });
@@ -4331,6 +4359,113 @@ function buildServerAdminPanel() {
         searchRoot: column,
         onActivate: () => refreshServerAdminPanel({ includeConfig: !getServerAdminState().configLoaded }),
     };
+}
+
+/**
+ * Creates a collapsible inline-drawer for Advanced Formatting sections.
+ * @param {string} id Drawer element ID
+ * @param {string} title Drawer title
+ * @param {string} description Short description
+ * @returns {HTMLElement} The drawer element
+ */
+function createAdvFormattingDrawer(id, title, description) {
+    const drawer = createElement('div', {
+        id,
+        className: 'inline-drawer wide100p flexFlowColumn sb-af-settings-drawer',
+    });
+    const header = createElement('div', { className: 'inline-drawer-toggle inline-drawer-header' });
+    const label = createElement('div', { className: 'flex-container flexFlowColumn' });
+    const titleEl = createElement('b');
+    titleEl.textContent = title;
+    label.appendChild(titleEl);
+    if (description) {
+        const desc = createElement('small', { className: 'sb-group-meta' });
+        desc.textContent = description;
+        label.appendChild(desc);
+    }
+    header.appendChild(label);
+    const icon = createElement('div', { className: 'fa-solid fa-circle-chevron-down inline-drawer-icon down' });
+    header.appendChild(icon);
+    drawer.appendChild(header);
+    const content = createElement('div', { className: 'inline-drawer-content' });
+    content.style.display = 'none';
+    drawer.appendChild(content);
+    return drawer;
+}
+
+/**
+ * Wraps Advanced Formatting columns (Context Template, Instruct Template,
+ * System Prompt, Reasoning) into collapsible drawers for better UX.
+ */
+function groupAdvancedFormattingIntoDrawers() {
+    const $af = $('#AdvancedFormatting');
+    if ($af.length === 0 || $af.data('sb-grouped')) {
+        return;
+    }
+
+    // The three-column container
+    const $columnsContainer = $af.find('.flex-container.spaceEvenly').first();
+    if ($columnsContainer.length === 0) {
+        return;
+    }
+
+    const sections = [
+        {
+            id: 'sb-af-context',
+            title: 'Context Template',
+            description: 'Story string, separators, and context formatting options',
+            selector: '#ContextSettings',
+        },
+        {
+            id: 'sb-af-instruct',
+            title: 'Instruct Template',
+            description: 'Instruct mode sequences, wrapping, and activation',
+            selector: '#InstructSettingsColumn',
+        },
+        {
+            id: 'sb-af-sysprompt',
+            title: 'System Prompt',
+            description: 'System prompt, post-history instructions, stopping strings, tokenizer',
+            selector: '#SystemPromptColumn',
+        },
+    ];
+
+    const $drawersContainer = $('<div>', { class: 'sb-af-drawers flex-container flexFlowColumn gap10' });
+
+    sections.forEach(section => {
+        const $col = $(section.selector).first();
+        if ($col.length === 0) return;
+
+        $col.detach();
+
+        const drawer = createAdvFormattingDrawer(section.id, section.title, section.description);
+        const content = drawer.querySelector('.inline-drawer-content');
+
+        // Remove the flex1 class so it fills the full width in stacked layout
+        $col.removeClass('flex1');
+        $col.addClass('wide100p');
+
+        content.appendChild($col[0]);
+        $drawersContainer.append(drawer);
+    });
+
+    // Also check if Reasoning section exists after the columns container
+    const $reasoning = $columnsContainer.nextAll().filter(function () {
+        return $(this).find('#reasoning_auto_parse').length > 0 || $(this).find('.sb-reasoning-toggle-grid').length > 0;
+    }).first();
+
+    if ($reasoning.length > 0) {
+        $reasoning.detach();
+        const drawer = createAdvFormattingDrawer('sb-af-reasoning', 'Reasoning', 'Auto-parse, formatting, and reasoning block settings');
+        const content = drawer.querySelector('.inline-drawer-content');
+        content.appendChild($reasoning[0]);
+        $drawersContainer.append(drawer);
+    }
+
+    // Replace the columns container with the stacked drawers
+    $columnsContainer.replaceWith($drawersContainer);
+
+    $af.data('sb-grouped', true);
 }
 
 function buildConsoleLogsPanel() {
@@ -5991,6 +6126,9 @@ function initAll() {
     // Reinitialize Select2 widgets after shell reparents DOM elements.
     // Select2 bindings break when elements are moved in the DOM.
     reinitSelect2AfterShell();
+
+    // Group Advanced Formatting sections into collapsible drawers
+    groupAdvancedFormattingIntoDrawers();
 
     window.SillyBunnyShell = {
         openTab(shellKey, tabId) {

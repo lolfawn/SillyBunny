@@ -13,7 +13,7 @@ import { APP_NAME, formatRuntimeLabel, isBunRuntime, isNativeTermuxEnvironment }
 import { getServerLogSnapshot } from '../server-log-buffer.js';
 import { serverDirectory } from '../server-directory.js';
 import { requireAdminMiddleware } from '../users.js';
-import { getVersion } from '../util.js';
+import { getConfigValue, getVersion } from '../util.js';
 
 const GIT_OPTIONS = Object.freeze({ timeout: { block: 10 * 60 * 1000 } });
 const RESTART_RESPONSE_DELAY_MS = 200;
@@ -305,12 +305,16 @@ async function getRepositoryStatus() {
     status.ahead = Number(aheadRaw) || 0;
     status.behind = Number(behindRaw) || 0;
     status.remoteCommit = toTrimmedString(await git.revparse(['--short', trackingBranch]).catch(() => ''));
-    status.canUpdate = status.behind > 0 && status.ahead === 0 && !status.hasLocalChanges;
+    const autoStashForStatus = getConfigValue('autoStashBeforePull', false, 'boolean');
+    status.canUpdate = status.behind > 0 && status.ahead === 0 && (!status.hasLocalChanges || autoStashForStatus);
+    status.autoStash = autoStashForStatus;
 
     if (status.behind > 0 && status.ahead > 0) {
         status.message = 'This branch has diverged from upstream and needs manual Git resolution.';
-    } else if (status.hasLocalChanges) {
+    } else if (status.hasLocalChanges && !autoStashForStatus) {
         status.message = 'Local changes are present, so auto-update is blocked to protect your work.';
+    } else if (status.hasLocalChanges && autoStashForStatus) {
+        status.message = `Local changes will be auto-stashed before updating. ${status.behind} upstream commit${status.behind === 1 ? '' : 's'} available.`;
     } else if (status.behind > 0) {
         status.message = `${status.behind} upstream commit${status.behind === 1 ? '' : 's'} available.`;
     } else if (status.ahead > 0) {
@@ -497,8 +501,23 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
             return response.status(409).json({ error: repository.message || 'This branch is not tracking an upstream remote.', repository });
         }
 
+        const autoStash = getConfigValue('autoStashBeforePull', false, 'boolean');
+        const git = simpleGit({ baseDir: serverDirectory, ...GIT_OPTIONS });
+        let stashed = false;
+        let stashPopWarning = null;
+
         if (repository.hasLocalChanges) {
-            return response.status(409).json({ error: repository.message || 'Local changes are present, so auto-update is blocked.', repository });
+            if (!autoStash) {
+                return response.status(409).json({ error: repository.message || 'Local changes are present, so auto-update is blocked.', repository });
+            }
+            try {
+                await git.stash(['push', '-m', 'SillyBunny auto-stash before update']);
+                stashed = true;
+                console.info('Local changes stashed before update.');
+            } catch (stashError) {
+                console.error('Failed to stash local changes.', stashError);
+                return response.status(500).json({ error: 'Failed to stash local changes: ' + stashError.message });
+            }
         }
 
         if (repository.ahead > 0 && repository.behind > 0) {
@@ -506,6 +525,9 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
         }
 
         if (repository.behind === 0) {
+            if (stashed) {
+                try { await git.stash(['pop']); } catch (_) { /* nothing to worry about */ }
+            }
             return response.json({
                 updated: false,
                 restarting: false,
@@ -514,9 +536,18 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
             });
         }
 
-        const git = simpleGit({ baseDir: serverDirectory, ...GIT_OPTIONS });
         await git.fetch();
         await git.raw(['pull', '--ff-only']);
+
+        if (stashed) {
+            try {
+                await git.stash(['pop']);
+                console.info('Stashed changes restored after update.');
+            } catch (popError) {
+                stashPopWarning = 'Update succeeded, but local changes could not be restored: ' + popError.message + '. Your changes remain in git stash.';
+                console.warn(stashPopWarning);
+            }
+        }
 
         const installCommand = getInstallCommand();
         let installResult = null;
@@ -533,7 +564,9 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
         response.status(202).json({
             updated: true,
             restarting: true,
-            message: 'Update applied. Restarting SillyBunny now.',
+            stashed,
+            stashPopWarning,
+            message: stashPopWarning || 'Update applied. Restarting SillyBunny now.',
             version: nextVersion,
             repository: nextRepository,
             install: installResult ? {

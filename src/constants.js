@@ -207,6 +207,7 @@ export const CHAT_COMPLETION_SOURCES = {
     FIREWORKS: 'fireworks',
     COMETAPI: 'cometapi',
     AZURE_OPENAI: 'azure_openai',
+    OPENAI_RESPONSES: 'openai_responses',
     ZAI: 'zai',
     SILICONFLOW: 'siliconflow',
 };

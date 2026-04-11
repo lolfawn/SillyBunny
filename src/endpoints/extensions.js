@@ -299,6 +299,22 @@ router.post('/update', async (request, response) => {
         if (!isRepo) {
             throw new Error(`Directory is not a Git repository at ${extensionPath}`);
         }
+
+        const autoStash = getConfigValue('autoStashBeforePull', false, 'boolean');
+        const gitStatus = await git.status();
+        let stashed = false;
+        let stashPopWarning = null;
+
+        if (!gitStatus.isClean() && autoStash) {
+            try {
+                await git.stash(['push', '-m', `SillyBunny auto-stash before extension update (${extensionName})`]);
+                stashed = true;
+                console.info(`Local changes stashed before updating extension at ${extensionPath}`);
+            } catch (stashError) {
+                console.warn(`Failed to stash local changes for extension at ${extensionPath}`, stashError);
+            }
+        }
+
         const currentBranch = await git.branch();
         if (!isUpToDate) {
             await git.pull('origin', currentBranch.current);
@@ -306,11 +322,22 @@ router.post('/update', async (request, response) => {
         } else {
             console.info(`Extension is up to date at ${extensionPath}`);
         }
+
+        if (stashed) {
+            try {
+                await git.stash(['pop']);
+                console.info(`Stashed changes restored for extension at ${extensionPath}`);
+            } catch (popError) {
+                stashPopWarning = `Extension updated, but local changes could not be restored: ${popError.message}. Changes remain in git stash.`;
+                console.warn(stashPopWarning);
+            }
+        }
+
         await git.fetch('origin');
         const fullCommitHash = await git.revparse(['HEAD']);
         const shortCommitHash = fullCommitHash.slice(0, 7);
 
-        return response.send({ shortCommitHash, extensionPath, isUpToDate, remoteUrl });
+        return response.send({ shortCommitHash, extensionPath, isUpToDate, remoteUrl, stashed, stashPopWarning });
     } catch (error) {
         console.error('Updating extension failed', error);
         return response.status(500).send('Internal Server Error. Check the server logs for more details.');

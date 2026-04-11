@@ -217,39 +217,42 @@
                                 </div>
                             </div>
                             <div id="textgenerationwebui_api-presets">
-                                <div class="margin0 title_restorable standoutHeader">
-                                    <strong>
-                                        <span data-i18n="Text Completion presets">Text Completion presets</span>
-                                    </strong>
+                                <div>
+                                    <div class="margin0 title_restorable standoutHeader">
+                                        <strong>
+                                            <span data-i18n="Text Completion presets">Text Completion presets</span>
+                                        </strong>
 
-                                    <div class="flex-container gap3px">
-                                        <div data-preset-manager-import="textgenerationwebui" class="margin0 menu_button_icon menu_button" title="Import preset" data-i18n="[title]Import preset">
-                                            <i class="fa-fw fa-solid fa-file-import"></i>
-                                        </div>
-                                        <div data-preset-manager-export="textgenerationwebui" class="margin0 menu_button_icon menu_button" title="Export preset" data-i18n="[title]Export preset">
-                                            <i class="fa-fw fa-solid fa-file-export"></i>
-                                        </div>
-                                        <div data-preset-manager-delete="textgenerationwebui" class="margin0 menu_button_icon menu_button" title="Delete the preset" data-i18n="[title]Delete the preset">
-                                            <i class="fa-fw fa-solid fa-trash-can"></i>
+                                        <div class="flex-container gap3px">
+                                            <div data-preset-manager-import="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Import preset" data-i18n="[title]Import preset">
+                                                <i class="fa-fw fa-solid fa-file-import"></i>
+                                            </div>
+                                            <div data-preset-manager-export="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Export preset" data-i18n="[title]Export preset">
+                                                <i class="fa-fw fa-solid fa-file-export"></i>
+                                            </div>
+                                            <div data-preset-manager-delete="textgenerationwebui" class="margin0 menu_button menu_button_icon" title="Delete the preset" data-i18n="[title]Delete the preset">
+                                                <i class="fa-fw fa-solid fa-trash-can"></i>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="flex-container flexNoGap">
-                                    <select id="settings_preset_textgenerationwebui" class="flex1 text_pole" data-preset-manager-for="textgenerationwebui">
-                                    </select>
-                                    <div class="flex-container marginLeft5 gap3px">
-                                        <input type="file" hidden data-preset-manager-file="textgenerationwebui" accept=".json, .settings">
-                                        <div data-preset-manager-update="textgenerationwebui" class="menu_button menu_button_icon" title="Update current preset" data-i18n="[title]Update current preset">
-                                            <i class="fa-fw fa-solid fa-save"></i>
-                                        </div>
-                                        <div data-preset-manager-rename="textgenerationwebui" class="menu_button menu_button_icon" title="Rename current preset" data-i18n="[title]Rename current preset">
-                                            <i class="fa-fw fa-solid fa-pencil"></i>
-                                        </div>
-                                        <div data-preset-manager-new="textgenerationwebui" class="menu_button menu_button_icon" title="Save preset as" data-i18n="[title]Save preset as">
-                                            <i class="fa-fw fa-solid fa-file-circle-plus"></i>
-                                        </div>
-                                        <div data-preset-manager-restore="textgenerationwebui" class="menu_button menu_button_icon" title="Restore current preset" data-i18n="[title]Restore current preset">
-                                            <i class="fa-fw fa-solid fa-recycle"></i>
+
+                                    <div class="flex-container flexNoGap">
+                                        <select id="settings_preset_textgenerationwebui" class="flex1 text_pole" data-preset-manager-for="textgenerationwebui">
+                                        </select>
+                                        <div class="flex-container marginLeft5 gap3px">
+                                            <input type="file" hidden data-preset-manager-file="textgenerationwebui" accept=".json, .settings">
+                                            <div data-preset-manager-update="textgenerationwebui" class="menu_button menu_button_icon" title="Update current preset" data-i18n="[title]Update current preset">
+                                                <i class="fa-fw fa-solid fa-save"></i>
+                                            </div>
+                                            <div data-preset-manager-rename="textgenerationwebui" class="menu_button menu_button_icon" title="Rename current preset" data-i18n="[title]Rename current preset">
+                                                <i class="fa-fw fa-solid fa-pencil"></i>
+                                            </div>
+                                            <div data-preset-manager-new="textgenerationwebui" class="menu_button menu_button_icon" title="Save preset as" data-i18n="[title]Save preset as">
+                                                <i class="fa-fw fa-solid fa-file-circle-plus"></i>
+                                            </div>
+                                            <div data-preset-manager-restore="textgenerationwebui" class="menu_button menu_button_icon" title="Restore current preset" data-i18n="[title]Restore current preset">
+                                                <i class="fa-fw fa-solid fa-recycle"></i>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2869,6 +2872,7 @@
                         <select id="chat_completion_source">
                             <optgroup>
                                 <option value="openai">OpenAI</option>
+                                <option value="openai_responses">OpenAI (Responses)</option>
                                 <option value="custom" data-i18n="Custom (OpenAI-compatible)">Custom (OpenAI-compatible)</option>
                             </optgroup>
                             <optgroup>
@@ -4040,28 +4044,42 @@
                 <div class="flex-container spaceEvenly">
                     <div id="ContextSettings" class="flex-container flexNoGap flexFlowColumn flex1">
                         <div>
-                            <h4 class="standoutHeader title_restorable" data-cc-null>
-                                <div>
+                            <div class="margin0 title_restorable standoutHeader" data-cc-null>
+                                <strong>
                                     <span data-i18n="Context Template">Context Template</span>
-                                </div>
-                                <div class="flex-container">
-                                    <label for="context_derived" class="checkbox_label flex1" title="Derive from Model Metadata, if possible." data-i18n="[title]context_derived">
+                                </strong>
+                                <div class="flex-container gap3px">
+                                    <label for="context_derived" class="margin0 menu_button menu_button_icon" title="Derive from Model Metadata, if possible." data-i18n="[title]context_derived">
                                         <input id="context_derived" type="checkbox" style="display:none;" />
-                                        <small><i class="fa-solid fa-bolt menu_button margin0"></i></small>
+                                        <i class="fa-fw fa-solid fa-bolt"></i>
                                     </label>
+                                    <div data-preset-manager-import="context" class="margin0 menu_button menu_button_icon" title="Import template" data-i18n="[title]Import template">
+                                        <i class="fa-fw fa-solid fa-file-import"></i>
+                                    </div>
+                                    <div data-preset-manager-export="context" class="margin0 menu_button menu_button_icon" title="Export template" data-i18n="[title]Export template">
+                                        <i class="fa-fw fa-solid fa-file-export"></i>
+                                    </div>
+                                    <div data-preset-manager-delete="context" id="context_delete_preset" class="margin0 menu_button menu_button_icon" title="Delete the template" data-i18n="[title]Delete the template">
+                                        <i class="fa-fw fa-solid fa-trash-can"></i>
+                                    </div>
                                 </div>
-                            </h4>
-                            <div class="flex-container" title="Select your current Context Template" data-i18n="[title]Select your current Context Template" data-cc-null>
+                            </div>
+                            <div class="flex-container flexNoGap" title="Select your current Context Template" data-i18n="[title]Select your current Context Template" data-cc-null>
                                 <select id="context_presets" data-preset-manager-for="context" class="flex1 text_pole"></select>
-                                <div class="flex-container justifyCenter gap3px">
+                                <div class="flex-container marginLeft5 gap3px">
                                     <input type="file" hidden data-preset-manager-file="context" accept=".json, .settings">
-                                    <i data-preset-manager-update="context" class="menu_button fa-solid fa-save" title="Update current template" data-i18n="[title]Update current template"></i>
-                                    <i data-preset-manager-rename="context" class="menu_button fa-pencil fa-solid" title="Rename current template" data-i18n="[title]Rename current template"></i>
-                                    <i data-preset-manager-new="context" class="menu_button fa-solid fa-file-circle-plus" title="Save template as" data-i18n="[title]Save template as"></i>
-                                    <i data-preset-manager-import="context" class="displayNone menu_button fa-solid fa-file-import" title="Import template" data-i18n="[title]Import template"></i>
-                                    <i data-preset-manager-export="context" class="displayNone menu_button fa-solid fa-file-export" title="Export template" data-i18n="[title]Export template"></i>
-                                    <i data-preset-manager-restore="context" class="menu_button fa-solid fa-recycle" title="Restore current template" data-i18n="[title]Restore current template"></i>
-                                    <i id="context_delete_preset" data-preset-manager-delete="context" class="menu_button fa-solid fa-trash-can" title="Delete the template" data-i18n="[title]Delete the template"></i>
+                                    <div data-preset-manager-update="context" class="menu_button menu_button_icon" title="Update current template" data-i18n="[title]Update current template">
+                                        <i class="fa-fw fa-solid fa-save"></i>
+                                    </div>
+                                    <div data-preset-manager-rename="context" class="menu_button menu_button_icon" title="Rename current template" data-i18n="[title]Rename current template">
+                                        <i class="fa-fw fa-solid fa-pencil"></i>
+                                    </div>
+                                    <div data-preset-manager-new="context" class="menu_button menu_button_icon" title="Save template as" data-i18n="[title]Save template as">
+                                        <i class="fa-fw fa-solid fa-file-circle-plus"></i>
+                                    </div>
+                                    <div data-preset-manager-restore="context" class="menu_button menu_button_icon" title="Restore current template" data-i18n="[title]Restore current template">
+                                        <i class="fa-fw fa-solid fa-recycle"></i>
+                                    </div>
                                 </div>
                             </div>
                             <div>
@@ -4168,39 +4186,53 @@
                         </div>
                     </div>
                     <div id="InstructSettingsColumn" class="flex-container flexNoGap flexFlowColumn flex1" data-cc-null>
-                        <h4 class="standoutHeader title_restorable justifySpaceBetween">
-                            <div class="flex-container">
+                        <div class="margin0 title_restorable standoutHeader">
+                            <strong>
                                 <span data-i18n="Instruct Template">Instruct Template</span>
-                            </div>
-                            <div class="flex-container">
-                                <label for="instruct_derived" class="checkbox_label flex1" title="Derive from Model Metadata, if possible." data-i18n="[title]instruct_derived">
+                            </strong>
+                            <div class="flex-container gap3px">
+                                <label for="instruct_derived" class="margin0 menu_button menu_button_icon" title="Derive from Model Metadata, if possible." data-i18n="[title]instruct_derived">
                                     <input id="instruct_derived" type="checkbox" style="display:none;" />
-                                    <small><i class="fa-solid fa-bolt menu_button margin0"></i></small>
+                                    <i class="fa-fw fa-solid fa-bolt"></i>
                                 </label>
-                                <label for="instruct_bind_to_context" class="checkbox_label flex1" title="Bind to Context&#10;If enabled, Context templates will be automatically selected based on selected Instruct template name or by preference." data-i18n="[title]instruct_bind_to_context">
+                                <label for="instruct_bind_to_context" class="margin0 menu_button menu_button_icon" title="Bind to Context&#10;If enabled, Context templates will be automatically selected based on selected Instruct template name or by preference." data-i18n="[title]instruct_bind_to_context">
                                     <input id="instruct_bind_to_context" type="checkbox" style="display:none;" />
-                                    <small><i class="fa-solid fa-link menu_button margin0"></i></small>
+                                    <i class="fa-fw fa-solid fa-link"></i>
                                 </label>
-                                <label id="instruct_enabled_label" for="instruct_enabled" class="checkbox_label flex1" title="Enable Instruct Mode" data-i18n="[title]instruct_enabled">
+                                <label id="instruct_enabled_label" for="instruct_enabled" class="margin0 menu_button menu_button_icon" title="Enable Instruct Mode" data-i18n="[title]instruct_enabled">
                                     <input id="instruct_enabled" type="checkbox" style="display:none;" />
-                                    <small><i class="fa-solid fa-power-off menu_button togglable margin0"></i></small>
+                                    <i class="fa-fw fa-solid fa-power-off togglable"></i>
                                 </label>
+                                <div data-preset-manager-import="instruct" class="margin0 menu_button menu_button_icon" title="Import template" data-i18n="[title]Import template">
+                                    <i class="fa-fw fa-solid fa-file-import"></i>
+                                </div>
+                                <div data-preset-manager-export="instruct" class="margin0 menu_button menu_button_icon" title="Export template" data-i18n="[title]Export template">
+                                    <i class="fa-fw fa-solid fa-file-export"></i>
+                                </div>
+                                <div data-preset-manager-delete="instruct" class="margin0 menu_button menu_button_icon" title="Delete template" data-i18n="[title]Delete template">
+                                    <i class="fa-fw fa-solid fa-trash-can"></i>
+                                </div>
                             </div>
-                        </h4>
+                        </div>
                         <div id="instructSettingsBlock">
 
 
-                            <div class="flex-container" title="Select your current Instruct Template" data-i18n="[title]Select your current Instruct Template">
+                            <div class="flex-container flexNoGap" title="Select your current Instruct Template" data-i18n="[title]Select your current Instruct Template">
                                 <select id="instruct_presets" data-preset-manager-for="instruct" class="flex1 text_pole"></select>
-                                <div class="flex-container margin0 justifyCenter gap3px">
+                                <div class="flex-container marginLeft5 gap3px">
                                     <input type="file" hidden data-preset-manager-file="instruct" accept=".json, .settings">
-                                    <i data-preset-manager-update="instruct" class="menu_button fa-solid fa-save" title="Update current template" data-i18n="[title]Update current template"></i>
-                                    <i data-preset-manager-rename="instruct" class="menu_button fa-pencil fa-solid" title="Rename current template" data-i18n="[title]Rename current template"></i>
-                                    <i data-preset-manager-new="instruct" class="menu_button fa-solid fa-file-circle-plus" title="Save template as" data-i18n="[title]Save template as"></i>
-                                    <i data-preset-manager-import="instruct" class="displayNone menu_button fa-solid fa-file-import" title="Import template" data-i18n="[title]Import template"></i>
-                                    <i data-preset-manager-export="instruct" class="displayNone menu_button fa-solid fa-file-export" title="Export template" data-i18n="[title]Export template"></i>
-                                    <i data-preset-manager-restore="instruct" class="menu_button fa-solid fa-recycle" title="Restore current template" data-i18n="[title]Restore current template"></i>
-                                    <i data-preset-manager-delete="instruct" class="menu_button fa-solid fa-trash-can" title="Delete template" data-i18n="[title]Delete template"></i>
+                                    <div data-preset-manager-update="instruct" class="menu_button menu_button_icon" title="Update current template" data-i18n="[title]Update current template">
+                                        <i class="fa-fw fa-solid fa-save"></i>
+                                    </div>
+                                    <div data-preset-manager-rename="instruct" class="menu_button menu_button_icon" title="Rename current template" data-i18n="[title]Rename current template">
+                                        <i class="fa-fw fa-solid fa-pencil"></i>
+                                    </div>
+                                    <div data-preset-manager-new="instruct" class="menu_button menu_button_icon" title="Save template as" data-i18n="[title]Save template as">
+                                        <i class="fa-fw fa-solid fa-file-circle-plus"></i>
+                                    </div>
+                                    <div data-preset-manager-restore="instruct" class="menu_button menu_button_icon" title="Restore current template" data-i18n="[title]Restore current template">
+                                        <i class="fa-fw fa-solid fa-recycle"></i>
+                                    </div>
                                 </div>
                             </div>
                             <label>
@@ -4361,29 +4393,43 @@
                         </div>
                     </div>
                     <div id="SystemPromptColumn" class="flex-container flexNoGap flexFlowColumn flex1">
-                        <h4 class="standoutHeader title_restorable justifySpaceBetween" data-cc-null>
-                            <div class="flex-container">
+                        <div class="margin0 title_restorable standoutHeader" data-cc-null>
+                            <strong>
                                 <span data-i18n="System Prompt">System Prompt</span>
-                            </div>
-                            <div class="flex-container">
-                                <label id="sysprompt_enabled_label" for="sysprompt_enabled" class="checkbox_label flex1" title="Enable System Prompt" data-i18n="[title]sysprompt_enabled">
+                            </strong>
+                            <div class="flex-container gap3px">
+                                <label id="sysprompt_enabled_label" for="sysprompt_enabled" class="margin0 menu_button menu_button_icon" title="Enable System Prompt" data-i18n="[title]sysprompt_enabled">
                                     <input id="sysprompt_enabled" type="checkbox" style="display:none;" />
-                                    <small><i class="fa-solid fa-power-off menu_button togglable margin0"></i></small>
+                                    <i class="fa-fw fa-solid fa-power-off togglable"></i>
                                 </label>
+                                <div data-preset-manager-import="sysprompt" class="margin0 menu_button menu_button_icon" title="Import template" data-i18n="[title]Import template">
+                                    <i class="fa-fw fa-solid fa-file-import"></i>
+                                </div>
+                                <div data-preset-manager-export="sysprompt" class="margin0 menu_button menu_button_icon" title="Export template" data-i18n="[title]Export template">
+                                    <i class="fa-fw fa-solid fa-file-export"></i>
+                                </div>
+                                <div data-preset-manager-delete="sysprompt" class="margin0 menu_button menu_button_icon" title="Delete prompt" data-i18n="[title]Delete prompt">
+                                    <i class="fa-fw fa-solid fa-trash-can"></i>
+                                </div>
                             </div>
-                        </h4>
+                        </div>
                         <div id="SystemPromptBlock" class="marginBot10" data-cc-null>
-                            <div class="flex-container" title="Select your current System Prompt" data-i18n="[title]Select your current System Prompt">
+                            <div class="flex-container flexNoGap" title="Select your current System Prompt" data-i18n="[title]Select your current System Prompt">
                                 <select id="sysprompt_select" data-preset-manager-for="sysprompt" class="flex1 text_pole"></select>
-                                <div class="flex-container margin0 justifyCenter gap3px">
+                                <div class="flex-container marginLeft5 gap3px">
                                     <input type="file" hidden data-preset-manager-file="sysprompt" accept=".json, .settings">
-                                    <i data-preset-manager-update="sysprompt" class="menu_button fa-solid fa-save" title="Update current prompt" data-i18n="[title]Update current prompt"></i>
-                                    <i data-preset-manager-rename="sysprompt" class="menu_button fa-pencil fa-solid" title="Rename current prompt" data-i18n="[title]Rename current prompt"></i>
-                                    <i data-preset-manager-new="sysprompt" class="menu_button fa-solid fa-file-circle-plus" title="Save prompt as" data-i18n="[title]Save prompt as"></i>
-                                    <i data-preset-manager-import="sysprompt" class="displayNone menu_button fa-solid fa-file-import" title="Import template" data-i18n="[title]Import template"></i>
-                                    <i data-preset-manager-export="sysprompt" class="displayNone menu_button fa-solid fa-file-export" title="Export template" data-i18n="[title]Export template"></i>
-                                    <i data-preset-manager-restore="sysprompt" class="menu_button fa-solid fa-recycle" title="Restore current prompt" data-i18n="[title]Restore current prompt"></i>
-                                    <i data-preset-manager-delete="sysprompt" class="menu_button fa-solid fa-trash-can" title="Delete prompt" data-i18n="[title]Delete prompt"></i>
+                                    <div data-preset-manager-update="sysprompt" class="menu_button menu_button_icon" title="Update current prompt" data-i18n="[title]Update current prompt">
+                                        <i class="fa-fw fa-solid fa-save"></i>
+                                    </div>
+                                    <div data-preset-manager-rename="sysprompt" class="menu_button menu_button_icon" title="Rename current prompt" data-i18n="[title]Rename current prompt">
+                                        <i class="fa-fw fa-solid fa-pencil"></i>
+                                    </div>
+                                    <div data-preset-manager-new="sysprompt" class="menu_button menu_button_icon" title="Save prompt as" data-i18n="[title]Save prompt as">
+                                        <i class="fa-fw fa-solid fa-file-circle-plus"></i>
+                                    </div>
+                                    <div data-preset-manager-restore="sysprompt" class="menu_button menu_button_icon" title="Restore current prompt" data-i18n="[title]Restore current prompt">
+                                        <i class="fa-fw fa-solid fa-recycle"></i>
+                                    </div>
                                 </div>
                             </div>
 
@@ -4509,17 +4555,31 @@
                                     <summary data-i18n="Reasoning Formatting">
                                         Reasoning Formatting
                                     </summary>
-                                    <div class="flex-container" title="Select your current Reasoning Template" data-i18n="[title]Select your current Reasoning Template">
+                                    <div class="flex-container flexNoGap" title="Select your current Reasoning Template" data-i18n="[title]Select your current Reasoning Template">
                                         <select id="reasoning_select" data-preset-manager-for="reasoning" class="flex1 text_pole"></select>
-                                        <div class="flex-container margin0 justifyCenter gap3px">
+                                        <div class="flex-container marginLeft5 gap3px">
                                             <input type="file" hidden data-preset-manager-file="reasoning" accept=".json, .settings">
-                                            <i data-preset-manager-update="reasoning" class="menu_button fa-solid fa-save" title="Update current template" data-i18n="[title]Update current template"></i>
-                                            <i data-preset-manager-rename="reasoning" class="menu_button fa-pencil fa-solid" title="Rename current template" data-i18n="[title]Rename current template"></i>
-                                            <i data-preset-manager-new="reasoning" class="menu_button fa-solid fa-file-circle-plus" title="Save template as" data-i18n="[title]Save template as"></i>
-                                            <i data-preset-manager-import="reasoning" class="displayNone menu_button fa-solid fa-file-import" title="Import template" data-i18n="[title]Import template"></i>
-                                            <i data-preset-manager-export="reasoning" class="displayNone menu_button fa-solid fa-file-export" title="Export template" data-i18n="[title]Export template"></i>
-                                            <i data-preset-manager-restore="reasoning" class="menu_button fa-solid fa-recycle" title="Restore current template" data-i18n="[title]Restore current template"></i>
-                                            <i data-preset-manager-delete="reasoning" class="menu_button fa-solid fa-trash-can" title="Delete template" data-i18n="[title]Delete template"></i>
+                                            <div data-preset-manager-update="reasoning" class="menu_button menu_button_icon" title="Update current template" data-i18n="[title]Update current template">
+                                                <i class="fa-fw fa-solid fa-save"></i>
+                                            </div>
+                                            <div data-preset-manager-rename="reasoning" class="menu_button menu_button_icon" title="Rename current template" data-i18n="[title]Rename current template">
+                                                <i class="fa-fw fa-solid fa-pencil"></i>
+                                            </div>
+                                            <div data-preset-manager-new="reasoning" class="menu_button menu_button_icon" title="Save template as" data-i18n="[title]Save template as">
+                                                <i class="fa-fw fa-solid fa-file-circle-plus"></i>
+                                            </div>
+                                            <div data-preset-manager-import="reasoning" class="menu_button menu_button_icon" title="Import template" data-i18n="[title]Import template">
+                                                <i class="fa-fw fa-solid fa-file-import"></i>
+                                            </div>
+                                            <div data-preset-manager-export="reasoning" class="menu_button menu_button_icon" title="Export template" data-i18n="[title]Export template">
+                                                <i class="fa-fw fa-solid fa-file-export"></i>
+                                            </div>
+                                            <div data-preset-manager-restore="reasoning" class="menu_button menu_button_icon" title="Restore current template" data-i18n="[title]Restore current template">
+                                                <i class="fa-fw fa-solid fa-recycle"></i>
+                                            </div>
+                                            <div data-preset-manager-delete="reasoning" class="menu_button menu_button_icon" title="Delete template" data-i18n="[title]Delete template">
+                                                <i class="fa-fw fa-solid fa-trash-can"></i>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="flex-container">

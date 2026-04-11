@@ -4,6 +4,7 @@ import path from 'node:path';
 import express from 'express';
 import { sync as writeFileAtomicSync } from 'write-file-atomic';
 import { color, getConfigValue, uuidv4 } from '../util.js';
+import { encrypt, decrypt, isEncrypted, getEncryptionPassphrase } from '../encryption.js';
 
 export const SECRETS_FILE = 'secrets.json';
 export const SECRET_KEYS = {
@@ -130,23 +131,51 @@ export class SecretManager {
     }
 
     /**
-     * Reads and parses the secrets file
+     * Reads and parses the secrets file, decrypting if necessary
      * @private
      * @returns {SecretKeys}
      */
     _readSecretsFile() {
         this._ensureSecretsFile();
-        const fileContents = fs.readFileSync(this.filePath, 'utf-8');
+        const rawBuffer = fs.readFileSync(this.filePath);
+        const passphrase = getEncryptionPassphrase(this.directories.root);
+
+        let fileContents;
+        if (isEncrypted(rawBuffer)) {
+            if (!passphrase) {
+                throw new Error('Secrets file is encrypted but no encryption passphrase is configured. Set encryptSecrets.enabled and a passphrase in config.yaml.');
+            }
+            fileContents = decrypt(rawBuffer, passphrase);
+        } else {
+            fileContents = rawBuffer.toString('utf-8');
+            // Auto-migrate: if encryption is enabled but file is plaintext, mark for re-encryption on next write
+            if (passphrase) {
+                this._needsEncryptionMigration = true;
+            }
+        }
+
         return /** @type {SecretKeys} */ (JSON.parse(fileContents));
     }
 
     /**
-     * Writes secrets to the file atomically
+     * Writes secrets to the file atomically, encrypting if configured
      * @private
      * @param {SecretKeys} secrets
      */
     _writeSecretsFile(secrets) {
-        writeFileAtomicSync(this.filePath, JSON.stringify(secrets, null, 4), 'utf-8');
+        const jsonString = JSON.stringify(secrets, null, 4);
+        const passphrase = getEncryptionPassphrase(this.directories.root);
+
+        if (passphrase) {
+            const encrypted = encrypt(jsonString, passphrase);
+            writeFileAtomicSync(this.filePath, encrypted);
+            if (this._needsEncryptionMigration) {
+                console.info(`Secrets file at ${this.filePath} has been encrypted.`);
+                this._needsEncryptionMigration = false;
+            }
+        } else {
+            writeFileAtomicSync(this.filePath, jsonString, 'utf-8');
+        }
     }
 
     /**

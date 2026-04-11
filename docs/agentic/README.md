@@ -1,28 +1,27 @@
 # Agentic Staging Workflow
 
-This folder is the working area for making `staging` the branch where SillyBunny experiments with more autonomous, story-aware behavior.
+This folder is the working area for making `staging` the branch where SillyBunny experiments with more story-aware prompt behavior during RP generation.
 
-The reference point is Aventuras:
-
-- richer durable memory
-- autonomous lore maintenance
-- structured world tracking
-- stronger per-turn orchestration
+The approach is closer to [OpenClaw](https://rentry.org/OpenClaw) than to autonomous agent frameworks: the agents are custom prompts that run before, during, or after in-chat generation to augment the RP pipeline. They aren't multi-step orchestrators -- they're focused, predictable hooks.
 
 SillyBunny already has a useful baseline in [public/scripts/agents.js](/run/media/platinum/HDD/SillyBunny/public/scripts/agents.js): retrieval, memory, and lorebook services tied into the generation loop. The goal here is to evolve that foundation instead of replacing it blindly.
 
-## Recent hotfix note
+## Recent changes
 
-### 2026-04-10 group chat recovery hotfix
+### v1.2.9 (2026-04-11)
 
-- Repository hotfix refresh for `v1.2.8`; this is not a new feature release.
+- Text Completion and Advanced Formatting settings now use collapsible drawer sections
+- OpenAI Responses API (`/v1/responses`) added as a new Chat Completion source
+- Auto-stash before git pull for both the app and extensions
+- AES-256-GCM encryption for `secrets.json` at rest, HTTPS enforcement option, session-based token auth
+
+### v1.2.8 hotfix (2026-04-10)
+
 - Fixed stale group metadata that could point group workflows at a missing chat `.jsonl` after failed creation or rename attempts.
 - Existing on-disk group chats are now preferred during recovery, and missing references are repaired instead of trapping the UI in repeated missing-file loops.
-- This matters for agentic and metadata-heavy group sessions because chat-scoped state should no longer get stranded behind a broken active group-chat pointer.
 
-### 2026-04-10 UI fixes patch
+### v1.2.8 UI fixes (2026-04-10)
 
-- Patch refresh for `v1.2.8`; this is not a new feature release.
 - Added Reset button next to palette presets, improved slider disabled-state feedback, fixed mobile eye toggle double-tap, persona overflow clip, settings grid centering, macOS top-bar border artifact, and a comprehensive border-radius token migration pass across theme stylesheets.
 
 ## Rules for experiments
