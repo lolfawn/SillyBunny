@@ -613,13 +613,11 @@ function hasMatchingAgentSnapshot(snapshot, existingAgents = getAgents()) {
  */
 function attachTouchDrag(cardEl, itemsEl, agentId) {
     let touchDragActive = false;
-    let touchStartY = 0;
-    let touchMoveThreshold = 8; // px before drag starts
+    let longPressTimer = null;
     let ghost = null;
     let ghostOffsetY = 0;
 
     function getCardAtPoint(x, y) {
-        // Temporarily hide ghost so elementFromPoint sees what's underneath
         if (ghost) ghost.style.display = 'none';
         const el = document.elementFromPoint(x, y);
         if (ghost) ghost.style.display = '';
@@ -640,22 +638,36 @@ function attachTouchDrag(cardEl, itemsEl, agentId) {
         }
     }
 
+    function cancelLongPress() {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+    }
+
+    function cleanup() {
+        cancelLongPress();
+        touchDragActive = false;
+        cardEl.classList.remove('ica--dragging');
+        if (ghost) {
+            ghost.remove();
+            ghost = null;
+        }
+        itemsEl.querySelectorAll('.ica--drop-indicator').forEach(el => el.remove());
+    }
+
     cardEl.addEventListener('touchstart', (event) => {
         if (event.touches.length !== 1) return;
-        touchStartY = event.touches[0].clientY;
-        touchDragActive = false;
-    }, { passive: true });
-
-    cardEl.addEventListener('touchmove', (event) => {
-        if (event.touches.length !== 1) return;
         const touch = event.touches[0];
+        const startX = touch.clientX;
+        const startY = touch.clientY;
 
-        if (!touchDragActive) {
-            if (Math.abs(touch.clientY - touchStartY) < touchMoveThreshold) return;
+        cancelLongPress();
+        longPressTimer = setTimeout(() => {
+            longPressTimer = null;
             touchDragActive = true;
             cardEl.classList.add('ica--dragging');
 
-            // Create a visual ghost clone
             ghost = cardEl.cloneNode(true);
             ghost.classList.add('ica--drag-ghost');
             ghost.style.cssText = `
@@ -668,8 +680,22 @@ function attachTouchDrag(cardEl, itemsEl, agentId) {
                 z-index: 9999;
                 transform: scale(1.02);
             `;
-            ghostOffsetY = touch.clientY - cardEl.getBoundingClientRect().top;
+            ghostOffsetY = startY - cardEl.getBoundingClientRect().top;
             document.body.appendChild(ghost);
+
+            // Haptic feedback if available
+            if (navigator.vibrate) navigator.vibrate(30);
+        }, 500);
+    }, { passive: true });
+
+    cardEl.addEventListener('touchmove', (event) => {
+        if (event.touches.length !== 1) { cleanup(); return; }
+        const touch = event.touches[0];
+
+        if (!touchDragActive) {
+            // User is scrolling — cancel the long-press timer
+            cancelLongPress();
+            return;
         }
 
         event.preventDefault();
@@ -678,6 +704,7 @@ function attachTouchDrag(cardEl, itemsEl, agentId) {
     }, { passive: false });
 
     cardEl.addEventListener('touchend', async (event) => {
+        cancelLongPress();
         if (!touchDragActive) return;
         touchDragActive = false;
         cardEl.classList.remove('ica--dragging');
@@ -705,15 +732,7 @@ function attachTouchDrag(cardEl, itemsEl, agentId) {
         await reorderAgentsInGroup(orderedIds);
     });
 
-    cardEl.addEventListener('touchcancel', () => {
-        touchDragActive = false;
-        cardEl.classList.remove('ica--dragging');
-        if (ghost) {
-            ghost.remove();
-            ghost = null;
-        }
-        itemsEl.querySelectorAll('.ica--drop-indicator').forEach(el => el.remove());
-    });
+    cardEl.addEventListener('touchcancel', cleanup);
 }
 
 async function reorderAgentsInGroup(orderedIds) {
@@ -826,6 +845,7 @@ function renderAgentList() {
                         ${connectionProfileLabel ? `<span class="ica--card-pill"><i class="fa-solid fa-plug fa-xs"></i> ${escapeHtml(connectionProfileLabel)}</span>` : ''}
                     </div>
                     <div class="ica--card-actions">
+                        <button type="button" class="ica--card-btn ica--btn-run" title="Run this agent on the latest message"><i class="fa-solid fa-robot"></i></button>
                         <button type="button" class="ica--card-btn ica--btn-edit"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
                         <button type="button" class="ica--card-btn ica--btn-export"><i class="fa-solid fa-download"></i> Export</button>
                         <button type="button" class="ica--card-btn ica--btn-delete caution"><i class="fa-solid fa-trash"></i></button>
@@ -868,6 +888,16 @@ function renderAgentList() {
             card.find('.ica--btn-edit').on('click', event => {
                 stopEvent(event);
                 openEditor(agent.id);
+            });
+
+            card.find('.ica--btn-run').on('click', async event => {
+                stopEvent(event);
+                const lastCharMessageIndex = chat.findLastIndex(m => m && !m.is_user && !m.is_system);
+                if (lastCharMessageIndex < 0) {
+                    toastr.warning('No character message to run the agent on.');
+                    return;
+                }
+                await runAgentOnMessage(agent.id, lastCharMessageIndex);
             });
 
             card.find('.ica--btn-export').on('click', event => {
@@ -939,9 +969,6 @@ function renderAgentList() {
         group.append(items);
         container.append(group);
     }
-
-    // Keep per-message run buttons in sync with current agent state
-    injectAllMessageRunButtons();
 }
 
 // ===================== Editor Modal =====================
@@ -1769,61 +1796,6 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     }
 }
 
-// ===================== Per-Message Run Buttons =====================
-
-/**
- * Returns agents that can be manually run on a message (have a prompt, prompt-transform enabled or have a prompt at all).
- * Agents are eligible if they are enabled and have a non-empty prompt.
- */
-function getManualRunAgents() {
-    return getAgents().filter(agent =>
-        agent.enabled &&
-        String(agent.prompt ?? '').trim(),
-    );
-}
-
-/**
- * Injects "Run Agent" buttons into the .extraMesButtons container of a single message element.
- * @param {number} messageIndex
- */
-function injectMessageRunButtons(messageIndex) {
-    const mesEl = document.querySelector(`.mes[mesid="${messageIndex}"]`);
-    if (!mesEl) return;
-
-    const message = chat[messageIndex];
-    if (!message || message.is_user || message.is_system) return;
-
-    // Remove any previously injected buttons for this message
-    mesEl.querySelectorAll('.ica--mes-run-btn').forEach(el => el.remove());
-
-    const agents = getManualRunAgents();
-    if (agents.length === 0) return;
-
-    const container = mesEl.querySelector('.extraMesButtons');
-    if (!container) return;
-
-    for (const agent of agents) {
-        const btn = document.createElement('div');
-        btn.className = 'mes_button ica--mes-run-btn';
-        btn.title = `Run agent: ${agent.name}`;
-        btn.dataset.agentId = agent.id;
-        btn.innerHTML = `<i class="fa-solid fa-robot"></i><span class="ica--mes-run-label">${escapeHtml(agent.name)}</span>`;
-        container.appendChild(btn);
-    }
-}
-
-/**
- * Re-injects run buttons into all currently rendered messages.
- */
-function injectAllMessageRunButtons() {
-    document.querySelectorAll('.mes[mesid]').forEach(mesEl => {
-        const messageIndex = Number(mesEl.getAttribute('mesid'));
-        if (!isNaN(messageIndex)) {
-            injectMessageRunButtons(messageIndex);
-        }
-    });
-}
-
 // ===================== Initialization =====================
 
 (async function () {
@@ -1905,9 +1877,6 @@ function injectAllMessageRunButtons() {
 
     // Initialize the pipeline runner
     initAgentRunner();
-
-    // Inject run buttons into any already-rendered messages
-    injectAllMessageRunButtons();
 
     // Render the panel
     renderAgentList();
@@ -2022,24 +1991,6 @@ function injectAllMessageRunButtons() {
         populateProfileDropdown();
         populateGlobalNotificationToggle();
         renderAgentList();
-        injectAllMessageRunButtons();
-    });
-
-    // Inject run buttons when new messages are rendered or updated
-    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (messageIndex) => {
-        injectMessageRunButtons(Number(messageIndex));
-    });
-    eventSource.on(event_types.MESSAGE_UPDATED, (messageIndex) => {
-        injectMessageRunButtons(Number(messageIndex));
-    });
-
-    // Delegated click handler for run-agent buttons
-    $(document).on('click', '.ica--mes-run-btn', function (event) {
-        event.stopPropagation();
-        const agentId = $(this).data('agent-id');
-        const messageIndex = Number($(this).closest('.mes').attr('mesid'));
-        if (!agentId || isNaN(messageIndex)) return;
-        runAgentOnMessage(agentId, messageIndex);
     });
 
     // Listen for Prompt Manager "Send to Agents" events
