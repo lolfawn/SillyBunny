@@ -25,11 +25,12 @@ import {
     updateRemoteChatName,
 } from '../script.js';
 import { deleteGroupChatByName, getGroupAvatar, groups, is_group_generating, openGroupById, openGroupChat } from './group-chats.js';
-import { enableExtension, findExtension } from './extensions.js';
+import { enableExtension, findExtension, installExtension } from './extensions.js';
 import { t } from './i18n.js';
 import { getPresetManager } from './preset-manager.js';
 import { callGenericPopup, POPUP_TYPE } from './popup.js';
 import { renderTemplateAsync } from './templates.js';
+import { isAdmin } from './user.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { flashHighlight, isElementInViewport, sortMoments, timestampToMoment } from './utils.js';
 
@@ -44,15 +45,23 @@ const DEFAULT_NEUTRAL_ASSISTANT_NAME = 'Assistant';
 
 const DEFAULT_DISPLAYED = 3;
 const MAX_DISPLAYED = 15;
-const STARTER_PACK_PRESET_NAME = 'Pura\'s Director Preset 11.5';
+const STARTER_PACK_PRESET_NAME_SILLYBUNNY = 'Pura\'s Director Preset (SillyBunny)';
+const STARTER_PACK_PRESET_NAME_SILLYTAVERN = 'Pura\'s Director Preset (SillyTavern)';
+const STARTER_PACK_PRESET_TITLE = 'Pura\'s Director Presets';
 const STARTER_PACK_CREATOR_NAME = 'purachina';
 const STARTER_PACK_SITE_URL = 'https://platberlitz.github.io/';
 const GEECHAN_SITE_URL = 'https://rentry.org/geechan';
 const TLD_CHUB_URL = 'https://chub.ai/users/thelonelydevil';
 const TLD_DISCORD_PALS_URL = 'https://github.com/TheLonelyDevil9/discord-pals/';
-const STARTER_PACK_EXTENSION_IDS = Object.freeze({
-    dialogueColors: 'third-party/sillytavern-character-colors',
-    quickImageGen: 'third-party/sillytavern-image-gen',
+const STARTER_PACK_EXTENSIONS = Object.freeze({
+    dialogueColors: Object.freeze({
+        id: 'third-party/sillytavern-character-colors',
+        repoUrl: 'https://github.com/platberlitz/sillytavern-character-colors',
+    }),
+    quickImageGen: Object.freeze({
+        id: 'third-party/sillytavern-image-gen',
+        repoUrl: 'https://github.com/platberlitz/sillytavern-image-gen',
+    }),
 });
 
 const WELCOME_TUTORIAL_STEPS = Object.freeze([
@@ -514,9 +523,30 @@ function buildTutorialSteps() {
     }));
 }
 
+function getStarterPackExtensionConfig(extensionName) {
+    return Object.values(STARTER_PACK_EXTENSIONS).find(extension => extension.id === extensionName) ?? null;
+}
+
 function buildExtensionStarterPackItem({ title, body, icon, chips, extensionName }) {
     const extension = findExtension(extensionName);
+    const extensionConfig = getStarterPackExtensionConfig(extensionName);
     const chipColumnCount = Math.max(2, Math.min(chips.length || 1, 4));
+
+    if (!extension && extensionConfig) {
+        return {
+            title,
+            body,
+            icon,
+            chips: [...chips],
+            chipColumnCount,
+            statusLabel: 'Git install',
+            statusTone: 'warm',
+            actionIcon: 'fa-download',
+            actionLabel: isAdmin() ? 'Install for all users' : 'Install for me',
+            actionType: 'install-starter-extension',
+            actionValue: extensionName,
+        };
+    }
 
     if (!extension) {
         return {
@@ -525,8 +555,8 @@ function buildExtensionStarterPackItem({ title, body, icon, chips, extensionName
             icon,
             chips: [...chips],
             chipColumnCount,
-            statusLabel: 'Bundled',
-            statusTone: 'warm',
+            statusLabel: 'Unavailable',
+            statusTone: 'neutral',
             actionIcon: 'fa-arrow-up-right-from-square',
             actionLabel: 'Open Extensions',
             actionType: 'open-tab',
@@ -556,7 +586,7 @@ function buildExtensionStarterPackItem({ title, body, icon, chips, extensionName
         icon,
         chips: [...chips],
         chipColumnCount,
-        statusLabel: 'Opt-in',
+        statusLabel: 'Installed',
         statusTone: 'warm',
         actionLabel: 'Enable and reload',
         actionIcon: 'fa-wand-magic-sparkles',
@@ -567,48 +597,22 @@ function buildExtensionStarterPackItem({ title, body, icon, chips, extensionName
 
 function buildPresetStarterPackItem() {
     const presetManager = getPresetManager('openai');
-    const presetValue = presetManager?.findPreset(STARTER_PACK_PRESET_NAME);
+    const sillyBunnyPreset = presetManager?.findPreset(STARTER_PACK_PRESET_NAME_SILLYBUNNY);
+    const sillyTavernPreset = presetManager?.findPreset(STARTER_PACK_PRESET_NAME_SILLYTAVERN);
     const isOpenAiStyleApi = main_api === 'openai';
-    const isSelected = isOpenAiStyleApi && presetManager?.getSelectedPresetName() === STARTER_PACK_PRESET_NAME;
-    const chips = ['OpenAI-style', 'Preset', STARTER_PACK_CREATOR_NAME];
+    const selectedPresetName = isOpenAiStyleApi ? presetManager?.getSelectedPresetName() : '';
+    const selectedVariant = selectedPresetName === STARTER_PACK_PRESET_NAME_SILLYBUNNY
+        ? 'SillyBunny'
+        : (selectedPresetName === STARTER_PACK_PRESET_NAME_SILLYTAVERN ? 'SillyTavern' : '');
+    const hasPresetPair = Boolean(sillyBunnyPreset && sillyTavernPreset);
+    const chips = ['OpenAI-style', 'Two versions', 'Agents-aware', STARTER_PACK_CREATOR_NAME];
     const chipColumnCount = Math.max(2, Math.min(chips.length, 4));
-
-    if (isSelected) {
-        return {
-            title: STARTER_PACK_PRESET_NAME,
-            body: `${STARTER_PACK_CREATOR_NAME}'s bundled OpenAI-style preset is already selected, so you are using the included director-style response tuning right now.`,
-            icon: 'fa-sliders',
-            chips,
-            chipColumnCount,
-            statusLabel: 'Selected',
-            statusTone: 'good',
-            actionIcon: 'fa-arrow-up-right-from-square',
-            actionLabel: 'Open Presets',
-            actionType: 'open-tab',
-            actionValue: 'left:presets',
-        };
-    }
-
-    if (isOpenAiStyleApi && presetValue) {
-        return {
-            title: STARTER_PACK_PRESET_NAME,
-            body: `${STARTER_PACK_CREATOR_NAME}'s bundled OpenAI-style preset is ready to apply when you want that director-style response tuning without importing files by hand.`,
-            icon: 'fa-sliders',
-            chips,
-            chipColumnCount,
-            statusLabel: 'Ready',
-            statusTone: 'warm',
-            actionIcon: 'fa-wand-magic-sparkles',
-            actionLabel: 'Apply preset',
-            actionType: 'apply-preset',
-            actionValue: STARTER_PACK_PRESET_NAME,
-        };
-    }
+    const body = `${STARTER_PACK_CREATOR_NAME}'s Director Preset now ships in two versions: the SillyTavern one includes the Toggle and Randomiser prompts, while the SillyBunny version keeps the Main, the Primary Toggles, and the Prefill Toggles only because Agents already cover the optional toggles and randomiser prompts.`;
 
     if (!isOpenAiStyleApi) {
         return {
-            title: STARTER_PACK_PRESET_NAME,
-            body: `${STARTER_PACK_CREATOR_NAME}'s bundled preset is for OpenAI-compatible chat-completions style setups. Switch APIs first, then you can apply it in one click.`,
+            title: STARTER_PACK_PRESET_TITLE,
+            body: `${body} Switch to an OpenAI-compatible chat-completions setup first, then you can apply either version here.`,
             icon: 'fa-sliders',
             chips,
             chipColumnCount,
@@ -621,13 +625,35 @@ function buildPresetStarterPackItem() {
         };
     }
 
+    if (hasPresetPair) {
+        return {
+            title: STARTER_PACK_PRESET_TITLE,
+            body: selectedVariant
+                ? `${body} The ${selectedVariant} version is selected right now.`
+                : `${body} Both versions are bundled and ready to apply without importing files by hand.`,
+            icon: 'fa-sliders',
+            chips,
+            chipColumnCount,
+            statusLabel: selectedVariant ? `Selected: ${selectedVariant}` : 'Ready',
+            statusTone: selectedVariant ? 'good' : 'warm',
+            actionIcon: 'fa-wand-magic-sparkles',
+            actionLabel: 'Apply SillyBunny',
+            actionType: 'apply-preset',
+            actionValue: STARTER_PACK_PRESET_NAME_SILLYBUNNY,
+            secondaryActionLabel: 'Apply SillyTavern',
+            secondaryActionIcon: 'fa-wand-magic-sparkles',
+            secondaryActionType: 'apply-preset',
+            secondaryActionValue: STARTER_PACK_PRESET_NAME_SILLYTAVERN,
+        };
+    }
+
     return {
-        title: STARTER_PACK_PRESET_NAME,
-        body: `${STARTER_PACK_CREATOR_NAME}'s bundled preset is included with SillyBunny and ready for OpenAI-style use, but it has not been selected yet.`,
+        title: STARTER_PACK_PRESET_TITLE,
+        body: `${body} Open the preset panel if you need to check what is available.`,
         icon: 'fa-sliders',
         chips,
         chipColumnCount,
-        statusLabel: 'Bundled',
+        statusLabel: 'Open Presets',
         statusTone: 'warm',
         actionIcon: 'fa-arrow-up-right-from-square',
         actionLabel: 'Open Presets',
@@ -715,14 +741,14 @@ function buildStarterPackItems() {
             body: `${STARTER_PACK_CREATOR_NAME}'s dialogue coloring add-on helps visually busy or emotionally dense chats stay readable, with optional regex setup if you want finer control.`,
             icon: 'fa-palette',
             chips: ['Extension', 'Readable chats', 'Opt-in'],
-            extensionName: STARTER_PACK_EXTENSION_IDS.dialogueColors,
+            extensionName: STARTER_PACK_EXTENSIONS.dialogueColors.id,
         }),
         buildExtensionStarterPackItem({
             title: 'Quick Image Gen',
             body: `${STARTER_PACK_CREATOR_NAME}'s opt-in image generation companion makes visual moments easier to spin up without hunting through separate tools first.`,
             icon: 'fa-image',
             chips: ['Extension', 'Images', 'Opt-in'],
-            extensionName: STARTER_PACK_EXTENSION_IDS.quickImageGen,
+            extensionName: STARTER_PACK_EXTENSIONS.quickImageGen.id,
         }),
         buildPresetStarterPackItem(),
         buildSiteStarterPackItem(),
@@ -888,6 +914,28 @@ async function applyOpenAiPreset(name) {
     return true;
 }
 
+async function installStarterPackExtension(extensionName) {
+    const extensionConfig = getStarterPackExtensionConfig(extensionName);
+    if (!extensionConfig) {
+        return false;
+    }
+
+    await installExtension(extensionConfig.repoUrl, isAdmin());
+
+    const installedExtension = findExtension(extensionName);
+    if (!installedExtension) {
+        await refreshWelcomeScreen();
+        return false;
+    }
+
+    if (!installedExtension.enabled) {
+        await enableExtension(installedExtension.name, false);
+    }
+
+    location.reload();
+    return true;
+}
+
 function setTutorialUiState(panel, index, expanded) {
     if (!(panel instanceof HTMLElement)) {
         return;
@@ -942,6 +990,9 @@ async function handleWelcomeAction(button, sendTextArea) {
             break;
         case 'enable-extension':
             await enableExtension(value);
+            break;
+        case 'install-starter-extension':
+            await installStarterPackExtension(value);
             break;
         case 'apply-preset':
             if (await applyOpenAiPreset(value)) {

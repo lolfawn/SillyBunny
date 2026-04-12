@@ -221,6 +221,7 @@ import { markdownUnderscoreExt } from './scripts/showdown-underscore.js';
 import { NOTE_MODULE_NAME, initAuthorsNote, metadata_keys, setFloatingPrompt, shouldWIAddPrompt } from './scripts/authors-note.js';
 import { registerPromptManagerMigration } from './scripts/PromptManager.js';
 import { getRegexedString, regex_placement } from './scripts/extensions/regex/engine.js';
+import { AGENT_REGEX_PLACEMENT, applyRegexScriptList } from './scripts/extensions/in-chat-agents/regex-scripts.js';
 import { initLogprobs, saveLogprobsForActiveMessage } from './scripts/logprobs.js';
 import { FILTER_STATES, FILTER_TYPES, FilterHelper, isFilterState } from './scripts/filters.js';
 import { getCfgPrompt, getGuidanceScale, initCfg } from './scripts/cfg-scale.js';
@@ -432,7 +433,7 @@ export let isChatSaving = false;
 let firstRun = false;
 export let settingsReady = false;
 let currentVersion = '0.0.0';
-const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.3.0';
+const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.3.1';
 
 export let displayVersion = SILLYBUNNY_UI_VERSION;
 
@@ -449,7 +450,7 @@ export const default_avatar = 'img/ai4.png';
 export const system_avatar = 'img/sillybunny-pixel-logo.png';
 export const comment_avatar = 'img/quill.png';
 export const default_user_avatar = 'img/user-default.png';
-export let CLIENT_VERSION = 'SillyBunny:v1.3.0:platberlitz'; // For Horde header
+export let CLIENT_VERSION = 'SillyBunny:v1.3.1:platberlitz'; // For Horde header
 let optionsPopper = Popper.createPopper(document.getElementById('options_button'), document.getElementById('options'), {
     placement: 'top-start',
 });
@@ -1795,9 +1796,13 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         return '';
     }
 
-    if (Number(messageId) === 0 && !isSystem && !isUser && !isReasoning) {
+    const resolvedMessageId = messageId !== null && messageId !== undefined && messageId !== ''
+        ? Number(messageId)
+        : NaN;
+    const chatMessage = Number.isFinite(resolvedMessageId) ? chat[resolvedMessageId] : null;
+
+    if (resolvedMessageId === 0 && !isSystem && !isUser && !isReasoning) {
         const mesBeforeReplace = mes;
-        const chatMessage = chat[messageId];
         mes = substituteParams(mes, undefined, ch_name);
         if (chatMessage && chatMessage.mes === mesBeforeReplace && chatMessage.extra?.display_text !== mesBeforeReplace) {
             chatMessage.mes = mes;
@@ -1842,8 +1847,22 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
 
         const regexPlacement = getRegexPlacement();
         const usableMessages = chat.map((x, index) => ({ message: x, index: index })).filter(x => !x.message.is_system);
-        const indexOf = usableMessages.findIndex(x => x.index === Number(messageId));
-        const depth = messageId >= 0 && indexOf !== -1 ? (usableMessages.length - indexOf - 1) : undefined;
+        const indexOf = usableMessages.findIndex(x => x.index === resolvedMessageId);
+        const depth = resolvedMessageId >= 0 && indexOf !== -1 ? (usableMessages.length - indexOf - 1) : undefined;
+        const agentRegexScripts = Array.isArray(chatMessage?.extra?.inChatAgents?.regexScripts)
+            ? chatMessage.extra.inChatAgents.regexScripts
+            : [];
+
+        if (!isUser && !isReasoning && agentRegexScripts.length > 0) {
+            mes = applyRegexScriptList(mes, agentRegexScripts, AGENT_REGEX_PLACEMENT.AI_OUTPUT, {
+                characterOverride: ch_name,
+                isMarkdown: true,
+                isEdit: Boolean(chatMessage?.extra?.inChatAgents?.edited),
+                depth,
+                substituteParamsFn: substituteParams,
+                substituteParamsExtendedFn: substituteParamsExtended,
+            });
+        }
 
         // Always override the character name
         mes = getRegexedString(mes, regexPlacement, {
@@ -8619,6 +8638,10 @@ function updateMessage(div) {
         mes.extra.bias = bias ?? null;
     } else {
         mes.extra.bias = null;
+    }
+
+    if (mes.extra?.inChatAgents) {
+        mes.extra.inChatAgents.edited = true;
     }
 
     chat_metadata.tainted = true;

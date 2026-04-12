@@ -208,6 +208,20 @@ body.firefox-macos #top-bar::before {
     display: none;
 }
 
+/*
+ * Firefox on macOS 15/26 can also mispaint contained/transformed descendants in
+ * the top-bar stack, which shows up as a dark block in the center header area.
+ * Keep the header surface simple for that platform/browser combination.
+ */
+body.firefox-macos #sb-topbar-stack,
+body.firefox-macos #sb-chatbar-layer {
+    contain: none;
+}
+
+body.firefox-macos #sb-chatbar-layer {
+    will-change: auto;
+}
+
 /* Safari on macOS can show a sub-pixel border artifact with backdrop-filter. */
 body.safari-macos #top-bar {
     border-bottom-color: transparent;
@@ -270,6 +284,13 @@ h3:not(.popup h3):not(#chat h3) {
 .checkbox_label small,
 .checkbox_label span {
     line-height: 1.45;
+}
+
+@media screen and (min-width: 769px) and (max-width: 1280px) and (pointer: fine) {
+    .checkbox_label {
+        min-height: 32px;
+        column-gap: 8px;
+    }
 }
 
 .menu_button:not(.disabled):not([disabled]):hover,
@@ -484,8 +505,12 @@ select.text_pole {
 
 @media screen and (min-width: 761px) {
     #options_button::before {
+        content: '' !important;
+        display: block !important;
         width: 1.32em !important;
         height: 1.32em !important;
+        background-color: currentColor !important;
+        opacity: 0.94;
         -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2.5' y='4.5' width='19' height='2.9' rx='1.45' fill='%23000'/%3E%3Crect x='2.5' y='10.55' width='19' height='2.9' rx='1.45' fill='%23000' opacity='0.85'/%3E%3Crect x='2.5' y='16.6' width='19' height='2.9' rx='1.45' fill='%23000'/%3E%3C/svg%3E") !important;
         mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2.5' y='4.5' width='19' height='2.9' rx='1.45' fill='%23000'/%3E%3Crect x='2.5' y='10.55' width='19' height='2.9' rx='1.45' fill='%23000' opacity='0.85'/%3E%3Crect x='2.5' y='16.6' width='19' height='2.9' rx='1.45' fill='%23000'/%3E%3C/svg%3E") !important;
         -webkit-mask-size: contain !important;

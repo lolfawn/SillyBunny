@@ -41,7 +41,7 @@
             </div>
         </div>
         <div class="ica--editor-row">
-            <label>Connection Profile <small>(used when refining this agent with AI)</small>
+            <label>Connection Profile <small>(used when refining this agent with AI and for prompt-based post-generation rewrites)</small>
                 <select id="ica--editor-connectionProfile" class="text_pole">
                     <option value="">Use default connection profile</option>
                 </select>
@@ -82,36 +82,61 @@
         </label>
     </div>
 
+    <div class="ica--editor-section" id="ica--regex-section">
+        <div class="ica--editor-section-header">
+            <strong>Agent Regex</strong>
+            <div class="ica--editor-section-actions">
+                <button type="button" id="ica--regex-resetTemplate" class="menu_button menu_button_icon" style="display:none">
+                    <i class="fa-solid fa-box-open"></i>
+                    <span>Load Bundled Regex</span>
+                </button>
+                <button type="button" id="ica--regex-add" class="menu_button menu_button_icon">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Add Regex</span>
+                </button>
+            </div>
+        </div>
+        <div id="ica--regex-note" class="ica--regex-note">Attach ST-style regex scripts that run when this agent activates.</div>
+        <div id="ica--regex-list" class="ica--regex-list"></div>
+    </div>
+
     <div class="ica--editor-section" id="ica--postprocess-section">
-        <strong>Post-Processing</strong>
+        <strong>Post-Generation Actions</strong>
+        <div class="ica--regex-note">Use Agent Regex above for ST-style regex scripts. This section can run the agent prompt as a second-pass rewrite or append pass and still supports extract/append helpers.</div>
+        <label class="checkbox_label">
+            <input type="checkbox" id="ica--editor-pp-promptEnabled" />
+            <span>Use this agent prompt as a post-generation prompt pass</span>
+        </label>
+        <div id="ica--pp-prompt-options" style="display:none">
+            <div class="ica--editor-row flex-container flexGap5">
+                <label class="flex1">Mode
+                    <select id="ica--editor-pp-promptMode" class="text_pole">
+                        <option value="rewrite">Rewrite current message</option>
+                        <option value="append">Append generated content</option>
+                    </select>
+                </label>
+                <label class="flex1">Max Tokens
+                    <input type="number" id="ica--editor-pp-promptMaxTokens" class="text_pole" min="16" max="16000" value="2000" />
+                </label>
+            </div>
+            <label class="checkbox_label">
+                <input type="checkbox" id="ica--editor-pp-promptShowNotifications" />
+                <span>Show toast notifications while this prompt pass runs</span>
+            </label>
+            <div class="ica--regex-note">The prompt pass runs after the main reply using this agent's prompt and connection profile. In <b>rewrite</b> mode it replaces the message. In <b>append</b> mode it only adds newly generated text after the original reply. Useful macros inside the prompt include <code>&#123;&#123;currentMessage&#125;&#125;</code>, <code>&#123;&#123;response&#125;&#125;</code>, and <code>&#123;&#123;original&#125;&#125;</code>.</div>
+        </div>
         <label class="checkbox_label">
             <input type="checkbox" id="ica--editor-pp-enabled" />
-            <span>Enable post-processing</span>
+            <span>Enable utility post-processing</span>
         </label>
         <div id="ica--pp-options" style="display:none">
             <div class="ica--editor-row">
                 <label>Type
                     <select id="ica--editor-pp-type" class="text_pole">
-                        <option value="regex">Regex Find/Replace</option>
                         <option value="extract">Extract to Variable</option>
                         <option value="append">Append Text</option>
                     </select>
                 </label>
-            </div>
-            <div id="ica--pp-regex">
-                <div class="ica--editor-row">
-                    <label>Find Pattern
-                        <input type="text" id="ica--editor-pp-regexFind" class="text_pole" placeholder="Regular expression" />
-                    </label>
-                </div>
-                <div class="ica--editor-row flex-container flexGap5">
-                    <label class="flex1">Replace
-                        <input type="text" id="ica--editor-pp-regexReplace" class="text_pole" placeholder="Replacement (empty = remove)" />
-                    </label>
-                    <label style="width:80px">Flags
-                        <input type="text" id="ica--editor-pp-regexFlags" class="text_pole" value="g" placeholder="gi" />
-                    </label>
-                </div>
             </div>
             <div id="ica--pp-extract" style="display:none">
                 <div class="ica--editor-row">

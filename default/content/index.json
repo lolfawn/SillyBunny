@@ -292,7 +292,11 @@
         "type": "openai_preset"
     },
     {
-        "filename": "presets/openai/Pura's Director Preset 11.5.json",
+        "filename": "presets/openai/Pura's Director Preset (SillyBunny).json",
+        "type": "openai_preset"
+    },
+    {
+        "filename": "presets/openai/Pura's Director Preset (SillyTavern).json",
         "type": "openai_preset"
     },
     {

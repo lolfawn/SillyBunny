@@ -6,6 +6,7 @@ import { eventSource, event_types } from '../../events.js';
 import {
     getAgents,
     getAgentById,
+    getAgentRegexScripts,
     loadAgents,
     saveAgent,
     deleteAgent,
@@ -17,27 +18,63 @@ import {
     getGlobalSettings,
     setGlobalSettings,
     getGroups,
-    loadGroups,
+    getCustomGroups,
+    loadBuiltinGroups,
+    loadCustomGroups,
     saveGroup,
     deleteGroup,
     createDefaultGroup,
 } from './agent-store.js';
 import { initAgentRunner } from './agent-runner.js';
+import {
+    AGENT_REGEX_PLACEMENT,
+    AGENT_REGEX_SUBSTITUTE,
+    createDefaultRegexScript,
+    normalizeRegexScript,
+} from './regex-scripts.js';
 
 const MODULE_NAME = 'in-chat-agents';
 
 /** Built-in templates loaded from JSON files. */
 let templates = [];
+let templateRegexBundles = {};
+
+const BUNDLED_REGEX_POST_DEFAULT_EXCLUDED_TEMPLATE_IDS = new Set([
+    'tpl-anti-slop-regex',
+]);
+
+const REGEX_PLACEMENT_LABELS = {
+    [AGENT_REGEX_PLACEMENT.AI_OUTPUT]: 'AI Output',
+    [AGENT_REGEX_PLACEMENT.USER_INPUT]: 'User Input',
+    [AGENT_REGEX_PLACEMENT.SLASH_COMMAND]: 'Slash Command',
+    [AGENT_REGEX_PLACEMENT.WORLD_INFO]: 'World Info',
+    [AGENT_REGEX_PLACEMENT.REASONING]: 'Reasoning',
+};
 
 function persistExtensionState() {
     extension_settings.inChatAgents = {
         ...(extension_settings.inChatAgents ?? {}),
         globalSettings: structuredClone(getGlobalSettings()),
-        groups: getGroups()
-            .filter(group => !group.builtin)
-            .map(group => structuredClone(group)),
     };
+    delete extension_settings.inChatAgents.groups;
     saveSettingsDebounced();
+}
+
+function stopEvent(event) {
+    event.preventDefault();
+    event.stopPropagation();
+}
+
+function stopEventPropagation(event) {
+    event.stopPropagation();
+}
+
+function normalizeAgentOrderValue(value, fallback = 100) {
+    if (!Number.isFinite(Number(value))) {
+        return fallback;
+    }
+
+    return Math.max(0, Math.min(999, Math.round(Number(value))));
 }
 
 function getConnectionManagerRequestService() {
@@ -103,10 +140,171 @@ function findTemplateById(templateId) {
     return templates.find(template => template.id === templateId);
 }
 
+function findTemplateForAgent(agent) {
+    const sourceTemplateId = String(agent?.sourceTemplateId ?? '').trim();
+    if (sourceTemplateId) {
+        return findTemplateById(sourceTemplateId) ?? null;
+    }
+
+    const agentName = String(agent?.name ?? '').trim().toLowerCase();
+    const agentPrompt = String(agent?.prompt ?? '').trim();
+    if (!agentName) {
+        return null;
+    }
+
+    return templates.find(template =>
+        String(template?.name ?? '').trim().toLowerCase() === agentName &&
+        String(template?.prompt ?? '').trim() === agentPrompt,
+    ) ?? null;
+}
+
+function getBundledRegexScriptsForTemplate(templateId) {
+    const bundledScripts = templateRegexBundles[String(templateId ?? '').trim()];
+    return Array.isArray(bundledScripts)
+        ? bundledScripts.map(script => normalizeRegexScript(script ?? {}))
+        : [];
+}
+
+function applyBundledTrackerPromptPass(template) {
+    if (String(template?.category ?? '') !== 'tracker') {
+        return template;
+    }
+
+    const postProcess = template?.postProcess && typeof template.postProcess === 'object'
+        ? template.postProcess
+        : {};
+
+    return {
+        ...template,
+        phase: 'post',
+        postProcess: {
+            ...postProcess,
+            promptTransformEnabled: true,
+            promptTransformShowNotifications: Object.hasOwn(postProcess, 'promptTransformShowNotifications')
+                ? Boolean(postProcess.promptTransformShowNotifications)
+                : true,
+            promptTransformMode: 'append',
+            promptTransformMaxTokens: Number.isFinite(Number(postProcess.promptTransformMaxTokens))
+                ? Number(postProcess.promptTransformMaxTokens)
+                : 2000,
+        },
+    };
+}
+
+function isBundledRegexPostDefaultTemplate(template, bundledScripts = null) {
+    const templateId = String(template?.id ?? '').trim();
+    if (!template || BUNDLED_REGEX_POST_DEFAULT_EXCLUDED_TEMPLATE_IDS.has(templateId)) {
+        return false;
+    }
+
+    const resolvedScripts = Array.isArray(bundledScripts)
+        ? bundledScripts
+        : (Array.isArray(template?.regexScripts) ? template.regexScripts : getBundledRegexScriptsForTemplate(templateId));
+
+    return Array.isArray(resolvedScripts) && resolvedScripts.length > 0;
+}
+
+function getBundledRegexPromptTransformMode(template) {
+    return String(template?.category ?? '') === 'tracker' ? 'append' : 'rewrite';
+}
+
+function applyBundledRegexPostDefaults(template, bundledScripts = null) {
+    if (!isBundledRegexPostDefaultTemplate(template, bundledScripts)) {
+        return template;
+    }
+
+    const postProcess = template?.postProcess && typeof template.postProcess === 'object'
+        ? template.postProcess
+        : {};
+    const hasPrompt = Boolean(String(template?.prompt ?? '').trim());
+
+    return {
+        ...template,
+        phase: 'post',
+        postProcess: {
+            ...postProcess,
+            promptTransformEnabled: hasPrompt ? true : Boolean(postProcess.promptTransformEnabled),
+            promptTransformShowNotifications: Object.hasOwn(postProcess, 'promptTransformShowNotifications')
+                ? Boolean(postProcess.promptTransformShowNotifications)
+                : true,
+            promptTransformMode: hasPrompt
+                ? getBundledRegexPromptTransformMode(template)
+                : (postProcess.promptTransformMode === 'append' ? 'append' : 'rewrite'),
+            promptTransformMaxTokens: Number.isFinite(Number(postProcess.promptTransformMaxTokens))
+                ? Number(postProcess.promptTransformMaxTokens)
+                : 2000,
+        },
+    };
+}
+
+function mergeTemplateDefaults(template) {
+    const templateWithPromptPass = applyBundledTrackerPromptPass(template);
+    const bundledScripts = getBundledRegexScriptsForTemplate(templateWithPromptPass?.id);
+    const templateWithRegexPostDefaults = applyBundledRegexPostDefaults(templateWithPromptPass, bundledScripts);
+    if (bundledScripts.length === 0) {
+        return {
+            ...templateWithRegexPostDefaults,
+            regexScripts: getAgentRegexScripts(templateWithRegexPostDefaults),
+        };
+    }
+
+    return {
+        ...templateWithRegexPostDefaults,
+        regexScripts: bundledScripts,
+    };
+}
+
+function getTemplateRegexCount(template) {
+    return Array.isArray(template?.regexScripts) ? template.regexScripts.length : 0;
+}
+
+function describeRegexPlacements(regexScript) {
+    return (regexScript.placement || [])
+        .map(placement => REGEX_PLACEMENT_LABELS[placement] || `Placement ${placement}`)
+        .join(', ');
+}
+
+function describeRegexScript(regexScript) {
+    const mode = regexScript.promptOnly
+        ? 'prompt'
+        : (regexScript.markdownOnly ? 'markdown' : 'raw');
+    const toggles = [
+        mode,
+        regexScript.runOnEdit ? 'edit' : null,
+        regexScript.disabled ? 'disabled' : null,
+    ].filter(Boolean).join(' • ');
+    const placements = describeRegexPlacements(regexScript) || 'AI Output';
+    return `${placements} • ${toggles}`;
+}
+
+function buildRegexTemplateLabel(regexCount) {
+    if (regexCount <= 0) {
+        return '';
+    }
+
+    return regexCount === 1 ? '1 regex' : `${regexCount} regex`;
+}
+
+function hasPromptTransform(agent) {
+    return Boolean(
+        agent?.postProcess?.promptTransformEnabled &&
+        ['post', 'both'].includes(String(agent?.phase ?? '')) &&
+        String(agent?.prompt ?? '').trim(),
+    );
+}
+
+function getPromptTransformMode(agent) {
+    return agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite';
+}
+
+function getPromptTransformLabel(agent) {
+    return getPromptTransformMode(agent) === 'append' ? 'prompt append' : 'prompt rewrite';
+}
+
 function buildAgentFromTemplate(template) {
     return {
         ...createDefaultAgent(),
-        ...structuredClone(template),
+        ...structuredClone(mergeTemplateDefaults(template)),
         id: crypto.randomUUID(),
         sourceTemplateId: template.id,
         enabled: false,
@@ -120,6 +318,241 @@ function buildAgentFromSnapshot(snapshot) {
         id: crypto.randomUUID(),
         enabled: false,
     };
+}
+
+function shouldMigrateBundledRegex(agent) {
+    if (!agent || getAgentRegexScripts(agent).length > 0) {
+        return false;
+    }
+
+    const template = findTemplateForAgent(agent);
+    return Boolean(template && getTemplateRegexCount(template) > 0);
+}
+
+async function migrateBundledRegexScriptsToSavedAgents() {
+    for (const agent of getAgents()) {
+        if (!shouldMigrateBundledRegex(agent)) {
+            continue;
+        }
+
+        const template = findTemplateForAgent(agent);
+        if (!template) {
+            continue;
+        }
+
+        agent.regexScripts = structuredClone(template.regexScripts);
+        agent.sourceTemplateId = agent.sourceTemplateId || template.id;
+        await saveAgent(agent);
+    }
+}
+
+function shouldMigrateBundledTrackerPromptPass(agent, template) {
+    if (!template || String(template.category ?? '') !== 'tracker') {
+        return false;
+    }
+
+    if (String(agent?.name ?? '').trim() !== String(template?.name ?? '').trim()) {
+        return false;
+    }
+
+    if (String(agent?.prompt ?? '').trim() !== String(template?.prompt ?? '').trim()) {
+        return false;
+    }
+
+    if (Boolean(agent?.postProcess?.promptTransformEnabled)) {
+        return false;
+    }
+
+    return String(agent?.phase ?? '') === 'both';
+}
+
+async function migrateBundledTrackerPromptPassesToSavedAgents() {
+    let migratedCount = 0;
+
+    for (const agent of getAgents()) {
+        const template = findTemplateForAgent(agent);
+        if (!shouldMigrateBundledTrackerPromptPass(agent, template)) {
+            continue;
+        }
+
+        agent.phase = String(template.phase ?? 'post');
+        agent.sourceTemplateId = agent.sourceTemplateId || template.id;
+        agent.postProcess.promptTransformEnabled = Boolean(template.postProcess?.promptTransformEnabled);
+        agent.postProcess.promptTransformShowNotifications = Object.hasOwn(template.postProcess ?? {}, 'promptTransformShowNotifications')
+            ? Boolean(template.postProcess?.promptTransformShowNotifications)
+            : true;
+        agent.postProcess.promptTransformMode = template.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite';
+        agent.postProcess.promptTransformMaxTokens = Number(template.postProcess?.promptTransformMaxTokens) || 2000;
+        await saveAgent(agent);
+        migratedCount++;
+    }
+
+    return migratedCount;
+}
+
+function shouldMigrateBundledRegexPostDefaults(agent, template) {
+    if (!template) {
+        return false;
+    }
+
+    const desiredTemplate = mergeTemplateDefaults(template);
+    if (!isBundledRegexPostDefaultTemplate(desiredTemplate, desiredTemplate.regexScripts)) {
+        return false;
+    }
+
+    if (String(agent?.name ?? '').trim() !== String(template?.name ?? '').trim()) {
+        return false;
+    }
+
+    if (String(agent?.prompt ?? '').trim() !== String(template?.prompt ?? '').trim()) {
+        return false;
+    }
+
+    if (String(agent?.phase ?? '') !== String(desiredTemplate?.phase ?? 'post')) {
+        return true;
+    }
+
+    if (!Boolean(desiredTemplate?.postProcess?.promptTransformEnabled)) {
+        return false;
+    }
+
+    if (!Boolean(agent?.postProcess?.promptTransformEnabled)) {
+        return true;
+    }
+
+    return getPromptTransformMode(agent) !== getPromptTransformMode(desiredTemplate);
+}
+
+async function migrateBundledRegexPostDefaultsToSavedAgents() {
+    let migratedCount = 0;
+
+    for (const agent of getAgents()) {
+        const template = findTemplateForAgent(agent);
+        if (!shouldMigrateBundledRegexPostDefaults(agent, template)) {
+            continue;
+        }
+
+        const desiredTemplate = mergeTemplateDefaults(template);
+        agent.phase = String(desiredTemplate.phase ?? 'post');
+        agent.sourceTemplateId = agent.sourceTemplateId || template.id;
+
+        if (Boolean(desiredTemplate?.postProcess?.promptTransformEnabled)) {
+            agent.postProcess.promptTransformEnabled = true;
+            agent.postProcess.promptTransformShowNotifications = Object.hasOwn(desiredTemplate.postProcess ?? {}, 'promptTransformShowNotifications')
+                ? Boolean(desiredTemplate.postProcess.promptTransformShowNotifications)
+                : true;
+            agent.postProcess.promptTransformMode = getPromptTransformMode(desiredTemplate);
+            agent.postProcess.promptTransformMaxTokens = Number(desiredTemplate.postProcess?.promptTransformMaxTokens) || 2000;
+        }
+
+        await saveAgent(agent);
+        migratedCount++;
+    }
+
+    return migratedCount;
+}
+
+function getAgentDuplicateKey(agent) {
+    const agentName = String(agent?.name ?? '').trim().toLowerCase();
+    const agentPrompt = String(agent?.prompt ?? '').trim();
+    if (!agentName || !agentPrompt) {
+        return '';
+    }
+
+    return `${agentName}\u0000${agentPrompt}`;
+}
+
+async function removeRedundantBundledAgentDuplicates() {
+    const groupedAgents = new Map();
+
+    for (const agent of getAgents()) {
+        const key = getAgentDuplicateKey(agent);
+        if (!key) {
+            continue;
+        }
+
+        if (!groupedAgents.has(key)) {
+            groupedAgents.set(key, []);
+        }
+
+        groupedAgents.get(key).push(agent);
+    }
+
+    const redundantIds = new Set();
+
+    for (const grouped of groupedAgents.values()) {
+        if (grouped.length < 2) {
+            continue;
+        }
+
+        const templateBacked = grouped.filter(agent => String(agent?.sourceTemplateId ?? '').trim());
+        const unsourced = grouped.filter(agent => !String(agent?.sourceTemplateId ?? '').trim());
+
+        if (templateBacked.length !== 1 || unsourced.length === 0) {
+            continue;
+        }
+
+        const template = findTemplateForAgent(templateBacked[0]);
+        if (!template) {
+            continue;
+        }
+
+        for (const agent of unsourced) {
+            redundantIds.add(agent.id);
+        }
+    }
+
+    for (const agentId of redundantIds) {
+        await deleteAgent(agentId);
+    }
+
+    return redundantIds.size;
+}
+
+async function loadCustomGroupsFromServer() {
+    const response = await fetch('/api/in-chat-agents/groups/list', {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to load custom groups');
+    }
+
+    const groups = await response.json();
+    loadCustomGroups(groups);
+}
+
+async function migrateLegacyGroups(legacyGroups = []) {
+    if (!Array.isArray(legacyGroups) || legacyGroups.length === 0) {
+        return 0;
+    }
+
+    const existingCustomGroupIds = new Set(getCustomGroups().map(group => group.id));
+    let migratedCount = 0;
+
+    for (const group of legacyGroups) {
+        if (!group || typeof group !== 'object') {
+            continue;
+        }
+
+        const groupId = String(group.id ?? '').trim();
+        if (groupId && existingCustomGroupIds.has(groupId)) {
+            continue;
+        }
+
+        await saveGroup({
+            ...structuredClone(group),
+            builtin: false,
+        });
+        if (groupId) {
+            existingCustomGroupIds.add(groupId);
+        }
+        migratedCount++;
+    }
+
+    return migratedCount;
 }
 
 function hasMatchingAgentSnapshot(snapshot, existingAgents = getAgents()) {
@@ -216,6 +649,16 @@ function renderAgentList() {
             const enabledClass = agent.enabled ? 'is-enabled' : '';
             const toggleClass = agent.enabled ? 'is-on' : '';
             const desc = agent.description || agent.prompt.substring(0, 80).replace(/\n/g, ' ') + (agent.prompt.length > 80 ? '...' : '');
+            const regexCount = getAgentRegexScripts(agent).length;
+            const runOrder = normalizeAgentOrderValue(agent?.injection?.order);
+            const runOrderLabel = agent.phase === 'both'
+                ? 'Pre/Post'
+                : (agent.phase === 'post' ? 'Post' : 'Pre');
+            const runOrderTitle = agent.phase === 'both'
+                ? 'Lower numbers run earlier during both the pre-generation and post-generation passes. Higher numbers run later.'
+                : `Lower numbers run earlier during the ${agent.phase === 'post' ? 'post-generation' : 'pre-generation'} pass. Higher numbers run later.`;
+            const promptTransformEnabled = hasPromptTransform(agent);
+            const promptTransformLabel = getPromptTransformLabel(agent);
             const connectionProfileLabel = agent.connectionProfile
                 ? profileNames.get(agent.connectionProfile) || `Missing profile (${agent.connectionProfile})`
                 : '';
@@ -231,9 +674,16 @@ function renderAgentList() {
                     <div class="ica--card-meta">
                         ${agent.conditions.triggerProbability < 100 ? `<span class="ica--card-pill"><i class="fa-solid fa-dice fa-xs"></i> ${agent.conditions.triggerProbability}%</span>` : ''}
                         ${agent.injection.position === 1 ? `<span class="ica--card-pill">depth ${agent.injection.depth}</span>` : ''}
+                        ${promptTransformEnabled ? `<span class="ica--card-pill"><i class="fa-solid fa-robot fa-xs"></i> ${promptTransformLabel}</span>` : ''}
+                        ${regexCount > 0 ? `<span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${regexCount} regex</span>` : ''}
                         ${connectionProfileLabel ? `<span class="ica--card-pill"><i class="fa-solid fa-plug fa-xs"></i> ${escapeHtml(connectionProfileLabel)}</span>` : ''}
                     </div>
                     <div class="ica--card-actions">
+                        <label class="ica--card-order-control" title="${escapeHtml(runOrderTitle)}">
+                            <span class="ica--card-order-label"><i class="fa-solid fa-arrow-down-1-9"></i> ${escapeHtml(runOrderLabel)}</span>
+                            <input type="number" class="ica--card-order-input text_pole" min="0" max="999" step="1" value="${runOrder}" aria-label="${escapeHtml(runOrderLabel)} run order" />
+                            <span class="ica--card-order-hint">lower first</span>
+                        </label>
                         <button type="button" class="ica--card-btn ica--btn-edit"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
                         <button type="button" class="ica--card-btn ica--btn-export"><i class="fa-solid fa-download"></i> Export</button>
                         <button type="button" class="ica--card-btn ica--btn-delete caution"><i class="fa-solid fa-trash"></i></button>
@@ -241,24 +691,58 @@ function renderAgentList() {
                 </div>
             `);
 
-            // Toggle
-            card.find('.ica--card-toggle').on('click', async function () {
+            card.on('click', () => openEditor(agent.id));
+
+            card.find('.ica--card-toggle').on('click', async function (event) {
+                stopEvent(event);
                 agent.enabled = !agent.enabled;
                 await saveAgent(agent);
                 renderAgentList();
             });
 
-            // Edit
-            card.find('.ica--btn-edit').on('click', () => openEditor(agent.id));
+            card.find('.ica--btn-edit').on('click', event => {
+                stopEvent(event);
+                openEditor(agent.id);
+            });
 
-            // Export
-            card.find('.ica--btn-export').on('click', () => {
+            card.find('.ica--btn-export').on('click', event => {
+                stopEvent(event);
                 const data = exportAgent(agent.id);
                 if (data) download(JSON.stringify(data, null, 2), `${agent.name}.json`, 'application/json');
             });
 
-            // Delete
-            card.find('.ica--btn-delete').on('click', async () => {
+            card.find('.ica--card-order-input').on('mousedown click focus', stopEventPropagation);
+            card.find('.ica--card-order-input').on('keydown', function (event) {
+                event.stopPropagation();
+
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    this.blur();
+                }
+
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    $(this).val(runOrder);
+                    this.blur();
+                }
+            });
+            card.find('.ica--card-order-input').on('change', async function (event) {
+                event.stopPropagation();
+
+                const normalizedOrder = normalizeAgentOrderValue($(this).val(), runOrder);
+                $(this).val(normalizedOrder);
+
+                if (normalizedOrder === runOrder) {
+                    return;
+                }
+
+                agent.injection.order = normalizedOrder;
+                await saveAgent(agent);
+                renderAgentList();
+            });
+
+            card.find('.ica--btn-delete').on('click', async event => {
+                stopEvent(event);
                 const result = await new Popup('Delete agent "' + escapeHtml(agent.name) + '"?', POPUP_TYPE.CONFIRM).show();
                 if (result === POPUP_RESULT.AFFIRMATIVE) {
                     await deleteAgent(agent.id);
@@ -276,6 +760,111 @@ function renderAgentList() {
 
 // ===================== Editor Modal =====================
 
+async function openRegexScriptEditor(existingScript = null) {
+    const regexScript = existingScript
+        ? normalizeRegexScript(structuredClone(existingScript))
+        : createDefaultRegexScript();
+
+    const placementOptions = [
+        AGENT_REGEX_PLACEMENT.AI_OUTPUT,
+        AGENT_REGEX_PLACEMENT.USER_INPUT,
+        AGENT_REGEX_PLACEMENT.SLASH_COMMAND,
+        AGENT_REGEX_PLACEMENT.WORLD_INFO,
+        AGENT_REGEX_PLACEMENT.REASONING,
+    ].map(placement => `
+        <label class="checkbox_label">
+            <input type="checkbox" name="ica--regex-placement" value="${placement}" ${regexScript.placement.includes(placement) ? 'checked' : ''} />
+            <span>${REGEX_PLACEMENT_LABELS[placement]}</span>
+        </label>
+    `).join('');
+
+    const html = $(`
+        <div class="ica--regex-editor">
+            <label class="ica--editor-row">Script Name
+                <input type="text" id="ica--regex-name" class="text_pole" placeholder="Regex script name" value="${escapeHtml(regexScript.scriptName)}" />
+            </label>
+            <label class="ica--editor-row">Find Regex
+                <textarea id="ica--regex-find" class="text_pole textarea_compact" rows="4" placeholder="/pattern/g or plain regex">${escapeHtml(regexScript.findRegex)}</textarea>
+            </label>
+            <label class="ica--editor-row">Replace String
+                <textarea id="ica--regex-replace" class="text_pole textarea_compact" rows="4" placeholder="Replacement text">${escapeHtml(regexScript.replaceString)}</textarea>
+            </label>
+            <label class="ica--editor-row">Trim Strings <small>(one per line)</small>
+                <textarea id="ica--regex-trim" class="text_pole textarea_compact" rows="3" placeholder="Text removed from capture groups before substitution">${escapeHtml((regexScript.trimStrings || []).join('\n'))}</textarea>
+            </label>
+            <div class="ica--editor-section ica--regex-subsection">
+                <strong>Placement</strong>
+                <div class="ica--regex-placement-grid">${placementOptions}</div>
+                <div class="ica--regex-note">Bundled in-chat agent regex currently executes on output formatting. Other placements are preserved for compatibility.</div>
+            </div>
+            <div class="ica--editor-row flex-container flexGap5">
+                <label class="flex1">Substitute Find Regex
+                    <select id="ica--regex-substitute" class="text_pole">
+                        <option value="${AGENT_REGEX_SUBSTITUTE.NONE}">None</option>
+                        <option value="${AGENT_REGEX_SUBSTITUTE.RAW}">Raw macros</option>
+                        <option value="${AGENT_REGEX_SUBSTITUTE.ESCAPED}">Escaped macros</option>
+                    </select>
+                </label>
+                <label class="flex1">Min Depth
+                    <input type="number" id="ica--regex-minDepth" class="text_pole" placeholder="blank" value="${regexScript.minDepth ?? ''}" />
+                </label>
+                <label class="flex1">Max Depth
+                    <input type="number" id="ica--regex-maxDepth" class="text_pole" placeholder="blank" value="${regexScript.maxDepth ?? ''}" />
+                </label>
+            </div>
+            <div class="ica--regex-toggles">
+                <label class="checkbox_label"><input type="checkbox" id="ica--regex-markdownOnly" ${regexScript.markdownOnly ? 'checked' : ''} /><span>Markdown only</span></label>
+                <label class="checkbox_label"><input type="checkbox" id="ica--regex-promptOnly" ${regexScript.promptOnly ? 'checked' : ''} /><span>Prompt only</span></label>
+                <label class="checkbox_label"><input type="checkbox" id="ica--regex-runOnEdit" ${regexScript.runOnEdit ? 'checked' : ''} /><span>Run on edit</span></label>
+                <label class="checkbox_label"><input type="checkbox" id="ica--regex-disabled" ${regexScript.disabled ? 'checked' : ''} /><span>Disabled</span></label>
+            </div>
+        </div>
+    `);
+
+    html.find('#ica--regex-substitute').val(String(regexScript.substituteRegex ?? AGENT_REGEX_SUBSTITUTE.NONE));
+
+    const result = await new Popup(html, POPUP_TYPE.CONFIRM, '', {
+        okButton: 'Save Regex',
+        cancelButton: 'Cancel',
+        wide: true,
+        large: true,
+    }).show();
+
+    if (result !== POPUP_RESULT.AFFIRMATIVE) {
+        return null;
+    }
+
+    const placement = [];
+    html.find('input[name="ica--regex-placement"]:checked').each(function () {
+        placement.push(Number($(this).val()));
+    });
+
+    const findRegex = html.find('#ica--regex-find').val()?.toString() ?? '';
+    if (!findRegex.trim()) {
+        toastr.warning('Regex scripts need a find pattern.');
+        return null;
+    }
+
+    return normalizeRegexScript({
+        ...regexScript,
+        scriptName: html.find('#ica--regex-name').val()?.toString().trim() || 'Regex Script',
+        findRegex,
+        replaceString: html.find('#ica--regex-replace').val()?.toString() ?? '',
+        trimStrings: html.find('#ica--regex-trim').val()?.toString()
+            .split('\n')
+            .map(value => value.trim())
+            .filter(Boolean),
+        placement,
+        substituteRegex: Number(html.find('#ica--regex-substitute').val()),
+        markdownOnly: html.find('#ica--regex-markdownOnly').prop('checked'),
+        promptOnly: html.find('#ica--regex-promptOnly').prop('checked'),
+        runOnEdit: html.find('#ica--regex-runOnEdit').prop('checked'),
+        disabled: html.find('#ica--regex-disabled').prop('checked'),
+        minDepth: html.find('#ica--regex-minDepth').val()?.toString() ?? '',
+        maxDepth: html.find('#ica--regex-maxDepth').val()?.toString() ?? '',
+    });
+}
+
 /**
  * Opens the agent editor for the given agent ID (or creates a new one).
  * @param {string|null} agentId
@@ -285,6 +874,11 @@ async function openEditor(agentId = null) {
     if (agentId && !existingAgent) return;
     const agent = existingAgent ? structuredClone(existingAgent) : createDefaultAgent();
     if (!agent) return;
+    let regexScripts = getAgentRegexScripts(agent).map(script => structuredClone(script));
+    const template = findTemplateForAgent(agent);
+    const bundledRegexScripts = Array.isArray(template?.regexScripts)
+        ? template.regexScripts.map(script => structuredClone(script))
+        : [];
 
     const html = await renderExtensionTemplateAsync(MODULE_NAME, 'editor');
     const editorEl = $(html);
@@ -308,11 +902,13 @@ async function openEditor(agentId = null) {
     editorEl.find('#ica--editor-scan').prop('checked', agent.injection.scan);
 
     // Post-process
-    editorEl.find('#ica--editor-pp-enabled').prop('checked', agent.postProcess.enabled);
-    editorEl.find('#ica--editor-pp-type').val(agent.postProcess.type);
-    editorEl.find('#ica--editor-pp-regexFind').val(agent.postProcess.regexFind);
-    editorEl.find('#ica--editor-pp-regexReplace').val(agent.postProcess.regexReplace);
-    editorEl.find('#ica--editor-pp-regexFlags').val(agent.postProcess.regexFlags);
+    const postProcessType = agent.postProcess.type === 'append' ? 'append' : 'extract';
+    editorEl.find('#ica--editor-pp-promptEnabled').prop('checked', Boolean(agent.postProcess.promptTransformEnabled));
+    editorEl.find('#ica--editor-pp-promptMode').val(getPromptTransformMode(agent));
+    editorEl.find('#ica--editor-pp-promptMaxTokens').val(agent.postProcess.promptTransformMaxTokens ?? 2000);
+    editorEl.find('#ica--editor-pp-promptShowNotifications').prop('checked', Boolean(agent.postProcess.promptTransformShowNotifications));
+    editorEl.find('#ica--editor-pp-enabled').prop('checked', agent.postProcess.enabled && agent.postProcess.type !== 'regex');
+    editorEl.find('#ica--editor-pp-type').val(postProcessType);
     editorEl.find('#ica--editor-pp-extractPattern').val(agent.postProcess.extractPattern);
     editorEl.find('#ica--editor-pp-extractVariable').val(agent.postProcess.extractVariable);
     editorEl.find('#ica--editor-pp-appendText').val(agent.postProcess.appendText);
@@ -336,16 +932,97 @@ async function openEditor(agentId = null) {
 
     // Show/hide post-process options
     function updatePPVisibility() {
+        const promptEnabled = editorEl.find('#ica--editor-pp-promptEnabled').prop('checked');
+        editorEl.find('#ica--pp-prompt-options').toggle(promptEnabled);
+
         const enabled = editorEl.find('#ica--editor-pp-enabled').prop('checked');
         editorEl.find('#ica--pp-options').toggle(enabled);
 
         const type = editorEl.find('#ica--editor-pp-type').val();
-        editorEl.find('#ica--pp-regex').toggle(type === 'regex');
         editorEl.find('#ica--pp-extract').toggle(type === 'extract');
         editorEl.find('#ica--pp-append').toggle(type === 'append');
     }
-    editorEl.find('#ica--editor-pp-enabled, #ica--editor-pp-type').on('change', updatePPVisibility);
+    editorEl.find('#ica--editor-pp-promptEnabled, #ica--editor-pp-enabled, #ica--editor-pp-type').on('change', updatePPVisibility);
     updatePPVisibility();
+
+    function renderRegexList() {
+        const list = editorEl.find('#ica--regex-list');
+        list.empty();
+
+        if (regexScripts.length === 0) {
+            list.append('<div class="ica--regex-empty">No regex scripts yet. Add one or load bundled template regex.</div>');
+            return;
+        }
+
+        for (const [index, script] of regexScripts.entries()) {
+            const item = $(`
+                <div class="ica--regex-item">
+                    <div class="ica--regex-item-main">
+                        <div class="ica--regex-item-title">${escapeHtml(script.scriptName || 'Regex Script')}</div>
+                        <div class="ica--regex-item-meta">${escapeHtml(describeRegexScript(script))}</div>
+                        <div class="ica--regex-item-pattern">${escapeHtml(script.findRegex)}</div>
+                    </div>
+                    <div class="ica--regex-item-actions">
+                        <button type="button" class="ica--card-btn ica--regex-up" title="Move up"><i class="fa-solid fa-arrow-up"></i></button>
+                        <button type="button" class="ica--card-btn ica--regex-down" title="Move down"><i class="fa-solid fa-arrow-down"></i></button>
+                        <button type="button" class="ica--card-btn ica--regex-edit"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+                        <button type="button" class="ica--card-btn caution ica--regex-delete"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            `);
+
+            item.find('.ica--regex-edit').on('click', async () => {
+                const updatedScript = await openRegexScriptEditor(script);
+                if (updatedScript) {
+                    regexScripts[index] = updatedScript;
+                    renderRegexList();
+                }
+            });
+
+            item.find('.ica--regex-up').on('click', () => {
+                if (index === 0) return;
+                [regexScripts[index - 1], regexScripts[index]] = [regexScripts[index], regexScripts[index - 1]];
+                renderRegexList();
+            });
+
+            item.find('.ica--regex-down').on('click', () => {
+                if (index >= regexScripts.length - 1) return;
+                [regexScripts[index + 1], regexScripts[index]] = [regexScripts[index], regexScripts[index + 1]];
+                renderRegexList();
+            });
+
+            item.find('.ica--regex-delete').on('click', () => {
+                regexScripts.splice(index, 1);
+                renderRegexList();
+            });
+
+            list.append(item);
+        }
+    }
+
+    editorEl.find('#ica--regex-note').text(
+        bundledRegexScripts.length > 0
+            ? `This template ships with ${buildRegexTemplateLabel(bundledRegexScripts.length)}.`
+            : 'Attach ST-style regex scripts that run when this agent activates.',
+    );
+
+    if (bundledRegexScripts.length > 0) {
+        editorEl.find('#ica--regex-resetTemplate').show();
+        editorEl.find('#ica--regex-resetTemplate').on('click', () => {
+            regexScripts = bundledRegexScripts.map(script => structuredClone(script));
+            renderRegexList();
+            toastr.success('Loaded bundled template regex.');
+        });
+    }
+
+    editorEl.find('#ica--regex-add').on('click', async () => {
+        const newScript = await openRegexScriptEditor();
+        if (newScript) {
+            regexScripts.push(newScript);
+            renderRegexList();
+        }
+    });
+    renderRegexList();
 
     // Refine with AI button
     editorEl.find('#ica--editor-refine').on('click', async () => {
@@ -383,14 +1060,21 @@ async function openEditor(agentId = null) {
     agent.injection.order = Number(editorEl.find('#ica--editor-order').val());
     agent.injection.scan = editorEl.find('#ica--editor-scan').prop('checked');
 
+    if (editorEl.find('#ica--editor-pp-promptEnabled').prop('checked') && !agent.prompt.trim()) {
+        toastr.warning('Prompt-based post-generation passes need an agent prompt.');
+        return;
+    }
+
     agent.postProcess.enabled = editorEl.find('#ica--editor-pp-enabled').prop('checked');
     agent.postProcess.type = editorEl.find('#ica--editor-pp-type').val().toString();
-    agent.postProcess.regexFind = editorEl.find('#ica--editor-pp-regexFind').val().toString();
-    agent.postProcess.regexReplace = editorEl.find('#ica--editor-pp-regexReplace').val().toString();
-    agent.postProcess.regexFlags = editorEl.find('#ica--editor-pp-regexFlags').val().toString();
     agent.postProcess.extractPattern = editorEl.find('#ica--editor-pp-extractPattern').val().toString();
     agent.postProcess.extractVariable = editorEl.find('#ica--editor-pp-extractVariable').val().toString();
     agent.postProcess.appendText = editorEl.find('#ica--editor-pp-appendText').val().toString();
+    agent.postProcess.promptTransformEnabled = editorEl.find('#ica--editor-pp-promptEnabled').prop('checked');
+    agent.postProcess.promptTransformShowNotifications = editorEl.find('#ica--editor-pp-promptShowNotifications').prop('checked');
+    agent.postProcess.promptTransformMode = editorEl.find('#ica--editor-pp-promptMode').val()?.toString() === 'append' ? 'append' : 'rewrite';
+    agent.postProcess.promptTransformMaxTokens = Number(editorEl.find('#ica--editor-pp-promptMaxTokens').val()) || 2000;
+    agent.regexScripts = regexScripts.map(script => normalizeRegexScript(script));
 
     agent.conditions.triggerProbability = Number(editorEl.find('#ica--editor-probability').val());
     const kwText = editorEl.find('#ica--editor-keywords').val().toString();
@@ -413,28 +1097,29 @@ async function openEditor(agentId = null) {
  * Loads built-in template agents from the templates directory.
  */
 async function loadTemplates() {
-    if (templates.length > 0) return;
+    if (templates.length > 0) {
+        return;
+    }
+
     try {
-        const resp = await fetch('/scripts/extensions/in-chat-agents/templates/index.json');
-        if (resp.ok) {
-            templates = await resp.json();
+        const [templateResponse, regexBundleResponse, groupResponse] = await Promise.all([
+            fetch('/scripts/extensions/in-chat-agents/templates/index.json'),
+            fetch('/scripts/extensions/in-chat-agents/templates/regex-bundles.json'),
+            fetch('/scripts/extensions/in-chat-agents/templates/groups.json'),
+        ]);
+
+        const rawTemplates = templateResponse.ok ? await templateResponse.json() : [];
+        templateRegexBundles = regexBundleResponse.ok ? await regexBundleResponse.json() : {};
+        templates = Array.isArray(rawTemplates)
+            ? rawTemplates.map(template => mergeTemplateDefaults(template))
+            : [];
+
+        if (groupResponse.ok) {
+            loadBuiltinGroups(await groupResponse.json());
         }
     } catch (e) {
         console.warn('[InChatAgents] Failed to load templates:', e);
     }
-    // Load builtin groups
-    try {
-        const resp = await fetch('/scripts/extensions/in-chat-agents/templates/groups.json');
-        if (resp.ok) {
-            const builtinGroups = await resp.json();
-            const existing = getGroups();
-            for (const bg of builtinGroups) {
-                if (!existing.find(g => g.id === bg.id)) {
-                    saveGroup(bg);
-                }
-            }
-        }
-    } catch { /* ok */ }
 }
 
 /**
@@ -474,15 +1159,20 @@ async function openTemplateBrowser() {
                 </div>
             `);
 
-            card.find('.ica--grp-apply').on('click', async () => {
+            card.on('click', async () => {
                 await applyGroup(group);
             });
 
-            card.find('.ica--grp-delete').on('click', async () => {
+            card.find('.ica--grp-apply').on('click', async event => {
+                stopEvent(event);
+                await applyGroup(group);
+            });
+
+            card.find('.ica--grp-delete').on('click', async event => {
+                stopEvent(event);
                 const r = await new Popup(`Delete group "${escapeHtml(group.name)}"?`, POPUP_TYPE.CONFIRM).show();
                 if (r === POPUP_RESULT.AFFIRMATIVE) {
-                    deleteGroup(group.id);
-                    persistExtensionState();
+                    await deleteGroup(group.id);
                     card.remove();
                     toastr.success(`Deleted group "${group.name}".`);
                 }
@@ -517,6 +1207,7 @@ async function openTemplateBrowser() {
 
     for (const tpl of templates) {
         const catInfo = AGENT_CATEGORIES[tpl.category] || AGENT_CATEGORIES.custom;
+        const regexCount = getTemplateRegexCount(tpl);
         const card = $(`
             <div class="ica--template-card" data-id="${tpl.id}">
                 <div class="ica--template-card-header">
@@ -524,6 +1215,7 @@ async function openTemplateBrowser() {
                     <span class="ica--template-card-category"><i class="fa-solid ${catInfo.icon}"></i> ${catInfo.label}</span>
                 </div>
                 <div class="ica--template-card-description">${escapeHtml(tpl.description)}</div>
+                ${regexCount > 0 ? `<div class="ica--template-card-badges"><span class="ica--card-pill"><i class="fa-solid fa-wand-magic-sparkles fa-xs"></i> ${buildRegexTemplateLabel(regexCount)}</span></div>` : ''}
                 <div class="ica--template-card-prompt">${escapeHtml(tpl.prompt.substring(0, 200))}</div>
             </div>
         `);
@@ -676,8 +1368,7 @@ async function createCustomGroup() {
         return;
     }
 
-    saveGroup(group);
-    persistExtensionState();
+    await saveGroup(group);
 
     toastr.success(`Created group "${name}" with ${selectedIds.length} agent(s).`);
 }
@@ -745,6 +1436,13 @@ function populateProfileDropdown() {
         emptyLabel: 'Use main AI',
         selectedValue: getGlobalSettings().connectionProfile || '',
     });
+}
+
+function populateGlobalNotificationToggle() {
+    $('#ica--promptTransformShowNotifications').prop(
+        'checked',
+        Boolean(getGlobalSettings().promptTransformShowNotifications),
+    );
 }
 
 /**
@@ -886,27 +1584,71 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     $('#in_chat_agents_container').append(settingsHtml);
 
     const savedState = extension_settings.inChatAgents;
+    const legacyGroups = Array.isArray(savedState?.groups)
+        ? savedState.groups.map(group => structuredClone(group))
+        : [];
     if (savedState && typeof savedState === 'object') {
         if (savedState.globalSettings && typeof savedState.globalSettings === 'object') {
             setGlobalSettings(savedState.globalSettings);
         }
-        if (Array.isArray(savedState.groups)) {
-            loadGroups(savedState.groups);
+    }
+
+    const initResults = await Promise.allSettled([
+        loadTemplates(),
+        loadCustomGroupsFromServer(),
+        (async () => {
+            const settingsResp = await fetch('/api/settings/get', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({}),
+            });
+
+            if (!settingsResp.ok) {
+                return;
+            }
+
+            const settings = await settingsResp.json();
+            if (settings.inChatAgents) {
+                loadAgents(settings.inChatAgents);
+            }
+        })(),
+    ]);
+
+    for (const result of initResults) {
+        if (result.status === 'rejected') {
+            console.warn('[InChatAgents] Failed during initialization:', result.reason);
         }
     }
 
-    // Load agents from server settings
-    const settingsResp = await fetch('/api/settings/get', {
-        method: 'POST',
-        headers: getRequestHeaders(),
-        body: JSON.stringify({}),
-    });
-
-    if (settingsResp.ok) {
-        const settings = await settingsResp.json();
-        if (settings.inChatAgents) {
-            loadAgents(settings.inChatAgents);
+    if (legacyGroups.length > 0) {
+        try {
+            const migratedCount = await migrateLegacyGroups(legacyGroups);
+            if (migratedCount > 0) {
+                toastr.success(`Migrated ${migratedCount} custom group(s) to backend storage.`);
+            }
+        } catch (error) {
+            console.warn('[InChatAgents] Failed to migrate legacy groups:', error);
         }
+    }
+
+    if (savedState && Object.hasOwn(savedState, 'groups')) {
+        persistExtensionState();
+    }
+
+    await migrateBundledRegexScriptsToSavedAgents();
+    const migratedTrackerPromptPassCount = await migrateBundledTrackerPromptPassesToSavedAgents();
+    if (migratedTrackerPromptPassCount > 0) {
+        toastr.success(`Updated ${migratedTrackerPromptPassCount} bundled tracker agent(s) to prompt append mode.`);
+    }
+
+    const migratedRegexPostDefaultsCount = await migrateBundledRegexPostDefaultsToSavedAgents();
+    if (migratedRegexPostDefaultsCount > 0) {
+        toastr.success(`Updated ${migratedRegexPostDefaultsCount} bundled regex agent(s) to post-generation defaults.`);
+    }
+
+    const removedDuplicateCount = await removeRedundantBundledAgentDuplicates();
+    if (removedDuplicateCount > 0) {
+        toastr.success(`Removed ${removedDuplicateCount} redundant bundled agent duplicate(s).`);
     }
 
     // Initialize the pipeline runner
@@ -928,14 +1670,20 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
 
     // Wire up connection profile dropdown
     populateProfileDropdown();
+    populateGlobalNotificationToggle();
     $('#ica--connectionProfile').on('change', function () {
         setGlobalSettings({ connectionProfile: this.value });
         persistExtensionState();
         renderAgentList();
     });
+    $('#ica--promptTransformShowNotifications').on('change', function () {
+        setGlobalSettings({ promptTransformShowNotifications: $(this).prop('checked') });
+        persistExtensionState();
+    });
     // Refresh profiles when chat changes (profiles may have been added/removed)
     eventSource.on(event_types.CHAT_CHANGED, () => {
         populateProfileDropdown();
+        populateGlobalNotificationToggle();
         renderAgentList();
     });
 

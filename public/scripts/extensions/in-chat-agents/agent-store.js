@@ -1,4 +1,9 @@
 import { getRequestHeaders } from '../../../script.js';
+import {
+    AGENT_REGEX_PLACEMENT,
+    AGENT_REGEX_SUBSTITUTE,
+    normalizeRegexScript,
+} from './regex-scripts.js';
 
 /**
  * @typedef {object} AgentInjection
@@ -19,6 +24,10 @@ import { getRequestHeaders } from '../../../script.js';
  * @property {string} appendText
  * @property {string} extractPattern
  * @property {string} extractVariable
+ * @property {boolean} promptTransformEnabled
+ * @property {boolean} promptTransformShowNotifications
+ * @property {'rewrite'|'append'} promptTransformMode
+ * @property {number} promptTransformMaxTokens
  */
 
 /**
@@ -26,6 +35,10 @@ import { getRequestHeaders } from '../../../script.js';
  * @property {string[]} triggerKeywords
  * @property {number} triggerProbability - 0-100
  * @property {string[]} generationTypes
+ */
+
+/**
+ * @typedef {import('../../char-data.js').RegexScriptData} AgentRegexScript
  */
 
 /**
@@ -42,6 +55,7 @@ import { getRequestHeaders } from '../../../script.js';
  * @property {'pre'|'post'|'both'} phase
  * @property {AgentInjection} injection
  * @property {AgentPostProcess} postProcess
+ * @property {AgentRegexScript[]} regexScripts
  * @property {string} connectionProfile
  * @property {string} sourceTemplateId
  * @property {boolean} enabled
@@ -51,14 +65,21 @@ import { getRequestHeaders } from '../../../script.js';
 /** @type {InChatAgent[]} */
 let agents = [];
 
+/** @type {AgentGroup[]} */
+let builtinGroups = [];
+
+/** @type {AgentGroup[]} */
+let customGroups = [];
+
 /** Global settings for the In-Chat Agents extension. */
 let globalSettings = {
     connectionProfile: '',
+    promptTransformShowNotifications: true,
 };
 
 /**
  * Returns the global settings.
- * @returns {{ connectionProfile: string }}
+ * @returns {{ connectionProfile: string, promptTransformShowNotifications: boolean }}
  */
 export function getGlobalSettings() {
     return globalSettings;
@@ -84,6 +105,58 @@ export const AGENT_CATEGORIES = {
     guard: { label: 'Guard', icon: 'fa-shield-halved' },
     custom: { label: 'Custom', icon: 'fa-puzzle-piece' },
 };
+
+function escapeRegexLiteral(value) {
+    return String(value ?? '').replaceAll('/', '\\/');
+}
+
+/**
+ * Converts a legacy single regex post-process block into an ST-style regex script.
+ * @param {Partial<InChatAgent>} rawAgent
+ * @returns {AgentRegexScript|null}
+ */
+export function getLegacyRegexScript(rawAgent = {}) {
+    const postProcess = rawAgent.postProcess;
+
+    if (!postProcess?.enabled || postProcess.type !== 'regex' || !postProcess.regexFind) {
+        return null;
+    }
+
+    const flags = String(postProcess.regexFlags ?? 'g').trim() || 'g';
+    return normalizeRegexScript({
+        id: `legacy-${String(rawAgent.id ?? crypto.randomUUID())}`,
+        scriptName: `${String(rawAgent.name ?? '').trim() || 'Agent'} legacy regex`,
+        findRegex: `/${escapeRegexLiteral(postProcess.regexFind)}/${flags}`,
+        replaceString: String(postProcess.regexReplace ?? ''),
+        trimStrings: [],
+        placement: [AGENT_REGEX_PLACEMENT.AI_OUTPUT],
+        disabled: false,
+        markdownOnly: true,
+        promptOnly: false,
+        runOnEdit: true,
+        substituteRegex: AGENT_REGEX_SUBSTITUTE.NONE,
+        minDepth: null,
+        maxDepth: null,
+    });
+}
+
+/**
+ * Returns the usable regex scripts for an agent, including legacy regex-only agents.
+ * @param {Partial<InChatAgent>} rawAgent
+ * @returns {AgentRegexScript[]}
+ */
+export function getAgentRegexScripts(rawAgent = {}) {
+    const explicitScripts = Array.isArray(rawAgent.regexScripts)
+        ? rawAgent.regexScripts.map(script => normalizeRegexScript(script ?? {}))
+        : [];
+
+    if (explicitScripts.length > 0) {
+        return explicitScripts;
+    }
+
+    const legacyScript = getLegacyRegexScript(rawAgent);
+    return legacyScript ? [legacyScript] : [];
+}
 
 /**
  * Creates a new agent with default values.
@@ -119,7 +192,12 @@ export function createDefaultAgent() {
             appendText: '',
             extractPattern: '',
             extractVariable: '',
+            promptTransformEnabled: false,
+            promptTransformShowNotifications: true,
+            promptTransformMode: 'rewrite',
+            promptTransformMaxTokens: 2000,
         },
+        regexScripts: [],
         enabled: false,
         conditions: {
             triggerKeywords: [],
@@ -134,16 +212,26 @@ export function createDefaultAgent() {
  * @param {Partial<InChatAgent>} rawAgent
  * @returns {InChatAgent}
  */
-function normalizeAgent(rawAgent = {}) {
+export function normalizeAgent(rawAgent = {}) {
     const defaults = createDefaultAgent();
+    const rawPostProcess = rawAgent.postProcess && typeof rawAgent.postProcess === 'object' ? rawAgent.postProcess : {};
     const conditions = rawAgent.conditions && typeof rawAgent.conditions === 'object' ? rawAgent.conditions : {};
 
     return {
         ...defaults,
         ...rawAgent,
+        id: typeof rawAgent.id === 'string' && rawAgent.id.trim() ? rawAgent.id.trim() : defaults.id,
+        name: typeof rawAgent.name === 'string' ? rawAgent.name : defaults.name,
+        description: typeof rawAgent.description === 'string' ? rawAgent.description : defaults.description,
+        icon: typeof rawAgent.icon === 'string' ? rawAgent.icon : defaults.icon,
+        category: Object.hasOwn(AGENT_CATEGORIES, rawAgent.category) ? rawAgent.category : defaults.category,
         tags: Array.isArray(rawAgent.tags)
             ? rawAgent.tags.map(tag => String(tag ?? '').trim()).filter(Boolean)
             : defaults.tags,
+        version: Number.isFinite(Number(rawAgent.version)) ? Number(rawAgent.version) : defaults.version,
+        author: typeof rawAgent.author === 'string' ? rawAgent.author : defaults.author,
+        prompt: typeof rawAgent.prompt === 'string' ? rawAgent.prompt : defaults.prompt,
+        phase: ['pre', 'post', 'both'].includes(rawAgent.phase) ? rawAgent.phase : defaults.phase,
         connectionProfile: typeof rawAgent.connectionProfile === 'string' ? rawAgent.connectionProfile : defaults.connectionProfile,
         sourceTemplateId: typeof rawAgent.sourceTemplateId === 'string' ? rawAgent.sourceTemplateId : defaults.sourceTemplateId,
         injection: {
@@ -152,14 +240,41 @@ function normalizeAgent(rawAgent = {}) {
         },
         postProcess: {
             ...defaults.postProcess,
-            ...(rawAgent.postProcess ?? {}),
+            ...rawPostProcess,
+            enabled: Boolean(rawPostProcess.enabled),
+            type: ['regex', 'append', 'extract'].includes(String(rawPostProcess.type))
+                ? String(rawPostProcess.type)
+                : defaults.postProcess.type,
+            regexFind: typeof rawPostProcess.regexFind === 'string' ? rawPostProcess.regexFind : defaults.postProcess.regexFind,
+            regexReplace: typeof rawPostProcess.regexReplace === 'string' ? rawPostProcess.regexReplace : defaults.postProcess.regexReplace,
+            regexFlags: typeof rawPostProcess.regexFlags === 'string' ? rawPostProcess.regexFlags : defaults.postProcess.regexFlags,
+            appendText: typeof rawPostProcess.appendText === 'string' ? rawPostProcess.appendText : defaults.postProcess.appendText,
+            extractPattern: typeof rawPostProcess.extractPattern === 'string' ? rawPostProcess.extractPattern : defaults.postProcess.extractPattern,
+            extractVariable: typeof rawPostProcess.extractVariable === 'string' ? rawPostProcess.extractVariable : defaults.postProcess.extractVariable,
+            promptTransformEnabled: Boolean(rawPostProcess.promptTransformEnabled),
+            promptTransformShowNotifications: Object.hasOwn(rawPostProcess, 'promptTransformShowNotifications')
+                ? Boolean(rawPostProcess.promptTransformShowNotifications)
+                : defaults.postProcess.promptTransformShowNotifications,
+            promptTransformMode: ['rewrite', 'append'].includes(String(rawPostProcess.promptTransformMode))
+                ? String(rawPostProcess.promptTransformMode)
+                : defaults.postProcess.promptTransformMode,
+            promptTransformMaxTokens: Number.isFinite(Number(rawPostProcess.promptTransformMaxTokens))
+                ? Math.max(16, Math.min(16000, Number(rawPostProcess.promptTransformMaxTokens)))
+                : defaults.postProcess.promptTransformMaxTokens,
         },
+        regexScripts: Array.isArray(rawAgent.regexScripts)
+            ? rawAgent.regexScripts.map(script => normalizeRegexScript(script ?? {}))
+            : defaults.regexScripts,
+        enabled: Boolean(rawAgent.enabled),
         conditions: {
             ...defaults.conditions,
             ...conditions,
             triggerKeywords: Array.isArray(conditions.triggerKeywords)
                 ? conditions.triggerKeywords.map(keyword => String(keyword ?? '').trim()).filter(Boolean)
                 : defaults.conditions.triggerKeywords,
+            triggerProbability: Number.isFinite(Number(conditions.triggerProbability))
+                ? Math.max(0, Math.min(100, Number(conditions.triggerProbability)))
+                : defaults.conditions.triggerProbability,
             generationTypes: Array.isArray(conditions.generationTypes)
                 ? conditions.generationTypes.map(type => String(type ?? '').trim()).filter(Boolean)
                 : defaults.conditions.generationTypes,
@@ -181,7 +296,7 @@ export function getAgents() {
  */
 export function getEnabledAgents() {
     return agents
-        .filter(a => a.enabled)
+        .filter(agent => agent.enabled)
         .sort((a, b) => a.injection.order - b.injection.order);
 }
 
@@ -191,7 +306,7 @@ export function getEnabledAgents() {
  * @returns {InChatAgent|undefined}
  */
 export function getAgentById(id) {
-    return agents.find(a => a.id === id);
+    return agents.find(agent => agent.id === id);
 }
 
 /**
@@ -210,9 +325,10 @@ export function loadAgents(data) {
  */
 export async function saveAgent(agent) {
     const normalizedAgent = normalizeAgent(agent);
-    const idx = agents.findIndex(a => a.id === normalizedAgent.id);
-    if (idx >= 0) {
-        agents[idx] = normalizedAgent;
+    const index = agents.findIndex(existingAgent => existingAgent.id === normalizedAgent.id);
+
+    if (index >= 0) {
+        agents[index] = normalizedAgent;
     } else {
         agents.push(normalizedAgent);
     }
@@ -233,7 +349,7 @@ export async function saveAgent(agent) {
  * @param {string} id
  */
 export async function deleteAgent(id) {
-    agents = agents.filter(a => a.id !== id);
+    agents = agents.filter(agent => agent.id !== id);
 
     const response = await fetch('/api/in-chat-agents/delete', {
         method: 'POST',
@@ -263,8 +379,8 @@ export async function importAgents(data) {
     }
 
     const imported = [];
-    for (const raw of agentsToImport) {
-        const agent = normalizeAgent({ ...createDefaultAgent(), ...raw, id: crypto.randomUUID() });
+    for (const rawAgent of agentsToImport) {
+        const agent = normalizeAgent({ ...createDefaultAgent(), ...rawAgent, id: crypto.randomUUID() });
         await saveAgent(agent);
         imported.push(agent);
     }
@@ -280,7 +396,7 @@ export function exportAllAgents() {
     return {
         format: 'sillybunny-inchat-agents',
         version: 1,
-        agents: agents,
+        agents,
     };
 }
 
@@ -290,7 +406,7 @@ export function exportAllAgents() {
  * @returns {InChatAgent|null}
  */
 export function exportAgent(id) {
-    return agents.find(a => a.id === id) || null;
+    return agents.find(agent => agent.id === id) || null;
 }
 
 // ===================== Agent Groups =====================
@@ -305,84 +421,6 @@ export function exportAgent(id) {
  * @property {boolean} builtin - Whether this is a pre-made group
  */
 
-/** @type {AgentGroup[]} */
-let groups = [];
-
-/**
- * Returns all groups (builtin + custom).
- * @returns {AgentGroup[]}
- */
-export function getGroups() {
-    return [...groups];
-}
-
-/**
- * Loads groups from settings or templates.
- * @param {AgentGroup[]} data
- */
-export function loadGroups(data) {
-    if (Array.isArray(data)) {
-        groups = data.map(group => ({
-            ...createDefaultGroup(),
-            ...group,
-            name: String(group?.name ?? ''),
-            description: String(group?.description ?? ''),
-            agentTemplateIds: Array.isArray(group?.agentTemplateIds)
-                ? group.agentTemplateIds.map(id => String(id ?? '').trim()).filter(Boolean)
-                : [],
-            customAgents: Array.isArray(group?.customAgents)
-                ? group.customAgents.map(agent => {
-                    const normalizedAgent = normalizeAgent(agent ?? {});
-                    delete normalizedAgent.id;
-                    normalizedAgent.enabled = false;
-                    return normalizedAgent;
-                })
-                : [],
-            builtin: Boolean(group?.builtin),
-        }));
-    }
-}
-
-/**
- * Saves a group. Updates local array and persists via global settings.
- * @param {AgentGroup} group
- */
-export function saveGroup(group) {
-    const normalizedGroup = {
-        ...createDefaultGroup(),
-        ...group,
-        name: String(group?.name ?? '').trim(),
-        description: String(group?.description ?? '').trim(),
-        agentTemplateIds: Array.isArray(group?.agentTemplateIds)
-            ? group.agentTemplateIds.map(id => String(id ?? '').trim()).filter(Boolean)
-            : [],
-        customAgents: Array.isArray(group?.customAgents)
-            ? group.customAgents.map(agent => {
-                const normalizedAgent = normalizeAgent(agent ?? {});
-                delete normalizedAgent.id;
-                normalizedAgent.enabled = false;
-                return normalizedAgent;
-            })
-            : [],
-        builtin: Boolean(group?.builtin),
-    };
-
-    const idx = groups.findIndex(g => g.id === normalizedGroup.id);
-    if (idx >= 0) {
-        groups[idx] = normalizedGroup;
-    } else {
-        groups.push(normalizedGroup);
-    }
-}
-
-/**
- * Deletes a group by ID.
- * @param {string} id
- */
-export function deleteGroup(id) {
-    groups = groups.filter(g => g.id !== id);
-}
-
 /**
  * Creates a default empty group.
  * @returns {AgentGroup}
@@ -396,4 +434,124 @@ export function createDefaultGroup() {
         customAgents: [],
         builtin: false,
     };
+}
+
+/**
+ * Normalizes an agent snapshot used inside custom groups.
+ * @param {Partial<InChatAgent>} rawAgent
+ * @returns {Partial<InChatAgent>}
+ */
+function normalizeGroupAgentSnapshot(rawAgent = {}) {
+    const normalizedAgent = normalizeAgent(rawAgent);
+    delete normalizedAgent.id;
+    normalizedAgent.enabled = false;
+    return normalizedAgent;
+}
+
+/**
+ * Normalizes a group payload.
+ * @param {Partial<AgentGroup>} rawGroup
+ * @param {object} [options]
+ * @param {boolean} [options.builtin]
+ * @returns {AgentGroup}
+ */
+function normalizeGroup(rawGroup = {}, { builtin = false } = {}) {
+    const defaults = createDefaultGroup();
+
+    return {
+        ...defaults,
+        ...rawGroup,
+        id: typeof rawGroup.id === 'string' && rawGroup.id.trim() ? rawGroup.id.trim() : defaults.id,
+        name: String(rawGroup.name ?? '').trim(),
+        description: String(rawGroup.description ?? '').trim(),
+        agentTemplateIds: Array.isArray(rawGroup.agentTemplateIds)
+            ? rawGroup.agentTemplateIds.map(id => String(id ?? '').trim()).filter(Boolean)
+            : [],
+        customAgents: Array.isArray(rawGroup.customAgents)
+            ? rawGroup.customAgents.map(agent => normalizeGroupAgentSnapshot(agent ?? {}))
+            : [],
+        builtin: builtin || Boolean(rawGroup.builtin),
+    };
+}
+
+/**
+ * Returns all groups (builtin + custom).
+ * @returns {AgentGroup[]}
+ */
+export function getGroups() {
+    return [...builtinGroups, ...customGroups];
+}
+
+/**
+ * Returns custom groups only.
+ * @returns {AgentGroup[]}
+ */
+export function getCustomGroups() {
+    return [...customGroups];
+}
+
+/**
+ * Loads builtin groups from extension templates.
+ * @param {AgentGroup[]} data
+ */
+export function loadBuiltinGroups(data) {
+    builtinGroups = Array.isArray(data)
+        ? data.map(group => normalizeGroup(group, { builtin: true }))
+        : [];
+}
+
+/**
+ * Loads custom groups from backend storage.
+ * @param {AgentGroup[]} data
+ */
+export function loadCustomGroups(data) {
+    customGroups = Array.isArray(data)
+        ? data.map(group => normalizeGroup(group, { builtin: false }))
+        : [];
+}
+
+/**
+ * Saves a custom group to the backend and local state.
+ * @param {AgentGroup} group
+ * @returns {Promise<AgentGroup>}
+ */
+export async function saveGroup(group) {
+    const normalizedGroup = normalizeGroup(group, { builtin: false });
+    const index = customGroups.findIndex(existingGroup => existingGroup.id === normalizedGroup.id);
+
+    if (index >= 0) {
+        customGroups[index] = normalizedGroup;
+    } else {
+        customGroups.push(normalizedGroup);
+    }
+
+    const response = await fetch('/api/in-chat-agents/groups/save', {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify(normalizedGroup),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to save group');
+    }
+
+    return normalizedGroup;
+}
+
+/**
+ * Deletes a custom group by ID.
+ * @param {string} id
+ */
+export async function deleteGroup(id) {
+    customGroups = customGroups.filter(group => group.id !== id);
+
+    const response = await fetch('/api/in-chat-agents/groups/delete', {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify({ id }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to delete group');
+    }
 }

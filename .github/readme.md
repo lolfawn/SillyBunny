@@ -4,12 +4,12 @@
 
 Based on **SillyTavern 1.17.0 stable** -- same data, same extensions, better shell.
 
-SillyBunny is a fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern) that keeps the workflow you already know but ships it inside a cleaner UI, a Bun-first backend, and lightweight agent hooks for roleplay.
+SillyBunny is a fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern) that keeps the workflow you already know but ships it inside a cleaner UI, a Bun-first backend, and two lightweight agent systems for roleplay.
 
 Project site, presets, themes, and extras: [platberlitz.github.io](https://platberlitz.github.io/)
 
 > [!WARNING]
-> Active fork. UI, Bun compat, and upstream syncs are ongoing -- expect some churn.
+> Active fork. UI, Bun compat, and upstream syncs are ongoing, so expect some churn.
 
 ---
 
@@ -20,7 +20,7 @@ Project site, presets, themes, and extras: [platberlitz.github.io](https://platb
 | **Runtime** | Bun (auto-installed), Node.js fallback |
 | **Default port** | `4444` |
 | **UI** | Custom navigation shell with search, themes, and mobile layout |
-| **Agents** | Lightweight pre/post-generation prompt hooks for RP (think OpenClaw, not AutoGPT) |
+| **Agents** | Built-in Agent Mode + user-facing In-Chat Agents for modular RP prompting |
 | **Data** | Drop-in compatible with SillyTavern characters, chats, presets, and extensions |
 
 ---
@@ -103,11 +103,38 @@ The stock SillyTavern layout is replaced with a custom navigation shell:
 
 Bun is the default. Startup is faster, and the launchers bootstrap it automatically. Node.js still works as a fallback.
 
+### Agents, without the buzzword soup
+
+SillyBunny has **two different agent systems**, and they solve different problems:
+
+- **Agent Mode** is the built-in service layer. It handles retrieval, memory, and lorebook upkeep for an active chat.
+- **In-Chat Agents** are user-facing prompt modules. They are the modular building blocks you toggle on the Agents page for trackers, formatting, cleanup, randomisers, and other RP helpers.
+
+These are not autonomous "go do tasks on the internet" agents. They are deliberately scoped prompt hooks around the chat generation pipeline.
+
+### How agents work
+
+The short version:
+
+1. **Pre-generation agents** can inject prompt text before the main reply is generated.
+2. **The main model** writes the assistant response as usual.
+3. **Post-generation prompt transforms** can optionally rewrite the reply or append extra content after the reply. These can use the main model or a different connection profile.
+4. **Post-process utilities** can extract structured data, run regex cleanup/formatting, or preserve machine-readable blocks while showing cleaner UI.
+5. **Groups and templates** let you swap whole stacks quickly without editing your base preset every time.
+
+Typical uses:
+
+- Trackers for scene, time, items, relationships, off-screen activity, and world state
+- Formatting helpers like direction menus, CYOA choices, or NPC profile cards
+- Cleanup passes like anti-slop or regex-based formatting
+- Randomisers and directives that change the pressure, genre, pacing, or escalation of a scene
+- Cheap helper-model passes that prepare or polish content without spending your main model's budget
+
 ### Agent Mode
 
-Agent Mode is a set of lightweight prompt hooks that run before, during, or after in-chat generation -- similar to how [OpenClaw](https://rentry.org/OpenClaw) works, but built into SillyBunny for RP use cases. These aren't autonomous multi-step agents; they're focused custom prompts that augment the generation pipeline.
+Agent Mode is the built-in chat-scoped system for durable story support.
 
-**Current agent services:**
+**Current services:**
 
 - **Retrieval** -- injects relevant context from recent chat, memory, and lorebooks before the next reply
 - **Memory** -- updates compact long-term memory after a reply is saved
@@ -115,44 +142,57 @@ Agent Mode is a set of lightweight prompt hooks that run before, during, or afte
 
 **How it works:**
 
-- Each agent service has its own source, model, reverse proxy, temperature, and max-token settings
-- You can copy the active chat profile to all agents with one click
+- Each service can reuse the main chat profile or use its own source/model/reverse-proxy settings
+- You can copy the active chat profile to all Agent Mode services in one click
+- Agent Mode state is stored per chat
 - World info entries can be marked `Agent blacklisted` to exclude them from agent processing
 
-**Current scope:**
+**Scope:**
 
-- Runs with active chats only, targeting the chat-completions pipeline
-- Intentionally lightweight -- the goal is augmented RP, not autonomous orchestration
+- Runs with active chats only
+- Targets the chat-completions pipeline
+- Intentionally lightweight: the goal is stronger RP support, not autonomous orchestration
 
 ### In-Chat Agents (Beta)
 
-In-Chat Agents are custom prompt modules you can create, toggle, and share for RP. The core idea: run trackers, formatting rules, and writing directives through separate API connections (including cheaper models), keeping your main generation budget for the actual story.
+In-Chat Agents are modular prompt blocks you can create, toggle, group, refine, import, export, and share.
 
-Think of them as modular prompt building blocks -- each agent injects text into the generation pipeline at a configurable position and depth, and can optionally post-process the response (extract structured data, regex cleanup, etc.).
+Think of them like a mini prompt pipeline builder inside the Agents page:
 
-**What you can do:**
+- Each agent has a **phase**: `Pre`, `Post`, or `Pre/Post`
+- Each agent has a **run order**, so you can decide what runs first or later within a pass
+- Agents can be gated by **generation type**, **keywords**, or **trigger probability**
+- Agents can target the **main connection** or a separate **connection profile**
+- Agents can carry **regex scripts** in a SillyTavern-style format for output formatting and cleanup
+- Agents can run **prompt transforms** in `rewrite` or `append` mode
+- Agents can be bundled into **Agent Groups** for one-click setup
 
-- Write your own custom agent prompts with full macro support (`{{char}}`, `{{user}}`, `{{random::a::b}}`)
-- Use pre-made templates: 31 agents covering trackers, randomisers, directives, formatting, anti-slop, and content control
-- Apply agent groups in one click (e.g. "Pura's Director Agents" imports all 31 templates at once)
-- Create your own custom groups from your current agents
-- Set a Connection Profile for the "Refine with AI" feature to use a cheaper model
-- Import agents directly from the Prompt Manager with one click (paper-plane button on each prompt)
-- Import/export agents as JSON for sharing
+**What ships with v1.3.1:**
 
-**Pre-made agent groups:**
+- **31 bundled templates** based on Pura's Director Preset ecosystem
+- Trackers, randomisers, directives, formatting helpers, anti-slop, and content toggles
+- Built-in groups for the full preset, trackers only, and randomisers only
+- ST-style regex options for bundled and custom agents
+- Per-agent and global prompt-transform toast notifications
+- Inline run-order editing directly from the agent cards
+- Prompt-transform greeting protection: greeting messages are intentionally left alone
 
-- **Pura's Director Agents** -- full Director Preset v12 (all 31 agents)
-- **Pura's Trackers Only** -- 11 tracker agents (relationship, scene, time, events, items, achievements, reputation, status, secrets, off-screen, world detail)
-- **Pura's Randomisers Only** -- 8 randomiser agents (chaos mode, scene pressure, genre, complications, etc.)
+**Bundled defaults in v1.3.1:**
 
-**Status:** Beta. If you find bugs, please let me know. The system is intentionally kept simple -- extensions already handle the more complex stuff. This is for people who want quick, toggleable prompt modules without writing a full extension.
+- Bundled trackers are set up for **post-generation prompt append**
+- Bundled regex-backed helpers default to **post-generation**
+- `Anti-Slop Regex` remains the exception and stays a straightforward cleanup tool
+- Pura's Director Preset now ships in **two versions**:
+  - **SillyTavern** version: includes the Toggle and Randomiser prompts
+  - **SillyBunny** version: keeps the Main, Primary Toggles, and Prefill Toggles, because Agents cover the optional toggles and randomisers
+
+**Status:** Beta. The goal is fast, toggleable prompt modules for RP without needing to write a full extension.
 
 ---
 
 ## UI preview
 
-These screenshots show the `v1.3.0` shell on desktop and mobile.
+These screenshots show the `v1.3.1` shell on desktop and mobile.
 
 #### Desktop
 
@@ -170,92 +210,72 @@ These screenshots show the `v1.3.0` shell on desktop and mobile.
 
 ## Changelog
 
+### v1.3.1 (2026-04-12)
+
+**In-Chat Agents**
+
+- Fixed the broken agent-card interactions and restored reliable backend-backed Agent Group behavior
+- Added ST-style regex script support for agents, including bundled regex packs for tracker and formatting templates
+- Added prompt-transform passes with `rewrite` and `append` modes, optional alternate connection profiles, and automatic message refresh after mutation
+- Bundled trackers now default to post-generation prompt append, while bundled regex-backed helpers default to post-generation behavior
+- Greeting messages are now left untouched by all prompt-transform agents
+- Added global and per-agent toast notifications for prompt-transform runs, enabled by default
+- Added inline run-order editing on agent cards with clearer `lower first` ordering semantics
+- Removed the duplicate bundled `Director Core` case and added bundled-template migration helpers for saved agents
+- Split Pura's Director Preset into **SillyBunny** and **SillyTavern** variants
+
+**Starter pack and bundled extras**
+
+- Starter-pack extension cards now install **Character Colors** and **Image Gen** directly from GitHub instead of shipping their files inside the repo
+- Updated the preset starter card to explain the two Director Preset variants more clearly
+
+**UI/UX fixes**
+
+- Moved the Agent Mode status overview inside the Agent Mode drawer so the Agents page reads more cleanly
+- Improved narrow-width behavior for agent cards, toggles, and inline controls
+- Refined the welcome-screen starter-pack presentation and preset actions
+
 ### v1.3.0
 
 **In-Chat Agents (Beta)**
 
-- New "In-Chat Agents" system on the Agents page -- custom prompt modules that inject into your RP generation pipeline. Write your own or use pre-made templates. Agents run pre-generation (prompt injection), post-generation (regex cleanup, data extraction), or both.
-- 31 pre-made agent templates derived from Pura's Director Preset v12: trackers (relationship, scene, time, events, items, achievements, reputation, status, secrets, off-screen, world detail), randomisers (chaos mode, scene pressure, genre, complications, combined director's cut, dead dove, intimacy/kink), directives, formatting, anti-slop, and content control.
-- Agent Groups: apply a whole set of agents in one click. Three built-in groups (Pura's Director Agents, Trackers Only, Randomisers Only) plus custom group creation.
-- Connection Profile support for the "Refine with AI" feature -- use a cheaper model for prompt refinement via the ConnectionManagerRequestService API.
-- One-click prompt transfer: paper-plane button on each Prompt Manager entry creates an In-Chat Agent with matching settings.
-- Import/export agents as JSON for sharing.
+- Added the first release of In-Chat Agents on the Agents page
+- Shipped 31 pre-made templates derived from Pura's Director Preset v12
+- Added built-in Agent Groups plus one-click Prompt Manager transfer and JSON import/export
+- Added connection-profile support for the `Refine with AI` flow
 
 **UI/UX fixes**
 
-- Agent Mode and In-Chat Agents panels are now collapsible drawers on the Agents page, both closed by default
-- Settings drawer states now persist across page reloads (MutationObserver rebinding)
-- Instruct Template section is hidden in Advanced Formatting when Chat Completions mode is active
-- Removed subtitle descriptions from Customize menu tabs to save vertical space
-- Settings search now shows actual extension names instead of repeated "EXTENSIONS" labels
-- Prompts section in Chat Completions presets now matches the style of other drawer sections (bold title, aligned layout)
-- Fixed agent overview card "OFF" pill overflow on narrow viewports
-- Fixed user avatar vertical centering in Bubbles chat style
-- Downgraded atomic write EPERM warnings to debug level (Windows antivirus false positives)
-- Bundled third-party extensions (sillytavern-character-colors, sillytavern-image-gen) are now git-ignored to avoid stash churn
+- Agent Mode and In-Chat Agents became collapsible drawers on the Agents page
+- Settings drawer state persistence was fixed
+- Advanced Formatting now hides Instruct Template in Chat Completions mode
+- Search labels, preset drawer styling, avatar centering, and narrow-card overflow all received cleanup
+- Bundled third-party extensions were git-ignored to reduce local git churn
 
 ### v1.2.9
 
-**UI overhaul -- collapsible settings sections**
-
-- Text Completion presets now use collapsible drawer sections (Sampling, Penalties, Advanced Algorithms, Token Control, Output & Generation), matching the Chat Completions layout so the settings page isn't a wall of sliders
-- Advanced Formatting sections (Context Template, Instruct Template, System Prompt, Reasoning) are now stacked collapsible drawers instead of three cramped side-by-side columns
-- Consistent dropdown styling across all preset selectors -- Text Completions, Context Template, Instruct Template, System Prompt, and Reasoning Template dropdowns now use the same button wrapper pattern with visible import/export controls
-
-**OpenAI Responses API**
-
-- Added "OpenAI (Responses)" as a new Chat Completion source that targets `/v1/responses` instead of `/v1/chat/completions`
-- Messages are converted to the Responses API format automatically (system messages become `instructions`, user/assistant messages become `input`)
-- Streaming is handled via server-side SSE translation so the frontend works without changes
-- Uses the same API key, model selector, and reverse proxy settings as standard OpenAI
-
-**Auto-stash before git pull**
-
-- New `autoStashBeforePull` option in `config.yaml` with a checkbox in the admin panel
-- When enabled, local changes are automatically stashed before pulling updates for both SillyBunny and extensions, then restored afterward
-- If the stash pop fails (merge conflict), the update still succeeds and a warning tells you your changes are in `git stash`
-- The admin status pill shows "Update Ready (Auto-stash)" instead of "Update Blocked" when local changes exist with auto-stash on
-
-**Encrypted secrets and improved auth**
-
-- API keys in `secrets.json` can now be encrypted at rest using AES-256-GCM (enable with `encryptSecrets.enabled: true` in `config.yaml`)
-- Encryption uses Scrypt key derivation with a configurable passphrase or auto-generated `.secret_key` file
-- Existing plaintext secrets are migrated to encrypted format automatically on first write
-- New `requireHttps` config option rejects plain HTTP connections from non-localhost
-- New session-based token auth as an alternative to HTTP Basic Auth (`sessionAuth.enabled: true`) -- POST credentials to `/api/auth/login`, get a Bearer token, use it for subsequent requests
+- Text Completion and Advanced Formatting settings moved to collapsible drawer sections
+- Added OpenAI Responses API support
+- Added auto-stash before git pull
+- Added encrypted secrets at rest plus improved auth options
 
 ### v1.2.8
 
-- CSS optimization pass: removed 130 lines of dead code, consolidated duplicate rules, replaced longhand overrides with shorthand
-- Styled the Presets "Prompts" section to match other Chat Completion drawer sections
-- Added adaptive contrast text variables that flip between light/dark based on surface luminance
-- Fixed top-bar pointer-events leak, drag listener unbinding, and safe-area-inset padding for notched devices
-
-#### v1.2.8 hotfix (2026-04-10)
-
-- Fixed group chat recovery when stale metadata pointed at a missing `.jsonl` file
-- Frontend group validation now repairs missing references and falls back to a valid chat
-
-#### v1.2.8 UI fixes (2026-04-10)
-
-- Fixed version label and Horde identifier to consistently report v1.2.8
-- Added palette preset Reset button, slider disabled-state tooltips, mobile eye toggle fix
-- Comprehensive border-radius token migration pass across theme stylesheets
+- CSS optimization pass, prompt drawer styling cleanup, adaptive contrast text variables
+- Group-chat recovery fixes for stale or missing `.jsonl` references
+- Version-label, palette-reset, mobile toggle, and border-radius token fixes
 
 ### v1.2.7
 
-- Reworked Chat Completion drawers (Prompt Manager gets its own section, config.yaml drawer moves inside Advanced & Reasoning)
-- Top-bar customization: desktop multi-part labels, live token counter, Context Size rename
-- Console Logs tab under Customize with live server output
-- Improved Characters flow, Settings/Extensions UX, and CSRF token handling
-- Native Termux compatibility improvements (Node.js default, bash start.sh documentation)
+- Reworked Chat Completion drawers
+- Added top-bar customization and Console Logs tab
+- Improved character flow, settings UX, and Termux support
 
 ### v1.2.5
 
 - Switched default port to `4444`
-- Added "Clear all cache" action and message screenshot export
-- Fixed Claude token counting on Bun, improved Docker bundling
-- Chat workflow and startup reliability fixes
+- Added cache clearing and message screenshot export
+- Fixed Claude token counting on Bun and improved startup reliability
 
 ---
 

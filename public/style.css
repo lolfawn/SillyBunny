@@ -4279,12 +4279,16 @@ button.toast-close-button {
 }
 
 input[type='checkbox'] {
+    --sb-checkbox-size: clamp(0.92rem, calc(0.78rem + 0.38vw), calc(var(--mainFontSize) + 0.12rem));
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
     position: relative;
-    width: calc(var(--mainFontSize) + 0.12rem);
-    height: calc(var(--mainFontSize) + 0.12rem);
+    width: var(--sb-checkbox-size);
+    height: var(--sb-checkbox-size);
+    min-width: var(--sb-checkbox-size);
+    min-height: var(--sb-checkbox-size);
+    aspect-ratio: 1 / 1;
     overflow: hidden;
     border-radius: 999px;
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 88%, var(--SmartThemeBodyColor) 14%);
@@ -4297,6 +4301,7 @@ input[type='checkbox'] {
     cursor: pointer;
     transform: translateY(-0.075em);
     flex-shrink: 0;
+    align-self: center;
     place-content: center;
     display: grid;
     transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 140ms ease;
@@ -4304,8 +4309,8 @@ input[type='checkbox'] {
 
 input[type="checkbox"]::before {
     content: "";
-    width: 0.54em;
-    height: 0.54em;
+    width: calc(var(--sb-checkbox-size) * 0.5);
+    height: calc(var(--sb-checkbox-size) * 0.5);
     border-radius: 999px;
     background: color-mix(in srgb, var(--color-primary, #f1b285) 86%, white 14%);
     transform: scale(0);
@@ -4347,6 +4352,17 @@ input[type='checkbox'].del_checkbox {
     opacity: 0.7;
     margin-top: 12px;
     margin-right: 12px;
+}
+
+@media screen and (min-width: 769px) and (max-width: 1280px) and (pointer: fine) {
+    input[type='checkbox'] {
+        --sb-checkbox-size: 0.96rem;
+    }
+
+    .checkbox_label {
+        min-height: 32px;
+        column-gap: 8px;
+    }
 }
 
 

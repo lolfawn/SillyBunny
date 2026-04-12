@@ -297,6 +297,9 @@ const sbState = {
         isApplyingSearch: false,
         chatObserver: null,
         sourceObserver: null,
+        sourceSelectObserver: null,
+        sourceObservedElement: null,
+        sourceChangeHandler: null,
         connectionStripOpen: false,
         sidebarOpen: false,
         mobileToolsOpen: false,
@@ -2784,17 +2787,93 @@ async function getConnectionStatusText() {
     return modelValue ? `${apiValue} - ${modelValue}` : apiValue;
 }
 
-function bindConnectionProfileSourceObserver() {
-    if (getChatbarState().sourceObserver) {
+function nodeTouchesConnectionProfilesSource(node) {
+    if (!(node instanceof Element)) {
+        return false;
+    }
+
+    return node.id === 'connection_profiles' || Boolean(node.querySelector('#connection_profiles'));
+}
+
+function mutationTouchesConnectionProfilesSource(mutation) {
+    if (nodeTouchesConnectionProfilesSource(mutation.target)) {
+        return true;
+    }
+
+    for (const node of mutation.addedNodes) {
+        if (nodeTouchesConnectionProfilesSource(node)) {
+            return true;
+        }
+    }
+
+    for (const node of mutation.removedNodes) {
+        if (nodeTouchesConnectionProfilesSource(node)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function bindConnectionProfileSourceElement(sourceElement) {
+    const chatbarState = getChatbarState();
+    const normalizedSource = sourceElement instanceof HTMLSelectElement ? sourceElement : null;
+
+    if (chatbarState.sourceObservedElement === normalizedSource) {
         return;
     }
 
-    const observer = new MutationObserver(() => {
+    if (chatbarState.sourceObservedElement instanceof HTMLSelectElement && typeof chatbarState.sourceChangeHandler === 'function') {
+        chatbarState.sourceObservedElement.removeEventListener('change', chatbarState.sourceChangeHandler);
+    }
+
+    chatbarState.sourceSelectObserver?.disconnect();
+    chatbarState.sourceObservedElement = normalizedSource;
+    chatbarState.sourceChangeHandler = null;
+
+    if (!(normalizedSource instanceof HTMLSelectElement)) {
+        return;
+    }
+
+    if (!chatbarState.sourceSelectObserver) {
+        chatbarState.sourceSelectObserver = new MutationObserver(() => {
+            scheduleChatbarRefresh(60);
+        });
+    }
+
+    const handleSourceChange = () => {
+        scheduleChatbarRefresh(0);
+    };
+
+    chatbarState.sourceChangeHandler = handleSourceChange;
+    normalizedSource.addEventListener('change', handleSourceChange);
+    chatbarState.sourceSelectObserver.observe(normalizedSource, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['disabled'],
+    });
+}
+
+function bindConnectionProfileSourceObserver() {
+    const chatbarState = getChatbarState();
+    if (chatbarState.sourceObserver) {
+        bindConnectionProfileSourceElement(document.getElementById('connection_profiles'));
+        return;
+    }
+
+    const observer = new MutationObserver(mutations => {
+        if (!mutations.some(mutationTouchesConnectionProfilesSource)) {
+            return;
+        }
+
+        bindConnectionProfileSourceElement(document.getElementById('connection_profiles'));
         scheduleChatbarRefresh(60);
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
-    getChatbarState().sourceObserver = observer;
+    chatbarState.sourceObserver = observer;
+    bindConnectionProfileSourceElement(document.getElementById('connection_profiles'));
 }
 
 async function refreshChatbarState() {
@@ -3467,13 +3546,19 @@ function buildAgentsPanel() {
         <p>Retrieval helps before generation, while memory and lorebook helpers clean up afterward.</p>
     `;
 
-    const overview = createElement('div', { id: 'sb-agent-overview', className: 'sb-agent-overview' });
     const agentPanel = document.getElementById('agent_mode_panel');
 
     const inChatAgentsContainer = createElement('div', { id: 'in_chat_agents_container' });
 
     if (agentPanel instanceof HTMLElement) {
-        column.append(callout, overview, agentPanel, inChatAgentsContainer);
+        const drawerContent = agentPanel.querySelector('.inline-drawer-content');
+
+        if (drawerContent instanceof HTMLElement && !drawerContent.querySelector('#sb-agent-overview')) {
+            const overview = createElement('div', { id: 'sb-agent-overview', className: 'sb-agent-overview' });
+            drawerContent.prepend(overview);
+        }
+
+        column.append(callout, agentPanel, inChatAgentsContainer);
     } else {
         const fallback = createElement('div', { className: 'sb-shell-empty-state' });
         fallback.innerHTML = '<strong>Agents are unavailable.</strong><p>The agent controls did not render in time, so this tab is temporarily empty.</p>';
