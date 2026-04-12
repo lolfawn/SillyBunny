@@ -67,7 +67,7 @@ import { UPLOADS_DIRECTORY } from './constants.js';
 // Routers
 import { router as usersPublicRouter } from './endpoints/users-public.js';
 import { init as statsInit, onExit as statsOnExit } from './endpoints/stats.js';
-import { checkForNewContent } from './endpoints/content-manager.js';
+import { checkForNewContent, PRESET_CONTENT_TYPES } from './endpoints/content-manager.js';
 import { init as settingsInit } from './endpoints/settings.js';
 import { ServerStartup, setupPrivateEndpoints } from './server-startup.js';
 import { diskCache } from './endpoints/characters.js';
@@ -339,7 +339,7 @@ async function preSetupTasks() {
 
     startupDirectories = await getUserDirectoriesList();
     await migrateGroupChatsMetadataFormat(startupDirectories);
-    await checkForNewContent(startupDirectories);
+    await checkForNewContent(startupDirectories, PRESET_CONTENT_TYPES);
     migrateFlatSecrets(startupDirectories);
     cleanUploads();
     migrateAccessLog();

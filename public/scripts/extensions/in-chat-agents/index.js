@@ -1,7 +1,7 @@
 import { extension_settings, renderExtensionTemplateAsync } from '../../extensions.js';
 import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../popup.js';
 import { download } from '../../utils.js';
-import { getRequestHeaders, generateQuietPrompt, saveSettingsDebounced } from '../../../script.js';
+import { CLIENT_VERSION, getRequestHeaders, generateQuietPrompt, saveSettingsDebounced } from '../../../script.js';
 import { eventSource, event_types } from '../../events.js';
 import {
     getAgents,
@@ -50,6 +50,10 @@ const REGEX_PLACEMENT_LABELS = {
     [AGENT_REGEX_PLACEMENT.WORLD_INFO]: 'World Info',
     [AGENT_REGEX_PLACEMENT.REASONING]: 'Reasoning',
 };
+
+function getTemplateAssetUrl(filename) {
+    return `/scripts/extensions/${MODULE_NAME}/templates/${filename}?v=${encodeURIComponent(CLIENT_VERSION || 'dev')}`;
+}
 
 function persistExtensionState() {
     extension_settings.inChatAgents = {
@@ -881,6 +885,11 @@ async function openEditor(agentId = null) {
         : [];
 
     const html = await renderExtensionTemplateAsync(MODULE_NAME, 'editor');
+    if (!html) {
+        toastr.error('Could not load the agent editor. Please refresh the page and try again.');
+        return;
+    }
+
     const editorEl = $(html);
 
     // Populate fields
@@ -1103,9 +1112,9 @@ async function loadTemplates() {
 
     try {
         const [templateResponse, regexBundleResponse, groupResponse] = await Promise.all([
-            fetch('/scripts/extensions/in-chat-agents/templates/index.json'),
-            fetch('/scripts/extensions/in-chat-agents/templates/regex-bundles.json'),
-            fetch('/scripts/extensions/in-chat-agents/templates/groups.json'),
+            fetch(getTemplateAssetUrl('index.json')),
+            fetch(getTemplateAssetUrl('regex-bundles.json')),
+            fetch(getTemplateAssetUrl('groups.json')),
         ]);
 
         const rawTemplates = templateResponse.ok ? await templateResponse.json() : [];
@@ -1581,6 +1590,11 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
 
 (async function () {
     const settingsHtml = await renderExtensionTemplateAsync(MODULE_NAME, 'settings');
+    if (!settingsHtml) {
+        console.warn('[InChatAgents] Could not load the settings template.');
+        return;
+    }
+
     $('#in_chat_agents_container').append(settingsHtml);
 
     const savedState = extension_settings.inChatAgents;

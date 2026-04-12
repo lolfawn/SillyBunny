@@ -55,6 +55,21 @@ export const CONTENT_TYPES = {
     REASONING: 'reasoning',
 };
 
+export const PRESET_CONTENT_TYPES = Object.freeze([
+    CONTENT_TYPES.KOBOLD_PRESET,
+    CONTENT_TYPES.OPENAI_PRESET,
+    CONTENT_TYPES.NOVEL_PRESET,
+    CONTENT_TYPES.TEXTGEN_PRESET,
+    CONTENT_TYPES.INSTRUCT,
+    CONTENT_TYPES.CONTEXT,
+    CONTENT_TYPES.SYSPROMPT,
+    CONTENT_TYPES.REASONING,
+]);
+
+function isPresetContentType(type) {
+    return PRESET_CONTENT_TYPES.includes(type);
+}
+
 /**
  * Gets the default presets from the content directory.
  * @param {import('../users.js').UserDirectoryList} directories User directories
@@ -66,7 +81,7 @@ export function getDefaultPresets(directories) {
         const presets = [];
 
         for (const contentItem of contentIndex) {
-            if (contentItem.type.endsWith('_preset') || ['instruct', 'context', 'sysprompt', 'reasoning'].includes(contentItem.type)) {
+            if (isPresetContentType(contentItem.type)) {
                 contentItem.name = path.parse(contentItem.filename).name;
                 contentItem.folder = getTargetByType(contentItem.type, directories);
                 presets.push(contentItem);
@@ -119,8 +134,10 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
     const contentLog = getContentLog(contentLogPath);
 
     for (const contentItem of contentIndex) {
+        const hasLoggedContent = contentLog.includes(contentItem.filename);
+
         // If the content item is already in the log, skip it
-        if (contentLog.includes(contentItem.filename) && !forceCategories?.includes(contentItem.type)) {
+        if (hasLoggedContent && !forceCategories?.includes(contentItem.type)) {
             continue;
         }
 
@@ -145,10 +162,15 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
 
         const basePath = path.parse(contentItem.filename).base;
         const targetPath = path.join(contentTarget, basePath);
-        contentLog.push(contentItem.filename);
+
+        if (!hasLoggedContent) {
+            contentLog.push(contentItem.filename);
+        }
 
         if (fs.existsSync(targetPath)) {
-            console.warn(`Content file ${contentItem.filename} already exists in ${contentTarget}`);
+            if (!hasLoggedContent) {
+                console.warn(`Content file ${contentItem.filename} already exists in ${contentTarget}`);
+            }
             continue;
         }
 
@@ -175,7 +197,10 @@ export async function checkForNewContent(directoriesList, forceCategories = []) 
             return;
         }
 
-        const contentIndex = getContentIndex();
+        const forceCategorySet = new Set(forceCategories ?? []);
+        const contentIndex = getContentIndex().filter(item => (
+            !contentCheckSkip || forceCategorySet.size === 0 || forceCategorySet.has(item.type)
+        ));
         let anyContentAdded = false;
 
         for (const directories of directoriesList) {

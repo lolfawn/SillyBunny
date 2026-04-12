@@ -52,6 +52,10 @@ function triggerAutoSave(handle) {
  * @returns {Array} Parsed files
  */
 function readAndParseFromDirectory(directoryPath, fileExtension = '.json') {
+    if (!fs.existsSync(directoryPath)) {
+        return [];
+    }
+
     const files = fs
         .readdirSync(directoryPath)
         .filter(x => path.parse(x).ext == fileExtension)
@@ -90,6 +94,13 @@ export function getSettingsBackupFilePrefix(handle) {
 }
 
 function readPresetsFromDirectory(directoryPath, options = {}) {
+    if (!fs.existsSync(directoryPath)) {
+        return {
+            fileContents: [],
+            fileNames: [],
+        };
+    }
+
     const {
         sortFunction,
         removeFileExtension = false,
