@@ -374,8 +374,10 @@ function shouldMigrateBundledTrackerPromptPass(agent, template) {
         return false;
     }
 
-    const desiredPhase = mergeTemplateDefaults(template).phase ?? 'pre';
-    return String(agent?.phase ?? '') !== desiredPhase;
+    const mergedDefaults = mergeTemplateDefaults(template);
+    const desiredPhase = mergedDefaults.phase ?? 'pre';
+    const desiredRole = mergedDefaults.injection?.role ?? 1;
+    return String(agent?.phase ?? '') !== desiredPhase || Number(agent?.injection?.role ?? 0) !== desiredRole;
 }
 
 async function migrateBundledTrackerPromptPassesToSavedAgents() {
@@ -389,6 +391,7 @@ async function migrateBundledTrackerPromptPassesToSavedAgents() {
 
         const mergedTemplate = mergeTemplateDefaults(template);
         agent.phase = String(mergedTemplate.phase ?? 'pre');
+        agent.injection.role = Number(mergedTemplate.injection?.role ?? 1);
         agent.sourceTemplateId = agent.sourceTemplateId || template.id;
         agent.postProcess.promptTransformEnabled = Boolean(mergedTemplate.postProcess?.promptTransformEnabled);
         agent.postProcess.promptTransformShowNotifications = Object.hasOwn(mergedTemplate.postProcess ?? {}, 'promptTransformShowNotifications')
