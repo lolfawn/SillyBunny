@@ -52,7 +52,6 @@ import { renderTemplateAsync } from './templates.js';
 
 import { countOccurrences, debounce, delay, download, getFileText, getSanitizedFilename, getStringHash, isOdd, isTrueBoolean, onlyUnique, resetScrollHeight, shuffle, sortMoments, stringToRange, timestampToMoment } from './utils.js';
 import { FILTER_TYPES } from './filters.js';
-import { PARSER_FLAG, SlashCommandParser } from './slash-commands/SlashCommandParser.js';
 import { SlashCommand } from './slash-commands/SlashCommand.js';
 import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from './slash-commands/SlashCommandArgument.js';
 import { AUTOCOMPLETE_SELECT_KEY, AUTOCOMPLETE_STATE, AUTOCOMPLETE_WIDTH } from './autocomplete/AutoComplete.js';
@@ -1716,6 +1715,7 @@ function getExampleMessagesBehavior() {
 
 //MARK: loadPowerUser
 export async function loadPowerUserSettings(settings, data) {
+    const { PARSER_FLAG, SlashCommandParser } = await import('./slash-commands/SlashCommandParser.js');
     const defaultStscript = JSON.parse(JSON.stringify(power_user.stscript));
     // Load from settings.json
     if (settings.power_user !== undefined) {
