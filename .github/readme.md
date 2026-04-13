@@ -214,36 +214,42 @@ These screenshots show the `v1.3.2` shell on desktop and mobile.
 
 **UI/UX overhaul**
 
-- Redesigned shell panels: centered on screen, narrower (900px max), horizontal tab bar at top
-- Centered shell open animations (scale+fade instead of directional slide)
-- Rearranged top bar: Navigate + Customize left, Home + Characters right, removed duplicate API button
+- Redesigned shell panels: centered on screen, narrower (900px max), horizontal tab bar at top instead of vertical sidebar
+- Centered shell animations: all shells now open with a scale+fade from center, replacing the directional slide-in
+- Rearranged top bar: Navigate + Customize on the left, Home + Characters on the right, removed duplicate API button
 - Added customizable quick-access shortcut buttons in the top bar (configurable in Settings)
-- Removed chatbar overlay; integrated chat management into the bottom bar with persona bubble
-- Added bottom bar size slider in Settings
-- Home screen defaults to First Steps with launchpad collapsed; "Show Launchpad" replaces "Replay Tutorial"
-- Added "Chat with Assistant Nahida" button on home screen; Nahida now appears in character list by default
-- Starter pack split into Pre-installed and Optional sections; added Summary Sharder, Guided Generations
+- Removed the optional chatbar overlay; integrated chat management (select, new, rename, delete) into the bottom bar
+- Added persona quick-access bubble next to the chat input with popup picker
+- Added bottom bar size slider (replaces the desktop top bar size slider)
+- Home screen defaults to First Steps tab with launchpad collapsed; renamed "Replay Tutorial" to "Show Launchpad"
+- Added "Chat with Assistant Nahida" button on the home screen alongside "Open Assistant"
+- Assistant Nahida is now created at app startup so she appears in the character list by default
+- Starter pack split into "Pre-installed" and "Optional installs" sections with clearer wording
+- Added Summary Sharder and Guided Generations (forked) to the optional installs in the starter pack
 - Bundled Memory Sharding Quick Reply preset for chat summarisation
 
 **Agent mode changes**
 
-- Removed Agent Mode orchestration; kept In-Chat Agents as a standalone lightweight tab
-- Summary Sharder recommended as the memory solution
+- Removed Agent Mode orchestration (retrieval/memory/lorebook services) to match the "intentionally lightweight" philosophy
+- Kept In-Chat Agents as a standalone tab with its own settings panel
+- Recommended Summary Sharder extension as the memory solution in the starter pack
 
 **Bug fixes**
 
-- Fixed stop generation button (`isStopped` flag now set correctly in `onStopStreaming`)
-- Fixed story branching performance (shallow copy instead of full `structuredClone`)
-- Fixed `applyBundledOptInDefaults()` always returning true
-- Fixed CLIENT_VERSION `v` prefix breaking extension version checks
-- Fixed circular dependency TDZ errors in GuidedGenerations, TunnelVision, Quick Reply, TTS
-- Fixed duplicate TTS settings panel
-- Fixed shell search showing generic "Extensions" instead of actual section names
+- Fixed stop generation button: `onStopStreaming()` now properly sets `isStopped` flag to prevent generation from appearing to complete normally
+- Fixed story branching performance: replaced deep `structuredClone` of entire chat with shallow copy, only deep-cloning the target message when swipe selection requires it
+- Fixed `applyBundledOptInDefaults()` always returning true (`return true || changed` → `return changed`)
+- Fixed CLIENT_VERSION format: removed `v` prefix so `versionCompare()` works correctly with extensions that specify `minimum_client_version`
+- Fixed circular dependency TDZ errors in GuidedGenerations, TunnelVision, Quick Reply, and TTS extensions
+- Fixed duplicate TTS settings panel by adding init guard
+- Fixed shell search results showing generic "Extensions" label instead of actual extension/section names
+- Added single-dropdown-at-a-time enforcement via `closeAllDropdowns()`
 
 **Platform support**
 
-- Added Node.js fallback launchers (`start-node.sh`, `Start-Node.bat`, `npm run start:node`)
-- Auto-switches to Node.js on macOS and ARM to avoid Bun CPU overhead (oven-sh/bun#26415)
+- Added Node.js fallback launcher: `start-node.sh`, `Start-Node.bat`, `npm run start:node`
+- Auto-detect macOS and ARM platforms and switch to Node.js to avoid Bun CPU overhead (oven-sh/bun#26415)
+- `SILLYBUNNY_USE_NODE=1` environment variable forces Node.js on any platform
 
 ### v1.3.1 (2026-04-12)
 
