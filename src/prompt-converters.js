@@ -434,6 +434,13 @@ export function convertGooglePrompt(messages, model, useSysPrompt, names) {
 
     if (useSysPrompt) {
         while (messages.length > 1 && messages[0].role === 'system') {
+            // Flatten array content to string for system prompt handling
+            if (Array.isArray(messages[0].content)) {
+                messages[0].content = messages[0].content
+                    .filter(p => p.type === 'text')
+                    .map(p => p.text)
+                    .join('\n\n');
+            }
             // Append example names if not already done by the frontend (e.g. for group chats).
             if (names.userName && messages[0].name === 'example_user') {
                 if (!messages[0].content.startsWith(`${names.userName}: `)) {
