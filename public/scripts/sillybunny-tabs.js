@@ -5316,7 +5316,10 @@ function renderSearchResults(shellKey, query) {
     const matches = [];
 
     for (const tabState of shellState.tabs.values()) {
-        tabState.searchIndex = createSearchIndex(tabState);
+        // Build index once; it's invalidated when the tab activates (content may have changed)
+        if (!tabState.searchIndex) {
+            tabState.searchIndex = createSearchIndex(tabState);
+        }
 
         // Supplement with persona data entries for the persona tab
         const extraEntries = tabState.id === 'persona' ? getPersonaSearchEntries(tabState) : [];
@@ -5459,6 +5462,8 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
         tabState.button?.setAttribute('tabindex', isActive ? '0' : '-1');
         tabState.panel.classList.toggle('sb-shell-panel-active', isActive);
         tabState.panel.setAttribute('aria-hidden', String(!isActive));
+        // Invalidate search index when switching to a tab so stale DOM isn't searched
+        if (isActive) tabState.searchIndex = null;
     }
 
     const activeTab = shellState.tabs.get(tabId);
