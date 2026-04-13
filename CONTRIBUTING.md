@@ -37,6 +37,16 @@ You can still send a pull request for `release` in the following scenarios:
 - Updating GitHub Actions.
 - Hotfixing a critical bug.
 
+### Release and hotfix hygiene
+
+If you're helping ship a SillyBunny release, keep the release copy in sync with the code:
+
+- Normal releases should bump every SillyBunny version reference that is user-facing or otherwise hardcoded, including the package version, the visible UI version strings, and the Horde fallback client string.
+- Update the root `README.md` changelog and any "current release" copy, then sync `.github/readme.md` by running `bash scripts/sync-readme-mirror.sh`. The GitHub README is a mirror, so do not edit it by hand.
+- Include a Discord-friendly update summary for non-hotfix releases so the changes can be posted without rewriting the notes from scratch.
+- Hotfixes are the exception: skip the version bump, README updates, changelog pass, and Discord post. Just include a short bulleted list of exactly what was hotfixed.
+- See `CLAUDE.md` for the maintainer-facing checklist and copy template.
+
 Project maintainers will test and can change your code before merging. To keep our workflow smooth, please ensure the following:
 
 - The "Allow edits from maintainers" option is checked.
