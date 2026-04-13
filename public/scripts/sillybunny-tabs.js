@@ -6388,7 +6388,12 @@ function togglePersonaPicker() {
 
     // powerUserSettings is the correct context property (not power_user)
     const personas = context.powerUserSettings?.personas ?? {};
-    const keys = Object.keys(personas);
+    const keys = Object.keys(personas).filter(avatarId => {
+        const name = personas[avatarId];
+        // Skip auto-created unnamed entries; always show the active persona
+        const isActive = name === currentName;
+        return isActive || (name && name !== '[Unnamed Persona]');
+    });
 
     if (!keys.length) {
         const empty = createElement('div', { className: 'sb-persona-option' });
