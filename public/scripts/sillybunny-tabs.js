@@ -3191,19 +3191,11 @@ function closeCharacterPanel() {
     const panel = document.getElementById('right-nav-panel');
 
     if (panel instanceof HTMLElement && panel.classList.contains('openDrawer')) {
-        triggerDrawerToggle('#rightNavHolder > .drawer-toggle');
-        window.requestAnimationFrame(() => {
-            if (panel.classList.contains('openDrawer')) {
-                forceDrawerState(panel, false, '#rightNavDrawerIcon');
-            }
-
-            syncChatbarVisibilityState();
-        });
+        forceDrawerState(panel, false, '#rightNavDrawerIcon');
 
         // Restore overflow:hidden on parent after closing (iOS Safari fix)
         const host = document.getElementById('rightNavHolder');
         if (host) host.style.overflow = '';
-        return;
     }
 
     syncChatbarVisibilityState();

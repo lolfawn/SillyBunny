@@ -995,16 +995,20 @@ body:not(.movingUI) .drawer-content.maximized {
 }
 
 .sb-shell-root.fillLeft:not(.openDrawer),
-.sb-shell-root.fillRight:not(.openDrawer) {
-    display: none !important;
-    width: 0 !important;
-    max-width: 0 !important;
-    min-width: 0 !important;
-    height: 0 !important;
-    min-height: 0 !important;
-    max-height: 0 !important;
+.sb-shell-root.fillRight:not(.openDrawer),
+#right-nav-panel:not(.openDrawer) {
+    opacity: 0;
+    visibility: hidden;
     pointer-events: none !important;
-    overflow: hidden !important;
+    transition: opacity 180ms ease, visibility 0s 180ms;
+}
+
+.sb-shell-root.fillLeft.openDrawer,
+.sb-shell-root.fillRight.openDrawer,
+#right-nav-panel.openDrawer {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 180ms ease;
 }
 
 #left-nav-panel.openDrawer,
