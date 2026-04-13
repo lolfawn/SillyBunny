@@ -1000,7 +1000,10 @@ body:not(.movingUI) .drawer-content.maximized {
     opacity: 0;
     visibility: hidden;
     pointer-events: none !important;
-    transition: opacity 180ms ease, visibility 0s 180ms;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    transition: opacity 180ms ease, visibility 0s 180ms, width 0s 180ms, height 0s 180ms, overflow 0s 180ms;
 }
 
 .sb-shell-root.fillLeft.openDrawer,
