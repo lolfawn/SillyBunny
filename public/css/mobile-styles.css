@@ -138,8 +138,8 @@
 
     /* Input area mobile optimization */
     #send_textarea {
-        min-height: calc(var(--bottomFormBlockSize) * 1.58);
-        padding: 12px 14px;
+        min-height: calc(var(--bottomFormBlockSize) * 1.1);
+        padding: 8px 10px;
     }
 
     #send_form .mes_stop {
@@ -172,7 +172,7 @@
     #rightSendForm {
         width: auto !important;
         min-width: max-content;
-        min-height: calc(var(--bottomFormBlockSize) * 1.2);
+        min-height: var(--bottomFormBlockSize);
         flex-wrap: nowrap !important;
         align-items: center;
     }
@@ -183,9 +183,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        min-width: 44px;
-        min-height: 44px;
-        font-size: calc(var(--mainFontSize) * 1.2);
+        min-width: 36px;
+        min-height: 36px;
+        font-size: calc(var(--mainFontSize) * 1.1);
     }
 
     /* Ensure consistent hamburger button sizing */
@@ -393,6 +393,17 @@
     /* Ignore desktop bottom bar scale on mobile — mobile sizing is handled by CSS */
     #form_sheld {
         font-size: var(--mainFontSize) !important;
+    }
+
+    /* Compact bottom bar on mobile */
+    #nonQRFormItems {
+        column-gap: 3px;
+        font-size: calc(var(--mainFontSize) * 1.6);
+    }
+
+    #send_form button,
+    #send_form .menu_button {
+        min-height: 36px;
     }
 
     /* Minimum touch targets for mobile */
@@ -947,8 +958,8 @@
 
     /* Input area optimization for small phones */
     #send_textarea {
-        min-height: calc(var(--bottomFormBlockSize) * 1.62);
-        padding: 12px;
+        min-height: calc(var(--bottomFormBlockSize) * 1.1);
+        padding: 8px;
         font-size: calc(var(--mainFontSize) * 1.05);
     }
 
