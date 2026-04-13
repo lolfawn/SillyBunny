@@ -131,9 +131,14 @@ function addExtensionMenuButton() {
         return;
     }
 
+    // Guard against double-insertion (lifecycle-hooks may fire initExtensionUI twice)
+    if ($extensions_menu.find('.moonlit-echoes-menu-button').length > 0) {
+        return;
+    }
+
     // Create button element with moon icon and theme name
     let $button = $(`
-    <div class="list-group-item flex-container flexGap5 interactable" title="Open ${EXTENSION_NAME} Settings" tabindex="0">
+    <div class="list-group-item flex-container flexGap5 interactable moonlit-echoes-menu-button" title="Open ${EXTENSION_NAME} Settings" tabindex="0">
         <i class="fa-solid fa-moon"></i>
         <span>${EXTENSION_NAME}</span>
     </div>

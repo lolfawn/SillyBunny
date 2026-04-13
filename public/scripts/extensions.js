@@ -696,6 +696,11 @@ function autoConnectInputHandler() {
 }
 
 async function addExtensionsButtonAndMenu() {
+    // Guard against double-injection
+    if (document.getElementById('extensionsMenu')) {
+        return;
+    }
+
     const buttonHTML = await renderTemplateAsync('wandButton');
     const extensionsMenuHTML = await renderTemplateAsync('wandMenu');
 
