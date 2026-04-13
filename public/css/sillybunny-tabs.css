@@ -1012,8 +1012,9 @@ body:not(.movingUI) .drawer-content.maximized {
 .sb-shell-root.fillLeft.openDrawer,
 .sb-shell-root.fillRight.openDrawer {
     display: flex;
-    width: min(900px, calc(100vw - 40px)) !important;
-    max-width: 900px !important;
+    width: 100vw !important;
+    width: 100dvw !important;
+    max-width: 100dvw !important;
     min-width: 0 !important;
     top: var(--sb-topbar-layout-offset) !important;
     height: calc(100dvh - var(--sb-topbar-layout-offset) - 16px) !important;

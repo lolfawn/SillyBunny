@@ -6489,6 +6489,10 @@ function initAll() {
     syncDesktopShellSizing();
     buildTopBar();
     buildBottomChatBar();
+    // Refresh again after the current JS task — APP_READY may have already
+    // fired before this listener was registered, so the initial call in
+    // buildBottomChatBar() may have found no active chat yet.
+    setTimeout(() => refreshBottomChatSelect(), 0);
     bindTopbarDragEvents();
     bindChatbarEvents();
     interceptDrawerOpeners();
