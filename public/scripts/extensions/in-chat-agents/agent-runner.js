@@ -17,6 +17,7 @@ import {
     getAgentById,
     getAgentRegexScripts,
     getEnabledAgents,
+    getGlobalSettings,
     resolveConnectionProfile,
 } from './agent-store.js';
 
