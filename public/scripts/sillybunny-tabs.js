@@ -6972,13 +6972,22 @@ function buildBottomChatBar() {
             eventSource.on(eventName, refresh);
         }
 
-        // Update persona bubble on persona change
-        if (eventTypes.PERSONA_CHANGED) {
-            eventSource.on(eventTypes.PERSONA_CHANGED, () => {
-                updatePersonaBubble(personaBubble);
-            });
+        // Update persona bubble on persona change, chat change, and app init
+        const refreshPersona = () => updatePersonaBubble(personaBubble);
+        const personaEvents = [
+            eventTypes.PERSONA_CHANGED,
+            eventTypes.APP_READY,
+            eventTypes.CHAT_CHANGED,
+            eventTypes.CHAT_LOADED,
+        ].filter(Boolean);
+
+        for (const eventName of new Set(personaEvents)) {
+            eventSource.on(eventName, refreshPersona);
         }
     }
+
+    // Defer initial persona bubble update in case user_avatar isn't ready yet
+    setTimeout(() => updatePersonaBubble(personaBubble), 100);
 
     // Close persona picker when clicking outside
     document.addEventListener('click', (e) => {
@@ -7108,6 +7117,7 @@ function togglePersonaPicker() {
     if (!context) return;
 
     const { personas, currentAvatarId } = getCurrentPersonaSelection(context);
+    const personaDescriptions = context?.powerUserSettings?.persona_descriptions ?? {};
     const picker = createElement('div', { id: 'sb-persona-picker' });
 
     const keys = Object.keys(personas).filter(avatarId => {
@@ -7124,8 +7134,9 @@ function togglePersonaPicker() {
     } else {
         for (const avatarId of keys) {
             const name = personas[avatarId] || avatarId;
+            const title = personaDescriptions[avatarId]?.title || '';
             const isActive = avatarId === currentAvatarId;
-            addPersonaOption(picker, avatarId, name, isActive, context);
+            addPersonaOption(picker, avatarId, name, title, isActive, context);
         }
     }
 
@@ -7137,7 +7148,7 @@ function togglePersonaPicker() {
     }
 }
 
-function addPersonaOption(picker, avatarId, name, isActive, context) {
+function addPersonaOption(picker, avatarId, name, title, isActive, context) {
     const option = createElement('div', {
         className: `sb-persona-option${isActive ? ' is-active' : ''}`,
     });
@@ -7155,7 +7166,16 @@ function addPersonaOption(picker, avatarId, name, isActive, context) {
     const label = createElement('span', { className: 'sb-persona-option-name' });
     label.textContent = name;
 
-    option.append(img, label);
+    if (title) {
+        const desc = createElement('span', { className: 'sb-persona-option-description' });
+        desc.textContent = title;
+        const info = createElement('div', { className: 'sb-persona-option-info' });
+        info.append(label, desc);
+        option.append(img, info);
+    } else {
+        option.append(img, label);
+    }
+
     option.addEventListener('click', async () => {
         picker.remove();
         // Use ST's /persona slash command — the most reliable way to switch personas
