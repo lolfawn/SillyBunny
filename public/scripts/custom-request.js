@@ -3,7 +3,7 @@ import { extractJsonFromData, extractMessageFromData, getGenerateUrl, getRequest
 import { getTextGenServer, createTextGenGenerationData, setting_names, textgenerationwebui_settings } from './textgen-settings.js';
 import { extractReasoningFromData } from './reasoning.js';
 import { formatInstructModeChat, formatInstructModePrompt, getInstructStoppingSequences } from './instruct-mode.js';
-import { getStreamingReply, tryParseStreamingError, createGenerationParameters, settingsToUpdate, oai_settings } from './openai.js';
+import { chat_completion_sources, getStreamingReply, tryParseStreamingError, createGenerationParameters, settingsToUpdate, oai_settings } from './openai.js';
 import EventSourceStream from './sse-stream.js';
 
 // #region Type Definitions
@@ -406,6 +406,17 @@ export class TextCompletionService {
             settings[key] = value;
         }
 
+        // Apply api_type from overridePayload to settings BEFORE createTextGenGenerationData
+        // so that source-specific parameter construction uses the correct API type.
+        // Without this, switching connection profiles corrupts the global textgenerationwebui_settings,
+        // causing createTextGenGenerationData to build a mismatched payload.
+        if (overridePayload.api_type) {
+            settings.type = overridePayload.api_type;
+        }
+        if (overridePayload.api_server !== undefined) {
+            settings.api_server = overridePayload.api_server;
+        }
+
         // convert to a generation payload
         const payload = createTextGenGenerationData(settings, overridePayload.model, overridePayload.prompt, preset.genamt);
 
@@ -590,11 +601,65 @@ export class ChatCompletionService {
             settings[settingToUpdate[1]] = value;
         }
 
-        // Ensure api-url is properly applied for all sources that accept it
-        ['custom_url', 'vertexai_region', 'zai_endpoint', 'siliconflow_endpoint'].forEach(field => {
-            // The order is: connection profile => CC preset => CC settings
-            overridePayload[field] = overridePayload[field] || settings[field] || oai_settings[field];
-        });
+        // Ensure api-url is properly applied for the correct API source only
+        const sourceToUrlField = {
+            [chat_completion_sources.CUSTOM]: 'custom_url',
+            [chat_completion_sources.VERTEXAI]: 'vertexai_region',
+            [chat_completion_sources.ZAI]: 'zai_endpoint',
+            [chat_completion_sources.SILICONFLOW]: 'siliconflow_endpoint',
+        };
+
+        if (overridePayload.chat_completion_source) {
+            const urlField = sourceToUrlField[overridePayload.chat_completion_source];
+            if (urlField && overridePayload[urlField]) {
+                // Only set the URL field for the actual API source
+            } else if (urlField) {
+                overridePayload[urlField] = overridePayload[urlField] || settings[urlField] || oai_settings[urlField];
+            }
+        } else {
+            // Fallback: apply URL fields for all sources (legacy behavior)
+            ['custom_url', 'vertexai_region', 'zai_endpoint', 'siliconflow_endpoint'].forEach(field => {
+                overridePayload[field] = overridePayload[field] || settings[field] || oai_settings[field];
+            });
+        }
+
+        // Apply overridePayload fields to settings BEFORE createGenerationParameters
+        // so that source-specific parameter construction uses the correct API source.
+        // Without this, switching connection profiles corrupts the global oai_settings,
+        // causing createGenerationParameters to build a mismatched payload.
+        if (overridePayload.chat_completion_source) {
+            settings.chat_completion_source = overridePayload.chat_completion_source;
+        }
+        if (overridePayload.model) {
+            settings.openai_model = overridePayload.model;
+        }
+        if (overridePayload.reverse_proxy !== undefined) {
+            settings.reverse_proxy = overridePayload.reverse_proxy;
+        }
+        if (overridePayload.proxy_password !== undefined) {
+            settings.proxy_password = overridePayload.proxy_password;
+        }
+        if (overridePayload.custom_url !== undefined) {
+            settings.custom_url = overridePayload.custom_url;
+        }
+        if (overridePayload.vertexai_region !== undefined) {
+            settings.vertexai_region = overridePayload.vertexai_region;
+        }
+        if (overridePayload.zai_endpoint !== undefined) {
+            settings.zai_endpoint = overridePayload.zai_endpoint;
+        }
+        if (overridePayload.siliconflow_endpoint !== undefined) {
+            settings.siliconflow_endpoint = overridePayload.siliconflow_endpoint;
+        }
+        if (overridePayload.custom_include_body !== undefined) {
+            settings.custom_include_body = overridePayload.custom_include_body;
+        }
+        if (overridePayload.custom_exclude_body !== undefined) {
+            settings.custom_exclude_body = overridePayload.custom_exclude_body;
+        }
+        if (overridePayload.custom_include_headers !== undefined) {
+            settings.custom_include_headers = overridePayload.custom_include_headers;
+        }
 
         // Convert from settings to generation payload
         const data = await createGenerationParameters(settings, overridePayload.model, 'quiet', overridePayload.messages);

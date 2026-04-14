@@ -429,23 +429,40 @@ export class ConnectionManagerRequestService {
                     const proxyPreset = proxies.find((p) => p.name === profile.proxy);
 
                     const messages = Array.isArray(prompt) ? prompt : [{ role: 'user', content: prompt }];
-                    return await context.ChatCompletionService.processRequest({
+                    const ccRequestData = {
                         stream,
                         messages,
                         max_tokens: maxTokens,
                         model: profile.model,
                         chat_completion_source: selectedApiMap.source,
-                        custom_url: profile['api-url'],
-                        vertexai_region: profile['api-url'],
-                        zai_endpoint: profile['api-url'],
-                        siliconflow_endpoint: profile['api-url'],
                         reverse_proxy: proxyPreset?.url,
                         proxy_password: proxyPreset?.password,
                         custom_prompt_post_processing: profile['prompt-post-processing'],
                         ...overridePayload,
-                    }, {
-                        presetName: includePreset ? profile.preset : undefined,
-                    }, extractData, signal);
+                    };
+
+                    // Only set the URL field for the actual API source to avoid contaminating
+                    // unrelated source URL fields that may be read from global settings
+                    switch (selectedApiMap.source) {
+                        case 'custom':
+                            ccRequestData.custom_url = overridePayload.custom_url || profile['api-url'];
+                            break;
+                        case 'vertexai':
+                            ccRequestData.vertexai_region = overridePayload.vertexai_region || profile['api-url'];
+                            break;
+                        case 'zai':
+                            ccRequestData.zai_endpoint = overridePayload.zai_endpoint || profile['api-url'];
+                            break;
+                        case 'siliconflow':
+                            ccRequestData.siliconflow_endpoint = overridePayload.siliconflow_endpoint || profile['api-url'];
+                            break;
+                    }
+
+                    return await context.ChatCompletionService.processRequest(
+                        ccRequestData,
+                        {
+                            presetName: includePreset ? profile.preset : undefined,
+                        }, extractData, signal);
                 }
                 case 'textgenerationwebui': {
                     if (!selectedApiMap.type) {
