@@ -149,7 +149,7 @@ Think of them like a mini prompt pipeline builder inside the Agents page:
 - Trackers: Achievements, CYOA Choices, Direction Menu, Event, Item, NPC Profiles, Parallel Off-Screen, Relationship, Reputation, Scene, Secrets, Status, Time, and World Detail
 - Randomizers: Chaos Mode, Combined Director's Cut, Dead Dove Escalation, Genre, Grounded Complication, Intimacy & Kink, Scene Driving Force, and Scene Pressure Cocktail
 - Content: Difficulty Increase, Don't Write for User, Friction Mode, Grounded Prose, HTML Toggle, Prose Polisher, and Write for User
-- Direction Menu and CYOA Choices now use **post-generation prompt append** (clickable options injected after each response)
+- Direction Menu and CYOA Choices now use **pre-generation tracker prompts** (the main model emits the clickable options directly in the response)
 - **Pathfinder** agentic lorebook navigator with 8 tools for retrieval, memory maintenance, and tree building
 - Bundled **Prose Polisher** post-generation agent by Geechan
 - Built-in groups for the full preset, trackers only, and randomisers only
@@ -160,7 +160,7 @@ Think of them like a mini prompt pipeline builder inside the Agents page:
 
 **Bundled defaults in v1.3.5:**
 
-- Bundled trackers, including CYOA Choices and Direction Menu, are set up for **post-generation prompt append**
+- Bundled trackers, including CYOA Choices and Direction Menu, are set up for **pre-generation**
 - All bundled tracker and menu agents use **User injection role** by default (better compatibility with models like GLM that de-prioritize System injections)
 - Agents use the main connection profile by default, with separate profile support when explicitly selected
 - Agent connection profiles default to **8192 max tokens**
@@ -332,7 +332,7 @@ These screenshots show the `v1.3.5` shell across Navigate, Customize, Agents, an
 - Fixed the broken agent-card interactions and restored reliable backend-backed Agent Group behavior
 - Added ST-style regex script support for agents, including bundled regex packs for tracker and formatting templates
 - Added prompt-transform passes with `rewrite` and `append` modes, optional alternate connection profiles, and automatic message refresh after mutation
-- Bundled trackers now default to post-generation prompt append, while bundled regex-backed helpers default to post-generation behavior
+- Bundled trackers now default to pre-generation, while bundled non-tracker regex-backed helpers default to post-generation behavior
 - Greeting messages are now left untouched by all prompt-transform agents
 - Added global and per-agent toast notifications for prompt-transform runs, enabled by default
 - Added inline run-order editing on agent cards with clearer `lower first` ordering semantics
