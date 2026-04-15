@@ -78,7 +78,7 @@ import {
  * @property {AgentConditions} conditions
  * @property {AgentToolDef[]} tools - Tool definitions for 'tool' category agents
  * @property {object} settings - Per-agent settings object for tool agents
- * @property {boolean} phaseLocked - Prevent phase from being changed by migrations
+ * @property {boolean} phaseLocked - Prevent bundled-template migrations from overriding user customizations
  */
 
 /** @type {InChatAgent[]} */

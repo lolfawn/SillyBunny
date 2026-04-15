@@ -1085,9 +1085,13 @@ async function processReceivedMessage(messageIndex, generationType) {
     const activeAgents = getActiveAgentsForMessage(generationType);
     const promptTransformAgents = getPromptTransformAgentsForMessage(activeAgents, generationType);
     const utilityAgents = activeAgents.filter(agent =>
-        (agent.phase === 'post' || agent.phase === 'both') &&
         agent.postProcess?.enabled &&
-        agent.postProcess.type !== 'regex',
+        agent.postProcess.type !== 'regex' &&
+        (
+            agent.phase === 'post' ||
+            agent.phase === 'both' ||
+            agent.postProcess.type === 'extract'
+        ),
     );
 
     let chatStateChanged = false;

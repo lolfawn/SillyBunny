@@ -129,7 +129,7 @@ Each service has its own model profile settings:
 
 ### When to Use Agent Mode vs In-Chat Agents
 
-- Use **In-Chat Agents** for prompt-level behavior: writing style, formatting, trackers appended to output, regex cleanup. These are lightweight and work with any backend.
+- Use **In-Chat Agents** for prompt-level behavior: writing style, tracker prompts, formatting, and regex cleanup. These are lightweight and work with any backend.
 - Use **Agent Mode** when you want persistent memory, cross-turn context retrieval, or automatic lorebook maintenance. This is heavier (extra API calls per turn) but gives the AI much better long-term awareness.
 - You can use both at the same time. They don't conflict -- Agent Mode handles memory and retrieval while In-Chat Agents handle per-turn prompt injection and output formatting.
 
@@ -156,7 +156,7 @@ Here's what happens on each generation turn when both systems are active:
 - Added phaseLocked flag to prevent startup migrations from overriding manual phase changes
 - Parallel prompt-transform execution via Promise.allSettled
 - Bulk select mode with enable/disable/delete/select-all
-- Drag-and-drop card reordering (long-press on mobile)
+- Drag-and-drop card reordering (drag handle + long-press on mobile)
 - Per-card manual run button (robot icon)
 - Slimmer toast notifications
 - Reset Bundled Agents to Defaults button

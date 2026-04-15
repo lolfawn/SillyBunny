@@ -78,8 +78,6 @@ const REMOVED_BUNDLED_GROUP_IDS = new Set([
     'grp-pura-director',
 ]);
 
-const TRACKER_CATEGORY_MENU_TEMPLATE_IDS = new Set();
-
 const BUNDLED_REGEX_POST_DEFAULT_EXCLUDED_TEMPLATE_IDS = new Set();
 
 const REGEX_PLACEMENT_LABELS = {
@@ -219,8 +217,7 @@ function getBundledRegexScriptsForTemplate(templateId) {
 }
 
 function shouldUseTrackerPromptPassDefaults(template) {
-    return String(template?.category ?? '') === 'tracker'
-        && !TRACKER_CATEGORY_MENU_TEMPLATE_IDS.has(String(template?.id ?? '').trim());
+    return String(template?.category ?? '') === 'tracker';
 }
 
 function applyBundledTrackerPromptPass(template) {
@@ -237,9 +234,7 @@ function applyBundledTrackerPromptPass(template) {
         phase: 'pre',
         postProcess: {
             ...postProcess,
-            promptTransformEnabled: Object.hasOwn(postProcess, 'promptTransformEnabled')
-                ? Boolean(postProcess.promptTransformEnabled)
-                : false,
+            promptTransformEnabled: false,
             promptTransformShowNotifications: Object.hasOwn(postProcess, 'promptTransformShowNotifications')
                 ? Boolean(postProcess.promptTransformShowNotifications)
                 : true,
@@ -253,7 +248,9 @@ function applyBundledTrackerPromptPass(template) {
 
 function isBundledRegexPostDefaultTemplate(template, bundledScripts = null) {
     const templateId = String(template?.id ?? '').trim();
-    if (!template || BUNDLED_REGEX_POST_DEFAULT_EXCLUDED_TEMPLATE_IDS.has(templateId)) {
+    if (!template
+        || shouldUseTrackerPromptPassDefaults(template)
+        || BUNDLED_REGEX_POST_DEFAULT_EXCLUDED_TEMPLATE_IDS.has(templateId)) {
         return false;
     }
 
@@ -388,8 +385,24 @@ function buildAgentFromSnapshot(snapshot) {
     };
 }
 
+function shouldSkipBundledTemplateMigrations(agent) {
+    return Boolean(agent?.phaseLocked);
+}
+
+function lockBundledAgentCustomization(agent, template = null) {
+    const linkedTemplate = template ?? findTemplateForAgent(agent);
+    const templateId = String(linkedTemplate?.id ?? agent?.sourceTemplateId ?? '').trim();
+    if (!templateId) {
+        return false;
+    }
+
+    agent.sourceTemplateId = templateId;
+    agent.phaseLocked = true;
+    return true;
+}
+
 function shouldMigrateBundledRegex(agent) {
-    if (!agent || getAgentRegexScripts(agent).length > 0) {
+    if (!agent || shouldSkipBundledTemplateMigrations(agent) || getAgentRegexScripts(agent).length > 0) {
         return false;
     }
 
@@ -418,6 +431,10 @@ async function migrateBundledTemplateMetadataToSavedAgents() {
     let migratedCount = 0;
 
     for (const agent of getAgents()) {
+        if (shouldSkipBundledTemplateMigrations(agent)) {
+            continue;
+        }
+
         const template = findTemplateForAgent(agent);
         if (!template) {
             continue;
@@ -445,7 +462,7 @@ function shouldMigrateBundledTrackerPromptPass(agent, template) {
         return false;
     }
 
-    if (agent?.phaseLocked) {
+    if (shouldSkipBundledTemplateMigrations(agent)) {
         return false;
     }
 
@@ -499,7 +516,7 @@ function shouldMigrateBundledRegexPostDefaults(agent, template) {
         return false;
     }
 
-    if (agent?.phaseLocked) {
+    if (shouldSkipBundledTemplateMigrations(agent)) {
         return false;
     }
 
@@ -564,6 +581,10 @@ async function migrateLegacyPromptTransformMaxTokens() {
     let migratedCount = 0;
 
     for (const agent of getAgents()) {
+        if (shouldSkipBundledTemplateMigrations(agent)) {
+            continue;
+        }
+
         const currentValue = Number(agent?.postProcess?.promptTransformMaxTokens);
         if (currentValue !== LEGACY_AGENT_MAX_TOKENS) {
             continue;
@@ -973,6 +994,12 @@ async function reorderAgentsInGroup(orderedIds) {
     renderAgentList();
 }
 
+function isTouchSortableDevice() {
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches
+        || window.matchMedia?.('(any-pointer: coarse)').matches;
+    return Boolean(coarsePointer);
+}
+
 function setupCategorySortable(itemsEl) {
     const items = $(itemsEl);
     if (!items.length || typeof items.sortable !== 'function') {
@@ -983,10 +1010,13 @@ function setupCategorySortable(itemsEl) {
         items.sortable('destroy');
     }
 
+    const touchSortable = isTouchSortableDevice();
+
     items.sortable({
         items: '.ica--agent-card',
-        delay: getSortableDelay(),
-        distance: 8,
+        handle: touchSortable ? '.ica--card-drag-handle' : null,
+        delay: touchSortable ? 1500 : getSortableDelay(),
+        distance: touchSortable ? 16 : 8,
         tolerance: 'pointer',
         cancel: '.ica--card-actions, .ica--card-actions *, .ica--card-toggle, .ica--card-select',
         placeholder: 'ica--agent-card-placeholder',
@@ -1032,6 +1062,53 @@ function openBulkEditPopup() {
 function closeBulkEditPopup() {
     const popup = document.getElementById('ica--bulkEditPopup');
     if (popup) popup.style.display = 'none';
+}
+
+function getScrollContainer(element) {
+    let current = element instanceof HTMLElement ? element : null;
+
+    while (current) {
+        const style = window.getComputedStyle(current);
+        const overflowY = style.overflowY;
+        const isScrollable = ['auto', 'scroll', 'overlay'].includes(overflowY)
+            && current.scrollHeight > current.clientHeight;
+        if (isScrollable) {
+            return current;
+        }
+
+        current = current.parentElement;
+    }
+
+    return document.scrollingElement instanceof HTMLElement
+        ? document.scrollingElement
+        : document.documentElement;
+}
+
+function captureAgentListScrollState(agentListElement) {
+    const scrollContainer = getScrollContainer(agentListElement);
+    if (!(scrollContainer instanceof HTMLElement)) {
+        return null;
+    }
+
+    return {
+        container: scrollContainer,
+        scrollTop: scrollContainer.scrollTop,
+        scrollLeft: scrollContainer.scrollLeft,
+    };
+}
+
+function restoreAgentListScrollState(scrollState) {
+    if (!(scrollState?.container instanceof HTMLElement)) {
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        scrollState.container.scrollTop = Math.min(
+            scrollState.scrollTop,
+            Math.max(0, scrollState.container.scrollHeight - scrollState.container.clientHeight),
+        );
+        scrollState.container.scrollLeft = scrollState.scrollLeft;
+    });
 }
 
 async function applyBulkEdit() {
@@ -1098,6 +1175,7 @@ async function applyBulkEdit() {
         }
 
         if (dirty) {
+            lockBundledAgentCustomization(agent);
             await saveAgent(agent);
             changed++;
         }
@@ -1117,6 +1195,7 @@ async function applyBulkEdit() {
  */
 function renderAgentList() {
     const container = $('#ica--agentList');
+    const scrollState = captureAgentListScrollState(container[0]);
     container.empty();
     const profileNames = buildProfileNameMap();
 
@@ -1148,6 +1227,7 @@ function renderAgentList() {
 
     if (Object.keys(grouped).length === 0) {
         container.append('<div class="ica--empty-state">No agents yet. Click <b>New Agent</b> or <b>Templates</b> to get started.</div>');
+        restoreAgentListScrollState(scrollState);
         return;
     }
 
@@ -1197,6 +1277,9 @@ function renderAgentList() {
                         ${selectModeActive ? `<input type="checkbox" class="ica--card-select" title="Select agent" ${selectedAgentIds.has(agent.id) ? 'checked' : ''} />` : `<button type="button" class="ica--card-toggle ${toggleClass}" title="${agent.enabled ? 'Disable' : 'Enable'}"></button>`}
                         <span class="ica--card-name">${escapeHtml(agent.name)}</span>
                         <span class="ica--card-phase">${phaseLabels[agent.phase] || agent.phase}</span>
+                        <button type="button" class="ica--card-drag-handle" title="Hold and drag to reorder">
+                            <i class="fa-solid fa-grip-vertical"></i>
+                        </button>
                     </div>
                     <div class="ica--card-desc">${escapeHtml(desc)}</div>
                     <div class="ica--card-meta">
@@ -1245,6 +1328,8 @@ function renderAgentList() {
                 renderAgentList();
             });
 
+            card.find('.ica--card-drag-handle').on('click', stopEvent);
+
             card.find('.ica--card-toggle').on('click', async function (event) {
                 stopEvent(event);
                 agent.enabled = !agent.enabled;
@@ -1289,6 +1374,8 @@ function renderAgentList() {
         group.append(items);
         container.append(group);
     }
+
+    restoreAgentListScrollState(scrollState);
 }
 
 // ===================== Editor Modal =====================
@@ -1406,6 +1493,7 @@ async function openEditor(agentId = null) {
     const existingAgent = agentId ? getAgentById(agentId) : null;
     if (agentId && !existingAgent) return;
     const agent = existingAgent ? structuredClone(existingAgent) : createDefaultAgent();
+    const originalAgentState = JSON.stringify(agent);
     if (!agent) return;
 
     // Check if this is a Pathfinder agent - open special settings panel
@@ -1596,7 +1684,6 @@ async function openEditor(agentId = null) {
     agent.name = editorEl.find('#ica--editor-name').val().toString().trim() || 'Untitled Agent';
     agent.category = editorEl.find('#ica--editor-category').val().toString();
     agent.phase = editorEl.find('#ica--editor-phase').val().toString();
-    agent.phaseLocked = true;
     agent.description = editorEl.find('#ica--editor-description').val().toString().trim();
     agent.connectionProfile = editorEl.find('#ica--editor-connectionProfile').val()?.toString() || '';
     agent.modelOverride = editorEl.find('#ica--editor-modelOverride').val()?.toString().trim() || '';
@@ -1634,6 +1721,10 @@ async function openEditor(agentId = null) {
     if (editorEl.find('#ica--editor-type-impersonate').prop('checked')) genTypes.push('impersonate');
     if (editorEl.find('#ica--editor-type-quiet').prop('checked')) genTypes.push('quiet');
     agent.conditions.generationTypes = genTypes;
+
+    if (JSON.stringify(agent) !== originalAgentState || agent.phaseLocked) {
+        lockBundledAgentCustomization(agent, template);
+    }
 
     await saveAgent(agent);
     renderAgentList();
@@ -2000,6 +2091,8 @@ function escapeHtml(str) {
  * @param {Object} agent - The Pathfinder agent
  */
 async function openPathfinderEditor(agent) {
+    const originalAgentState = JSON.stringify(agent);
+    const template = findTemplateForAgent(agent);
     const settingsPanel = await openPathfinderSettings(agent, async (updatedAgent) => {
         await saveAgent(updatedAgent);
         renderAgentList();
@@ -2015,6 +2108,10 @@ async function openPathfinderEditor(agent) {
     }).show();
 
     if (result === POPUP_RESULT.AFFIRMATIVE) {
+        if (JSON.stringify(agent) !== originalAgentState || agent.phaseLocked) {
+            lockBundledAgentCustomization(agent, template);
+        }
+
         // Settings are already saved via the UI callbacks
         await saveAgent(agent);
         renderAgentList();
@@ -2300,7 +2397,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
 
     const migratedTrackerPromptPassCount = await migrateBundledTrackerPromptPassesToSavedAgents();
     if (migratedTrackerPromptPassCount > 0) {
-        toastr.success(`Updated ${migratedTrackerPromptPassCount} bundled tracker agent(s) to prompt append mode.`);
+        toastr.success(`Updated ${migratedTrackerPromptPassCount} bundled tracker agent(s) to pre-generation defaults.`);
     }
 
     const migratedRegexPostDefaultsCount = await migrateBundledRegexPostDefaultsToSavedAgents();
@@ -2407,6 +2504,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
             const agent = getAgentById(id);
             if (agent && agent.injection.role !== 0) {
                 agent.injection.role = 0;
+                lockBundledAgentCustomization(agent);
                 await saveAgent(agent);
             }
         }
@@ -2419,6 +2517,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
             const agent = getAgentById(id);
             if (agent && agent.injection.role !== 1) {
                 agent.injection.role = 1;
+                lockBundledAgentCustomization(agent);
                 await saveAgent(agent);
             }
         }

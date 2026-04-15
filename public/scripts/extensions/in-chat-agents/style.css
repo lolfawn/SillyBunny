@@ -204,6 +204,32 @@
     gap: 8px;
 }
 
+.ica--card-drag-handle {
+    display: none;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    margin-left: 2px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    opacity: 0.45;
+    cursor: grab;
+    flex-shrink: 0;
+}
+
+.ica--card-drag-handle:hover {
+    opacity: 0.85;
+    background: color-mix(in srgb, var(--SmartThemeBorderColor, #555) 18%, transparent);
+}
+
+.ica--card-drag-handle:active {
+    cursor: grabbing;
+}
+
 .ica--card-toggle {
     position: relative;
     width: 28px;
@@ -933,4 +959,15 @@
     background: var(--SmartThemeQuoteColor, #88c3e8);
     border-radius: 2px;
     pointer-events: none;
+}
+
+@media (pointer: coarse), (any-pointer: coarse) {
+    .ica--category-items.ui-sortable .ica--agent-card {
+        touch-action: pan-y;
+    }
+
+    .ica--card-drag-handle {
+        display: inline-flex;
+        touch-action: none;
+    }
 }
