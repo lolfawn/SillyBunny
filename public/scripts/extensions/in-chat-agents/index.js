@@ -2135,6 +2135,22 @@ function populateProfileDropdown() {
     });
 }
 
+function refreshConnectionProfileUi() {
+    populateProfileDropdown();
+
+    const editorSelect = document.getElementById('ica--editor-connectionProfile');
+    if (editorSelect instanceof HTMLSelectElement) {
+        const emptyLabel = editorSelect.options[0]?.textContent?.trim() || 'Use extension default';
+        const selectedValue = editorSelect.value || '';
+        populateConnectionProfileSelect(editorSelect, {
+            emptyLabel,
+            selectedValue,
+        });
+    }
+
+    renderAgentList();
+}
+
 function populateGlobalNotificationToggle() {
     $('#ica--promptTransformShowNotifications').prop(
         'checked',
@@ -2604,12 +2620,24 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         renderAgentList();
     });
     // Refresh profiles when chat changes (profiles may have been added/removed)
-    eventSource.on(event_types.CHAT_CHANGED, () => {
-        populateProfileDropdown();
+    const refreshProfileUi = () => {
+        refreshConnectionProfileUi();
         populateGlobalNotificationToggle();
         populateGlobalExecutionModeDropdown();
-        renderAgentList();
-    });
+    };
+
+    eventSource.on(event_types.CHAT_CHANGED, refreshProfileUi);
+
+    const connectionProfileEvents = [
+        event_types.CONNECTION_PROFILE_LOADED,
+        event_types.CONNECTION_PROFILE_CREATED,
+        event_types.CONNECTION_PROFILE_UPDATED,
+        event_types.CONNECTION_PROFILE_DELETED,
+    ].filter(Boolean);
+
+    for (const eventName of connectionProfileEvents) {
+        eventSource.on(eventName, refreshProfileUi);
+    }
 
     // Listen for Prompt Manager "Send to Agents" events
     window.addEventListener('PromptManagerSendToAgents', async (event) => {

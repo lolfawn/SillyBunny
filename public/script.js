@@ -281,6 +281,7 @@ import { clearItemizedPrompts, deleteItemizedPromptForMessage, deleteItemizedPro
 import { getSystemMessageByType, initSystemMessages, SAFETY_CHAT, sendSystemMessage, system_message_types, system_messages } from './scripts/system-messages.js';
 import { event_types, eventSource } from './scripts/events.js';
 import { initAccessibility } from './scripts/a11y.js';
+import { initQuickContextSizeEnhancer } from './scripts/quick-context-size-enhancer.js';
 import { applyStreamFadeIn } from './scripts/util/stream-fadein.js';
 import { initDomHandlers } from './scripts/dom-handlers.js';
 import { SimpleMutex } from './scripts/util/SimpleMutex.js';
@@ -434,7 +435,7 @@ export let isChatSaving = false;
 let firstRun = false;
 export let settingsReady = false;
 let currentVersion = '0.0.0';
-const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.3.4';
+const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.3.6';
 
 export let displayVersion = SILLYBUNNY_UI_VERSION;
 
@@ -451,7 +452,7 @@ export const default_avatar = 'img/ai4.png';
 export const system_avatar = 'img/sillybunny-pixel-logo.png';
 export const comment_avatar = 'img/quill.png';
 export const default_user_avatar = 'img/user-default.png';
-export let CLIENT_VERSION = 'SillyBunny:v1.3.4:platberlitz'; // For Horde header
+export let CLIENT_VERSION = 'SillyBunny:v1.3.6:platberlitz'; // For Horde header
 let optionsPopper = Popper.createPopper(document.getElementById('options_button'), document.getElementById('options'), {
     placement: 'top-start',
 });
@@ -641,6 +642,12 @@ export let extension_prompts = {};
 export let main_api;// = "kobold";
 let abortController = new AbortController();
 
+function clearStreamingProcessorIfCurrent(processor) {
+    if (streamingProcessor === processor) {
+        streamingProcessor = null;
+    }
+}
+
 //css
 var css_send_form_display = $('<div id=send_form></div>').css('display');
 
@@ -809,6 +816,7 @@ async function firstLoadInit() {
         initBulkEdit();
         initReasoning();
         initWelcomeScreen();
+        initQuickContextSizeEnhancer();
         await initScrapers();
         initCustomSelectedSamplers();
         initDataMaid();
@@ -3621,6 +3629,7 @@ class StreamingProcessor {
         this.type = type;
         this.force_name2 = forceName2;
         this.isStopped = false;
+        this.isCancelled = false;
         this.isFinished = false;
         this.generator = this.nullStreamingGeneration;
         this.abortController = new AbortController();
@@ -3877,8 +3886,13 @@ class StreamingProcessor {
     }
 
     onErrorStreaming() {
+        if (this.isFinished) {
+            return;
+        }
+
         this.abortController.abort();
         this.isStopped = true;
+        this.isFinished = true;
 
         this.markUIGenStopped();
 
@@ -3904,8 +3918,12 @@ class StreamingProcessor {
     }
 
     onStopStreaming() {
+        if (this.isCancelled) {
+            return;
+        }
+
         this.isStopped = true;
-        this.isFinished = true;
+        this.isCancelled = true;
         this.abortController.abort();
     }
 
@@ -3939,6 +3957,8 @@ class StreamingProcessor {
                     this.timeToFirstToken = now - this.createdAt.getTime();
                 }
                 if (this.isStopped || this.abortController.signal.aborted) {
+                    this.isStopped = true;
+                    this.isFinished = true;
                     return this.result;
                 }
 
@@ -3958,7 +3978,13 @@ class StreamingProcessor {
             const seconds = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
             console.warn(`Stream stats: ${timestamps.length} tokens, ${seconds.toFixed(2)} seconds, rate: ${Number(timestamps.length / seconds).toFixed(2)} TPS`);
         } catch (err) {
-            // in the case of a self-inflicted abort, we have already cleaned up
+            const isCancelled = this.isCancelled || this.abortController.signal.aborted;
+            if (!this.isFinished && isCancelled) {
+                this.isStopped = true;
+                this.isFinished = true;
+                return this.result;
+            }
+
             if (!this.isFinished) {
                 console.error(err);
                 this.onErrorStreaming();
@@ -5445,16 +5471,16 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
 
         if (isStreamingEnabled() && type !== 'quiet') {
             continue_mag = promptReasoning.removePrefix(continue_mag);
-            streamingProcessor = new StreamingProcessor(type, force_name2, generation_started, continue_mag, promptReasoning);
+            const activeStreamingProcessor = streamingProcessor = new StreamingProcessor(type, force_name2, generation_started, continue_mag, promptReasoning);
             if (isContinue) {
                 // Save reply does add cycle text to the prompt, so it's not needed here
-                streamingProcessor.firstMessageText = '';
+                activeStreamingProcessor.firstMessageText = '';
             }
 
-            streamingProcessor.generator = await sendStreamingRequest(type, generate_data);
+            activeStreamingProcessor.generator = await sendStreamingRequest(type, generate_data);
 
             hideSwipeButtons();
-            let getMessage = await streamingProcessor.generate();
+            let getMessage = await activeStreamingProcessor.generate();
             let messageChunk = cleanUpMessage({
                 getMessage: getMessage,
                 isImpersonate: isImpersonate,
@@ -5466,18 +5492,21 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 getMessage = continue_mag + getMessage;
             }
 
-            const isStreamFinished = streamingProcessor && !streamingProcessor.isStopped && streamingProcessor.isFinished;
-            const isStreamWithToolCalls = streamingProcessor && Array.isArray(streamingProcessor.toolCalls) && streamingProcessor.toolCalls.length;
+            const isStreamCancelled = activeStreamingProcessor.isStopped
+                || activeStreamingProcessor.isCancelled
+                || activeStreamingProcessor.abortController.signal.aborted;
+            const isStreamFinished = !isStreamCancelled && activeStreamingProcessor.isFinished;
+            const isStreamWithToolCalls = Array.isArray(activeStreamingProcessor.toolCalls) && activeStreamingProcessor.toolCalls.length;
             if (canPerformToolCalls && isStreamFinished && isStreamWithToolCalls) {
                 const lastMessage = chat[chat.length - 1];
-                const hasToolCalls = ToolManager.hasToolCalls(streamingProcessor.toolCalls);
-                const shouldDeleteMessage = type !== 'swipe' && ['', '...'].includes(lastMessage?.mes) && !lastMessage?.extra?.reasoning && ['', '...'].includes(streamingProcessor?.result);
+                const hasToolCalls = ToolManager.hasToolCalls(activeStreamingProcessor.toolCalls);
+                const shouldDeleteMessage = type !== 'swipe' && ['', '...'].includes(lastMessage?.mes) && !lastMessage?.extra?.reasoning && ['', '...'].includes(activeStreamingProcessor.result);
                 hasToolCalls && shouldDeleteMessage && await deleteLastMessage();
                 if (hasToolCalls && !shouldDeleteMessage) {
-                    await streamingProcessor.finalizeIntermediaryMessage(streamingProcessor.messageId, getMessage, { unlockUI: false });
+                    await activeStreamingProcessor.finalizeIntermediaryMessage(activeStreamingProcessor.messageId, getMessage, { unlockUI: false });
                 }
-                const invocationResult = await ToolManager.invokeFunctionTools(streamingProcessor.toolCalls, {
-                    reasoningText: streamingProcessor.reasoningHandler.reasoning,
+                const invocationResult = await ToolManager.invokeFunctionTools(activeStreamingProcessor.toolCalls, {
+                    reasoningText: activeStreamingProcessor.reasoningHandler.reasoning,
                 });
                 const shouldStopGeneration = (!invocationResult.invocations.length && shouldDeleteMessage) || invocationResult.stealthCalls.length;
                 if (hasToolCalls) {
@@ -5486,11 +5515,11 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                             ToolManager.showToolCallError(invocationResult.errors);
                         }
                         unblockGeneration(type);
-                        streamingProcessor = null;
+                        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
                         return;
                     }
 
-                    streamingProcessor = null;
+                    clearStreamingProcessorIfCurrent(activeStreamingProcessor);
                     depth = depth + 1;
                     await ToolManager.saveFunctionToolInvocations(invocationResult.invocations);
                     return Generate('normal', { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, depth }, dryRun);
@@ -5498,14 +5527,17 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             }
 
             if (isStreamFinished) {
-                await streamingProcessor.onFinishStreaming(streamingProcessor.messageId, getMessage);
-                streamingProcessor = null;
+                await activeStreamingProcessor.onFinishStreaming(activeStreamingProcessor.messageId, getMessage);
+                clearStreamingProcessorIfCurrent(activeStreamingProcessor);
                 triggerAutoContinue(messageChunk, isImpersonate);
                 return Object.defineProperties(new String(getMessage), {
                     'messageChunk': { value: messageChunk },
                     'fromStream': { value: true },
                 });
             }
+
+            clearStreamingProcessorIfCurrent(activeStreamingProcessor);
+            return;
         } else {
             return await sendGenerationRequest(type, generate_data, { jsonSchema });
         }
@@ -5632,7 +5664,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
 
         console.debug('/api/chats/save called by /Generate');
         await saveChatConditional();
-        await runPostGenerationAgents({ depth });
+        await runPostGenerationAgents({ depth, generationType: originalType });
         unblockGeneration(type);
         streamingProcessor = null;
 
@@ -5667,19 +5699,24 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
  * Stops the generation and any streaming if it is currently running.
  */
 export function stopGeneration() {
+    const activeStreamingProcessor = streamingProcessor;
+    const activeGenerationType = activeStreamingProcessor?.type;
+    const shouldAbortRequest = Boolean(is_send_press || is_group_generating || activeStreamingProcessor);
     let stopped = false;
-    if (streamingProcessor) {
-        streamingProcessor.onStopStreaming();
+    if (activeStreamingProcessor) {
+        activeStreamingProcessor.onStopStreaming();
+        clearStreamingProcessorIfCurrent(activeStreamingProcessor);
         stopped = true;
     }
-    if (abortController) {
+    if (shouldAbortRequest && abortController) {
         abortController.abort('Clicked stop button');
         stopped = true;
     }
     if (stopped) {
+        unblockGeneration(activeGenerationType);
         hideStopButton();
+        eventSource.emit(event_types.GENERATION_STOPPED);
     }
-    eventSource.emit(event_types.GENERATION_STOPPED);
     return stopped;
 }
 

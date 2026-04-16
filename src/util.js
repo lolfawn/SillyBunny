@@ -1125,6 +1125,8 @@ const LLM_LOG_SCALAR_KEYS = [
     'max_completion_tokens',
     'max_output_tokens',
 ];
+const LLM_LOG_PREVIEW_LIMIT = 3;
+const LLM_LOG_PREVIEW_TEXT_LIMIT = 160;
 
 function addSummaryCount(target, key, amount = 1) {
     if (!key) {
@@ -1145,15 +1147,94 @@ function mergeSummaryCounts(target, source) {
     }
 }
 
-function summarizePartsForLog(parts) {
+function normalizeLlmLogPreviewText(value) {
+    return String(value ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function truncateLlmLogPreviewText(value, maxLength = LLM_LOG_PREVIEW_TEXT_LIMIT) {
+    if (value.length <= maxLength) {
+        return value;
+    }
+
+    return `${value.slice(0, maxLength - 1)}…`;
+}
+
+function addSummaryPreview(target, role, type, text) {
+    if (!Array.isArray(target) || target.length >= LLM_LOG_PREVIEW_LIMIT) {
+        return;
+    }
+
+    const normalizedText = normalizeLlmLogPreviewText(text);
+    if (!normalizedText) {
+        return;
+    }
+
+    target.push({
+        role: role || 'unknown',
+        type: type || 'text',
+        preview: truncateLlmLogPreviewText(normalizedText),
+    });
+}
+
+function mergeSummaryPreviews(target, source) {
+    if (!Array.isArray(target) || !Array.isArray(source)) {
+        return;
+    }
+
+    for (const preview of source) {
+        if (target.length >= LLM_LOG_PREVIEW_LIMIT) {
+            break;
+        }
+
+        if (!preview || typeof preview !== 'object') {
+            continue;
+        }
+
+        target.push(preview);
+    }
+}
+
+function getPartPreview(part) {
+    if (typeof part === 'string') {
+        return { type: 'text', text: part };
+    }
+
+    if (!part || typeof part !== 'object') {
+        return null;
+    }
+
+    if (typeof part.text === 'string') {
+        return { type: part.type ?? 'text', text: part.text };
+    }
+
+    if (typeof part.input_text === 'string') {
+        return { type: part.type ?? 'input_text', text: part.input_text };
+    }
+
+    if (typeof part.output_text === 'string') {
+        return { type: part.type ?? 'output_text', text: part.output_text };
+    }
+
+    if (typeof part.content === 'string' && !part.functionCall && !part.functionResponse) {
+        return { type: part.type ?? 'text', text: part.content };
+    }
+
+    return null;
+}
+
+function summarizePartsForLog(parts, { role = 'unknown' } = {}) {
     const summary = { count: parts.length };
     const types = {};
     let textChars = 0;
+    const previews = [];
 
     for (const part of parts) {
         if (typeof part === 'string') {
             addSummaryCount(types, 'string');
             textChars += part.length;
+            addSummaryPreview(previews, role, 'text', part);
             continue;
         }
 
@@ -1200,6 +1281,11 @@ function summarizePartsForLog(parts) {
         if (part.thought || part.thoughtSignature) {
             addSummaryCount(types, 'thought');
         }
+
+        const preview = getPartPreview(part);
+        if (preview) {
+            addSummaryPreview(previews, role, preview.type, preview.text);
+        }
     }
 
     if (textChars) {
@@ -1208,6 +1294,10 @@ function summarizePartsForLog(parts) {
 
     if (Object.keys(types).length) {
         summary.types = types;
+    }
+
+    if (previews.length) {
+        summary.previews = previews;
     }
 
     return summary;
@@ -1222,6 +1312,7 @@ function summarizeMessagesForLog(messages) {
     let namedMessages = 0;
     let toolCalls = 0;
     let toolResponses = 0;
+    const previews = [];
 
     for (const message of messages) {
         if (!message || typeof message !== 'object') {
@@ -1239,18 +1330,21 @@ function summarizeMessagesForLog(messages) {
             contentItems++;
             textChars += message.content.length;
             addSummaryCount(partTypes, 'text');
+            addSummaryPreview(previews, message.role ?? 'unknown', 'text', message.content);
         } else if (Array.isArray(message.content)) {
-            const contentSummary = summarizePartsForLog(message.content);
+            const contentSummary = summarizePartsForLog(message.content, { role: message.role ?? 'unknown' });
             contentItems += contentSummary.count;
             textChars += contentSummary.textChars ?? 0;
             mergeSummaryCounts(partTypes, contentSummary.types);
+            mergeSummaryPreviews(previews, contentSummary.previews);
         }
 
         if (Array.isArray(message.parts)) {
-            const partsSummary = summarizePartsForLog(message.parts);
+            const partsSummary = summarizePartsForLog(message.parts, { role: message.role ?? 'unknown' });
             contentItems += partsSummary.count;
             textChars += partsSummary.textChars ?? 0;
             mergeSummaryCounts(partTypes, partsSummary.types);
+            mergeSummaryPreviews(previews, partsSummary.previews);
         }
 
         if (Array.isArray(message.tool_calls)) {
@@ -1290,6 +1384,10 @@ function summarizeMessagesForLog(messages) {
         summary.toolResponses = toolResponses;
     }
 
+    if (previews.length) {
+        summary.previews = previews;
+    }
+
     return summary;
 }
 
@@ -1298,6 +1396,7 @@ function summarizeChoicesForLog(choices) {
     const finishReasons = {};
     const choiceMessages = [];
     let textChars = 0;
+    const previews = [];
 
     for (const choice of choices) {
         if (!choice || typeof choice !== 'object') {
@@ -1309,6 +1408,7 @@ function summarizeChoicesForLog(choices) {
 
         if (typeof choice.text === 'string') {
             textChars += choice.text.length;
+            addSummaryPreview(previews, 'assistant', 'text', choice.text);
         }
 
         if (choice.message && typeof choice.message === 'object') {
@@ -1326,10 +1426,15 @@ function summarizeChoicesForLog(choices) {
 
     if (choiceMessages.length) {
         summary.messages = summarizeMessagesForLog(choiceMessages);
+        mergeSummaryPreviews(previews, summary.messages.previews);
     }
 
     if (textChars) {
         summary.textChars = textChars;
+    }
+
+    if (previews.length) {
+        summary.previews = previews;
     }
 
     return summary;
@@ -1340,6 +1445,7 @@ function summarizeCandidatesForLog(candidates) {
     const finishReasons = {};
     const candidateMessages = [];
     let textChars = 0;
+    const previews = [];
 
     for (const candidate of candidates) {
         if (!candidate || typeof candidate !== 'object') {
@@ -1352,6 +1458,7 @@ function summarizeCandidatesForLog(candidates) {
         const content = candidate.content ?? candidate.output;
         if (typeof content === 'string') {
             textChars += content.length;
+            addSummaryPreview(previews, 'model', 'text', content);
         } else if (content && typeof content === 'object' && Array.isArray(content.parts)) {
             candidateMessages.push({ role: content.role ?? 'model', parts: content.parts });
         }
@@ -1363,10 +1470,15 @@ function summarizeCandidatesForLog(candidates) {
 
     if (candidateMessages.length) {
         summary.messages = summarizeMessagesForLog(candidateMessages);
+        mergeSummaryPreviews(previews, summary.messages.previews);
     }
 
     if (textChars) {
         summary.textChars = textChars;
+    }
+
+    if (previews.length) {
+        summary.previews = previews;
     }
 
     return summary;

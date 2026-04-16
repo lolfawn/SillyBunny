@@ -2440,8 +2440,21 @@ export async function runPreGenerationAgents({ dryRun, depth } = {}) {
     };
 }
 
-export async function runPostGenerationAgents({ depth } = {}) {
-    if (depth > 0) {
+const POST_GENERATION_AGENT_SKIP_TYPES = new Set([
+    'continue',
+    'impersonate',
+    'quiet',
+    'regenerate',
+    'swipe',
+]);
+
+function shouldRunPostGenerationAgents(generationType = 'normal') {
+    const normalizedType = String(generationType ?? 'normal').trim().toLowerCase();
+    return !POST_GENERATION_AGENT_SKIP_TYPES.has(normalizedType);
+}
+
+export async function runPostGenerationAgents({ depth, generationType = 'normal' } = {}) {
+    if (depth > 0 || !shouldRunPostGenerationAgents(generationType)) {
         return;
     }
 

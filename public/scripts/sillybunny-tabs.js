@@ -126,6 +126,8 @@ const SB_DESKTOP_SHELL_RESIZE = Object.freeze({
     minHeight: 320,
     bottomGap: 16,
 });
+const SB_INIT_RETRY_DELAY_MS = 150;
+const SB_INIT_MAX_RETRIES = 30;
 
 const SB_THEMES = Object.freeze([
     {
@@ -310,6 +312,9 @@ const SB_SEARCH_TARGET_SELECTOR = [
 
 const sbState = {
     initialized: false,
+    initRetryTimer: 0,
+    initRetryCount: 0,
+    initObserver: null,
     theme: normalizeTheme(safeGetItem(SB_STORAGE_KEYS.theme)),
     surfaceTransparency: normalizeSurfaceTransparency(safeGetItem(SB_STORAGE_KEYS.surfaceTransparency)),
     topbarScale: {
@@ -360,6 +365,9 @@ const sbState = {
         connectionStripOpen: false,
         sidebarOpen: false,
         mobileToolsOpen: false,
+        bindingRetryTimer: 0,
+        boundEventSource: null,
+        windowBindingsAttached: false,
         topbarOffset: normalizeTopbarOffset(safeGetItem(SB_STORAGE_KEYS.topbarOffset)),
         renderedTopbarOffset: { x: 0, y: 0 },
         dragging: null,
@@ -3355,7 +3363,7 @@ async function refreshChatbarState() {
     const desktopRefs = getChatDesktopRefs();
     const mobileRefs = getChatMobileRefs();
 
-    if (!desktopRefs) {
+    if (!desktopRefs && !mobileRefs) {
         return;
     }
 
@@ -3373,17 +3381,19 @@ async function refreshChatbarState() {
         chatNames.unshift(chatContext.chatId);
     }
 
-    populateChatSelector(desktopRefs.chatSelect, chatNames, chatContext, chatContext.canBrowseChats ? 'No saved chats yet' : 'No chat selected');
+    populateChatSelector(desktopRefs?.chatSelect, chatNames, chatContext, chatContext.canBrowseChats ? 'No saved chats yet' : 'No chat selected');
     populateChatSelector(mobileRefs?.chatSelect, chatNames, chatContext, chatContext.canBrowseChats ? 'No saved chats yet' : 'No chat selected');
 
-    setButtonDisabled(desktopRefs.managerButton, !chatContext.canBrowseChats);
-    setButtonDisabled(desktopRefs.toggleSidebarButton, !chatContext.canBrowseChats);
-    setButtonDisabled(desktopRefs.newButton, !chatContext.canStartNewChat);
-    setButtonDisabled(desktopRefs.renameButton, !chatContext.hasChat);
-    setButtonDisabled(desktopRefs.deleteButton, !chatContext.hasChat);
-    setButtonDisabled(desktopRefs.closeButton, !chatContext.hasChat);
-    setButtonDisabled(desktopRefs.chatSelect, !chatContext.canBrowseChats);
-    setButtonDisabled(desktopRefs.searchInput, !chatContext.hasChat);
+    if (desktopRefs) {
+        setButtonDisabled(desktopRefs.managerButton, !chatContext.canBrowseChats);
+        setButtonDisabled(desktopRefs.toggleSidebarButton, !chatContext.canBrowseChats);
+        setButtonDisabled(desktopRefs.newButton, !chatContext.canStartNewChat);
+        setButtonDisabled(desktopRefs.renameButton, !chatContext.hasChat);
+        setButtonDisabled(desktopRefs.deleteButton, !chatContext.hasChat);
+        setButtonDisabled(desktopRefs.closeButton, !chatContext.hasChat);
+        setButtonDisabled(desktopRefs.chatSelect, !chatContext.canBrowseChats);
+        setButtonDisabled(desktopRefs.searchInput, !chatContext.hasChat);
+    }
 
     if (mobileRefs) {
         setButtonDisabled(mobileRefs.managerButton, !chatContext.canBrowseChats);
@@ -3398,14 +3408,18 @@ async function refreshChatbarState() {
     const connectionProfilesSource = document.getElementById('connection_profiles');
     const hasConnectionProfiles = connectionProfilesSource instanceof HTMLSelectElement;
 
-    desktopRefs.toggleConnectionButton.hidden = !hasConnectionProfiles;
-    desktopRefs.connectionStrip.hidden = !hasConnectionProfiles || !isConnectionStripOpen();
+    if (desktopRefs) {
+        desktopRefs.toggleConnectionButton.hidden = !hasConnectionProfiles;
+        desktopRefs.connectionStrip.hidden = !hasConnectionProfiles || !isConnectionStripOpen();
+    }
 
     if (!hasConnectionProfiles) {
         setConnectionStripOpenState(false);
-        desktopRefs.connectionSelect.replaceChildren();
-        desktopRefs.connectionStatus.textContent = '';
-        setButtonDisabled(desktopRefs.connectionConnectButton, true);
+        if (desktopRefs) {
+            desktopRefs.connectionSelect.replaceChildren();
+            desktopRefs.connectionStatus.textContent = '';
+            setButtonDisabled(desktopRefs.connectionConnectButton, true);
+        }
 
         if (mobileRefs?.connectionSection instanceof HTMLElement) {
             mobileRefs.connectionSection.hidden = true;
@@ -3414,10 +3428,12 @@ async function refreshChatbarState() {
         }
     } else {
         const optionsMarkup = connectionProfilesSource.innerHTML;
-        desktopRefs.connectionSelect.innerHTML = optionsMarkup;
-        desktopRefs.connectionSelect.value = connectionProfilesSource.value;
-        desktopRefs.connectionStatus.textContent = connectionStatusText;
-        setButtonDisabled(desktopRefs.connectionConnectButton, !resolveActiveApiConnectButton());
+        if (desktopRefs) {
+            desktopRefs.connectionSelect.innerHTML = optionsMarkup;
+            desktopRefs.connectionSelect.value = connectionProfilesSource.value;
+            desktopRefs.connectionStatus.textContent = connectionStatusText;
+            setButtonDisabled(desktopRefs.connectionConnectButton, !resolveActiveApiConnectButton());
+        }
 
         if (mobileRefs?.connectionSection instanceof HTMLElement) {
             mobileRefs.connectionSection.hidden = false;
@@ -3435,8 +3451,10 @@ async function refreshChatbarState() {
         onSelect: chatId => openChatById(chatId, { closeMobileTools: true }),
     });
 
-    setButtonPressed(desktopRefs.toggleSidebarButton, isChatSidebarOpen());
-    setButtonPressed(desktopRefs.toggleConnectionButton, isConnectionStripOpen());
+    if (desktopRefs) {
+        setButtonPressed(desktopRefs.toggleSidebarButton, isChatSidebarOpen());
+        setButtonPressed(desktopRefs.toggleConnectionButton, isConnectionStripOpen());
+    }
 
     if (!chatContext.canBrowseChats) {
         setChatSidebarOpenState(false);
@@ -3450,12 +3468,103 @@ async function refreshChatbarState() {
 }
 
 function scheduleChatbarRefresh(delay = 0) {
-    // Chatbar has been removed — this is a no-op stub to prevent errors from existing call sites.
+    const chatbarState = getChatbarState();
+    const safeDelay = Math.max(0, Number(delay) || 0);
+
+    window.clearTimeout(chatbarState.refreshTimer);
+    chatbarState.refreshTimer = window.setTimeout(() => {
+        chatbarState.refreshTimer = 0;
+        void refreshChatbarState().catch(error => {
+            console.warn('[SillyBunny] Failed to refresh chat tools state.', error);
+        });
+    }, safeDelay);
+}
+
+function scheduleChatbarBindingRetry(delay = 240) {
+    const chatbarState = getChatbarState();
+
+    window.clearTimeout(chatbarState.bindingRetryTimer);
+    chatbarState.bindingRetryTimer = window.setTimeout(() => {
+        bindChatbarEvents();
+    }, delay);
+}
+
+function bindChatbarWindowEvents() {
+    const chatbarState = getChatbarState();
+
+    if (chatbarState.windowBindingsAttached) {
+        return;
+    }
+
+    const refreshWithContext = () => {
+        window.requestAnimationFrame(() => scheduleChatbarRefresh(0));
+        bindChatbarEvents();
+    };
+
+    window.addEventListener('pageshow', refreshWithContext, { passive: true });
+    window.addEventListener('focus', refreshWithContext, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            refreshWithContext();
+        }
+    });
+
+    chatbarState.windowBindingsAttached = true;
 }
 
 function bindChatbarEvents() {
-    // Chatbar has been removed — event binding is no longer needed.
-    // Chat management is now handled from the bottom bar.
+    const chatbarState = getChatbarState();
+    const context = getSillyTavernContext();
+    const eventSource = context?.eventSource;
+    const eventTypes = context?.eventTypes ?? context?.event_types;
+
+    bindChatbarWindowEvents();
+    initChatSearchObserver();
+    bindConnectionProfileSourceObserver();
+
+    if (!eventSource || !eventTypes) {
+        scheduleChatbarRefresh(0);
+        scheduleChatbarBindingRetry();
+        return;
+    }
+
+    window.clearTimeout(chatbarState.bindingRetryTimer);
+
+    if (chatbarState.boundEventSource === eventSource) {
+        scheduleChatbarRefresh(0);
+        return;
+    }
+
+    const refresh = () => scheduleChatbarRefresh(0);
+    const events = [
+        eventTypes.APP_READY,
+        eventTypes.CHAT_CHANGED,
+        eventTypes.CHAT_LOADED,
+        eventTypes.CHAT_CREATED,
+        eventTypes.GROUP_CHAT_CREATED,
+        eventTypes.CHAT_DELETED,
+        eventTypes.GROUP_CHAT_DELETED,
+        eventTypes.MESSAGE_RECEIVED,
+        eventTypes.MESSAGE_UPDATED,
+        eventTypes.MESSAGE_EDITED,
+        eventTypes.MESSAGE_DELETED,
+        eventTypes.MESSAGE_SWIPED,
+        eventTypes.MESSAGE_SWIPE_DELETED,
+        eventTypes.CONNECTION_PROFILE_LOADED,
+        eventTypes.CONNECTION_PROFILE_CREATED,
+        eventTypes.CONNECTION_PROFILE_UPDATED,
+        eventTypes.CONNECTION_PROFILE_DELETED,
+        eventTypes.MAIN_API_CHANGED,
+        eventTypes.ONLINE_STATUS_CHANGED,
+        eventTypes.SETTINGS_UPDATED,
+    ].filter(Boolean);
+
+    for (const eventName of new Set(events)) {
+        eventSource.on(eventName, refresh);
+    }
+
+    chatbarState.boundEventSource = eventSource;
+    scheduleChatbarRefresh(0);
 }
 
 function triggerDrawerToggle(selector) {
@@ -7205,11 +7314,37 @@ function initAll() {
 
     const leftShellRoot = document.getElementById(getShellConfig('left').rootPanelId);
     const rightShellRoot = document.getElementById(getShellConfig('right').rootPanelId);
+    const topBarRoot = document.getElementById('top-bar');
+    const bottomChatBarRoot = document.getElementById('sb-bottom-chat-bar');
 
-    if (!(leftShellRoot instanceof HTMLElement) || !(rightShellRoot instanceof HTMLElement)) {
+    if (!(leftShellRoot instanceof HTMLElement)
+        || !(rightShellRoot instanceof HTMLElement)
+        || !(topBarRoot instanceof HTMLElement)
+        || !(bottomChatBarRoot instanceof HTMLElement)) {
+        if (!sbState.initObserver && document.body instanceof HTMLElement) {
+            sbState.initObserver = new MutationObserver(() => {
+                if (!sbState.initialized) {
+                    initAll();
+                }
+            });
+            sbState.initObserver.observe(document.body, { childList: true, subtree: true });
+        }
+
+        if (!sbState.initRetryTimer && sbState.initRetryCount < SB_INIT_MAX_RETRIES) {
+            sbState.initRetryTimer = window.setTimeout(() => {
+                sbState.initRetryTimer = 0;
+                sbState.initRetryCount += 1;
+                initAll();
+            }, SB_INIT_RETRY_DELAY_MS);
+        }
         return;
     }
 
+    window.clearTimeout(sbState.initRetryTimer);
+    sbState.initRetryTimer = 0;
+    sbState.initRetryCount = 0;
+    sbState.initObserver?.disconnect();
+    sbState.initObserver = null;
     sbState.initialized = true;
 
     restorePersistedTopbarState();
@@ -7237,6 +7372,7 @@ function initAll() {
     setTimeout(() => refreshBottomChatSelect(), 0);
     bindTopbarDragEvents();
     bindChatbarEvents();
+    scheduleChatbarRefresh(0);
     interceptDrawerOpeners();
     bindWorldInfoRoute();
     applyDefaultDrawerStates();

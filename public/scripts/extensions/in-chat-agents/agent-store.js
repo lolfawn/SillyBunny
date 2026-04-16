@@ -117,10 +117,25 @@ function normalizeConnectionProfileId(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
-export function getDefaultConnectionProfile() {
+function getLiveConnectionManagerProfile() {
+    const connectionProfilesSelect = document.getElementById('connection_profiles');
+
+    if (!(connectionProfilesSelect instanceof HTMLSelectElement)) {
+        return '';
+    }
+
+    return normalizeConnectionProfileId(connectionProfilesSelect.value);
+}
+
+export function getActiveConnectionProfile() {
     const globalProfileId = normalizeConnectionProfileId(globalSettings.connectionProfile);
     if (globalProfileId) {
         return globalProfileId;
+    }
+
+    const liveConnectionManagerProfile = getLiveConnectionManagerProfile();
+    if (liveConnectionManagerProfile) {
+        return liveConnectionManagerProfile;
     }
 
     const selectedConnectionManagerProfile = normalizeConnectionProfileId(
@@ -129,13 +144,17 @@ export function getDefaultConnectionProfile() {
     return selectedConnectionManagerProfile || '';
 }
 
+export function getDefaultConnectionProfile() {
+    return getActiveConnectionProfile();
+}
+
 export function resolveConnectionProfile(profileId = '') {
     const explicitProfileId = normalizeConnectionProfileId(profileId);
     if (explicitProfileId) {
         return explicitProfileId;
     }
 
-    return getDefaultConnectionProfile();
+    return getActiveConnectionProfile();
 }
 
 export const LEGACY_AGENT_MAX_TOKENS = 2000;
