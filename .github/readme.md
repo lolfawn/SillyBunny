@@ -182,45 +182,45 @@ These screenshots show the `v1.3.6` shell across Navigate, Customize, Agents, an
 
 ##### Desktop
 
-![SillyBunny desktop Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-navigate-v1.3.3.png)
+![SillyBunny desktop Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-navigate-v1.3.6.png)
 
-![SillyBunny desktop Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-customize-v1.3.3.png)
+![SillyBunny desktop Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-customize-v1.3.6.png)
 
-![SillyBunny desktop Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-agents-v1.3.3.png)
+![SillyBunny desktop Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-agents-v1.3.6.png)
 
-![SillyBunny desktop Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-characters-v1.3.3.png)
+![SillyBunny desktop Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-characters-v1.3.6.png)
 
 ##### Mobile
 
-![SillyBunny mobile Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-navigate-v1.3.3.png)
+![SillyBunny mobile Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-navigate-v1.3.6.png)
 
-![SillyBunny mobile Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-customize-v1.3.3.png)
+![SillyBunny mobile Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-customize-v1.3.6.png)
 
-![SillyBunny mobile Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-agents-v1.3.3.png)
+![SillyBunny mobile Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-agents-v1.3.6.png)
 
-![SillyBunny mobile Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-characters-v1.3.3.png)
+![SillyBunny mobile Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-characters-v1.3.6.png)
 
 #### Moonlit Echoes enabled
 
 ##### Desktop
 
-![SillyBunny Moonlit desktop Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-navigate-v1.3.3.png)
+![SillyBunny Moonlit desktop Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-navigate-v1.3.6.png)
 
-![SillyBunny Moonlit desktop Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-customize-v1.3.3.png)
+![SillyBunny Moonlit desktop Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-customize-v1.3.6.png)
 
-![SillyBunny Moonlit desktop Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-agents-v1.3.3.png)
+![SillyBunny Moonlit desktop Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-agents-v1.3.6.png)
 
-![SillyBunny Moonlit desktop Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-characters-v1.3.3.png)
+![SillyBunny Moonlit desktop Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-characters-v1.3.6.png)
 
 ##### Mobile
 
-![SillyBunny Moonlit mobile Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-navigate-v1.3.3.png)
+![SillyBunny Moonlit mobile Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-navigate-v1.3.6.png)
 
-![SillyBunny Moonlit mobile Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-customize-v1.3.3.png)
+![SillyBunny Moonlit mobile Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-customize-v1.3.6.png)
 
-![SillyBunny Moonlit mobile Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-agents-v1.3.3.png)
+![SillyBunny Moonlit mobile Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-agents-v1.3.6.png)
 
-![SillyBunny Moonlit mobile Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-characters-v1.3.3.png)
+![SillyBunny Moonlit mobile Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-characters-v1.3.6.png)
 
 ---
 
@@ -244,6 +244,7 @@ These screenshots show the `v1.3.6` shell across Navigate, Customize, Agents, an
 
 - Fixed In-Chat Agents default profile fallback so blank/default agent profile settings now follow the live Connection Manager selection instead of silently using only the currently enabled API setting
 - Added profile UI refresh hooks so Connection Manager profile changes, creation, updates, and deletion stay aligned with what agent cards and dropdowns show
+- In-Chat Agent prompt-transform notifications now show the Connection Manager profile display name instead of the raw internal profile id, so running-agent toasts read the exact profile name you picked
 - Restored short text previews in Google AI Studio debug logs while keeping the safer summarized logging format, so requests and responses show enough visible content to debug prompts again without dumping full payloads
 
 ### v1.3.3 (2026-04-14)
