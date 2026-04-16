@@ -2,26 +2,50 @@
 
 # SillyBunny
 
-Based on **SillyTavern 1.17.0 stable** -- same data, same extensions, better shell.
+An elegant fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), designed with a cleaner, shell-based UI, Bun-based backend, and a lightweight agnetic system to faciliate modern agent functionality.
 
-SillyBunny is a fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern) that keeps the workflow you already know but ships it inside a cleaner UI, a Bun-first backend, and two lightweight agent systems for roleplay.
-
-Project site, presets, themes, and extras: [platberlitz.github.io](https://platberlitz.github.io/)
+You can find more information, presets, themes, and extras here: [platberlitz.github.io](https://platberlitz.github.io/)
 
 > [!WARNING]
-> Active fork. UI, Bun compat, and upstream syncs are ongoing, so expect some churn.
-
+> This is an active fork, and is considered beta quality. [Please direct all issues to this project's issue tracker.](https://github.com/platberlitz/SillyBunny/issues)
 ---
-
 ## At a glance
 
 | | |
 |-|-|
-| **Runtime** | Bun (auto-installed), Node.js fallback |
-| **Default port** | `4444` |
 | **UI** | Custom navigation shell with search, themes, and mobile layout |
-| **Agents** | Built-in Agent Mode + user-facing In-Chat Agents for modular RP prompting |
-| **Data** | Drop-in compatible with SillyTavern characters, chats, presets, and extensions |
+| **Runtime** | Bun (auto-installed), Node.js fallback |
+| **Agents** | Built-in In-Chat Agents for modular RP prompting |
+| **Data** | Drop-in compatible with SillyTavern settings, characters, chats, presets, and extensions |
+| **Default port** | `4444` |
+
+---
+
+## User Interface
+
+These screenshots show the new shell-based UI across Navigate, Customize, Agents, and Characters on desktop and mobile.
+
+#### Default shell
+
+##### Desktop
+
+![SillyBunny desktop Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-navigate-v1.3.6.png)
+
+![SillyBunny desktop Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-customize-v1.3.6.png)
+
+![SillyBunny desktop Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-agents-v1.3.6.png)
+
+![SillyBunny desktop Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-characters-v1.3.6.png)
+
+##### Mobile
+
+![SillyBunny mobile Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-navigate-v1.3.6.png)
+
+![SillyBunny mobile Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-customize-v1.3.6.png)
+
+![SillyBunny mobile Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-agents-v1.3.6.png)
+
+![SillyBunny mobile Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-characters-v1.3.6.png)
 
 ---
 
@@ -32,19 +56,18 @@ git clone https://github.com/platberlitz/SillyBunny.git
 cd SillyBunny
 ```
 
-Then run the launcher for your OS:
+Then run the launcher for your OS, which auto-installs all dependencies, checks for updates, and starts a server instance. You can also open `http://127.0.0.1:4444` manually in your browser.
 
 | Platform | Command |
 |----------|---------|
-| Linux / WSL | `./start.sh` |
+| Windows | `.\Start.bat` |
 | macOS (Terminal) | `./Start.command` |
 | macOS (Finder) | Double-click `Start.command` (right-click > Open if Gatekeeper warns) |
-| Windows | `.\Start.bat` |
+| Linux / WSL | `./start.sh` |
+| Docker | `docker compose -f docker/docker-compose.yml up --build`
 | Android (Termux) | `bash start.sh` |
 
-The launcher handles everything: installs Bun if missing, installs packages, checks for updates, then starts the server. Open `http://127.0.0.1:4444` in your browser.
-
-If you already manage your own Bun install, `bun run start` still works. Other launch variants:
+If you already manage your own Bun install, run via `bun run start`. Other launch variants:
 
 ```bash
 bun run start:mobile   # lower-memory (--smol)
@@ -73,6 +96,8 @@ bash start.sh
 - To force Bun anyway: `SILLYBUNNY_TERMUX_RUNTIME=bun bash start.sh`
 - For shared storage access: `termux-setup-storage` once before starting
 
+---
+
 ### Update controls
 
 | What you want | Command |
@@ -85,142 +110,62 @@ bash start.sh
 
 ---
 
-## What's different from SillyTavern
+## Changes vs. SillyTavern
 
-### Better UI
+### Different UI
 
-The stock SillyTavern layout is replaced with a custom navigation shell:
+The original SillyTavern layout is replaced with a custom navigation shell:
 
 - **Left/right panel navigation** for workspace and customization
 - **Search-first** across presets, lore, extensions, personas, and settings
 - **Mobile-aware** with a dedicated phone/tablet navigation layer
 - **Collapsible settings sections** in both Chat Completions and Text Completions presets
-- **Three shell themes**: Modern Glass, Clean Minimal, Bold Stylized
-- **Three palette presets**: Forest Dusk, Forest Dawn, Rose Glow
-- **Three message styles**: Flat, Bubbles, Document
+- **Extra shell themes**: Modern Glass, Clean Minimal, Bold Stylized, etc.
+- **Extra palette presets**: Forest Dusk, Forest Dawn, Rose Glow, etc.
 
 ### Bun-first runtime
 
-Bun is the default. Startup is faster, and the launchers bootstrap it automatically. Node.js still works as a fallback.
+Instead of node.js, this fork uses Bun. This results in consistently faster startups and automatic launcher bootstraping. Node.js is still fully functional as a fallback system.
 
-### Agents, without the buzzword soup
+### In-Chat Agnetic Support
 
-SillyBunny has **In-Chat Agents** -- user-facing prompt modules you can create, toggle, group, refine, import, export, and share.
+SillyBunny has support for In-Chat Agents. These are custom prompt fields that can run separately from the main generation, which allows for a lot of extra flexibility. Included are several pre-built prompts designed for trackers, post-gen cleanup, anti-slop, and more. Agents can use the main model or a different connection profile, allowing for a fast, smaller model to run long agnetic tasks with ease while a large, main model writes the actual story content.
 
-These are not autonomous "go do tasks on the internet" agents. They are deliberately scoped prompt hooks around the chat generation pipeline.
+This feature is currently in beta. These are designed to fill the gap between full extensions and simple, modular agnetic functionality.
 
-### How agents work
+**Pipeline:**
 
-The short version:
-
-1. **Pre-generation agents** can inject prompt text before the main reply is generated.
-2. **The main model** writes the assistant response as usual.
-3. **Post-generation prompt transforms** can optionally rewrite the reply or append extra content after the reply. These can use the main model or a different connection profile.
+1. **Pre-generation agents** injects prompt text before the main reply is generated.
+2. **Main Model** writes the main RP reply.
+3. **Post-generation agents** optionally rewrites the contents of the main response, or appends extra content after the reply.
 4. **Post-process utilities** can extract structured data, run regex cleanup/formatting, or preserve machine-readable blocks while showing cleaner UI.
 5. **Groups and templates** let you swap whole stacks quickly without editing your base preset every time.
 
-Typical uses:
+**Typical uses:**
 
-- Trackers for scene, time, items, relationships, off-screen activity, and world state
-- Formatting helpers like direction menus, CYOA choices, or NPC profile cards
-- Cleanup passes like anti-slop or regex-based formatting
-- Randomisers and directives that change the pressure, genre, pacing, or escalation of a scene
-- Content toggles for prose style, difficulty, POV, and HTML artifacts
-- Agentic lorebook navigation for on-demand retrieval, memory maintenance, and tree building
-- Cheap helper-model passes that prepare or polish content without spending your main model's budget
+- Trackers for scene, time, items, relationships, off-screen activity, and world state.
+- Writing cleanup passes like anti-slop or regex-based formatting.
+- Formatting helpers like direction menus, CYOA choices, or NPC profile cards.
+- Randomisers and directives that change the pressure, genre, pacing, or escalation of a scene.
+- Content toggles for prose style, difficulty, POV, and HTML artifacts.
+- Agentic lorebook navigation for on-demand retrieval, memory maintenance, and tree building.
+- Cheap helper-model passes that prepare or polish content without spending your main model's budget.
 
-### In-Chat Agents (Beta)
+**Included Agents**
 
-In-Chat Agents are modular prompt blocks you can create, toggle, group, refine, import, export, and share.
+* **Trackers:** Achievements, CYOA Choices, Direction Menu, Event, Item, NPC Profiles, Parallel Off-Screen, Relationship, Reputation, Scene, Secrets, Status, Time, and World Detail.
+* **Randomizers:** Chaos Mode, Combined Director's Cut, Dead Dove Escalation, Genre, Grounded Complication, Intimacy & Kink, Scene Driving Force, and Scene Pressure Cocktail.
+* **Content:** Difficulty Increase, Don't Write for User, Friction Mode, Grounded Prose, HTML Toggle, and Write for User.
+* **Post Generation Editors:** Prose Polisher
+* **Additional Agents:** Pathfinder (an agentic lorebook navigator with 8 tools for retrieval, memory maintenance, and tree building).
 
-Think of them like a mini prompt pipeline builder inside the Agents page:
-
-- Each agent has a **phase**: `Pre`, `Post`, or `Pre/Post`
-- Each agent has a **run order**, so you can decide what runs first or later within a pass
-- Agents can be gated by **generation type**, **keywords**, or **trigger probability**
-- Agents can target the **main connection** or a separate **connection profile**
-- Agents can carry **regex scripts** in a SillyTavern-style format for output formatting and cleanup
-- Agents can run **prompt transforms** in `rewrite` or `append` mode
-- Agents can be bundled into **Agent Groups** for one-click setup
-
-**What ships with v1.3.6:**
-
-- **30 bundled agents** across Tracker (13), Randomizer (8), Content (6), and Tool (1) categories, plus Pathfinder (1), plus room for custom agents
-- Trackers: Achievements, CYOA Choices, Direction Menu, Event, Item, NPC Profiles, Parallel Off-Screen, Relationship, Reputation, Scene, Secrets, Status, Time, and World Detail
-- Randomizers: Chaos Mode, Combined Director's Cut, Dead Dove Escalation, Genre, Grounded Complication, Intimacy & Kink, Scene Driving Force, and Scene Pressure Cocktail
-- Content: Difficulty Increase, Don't Write for User, Friction Mode, Grounded Prose, HTML Toggle, Prose Polisher, and Write for User
-- Direction Menu and CYOA Choices now use **pre-generation tracker prompts** (the main model emits the clickable options directly in the response)
-- **Pathfinder** agentic lorebook navigator with 8 tools for retrieval, memory maintenance, and tree building
-- Bundled **Prose Polisher** post-generation agent by Geechan
-- Built-in groups for the full preset, trackers only, and randomisers only
-- ST-style regex options for custom agents
-- Toast notifications while prompt-transform agents run
-- Inline run-order editing directly from the agent cards
-- Fullscreen prompt editors and click-to-edit agent cards
-
-**Bundled defaults in v1.3.6:**
-
-- Bundled trackers, including CYOA Choices and Direction Menu, are set up for **pre-generation**
-- All bundled tracker and menu agents use **User injection role** by default (better compatibility with models like GLM that de-prioritize System injections)
-- Agents use the main connection profile by default, with separate profile support when explicitly selected
-- Agent connection profiles default to **8192 max tokens**
-- Prose Polisher is pickable by default as a post-generation pass that can rewrite the current message
-- Prompt transforms can target edited or user-supplied text, not only freshly generated AI messages
-- Pura's Director Preset now ships in **two versions**:
-  - **SillyTavern** version: includes the Toggle and Randomiser prompts
-  - **SillyBunny** version: keeps the Main, Primary Toggles, and Prefill Toggles, because Agents cover the optional toggles and randomisers
-
-**Status:** Beta. The goal is fast, toggleable prompt modules for RP without needing to write a full extension.
-
----
-
-## UI preview
-
-These screenshots show the `v1.3.6` shell across Navigate, Customize, Agents, and Characters on desktop and mobile, plus the same views with Moonlit Echoes enabled.
-
-#### Default shell
-
-##### Desktop
-
-![SillyBunny desktop Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-navigate-v1.3.6.png)
-
-![SillyBunny desktop Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-customize-v1.3.6.png)
-
-![SillyBunny desktop Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-agents-v1.3.6.png)
-
-![SillyBunny desktop Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-desktop-characters-v1.3.6.png)
-
-##### Mobile
-
-![SillyBunny mobile Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-navigate-v1.3.6.png)
-
-![SillyBunny mobile Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-customize-v1.3.6.png)
-
-![SillyBunny mobile Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-agents-v1.3.6.png)
-
-![SillyBunny mobile Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-mobile-characters-v1.3.6.png)
-
-#### Moonlit Echoes enabled
-
-##### Desktop
-
-![SillyBunny Moonlit desktop Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-navigate-v1.3.6.png)
-
-![SillyBunny Moonlit desktop Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-customize-v1.3.6.png)
-
-![SillyBunny Moonlit desktop Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-agents-v1.3.6.png)
-
-![SillyBunny Moonlit desktop Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-desktop-characters-v1.3.6.png)
-
-##### Mobile
-
-![SillyBunny Moonlit mobile Navigate](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-navigate-v1.3.6.png)
-
-![SillyBunny Moonlit mobile Customize](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-customize-v1.3.6.png)
-
-![SillyBunny Moonlit mobile Agents](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-agents-v1.3.6.png)
-
-![SillyBunny Moonlit mobile Characters](https://raw.githubusercontent.com/platberlitz/SillyBunny/main/docs/assets/readme/sillybunny-ui-moonlit-mobile-characters-v1.3.6.png)
+**Agent Behaviors and Settings**
+* Agentic prompts feature inline run-order editing, click-to-edit functionality, and fullscreen prompt editors.
+* Agents use the main connection profile by default with an 8192 max token limit. Separate connection profile support is available when explicitly selected.
+* Bundled trackers, including CYOA Choices, are configured for pre-generation. The main model emits clickable options directly in the response.
+* All bundled tracker and menu agents default to the User injection role to maintain compatibility with models that deprioritize System injections.
+* Built-in groups are available for the full preset, trackers only, and randomizers only.
+* Custom agents support ST-style regex options.
 
 ---
 
@@ -388,17 +333,9 @@ These screenshots show the `v1.3.6` shell across Navigate, Customize, Agents, an
 
 ---
 
-## Docker
+## Upstream Information
 
-```bash
-docker compose -f docker/docker-compose.yml up --build
-```
-
----
-
-## Compatibility
-
-SillyBunny is a fork, not a replacement. Most SillyTavern behavior, data formats, and ecosystem knowledge still apply.
+SillyBunny is a fork of SillyTavern. Most SillyTavern behavior, data formats, and ecosystem knowledge still apply. If running into an issue reproducable in upstream, please direct issues there.
 
 | Resource | Link |
 |----------|------|
@@ -408,6 +345,11 @@ SillyBunny is a fork, not a replacement. Most SillyTavern behavior, data formats
 | Subreddit | [r/SillyTavernAI](https://reddit.com/r/SillyTavernAI) |
 
 If something feels off, compare against the upstream `release` branch first.
+
+## Contributors
+
+- [Platberlitz](https://github.com/platberlitz)
+- [Geechan](https://github.com/Geechan)
 
 ## License
 
