@@ -1,13 +1,15 @@
 <!-- This file mirrors the root README so GitHub renders the correct project homepage copy. -->
 
-# SillyBunny
+# 🐰 SillyBunny 🐰
 
-An elegant fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), designed with a cleaner, shell-based UI, Bun-based backend, and a lightweight agnetic system to faciliate modern agent functionality.
+An elegant fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), designed with a cleaner, shell-based UI; Bun-based backend; built-in tutorials, presets, extensions, and a quick-start dashboard; and a lightweight agnetic system to faciliate modern agent functionality.
 
-You can find more information, presets, themes, and extras here: [platberlitz.github.io](https://platberlitz.github.io/)
+You can find additional extras here: [platberlitz.github.io](https://platberlitz.github.io/)
 
 > [!WARNING]
-> This is an active fork, and is considered beta quality. [Please direct all issues to this project's issue tracker.](https://github.com/platberlitz/SillyBunny/issues)
+> This is an in-dev fork, and is considered beta quality. [Please direct all issues to this project's issue tracker.](https://github.com/platberlitz/SillyBunny/issues)
+>
+> Disclaimer: LLMs are used to facilitate development of this fork. Overall software design, prompting, testing, and documentation are handled by humans. To keep things simple, we try to maintain close to upstream as possible.
 ---
 ## At a glance
 
@@ -15,6 +17,7 @@ You can find more information, presets, themes, and extras here: [platberlitz.gi
 |-|-|
 | **UI** | Custom navigation shell with search, themes, and mobile layout |
 | **Runtime** | Bun (auto-installed), Node.js fallback |
+| **Bundled Goodies** | Pre-bundled RP presets, complementary extensions, and additional themes, alongside built-in detailed tutorials |
 | **Agents** | Built-in In-Chat Agents for modular RP prompting |
 | **Data** | Drop-in compatible with SillyTavern settings, characters, chats, presets, and extensions |
 | **Default port** | `4444` |
@@ -49,7 +52,7 @@ These screenshots show the new shell-based UI across Navigate, Customize, Agents
 
 ---
 
-## Quick start
+## Quick Start
 
 [Grab the latest release here.](https://github.com/platberlitz/SillyBunny/releases/latest)
 
@@ -129,7 +132,7 @@ The original SillyTavern layout is replaced with a custom navigation shell:
 
 ### Bun-first runtime
 
-Instead of node.js, this fork uses Bun. This results in consistently faster startups and automatic launcher bootstraping. Node.js is still fully functional as a fallback system.
+Instead of node.js, this fork uses Bun. This results in consistently faster startups, overall performance, and automatic launcher bootstraping. Node.js is still fully functional as a fallback system.
 
 ### In-Chat Agnetic Support
 
@@ -145,7 +148,7 @@ This feature is currently in beta. These are designed to fill the gap between fu
 4. **Post-process utilities** can extract structured data, run regex cleanup/formatting, or preserve machine-readable blocks while showing cleaner UI.
 5. **Groups and templates** let you swap whole stacks quickly without editing your base preset every time.
 
-**Typical uses:**
+**Typical Usecases:**
 
 - Trackers for scene, time, items, relationships, off-screen activity, and world state.
 - Writing cleanup passes like anti-slop or regex-based formatting.
@@ -170,6 +173,14 @@ This feature is currently in beta. These are designed to fill the gap between fu
 * All bundled tracker and menu agents default to the User injection role to maintain compatibility with models that deprioritize System injections.
 * Built-in groups are available for the full preset, trackers only, and randomizers only.
 * Custom agents support ST-style regex options.
+
+### Bundled Goodies & Tutorials
+SillyBunny includes some extras by default to help you get started right away:
+* A tutorial that guides you through the SillyBunny interface.
+* Pre-bundled roleplay presets from purachina and Geechan.
+* A character card conversion preset from TLD to help you generate character cards from scratch, or convert from existing cards to a better format.
+* A friendly quick-start guide with optional recommended extensions (Summary Sharder, Dialogue Colours, Quick Image Gen, Guided Generations, CSS Snippets).
+* Two custom assistants to help you get started - Bunny Guide, and Assistant Nahida.
 
 ---
 
@@ -218,6 +229,4 @@ If something feels off, compare against the upstream `release` branch first.
 - [Platberlitz](https://github.com/platberlitz)
 - [Geechan](https://github.com/Geechan)
 
-## License
-
-AGPL-3.0
+[Licensed as free software under the AGPL-3.0.](https://www.gnu.org/licenses/agpl-3.0.en.html)
