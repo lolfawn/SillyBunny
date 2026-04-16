@@ -361,13 +361,46 @@ function shouldShowPromptTransformNotifications(agent) {
     );
 }
 
+function getConnectionProfileDisplayName(profileId = '') {
+    const normalizedProfileId = String(profileId ?? '').trim();
+    if (!normalizedProfileId) {
+        return '';
+    }
+
+    const connectionProfilesSelect = document.getElementById('connection_profiles');
+    if (connectionProfilesSelect instanceof HTMLSelectElement) {
+        const matchingOption = Array.from(connectionProfilesSelect.options)
+            .find(option => String(option.value ?? '').trim() === normalizedProfileId);
+        const optionLabel = String(matchingOption?.textContent ?? '').trim();
+        if (optionLabel) {
+            return optionLabel;
+        }
+    }
+
+    const context = getContext();
+    const CMRS = context?.ConnectionManagerRequestService;
+    if (CMRS && typeof CMRS.getProfile === 'function') {
+        try {
+            const profile = CMRS.getProfile(normalizedProfileId);
+            const profileName = String(profile?.name ?? '').trim();
+            if (profileName) {
+                return profileName;
+            }
+        } catch {
+            // Fall back to the raw profile id when the profile no longer exists.
+        }
+    }
+
+    return normalizedProfileId;
+}
+
 function describePromptTransformTarget(profileId = '', runner = '') {
     if (runner === 'main') {
         return 'the main model';
     }
 
     if (profileId) {
-        return `profile "${profileId}"`;
+        return `profile "${getConnectionProfileDisplayName(profileId)}"`;
     }
 
     return 'the main model';
@@ -637,7 +670,7 @@ async function requestProfilePromptTransform(CMRS, profileId, promptMessages, ma
             };
         }
     } catch (error) {
-        console.warn(`[InChatAgents] Primary prompt transform request via profile "${profileId}" failed, retrying with fallback prompt formatting.`, error);
+        console.warn(`[InChatAgents] Primary prompt transform request via ${describePromptTransformTarget(profileId, 'profile')} failed, retrying with fallback prompt formatting.`, error);
     }
 
     let fallbackPrompt = '';
@@ -645,7 +678,7 @@ async function requestProfilePromptTransform(CMRS, profileId, promptMessages, ma
         try {
             fallbackPrompt = String(CMRS.constructPrompt(promptMessages, profileId) ?? '');
         } catch (error) {
-            console.warn(`[InChatAgents] Failed to construct fallback prompt for profile "${profileId}".`, error);
+            console.warn(`[InChatAgents] Failed to construct fallback prompt for ${describePromptTransformTarget(profileId, 'profile')}.`, error);
         }
     }
 
@@ -681,7 +714,7 @@ async function requestPromptTransform(agent, promptMessages, maxTokens) {
 
     if (profileId) {
         if (!CMRS || typeof CMRS.sendRequest !== 'function') {
-            throw new Error(`Connection profile "${profileId}" is set, but Connection Manager is unavailable.`);
+            throw new Error(`${describePromptTransformTarget(profileId, 'profile')} is set, but Connection Manager is unavailable.`);
         }
 
         return await requestProfilePromptTransform(CMRS, profileId, promptMessages, maxTokens, modelOverride);
@@ -814,7 +847,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
             syncPromptTransformMessageState(message, messageIndex);
         }
 
-        console.info(`[InChatAgents] ${describePromptTransformMode(promptTransformMode)} agent "${agent.name}" ran via ${response.runner === 'profile' ? `profile "${response.profileId}"` : 'the main model'}${changed ? ' and changed the message.' : ' with no text change.'}`);
+        console.info(`[InChatAgents] ${describePromptTransformMode(promptTransformMode)} agent "${agent.name}" ran via ${describePromptTransformTarget(response.profileId, response.runner)}${changed ? ' and changed the message.' : ' with no text change.'}`);
 
         const result = {
             agentId: agent.id,
