@@ -1294,19 +1294,11 @@ async function onMessageSwiped(data) {
         return;
     }
 
-    const messageIndex = typeof data === 'object' && data !== null
-        ? Number(data.messageId ?? data.message_index ?? chat.length - 1)
-        : chat.length - 1;
-    const message = chat[messageIndex];
-    if (!message || message.is_user || message.is_system) {
-        return;
-    }
-
-    if (pendingGenerationSnapshot) {
-        return;
-    }
-
-    await processReceivedMessage(messageIndex, 'normal');
+    // `MESSAGE_SWIPED` fires during swipe navigation before any overswipe generation starts.
+    // Re-running prompt-transform / append agents here mutates the current swipe again,
+    // which makes agents like Prose Polisher fire just from browsing swipes.
+    // Real swipe generations are handled later by `MESSAGE_RECEIVED`.
+    void data;
 }
 
 /**
