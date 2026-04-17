@@ -2102,6 +2102,30 @@ export function updateMessageBlock(messageId, message, { rerenderMessage = true 
         messageElement.find('.mes_text').html(messageFormatting(text, message.name, message.is_system, message.is_user, messageId, {}, false));
     }
 
+    // Update reasoning tokens badge
+    const reasoningTokens = message?.extra?.reasoning_tokens;
+    if (reasoningTokens && reasoningTokens > 0) {
+        let badge = messageElement.find('.reasoning-tokens-badge');
+        if (!badge.length) {
+            badge = $('<span class="reasoning-tokens-badge"></span>');
+            messageElement.find('.tokenCounterDisplay').after(badge);
+        }
+        badge.text(`💭 ${reasoningTokens}`);
+    } else {
+        messageElement.find('.reasoning-tokens-badge').remove();
+    }
+
+    // Update agent transform badge
+    if (message?.extra?.inChatAgentTransformHistory?.length > 0) {
+        let transformBadge = messageElement.find('.agent-transform-badge');
+        if (!transformBadge.length) {
+            transformBadge = $('<span class="agent-transform-badge" title="Modified by agent(s)">📝</span>');
+            messageElement.find('.tokenCounterDisplay').after(transformBadge);
+        }
+    } else {
+        messageElement.find('.agent-transform-badge').remove();
+    }
+
     updateReasoningUI(messageElement);
 
     addCopyToCodeBlocks(messageElement);
