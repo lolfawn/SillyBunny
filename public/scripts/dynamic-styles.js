@@ -188,8 +188,9 @@ function applyDynamicFocusStyles(styleSheet, { fromExtension = false } = {}) {
 
             try {
                 targetStyleSheet.insertRule(focusRule, targetStyleSheet.cssRules.length);
-            } catch (e) {
-                console.warn('Failed to insert focus rule:', e);
+            } catch {
+                // insertRule rejects :has() and other complex selectors — these are
+                // cosmetic :focus-visible mirrors of :hover rules, safe to skip
             }
         }
     });
