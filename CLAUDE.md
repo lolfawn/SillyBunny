@@ -60,24 +60,44 @@ Notes:
 
 ## Discord-friendly release post
 
-Keep it short, plain-English, and easy to scan. Lead with the version, then the highlights, then notable fixes.
+Keep it short, plain-English, and easy to scan. Lead with `@here` and the version, then a one-sentence summary, then fixes grouped by category with bold headers. End with update instructions.
 
 Template:
 
 ```md
-SillyBunny vX.Y.Z is up.
+@here
 
-Highlights:
-- ...
-- ...
-- ...
+**SillyBunny vX.Y.Z is up**
 
-Fixes:
-- ...
-- ...
+One-sentence summary of what this release delivers.
 
-Usual update path applies: relaunch or pull/update as normal.
+**Category name**
+
+- Fixed …
+- Added …
+
+**Another category**
+
+- Fixed …
+- Restored …
+
+**How to update**
+
+- Built-in updater, **Customize → Server → Update**
+- Git clone, `git pull`
+- Launcher users, restart with `Start.bat` / `start.sh`
 ```
+
+### Style guide
+
+- Use `@here` at the top to ping the channel.
+- Version line is **bold** with "is up" — not "released" or "available".
+- The one-sentence summary after the version covers the main themes without listing everything.
+- Group fixes under **bold category headers** that match functional areas (e.g., "Shell and startup", "Streaming and swipes", "In-Chat Agents / connection profiles", "Versioning and docs"). Group by subsystem, not by PR.
+- Each bullet is a self-contained fix or addition — no "also fixed" chains.
+- Start bullet with the verb: "Fixed", "Added", "Restored", "Bumped", "Removed".
+- End with the **How to update** section showing all three update paths.
+- No internal jargon, no code references, no ticket numbers — write for users.
 
 ## Hotfix summary format
 

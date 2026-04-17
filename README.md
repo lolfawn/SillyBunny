@@ -200,6 +200,12 @@ SillyBunny includes some extras by default to help you get started right away:
 
 - Fixed Gemini tool registration showing 0/8 tools — diagnostics now checks for API/model support, enabled agents, and event-driven tool re-registration on settings changes
 - Removed the confusing duplicate "Skip second filter pass" checkbox from the prompt editor (use the single-pass pipeline type instead)
+- Added agent prompt transform history — messages modified by agents now show a 📝 badge; clicking it reveals a before/after diff popup with Undo/Redo buttons
+- Fixed agent prompt transform producing `[object Object]` when using Google AI Studio connection profiles — the response text extraction now handles Gemini's parts-based response format
+
+**Model selection**
+
+- Added dynamic `/v1/models` dropdowns with text input fallback for Claude, AI21, Cohere, Perplexity, VertexAI, and ZAI — selecting a model from the API now populates the dropdown, while the text input allows entering custom model names
 
 **UI and reliability**
 

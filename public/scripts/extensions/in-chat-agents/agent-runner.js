@@ -31,7 +31,9 @@ import { getTree as pfGetTree, getAllEntryUids as pfGetAllEntryUids } from './pa
 
 const PROMPT_KEY_PREFIX = 'inchat_agent_';
 const MESSAGE_EXTRA_KEY = 'inChatAgents';
-const PROMPT_RUNS_EXTRA_KEY = 'inChatAgentPromptRuns';
+export const PROMPT_RUNS_EXTRA_KEY = 'inChatAgentPromptRuns';
+export const PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
+const MAX_TRANSFORM_HISTORY = 10;
 const pendingRefreshTimeouts = new Map();
 const DEFAULT_PROMPT_TRANSFORM_MAX_TOKENS = DEFAULT_AGENT_MAX_TOKENS;
 const GREETING_GENERATION_TYPE = 'first_message';
@@ -513,6 +515,33 @@ function updatePromptTransformRuns(message, runs) {
     return true;
 }
 
+function updatePromptTransformHistory(message, run) {
+    if (!message || !run || !run.changed) {
+        return false;
+    }
+
+    message.extra ??= {};
+    const history = Array.isArray(message.extra[PROMPT_TRANSFORM_HISTORY_KEY])
+        ? message.extra[PROMPT_TRANSFORM_HISTORY_KEY]
+        : [];
+
+    history.push({
+        agentId: run.agentId,
+        agentName: run.agentName,
+        mode: run.mode,
+        beforeText: String(run.beforeText ?? ''),
+        afterText: String(run.nextMessageText ?? ''),
+        timestamp: run.timestamp,
+    });
+
+    while (history.length > MAX_TRANSFORM_HISTORY) {
+        history.shift();
+    }
+
+    message.extra[PROMPT_TRANSFORM_HISTORY_KEY] = history;
+    return true;
+}
+
 function buildPromptTransformMessages(agentPrompt, messageText, assistantName, generationType, mode) {
     const actionInstruction = mode === 'append'
         ? 'Generate only the new content that should be appended after the assistant response according to the instructions above. Do not repeat, rewrite, summarize, or quote the original assistant response. Return only the appended content, with no labels or commentary unless the appended content itself requires them.'
@@ -590,7 +619,8 @@ function sanitizePromptTransformRunForStorage(result) {
         return result;
     }
 
-    const { outputText, nextMessageText, ...storedResult } = result;
+    // Keep beforeText and nextMessageText for diff/undo — only strip raw outputText
+    const { outputText, ...storedResult } = result;
     return storedResult;
 }
 
@@ -628,6 +658,7 @@ function consolidateAppendPromptTransformOutputs(baseText, agents, results) {
     return {
         text: mergedText,
         changed: mergedText !== String(baseText ?? ''),
+        beforeText: String(baseText ?? ''),
     };
 }
 
@@ -636,9 +667,83 @@ function extractProfileResponseText(response) {
         return response;
     }
 
-    return typeof response?.content === 'string'
-        ? response.content
-        : (response?.toString?.() || '');
+    if (response == null) {
+        return '';
+    }
+
+    // Handle ConnectionManager response: { content: string, reasoning: string }
+    if (typeof response.content === 'string') {
+        return response.content;
+    }
+
+    // Handle Gemini-style response: { content: { parts: [{ text: "..." }] } }
+    if (Array.isArray(response.content)) {
+        return response.content
+            .filter(part => typeof part?.text === 'string')
+            .map(part => part.text)
+            .join('\n\n');
+    }
+
+    // Handle response.content being an object with parts (Gemini format)
+    if (typeof response.content === 'object' && response.content !== null) {
+        if (Array.isArray(response.content.parts)) {
+            return response.content.parts
+                .filter(part => typeof part?.text === 'string')
+                .map(part => part.text)
+                .join('\n\n');
+        }
+        // Single text field inside content object
+        if (typeof response.content.text === 'string') {
+            return response.content.text;
+        }
+    }
+
+    // Handle direct Gemini candidates format: { candidates: [{ content: { parts: [...] } }] }
+    if (Array.isArray(response.candidates)) {
+        const candidate = response.candidates[0];
+        const parts = candidate?.content?.parts ?? candidate?.output?.parts ?? [];
+        if (Array.isArray(parts) && parts.length > 0) {
+            return parts
+                .filter(part => typeof part?.text === 'string')
+                .map(part => part.text)
+                .join('\n\n');
+        }
+        if (typeof candidate?.output === 'string') {
+            return candidate.output;
+        }
+    }
+
+    // Handle OpenAI-style: { choices: [{ message: { content: "..." } }] }
+    if (Array.isArray(response.choices)) {
+        const content = response.choices[0]?.message?.content;
+        if (typeof content === 'string') {
+            return content;
+        }
+        if (typeof content === 'object' && content !== null) {
+            if (Array.isArray(content)) {
+                return content
+                    .filter(part => typeof part?.text === 'string')
+                    .map(part => part.text)
+                    .join('\n\n');
+            }
+            if (typeof content.text === 'string') {
+                return content.text;
+            }
+        }
+    }
+
+    // Fallback: try common text fields before falling back to toString
+    if (typeof response.text === 'string') {
+        return response.text;
+    }
+    if (typeof response.output === 'string') {
+        return response.output;
+    }
+    if (typeof response.message === 'string') {
+        return response.message;
+    }
+
+    return '';
 }
 
 function buildFallbackPromptText(promptMessages) {
@@ -772,6 +877,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
             timestamp: new Date().toISOString(),
             outputText: '',
             nextMessageText: currentMessageText,
+            beforeText: currentMessageText,
         };
 
         return result;
@@ -795,6 +901,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
             timestamp: new Date().toISOString(),
             outputText: '',
             nextMessageText: currentMessageText,
+            beforeText: currentMessageText,
         };
 
         return result;
@@ -829,6 +936,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
                 timestamp: new Date().toISOString(),
                 outputText: '',
                 nextMessageText: currentMessageText,
+                beforeText: currentMessageText,
             };
 
             if (showNotifications) {
@@ -860,6 +968,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
             timestamp: new Date().toISOString(),
             outputText: promptOutputText,
             nextMessageText,
+            beforeText: currentMessageText,
         };
 
         if (showNotifications) {
@@ -881,6 +990,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
             timestamp: new Date().toISOString(),
             outputText: '',
             nextMessageText: currentMessageText,
+            beforeText: currentMessageText,
         };
 
         if (showNotifications) {
@@ -919,6 +1029,7 @@ async function runPromptTransformAppendBatch(agents, message, generationType, me
                     timestamp: new Date().toISOString(),
                     outputText: '',
                     nextMessageText: currentMessageText,
+                    beforeText: currentMessageText,
                 });
             }
         }
@@ -941,6 +1052,7 @@ async function runPromptTransformAppendBatch(agents, message, generationType, me
                         timestamp: new Date().toISOString(),
                         outputText: '',
                         nextMessageText: currentMessageText,
+                        beforeText: currentMessageText,
                     };
                 }
             }),
@@ -957,6 +1069,7 @@ async function runPromptTransformAppendBatch(agents, message, generationType, me
         results,
         changed: consolidated.changed,
         nextMessageText: consolidated.text,
+        beforeText: currentMessageText,
     };
 }
 
@@ -1192,6 +1305,10 @@ async function processReceivedMessage(messageIndex, generationType) {
 
     if (updatePromptTransformRuns(message, promptRuns)) {
         chatStateChanged = true;
+    }
+
+    for (const run of promptRuns) {
+        updatePromptTransformHistory(message, run);
     }
 
     for (const agent of utilityAgents) {
@@ -1438,6 +1555,50 @@ function onWorldInfoUpdatedToolSync() {
     syncToolAgentRegistrations();
 }
 
+export function undoPromptTransform(messageIndex) {
+    const message = chat[messageIndex];
+    if (!message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    const history = Array.isArray(message.extra?.[PROMPT_TRANSFORM_HISTORY_KEY])
+        ? message.extra[PROMPT_TRANSFORM_HISTORY_KEY]
+        : [];
+
+    if (history.length === 0) {
+        return false;
+    }
+
+    const lastEntry = history[history.length - 1];
+    message.mes = lastEntry.beforeText;
+    syncPromptTransformMessageState(message, messageIndex);
+    saveChatDebounced();
+    scheduleMessageRefresh(messageIndex, message);
+    return true;
+}
+
+export function redoPromptTransform(messageIndex) {
+    const message = chat[messageIndex];
+    if (!message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    const history = Array.isArray(message.extra?.[PROMPT_TRANSFORM_HISTORY_KEY])
+        ? message.extra[PROMPT_TRANSFORM_HISTORY_KEY]
+        : [];
+
+    if (history.length === 0) {
+        return false;
+    }
+
+    const lastEntry = history[history.length - 1];
+    message.mes = lastEntry.afterText;
+    syncPromptTransformMessageState(message, messageIndex);
+    saveChatDebounced();
+    scheduleMessageRefresh(messageIndex, message);
+    return true;
+}
+
 /**
  * Registers all event listeners for the agent runner.
  */
@@ -1505,6 +1666,8 @@ export async function runAgentOnMessage(agentId, messageIndex) {
     if (updatePromptTransformRuns(message, [result])) {
         saveChatDebounced();
     }
+
+    updatePromptTransformHistory(message, result);
 
     if (result.changed) {
         scheduleMessageRefresh(messageIndex, message);

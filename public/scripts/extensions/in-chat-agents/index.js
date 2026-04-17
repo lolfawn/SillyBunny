@@ -32,7 +32,7 @@ import {
     getEnabledToolAgents,
     normalizeToolDef,
 } from './agent-store.js';
-import { initAgentRunner, runAgentOnMessage, syncToolAgentRegistrations } from './agent-runner.js';
+import { initAgentRunner, runAgentOnMessage, syncToolAgentRegistrations, undoPromptTransform, redoPromptTransform, PROMPT_TRANSFORM_HISTORY_KEY } from './agent-runner.js';
 import {
     AGENT_REGEX_PLACEMENT,
     AGENT_REGEX_SUBSTITUTE,
@@ -2683,5 +2683,69 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         if (event.detail?.tabId === 'agents') {
             syncToolAgentRegistrations();
         }
+    });
+
+    // Transform history popup — click the 📝 badge on a message
+    $(document).on('click', '.agent-transform-badge', async function () {
+        const mesId = $(this).closest('.mes').attr('mesid');
+        const messageIndex = Number(mesId);
+        if (isNaN(messageIndex) || !chat[messageIndex]) {
+            return;
+        }
+
+        const message = chat[messageIndex];
+        const history = message.extra?.[PROMPT_TRANSFORM_HISTORY_KEY];
+        if (!Array.isArray(history) || history.length === 0) {
+            toastr.info('No transform history available.');
+            return;
+        }
+
+        const entries = history.map((entry, i) => {
+            const beforePreview = escapeHtml(String(entry.beforeText ?? '').slice(0, 500));
+            const afterPreview = escapeHtml(String(entry.afterText ?? '').slice(0, 500));
+            const beforeEllipsis = entry.beforeText?.length > 500 ? '...' : '';
+            const afterEllipsis = entry.afterText?.length > 500 ? '...' : '';
+            const timestamp = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
+            return `
+                <div class="ica-transform-history-entry" data-index="${i}">
+                    <h5>${escapeHtml(entry.agentName || 'Agent')} <small>(${escapeHtml(entry.mode || 'replace')})</small></h5>
+                    <small>${timestamp}</small>
+                    <div class="ica-diff-original">
+                        <strong>Before:</strong>
+                        <pre>${beforePreview}${beforeEllipsis}</pre>
+                    </div>
+                    <div class="ica-diff-after">
+                        <strong>After:</strong>
+                        <pre>${afterPreview}${afterEllipsis}</pre>
+                    </div>
+                    <div class="ica-transform-actions">
+                        <button class="ica-undo-btn menu_button" data-mesid="${messageIndex}">Undo</button>
+                        <button class="ica-redo-btn menu_button" data-mesid="${messageIndex}">Redo</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const html = $(`<div class="ica-transform-history">${entries}</div>`);
+
+        html.find('.ica-undo-btn').on('click', function () {
+            const idx = Number($(this).data('mesid'));
+            if (undoPromptTransform(idx)) {
+                toastr.success('Transform undone.');
+            } else {
+                toastr.warning('Could not undo transform.');
+            }
+        });
+
+        html.find('.ica-redo-btn').on('click', function () {
+            const idx = Number($(this).data('mesid'));
+            if (redoPromptTransform(idx)) {
+                toastr.success('Transform redone.');
+            } else {
+                toastr.warning('Could not redo transform.');
+            }
+        });
+
+        await new Popup(html, POPUP_TYPE.TEXT, '', { wide: true }).show();
     });
 })();

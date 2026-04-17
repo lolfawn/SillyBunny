@@ -2747,6 +2747,16 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
         messageElement.find('.reasoning-tokens-badge').remove();
     }
 
+    if (mes.extra?.inChatAgentTransformHistory?.length > 0) {
+        let transformBadge = messageElement.find('.agent-transform-badge');
+        if (!transformBadge.length) {
+            transformBadge = $('<span class="agent-transform-badge" title="Modified by agent(s)">📝</span>');
+            messageElement.find('.tokenCounterDisplay').after(transformBadge);
+        }
+    } else {
+        messageElement.find('.agent-transform-badge').remove();
+    }
+
     mes.title && messageElement.attr('title', mes.title);
     timerValue && messageElement.find('.mes_timer').attr('title', timerTitle).text(timerValue);
     bookmarkLink && updateBookmarkDisplay(messageElement);
