@@ -57,6 +57,40 @@ Agents in the post phase can:
 - **Extract**: pull structured data from the response via regex and store it in chat variables
 - **Regex scripts**: find-and-replace patterns on the output (for formatting cleanup, tag removal, etc.)
 
+### Prompt Transform History
+
+When an agent modifies a message via prompt transform (rewrite or append), SillyBunny stores the **before and after text** so you can review, undo, or redo the change.
+
+#### How to review a transform
+
+1. After an agent modifies a message, a **📝 badge** appears next to the token count
+2. Click the badge to open the transform history popup
+3. The popup shows each transform with:
+   - Agent name and mode (rewrite or append)
+   - Timestamp
+   - **Before** and **After** text previews (truncated to 500 characters)
+
+#### Undo and Redo
+
+Each transform history entry has **Undo** and **Redo** buttons:
+
+- **Undo** restores the message text to what it was before the transform
+- **Redo** restores the message text to what it was after the transform
+
+You can undo and redo multiple times, up to the history cap (10 entries per message).
+
+#### History storage
+
+- Transform history is stored in `message.extra.inChatAgentTransformHistory`
+- Each entry contains: `agentId`, `agentName`, `mode`, `beforeText`, `afterText`, `timestamp`
+- History is capped at 10 entries per message (oldest entries are pruned)
+- The `outputText` (raw LLM output) is not stored to save space — only `beforeText` and `afterText` are kept
+- History persists across page reloads since it's saved as part of the chat data
+
+#### Google AI Studio fix
+
+Agent prompt transforms that use Google AI Studio (Makersuite/VertexAI) connection profiles previously produced `[object Object]` because the response text extraction didn't handle Gemini's parts-based response format. This is now fixed — the extraction handles 7 response format shapes including Gemini, OpenAI, and ConnectionManager responses.
+
 ### Bundled Templates
 
 SillyBunny ships with 30+ pre-made agents from Pura's Director Preset v12, organized into categories: directives, trackers, randomizers, formatting, and guards. You can also create your own from scratch.
@@ -150,6 +184,15 @@ Here's what happens on each generation turn when both systems are active:
 
 ## Recent Changes
 
+### v1.3.7 (2026-04-17)
+
+- Added prompt transform history — messages modified by agents now show a 📝 badge with a before/after diff popup and Undo/Redo buttons
+- Fixed agent prompt transform producing `[object Object]` on Google AI Studio connection profiles (now handles Gemini parts-based response format)
+- Fixed Gemini tool registration showing 0/8 tools — diagnostics now checks API/model support and event-driven re-registration on settings changes
+- Removed confusing duplicate "Skip second filter pass" checkbox from prompt editor
+- Added dynamic `/v1/models` dropdowns with text input fallback for all providers
+- Added reasoning tokens (💭) inline badge for models that report thinking tokens
+
 ### v1.3.3 (2026-04-12)
 
 - Trackers now default to pre-generation phase with User role
@@ -190,3 +233,8 @@ Here's what happens on each generation turn when both systems are active:
 - [current-state-map.md](current-state-map.md) -- where agent code lives in the repo
 - [milestones.md](milestones.md) -- roadmap
 - [experiment-template.md](experiment-template.md) -- how to propose new experiments
+- [../shell-tabs.md](../shell-tabs.md) -- Navigate/Customize shell tab system
+- [../model-dropdowns.md](../model-dropdowns.md) -- Dynamic /v1/models model selection
+- [../reasoning-tokens.md](../reasoning-tokens.md) -- Reasoning tokens inline badge
+- [../mobile-ux.md](../mobile-ux.md) -- Mobile UX improvements
+- [../version-compat.md](../version-compat.md) -- SillyTavern extension compatibility
