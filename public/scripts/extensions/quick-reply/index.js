@@ -9,15 +9,12 @@ import { QuickReplySettings } from './src/QuickReplySettings.js';
 import { SlashCommandHandler } from './src/SlashCommandHandler.js';
 import { ButtonUi } from './src/ui/ButtonUi.js';
 import { SettingsUi } from './src/ui/SettingsUi.js';
-import { debounceAsync } from '../../utils.js';
 import { selected_group } from '../../group-chats.js';
-export { debounceAsync };
-
-
-const _VERBOSE = true;
-export const debug = (...msg) => _VERBOSE ? console.debug('[QR2]', ...msg) : null;
-export const log = (...msg) => _VERBOSE ? console.log('[QR2]', ...msg) : null;
-export const warn = (...msg) => _VERBOSE ? console.warn('[QR2]', ...msg) : null;
+import { debounceAsync, debug, log, warn } from './src/shared.js';
+// Re-exported so that any existing `from '.../quick-reply/index.js'` imports
+// keep working. Internally the other src/ modules should import from
+// './shared.js' directly to avoid a circular back-edge — see shared.js.
+export { debounceAsync, debug, log, warn };
 
 
 const defaultConfig = {
@@ -230,7 +227,18 @@ const finalizeInit = async () => {
     isReady = true;
     debug('READY');
 };
-await init();
+// Fire-and-forget init — using top-level await here creates a circular
+// top-level-await deadlock on slow boots: init() awaits a dynamic import of
+// ./src/QuickReply.js, but that module statically imports from this file via
+// `import { log, quickReplyApi, warn } from '../index.js'`. With top-level
+// await the module resolver must wait for this file to finish evaluating
+// before QuickReply.js can resolve — while this file is waiting on that
+// import. The isReady flag + executeQueue pattern below already handles the
+// case where event handlers fire before init completes.
+init().catch(err => {
+    console.error('[QR2] init failed:', err);
+    try { toastr?.error(err?.message ?? String(err), 'Quick Reply init failed'); } catch { /* noop */ }
+});
 
 const purgeCharacterQuickReplySets = ({ character }) => {
     // Remove the character's Quick Reply Sets from the settings.
