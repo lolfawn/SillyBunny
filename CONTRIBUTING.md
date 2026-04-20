@@ -27,11 +27,12 @@ You can still send a pull request for `release` in the following scenarios:
 
 #### PR Structure
 
-Pull requests should use the following prefixes before the title:
+Pull requests should use the following [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary) PR prefixes before the title:
 - `fix` - a direct bug fix.
 - `chore` - a simple maintenance change.
-- `feature` - a new feature implementation.
+- `feat` - a new feature implementation.
 - `sync` - synchronizing with upstream.
+- `docs` - new documentation or modifications to documentation.
 
 Titles themselves should be direct and address the exact changes made.
 
