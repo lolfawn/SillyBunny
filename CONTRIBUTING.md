@@ -14,6 +14,7 @@ BEFORE submitting a pull request, keep the following project philosophies and be
 - Reuse existing metadata/state formats where possible instead of inventing new persistent structures.
 - While Bun is the default runtime, Node.js backwards compatibility is required. Do not use Bun-exclusive APIs (such as Bun.file() or Bun.serve()) unless a standard Node.js fallback is included. Test all structural changes in both runtime environments.
 - Keep fork-specific feature additions and upstream synchronization merges in separate pull requests. Mixing upstream code updates with SillyBunny feature logic complicates the review process.
+- Make sure new features work elegantly with parity on both mobile and desktop environments.
 
 #### Correct target branch
 
