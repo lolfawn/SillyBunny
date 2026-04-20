@@ -1,9 +1,85 @@
-# How to contribute to SillyBunny
+# SillyBunny Contribution Guide
+
+## Project Etiquette
+
+BEFORE submitting a pull request, keep the following project philosophies and best practices in mind:
+
+#### General philosophies
+
+- SillyBunny is a derivative fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), not a replacement. Sustainability to upstream is critical: keep SillyBunny's general code compatibility as close to upstream as possible.
+- Backwards compatibility with SillyTavern is a key design goal of the project. A user should be able to open SillyBunny, import their pre-existing SillyTavern settings, and feel right at home with SillyTavern's featureset.
+- Follow KISS (keep it simple, stupid). A solution to a problem should not have any excess overreach. Always prefer a simple, modular approach to a problem or feature, using smaller PRs to address each individual problem.
+- Changes to upstream should be self-contained in their own files where possible. With the exception of UI modifications, try to minimise actual changes to base SillyTavern code.
+- When modifying base SillyTavern files, leave clear inline comments indicating where and why SillyBunny code diverges from upstream. This aids maintainers during future upstream merge conflict resolutions.
+- Reuse existing metadata/state formats where possible instead of inventing new persistent structures.
+- While Bun is the default runtime, Node.js backwards compatibility is required. Do not use Bun-exclusive APIs (such as Bun.file() or Bun.serve()) unless a standard Node.js fallback is included. Test all structural changes in both runtime environments.
+- Keep fork-specific feature additions and upstream synchronization merges in separate pull requests. Mixing upstream code updates with SillyBunny feature logic complicates the review process.
+
+#### Correct target branch
+
+Always create pull requests using the `staging` branch; 99% of contributions should go there. This way, we can ensure stability before a proper release version.
+
+You can still send a pull request for `release` in the following scenarios:
+
+- Updating documentation.
+- Updating GitHub Actions.
+- Hotfixing a critical bug. (Note: Hotfixes merged into release must also be backported to staging to prevent regression in the next update)
+
+#### PR Structure
+
+Pull requests should use the following prefixes before the title:
+- `fix` - a direct bug fix.
+- `chore` - a simple maintenance change.
+- `feature` - a new feature implementation.
+- `sync` - synchronizing with upstream.
+
+Titles themselves should be direct and address the exact changes made.
+
+#### Release and hotfix hygiene
+
+If you're helping ship a SillyBunny release, keep the release copy in sync with the code:
+
+- Normal releases should bump every SillyBunny version reference that is user-facing or otherwise hardcoded, including the package version, the visible UI version strings, and the Horde fallback client string.
+- Update the root `README.md` changelog, replacing the existing changelog with the most recent, then sync `.github/readme.md` by running `bash scripts/sync-readme-mirror.sh`. The GitHub README is a mirror, so do not edit it by hand.
+- Hotfixes are an exception: skip the version bump, README updates, changelog pass, and Discord post. Just include a short bulleted list of exactly what was hotfixed.
+
+Project maintainers will test and can change your code before merging. To keep our workflow smooth, please ensure the following:
+
+- The "Allow edits from maintainers" option is checked.
+- Avoid force-pushing your branch once the PR is out of draft state.
+
+Include a Discord-friendly update summary for non-hotfix releases so the changes can be freely posted without rewriting notes from scratch, using the following formatting template:
+```
+**SillyBunny version XXX has released**
+(quick summary of changes)
+
+**Detailed Changelog**
+(technical details but still human readable)
+
+**How to update**
+- Built-in updater: open Customize > Server and update from there.
+- Git clone: run git pull.
+- Launcher users: close and reopen Start.bat, Start.command, or start.sh.
+- ZIP users: grab the new release directly.
+```
+#### Upstream sync
+
+When a new, stable upstream SillyTavern version releases:
+
+- Prioritize synchronizing to `staging` over new features and bug fixes.
+- Check for code compatibility with the new version release.
+- Resolve merge conflicts carefully, ensuring that upstream changes do not overwrite SillyBunny's custom UI modifications, Bun-specific optimizations, or additional features.
+- Verify that any new upstream UI elements (such as new settings, menus, or buttons) integrate correctly into the fork's modified DOM structure.
+- Review the upstream changelog to identify any newly added dependencies or modifications to metadata/state formats.
+- Test the synchronized code in both Bun and Node.js environments to confirm that runtime parity is maintained.
+- Complete the synchronization as a standalone pull request before applying fixes to current bug chores in separate, subsequent updates.
+
+---
 
 ## Setting up the dev environment
 
 1. Required software: git and bun.
-2. Recommended editor: Visual Studio Code.
+2. An IDE or editor of your choice. Visual Studio Code is a safe default.
 3. You can also use GitHub Codespaces which sets up everything for you.
 
 ## Getting the code ready
@@ -17,91 +93,12 @@
 7. Commit the changes and push the branch to the remote repo.
 8. Go to GitHub, and open a pull request, targeting the appropriate upstream branch.
 
-## Contribution guidelines
+### License
 
-### Maintain code quality
+This program is licensed as free software under the [AGPL 3.0](https://www.gnu.org/licenses/agpl-3.0.html). This implies NO warranty, and due diligence to maintain adherence to the copyleft structure of the license. Any derivatives or modifications of this program must be released under the same license.
 
-Our standards are pretty low, but make sure the code is not too ugly:
+---
 
-- Run VS Code's autoformat when you're done.
-- Check with ESLint by running `bun run lint`, then fix the errors.
-- Use common sense and follow existing naming conventions.
-
-### Use the correct target branch
-
-Create pull requests for the `staging` branch, 99% of contributions should go there. That way people could test your code before the next stable release.
-
-You can still send a pull request for `release` in the following scenarios:
-
-- Updating README.
-- Updating GitHub Actions.
-- Hotfixing a critical bug.
-
-### Release and hotfix hygiene
-
-If you're helping ship a SillyBunny release, keep the release copy in sync with the code:
-
-- Normal releases should bump every SillyBunny version reference that is user-facing or otherwise hardcoded, including the package version, the visible UI version strings, and the Horde fallback client string.
-- Update the root `README.md` changelog and any "current release" copy, then sync `.github/readme.md` by running `bash scripts/sync-readme-mirror.sh`. The GitHub README is a mirror, so do not edit it by hand.
-- Include a Discord-friendly update summary for non-hotfix releases so the changes can be posted without rewriting the notes from scratch.
-- Hotfixes are the exception: skip the version bump, README updates, changelog pass, and Discord post. Just include a short bulleted list of exactly what was hotfixed.
-- See `CLAUDE.md` for the maintainer-facing checklist and copy template.
-
-Project maintainers will test and can change your code before merging. To keep our workflow smooth, please ensure the following:
-
-- The "Allow edits from maintainers" option is checked.
-- Avoid force-pushing your branch once the PR is out of draft state.
-
-### Maintainer note for GitHub automation
-
-Repository automation can run either with the built-in Actions token or with an optional GitHub App.
-
-If you are maintaining the repo or updating workflow files, see [docs/github-automation.md](docs/github-automation.md) for the current setup, required repository settings, and the optional App-based configuration.
-
-### Agentic experiments on `staging`
-
-If you are using `staging` to push SillyBunny toward more autonomous, Aventuras-style behavior, use the workflow docs in [docs/agentic/README.md](docs/agentic/README.md).
-
-Keep those experiments narrow, reversible, and documented before moving them toward `main` or `release`.
-
-### Make contributions small and testable
-
-To make sure that your contribution remains testable and reviewable, try not to exceed a soft limit of **200 lines of code** (both additions and deletions) per pull request. If you have more to contribute, split it into multiple pull requests.
-
-We can also consider creating a separate feature branch for more substantial changes, but please discuss it with the maintainers first. For example:
-
-- Leave the main larger PR as a draft so it can be used to discuss the implementation.
-- Split each group of functions or features into a ~200 line PR so it can be properly reviewed and merged to staging or a feature branch.
-- If there are large codependent changes that cannot be split, start with the most utilized dependencies and stub dependent functions.
-- Each will be reviewed and tested one by one, merging into the feature branch as they're ready.
-- Do not create all branches in advance, as subsequent changes made in previous commits as a result of test/review may create a lot of merge conflicts.
-
-### Provide clear descriptions of your changes
-
-Write at least somewhat meaningful PR descriptions and commit messages. There's no "right" way to do it, but the following may help with outlining a general structure:
-
-- What is the reason for a change?
-- What did you do to achieve this?
-- How would a reviewer test the change?
-
-### We (likely) don't speak your language
-
-English is the primary language of communication in this project. Please use only English when writing commit messages, PR descriptions, comments and other text. This does not apply to contributions to localization files.
-
-### Legal stuff
-
-Mind the license. Your contributions will be licensed under the GNU Affero General Public License. If you don't know what that implies, consult your lawyer.
-
-## Use of AI coding assistance tools ("Vibe Coding")
-
-We do not prohibit nor encourage the use of AI tools for coding assistance to help you write code, documentation, etc. This includes specialized IDEs, plugins and add-ons, chat interfaces, etc. However, please keep in mind the following:
-
-- No matter who (or what) wrote the code, you are responsible for it. Make sure to carefully review and test everything before committing, and be ready to discuss and fix any issues that may arise during the review.
-- Maintainers can reject reviewing and accepting PRs of very low quality, i.e. if the time to fix the issues exceeds the time to write the code from scratch.
-- Avoid common mistakes attributed to AI tools, such as: adding/removing unrelated comments, excessive logging, unawareness of the project context and conventions, etc.
-- You are allowed, but not required, to trigger AI tools that are added to the project by maintainers (Gemini, Copilot, Codex). Keep in mind that any feedback (comments, suggestions) that these tools generate is not a call to action; make sure to properly assess it before applying.
-
-## Further reading
-
-1. [How to write UI extensions](https://docs.sillytavern.app/for-contributors/writing-extensions/)
-2. [How to write server plugins](https://docs.sillytavern.app/for-contributors/server-plugins)
+> [!WARNING]
+> ### AI Disclaimer (Vibe Coding)
+> LLMs are used liberally in this project to implement changes to the code. You are more than welcome to submit a PR with AI-assistance, as long as it aligns with the contribution guidelines.
