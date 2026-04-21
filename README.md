@@ -194,6 +194,7 @@ SillyBunny includes some extras by default to help you get started right away:
 - Home now highlights in the top bar while the landing page is visible, matching the active-state treatment used by the shell buttons
 - Switching from Navigate to Customize no longer double-triggers and closes the shell again during the opening animation
 - Home now reflows from its own panel width, so returning from Customize no longer crushes the landing copy into a narrow one-word column
+- Home display toggles now render once in a centered top row instead of duplicating again above Recent Chats
 
 **Themes and Appearance**
 

@@ -11,7 +11,9 @@
                         <strong>Important:</strong> SillyBunny is a fork of SillyTavern. Please direct SillyBunny issues and bug reports to <a href="https://github.com/platberlitz/SillyBunny" target="_blank">purachina on GitHub</a>.
                     </div>
                 </div>
-                <div class="welcomePanelToggles">
+            </div>
+            <div class="welcomePanelToggles">
+                <div class="welcomePanelModeControls" aria-label="Home panel display">
                     <button class="menu_button menu_button_icon welcomePanelModeToggle welcomePanelModeToggle--full" title="Show full Home panel" aria-label="Show full Home panel" aria-pressed="{{#if welcomePanelFull}}true{{else}}false{{/if}}" data-i18n="[title]Show full Home panel;[aria-label]Show full Home panel" data-welcome-panel-mode-target="full">
                         <i class="fa-solid fa-window-maximize"></i>
                         <span>Full Home</span>
@@ -24,6 +26,8 @@
                         <i class="fa-solid fa-rectangle-list"></i>
                         <span>List only</span>
                     </button>
+                </div>
+                <div class="welcomePanelVisibilityControls">
                     <button class="mes_button showRecentChats" title="Show recent chats" data-i18n="[title]Show recent chats">
                         <i class="fa-solid fa-list-ul fa-fw"></i>
                     </button>
@@ -364,20 +368,6 @@
                     Recent Chats
                 </div>
                 <p>Jump back into a thread, pin the keepers, or start fresh when inspiration changes direction.</p>
-            </div>
-            <div class="welcomeRecentControls" aria-label="Home panel display">
-                <button class="menu_button menu_button_icon welcomePanelModeChip welcomePanelModeToggle--full" data-welcome-panel-mode-target="full" aria-pressed="{{#if welcomePanelFull}}true{{else}}false{{/if}}">
-                    <i class="fa-solid fa-window-maximize"></i>
-                    <span>Full Home</span>
-                </button>
-                <button class="menu_button menu_button_icon welcomePanelModeChip welcomePanelModeToggle--compact" data-welcome-panel-mode-target="compact" aria-pressed="{{#if welcomePanelCompact}}true{{else}}false{{/if}}">
-                    <i class="fa-solid fa-compress"></i>
-                    <span>Compact</span>
-                </button>
-                <button class="menu_button menu_button_icon welcomePanelModeChip welcomePanelModeToggle--list" data-welcome-panel-mode-target="list" aria-pressed="{{#if welcomePanelListOnly}}true{{else}}false{{/if}}">
-                    <i class="fa-solid fa-rectangle-list"></i>
-                    <span>List only</span>
-                </button>
             </div>
         </div>
         <div class="welcomeRecent">

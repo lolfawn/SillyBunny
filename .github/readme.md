@@ -190,6 +190,7 @@ SillyBunny includes some extras by default to help you get started right away:
 - Open Launchpad button now toggles the launchpad (opens if closed, closes if open)
 - Added active state highlighting to Open Launchpad button when launchpad is open
 - Launchpad now expands by default on first startup to showcase tutorials
+- Home display toggles now render once in a centered top row instead of duplicating again above Recent Chats
 
 **Themes and Appearance**
 
