@@ -178,6 +178,24 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Latest Update
 
+### v1.3.9 (2026-04-21)
+
+**User Experience**
+
+- Moved Open Launchpad button next to Temporary Chat for better visual alignment
+- Open Launchpad button now toggles the launchpad (opens if closed, closes if open)
+- Added active state highlighting to Open Launchpad button when launchpad is open
+- Launchpad now expands by default on first startup to showcase tutorials
+
+**Themes and Appearance**
+
+- Changed default UI theme to Dark V1.0 (from Default (Dark) 1.7.1)
+- Changed default shell style to Clean Minimal (from Modern Glass)
+- Removed Forest Dusk, Forest Dawn, and Rose Glow theme preset buttons
+- Reset button now resets theme colors to Dark V1.0
+
+---
+
 ### v1.3.8 (2026-04-21)
 
 **Bug fixes**

@@ -399,7 +399,7 @@ const sbState = {
 };
 
 function normalizeTheme(themeId) {
-    return SB_THEMES.some(theme => theme.id === themeId) ? themeId : 'modern-glass';
+    return SB_THEMES.some(theme => theme.id === themeId) ? themeId : 'clean-minimal';
 }
 
 function normalizeTopbarLabelPart(value, fallback = '') {

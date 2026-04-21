@@ -431,7 +431,7 @@ export let swipeState = SWIPE_STATE.NONE;
 let chatSaveTimeout;
 let importFlashTimeout;
 export let isChatSaving = false;
-let firstRun = false;
+export let firstRun = false;
 export let settingsReady = false;
 let currentVersion = '0.0.0';
 const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.3.8';

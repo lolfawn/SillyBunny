@@ -483,9 +483,20 @@ function getInitialDeckView() {
     return 'tour';
 }
 
-function isWelcomeDeckCollapsed() {
+async function isWelcomeDeckCollapsed() {
     const stored = getWelcomeUiPreference(welcomeDeckCollapsedKey);
-    return stored === null ? true : stored === 'true';
+    if (stored === null) {
+        // Check if this is first run - if so, default to expanded (false)
+        // Otherwise default to collapsed (true)
+        try {
+            // Import firstRun from script.js
+            const { firstRun } = await import('../script.js');
+            return firstRun ? false : true;
+        } catch {
+            return true;
+        }
+    }
+    return stored === 'true';
 }
 
 function isWelcomePanelMode(mode) {
@@ -862,9 +873,9 @@ function buildStarterPackItems() {
     };
 }
 
-function buildWelcomeTemplateData(chats) {
+async function buildWelcomeTemplateData(chats) {
     const activeDeckView = getInitialDeckView();
-    const deckCollapsed = isWelcomeDeckCollapsed();
+    const deckCollapsed = await isWelcomeDeckCollapsed();
     const welcomePanelMode = getWelcomePanelMode();
 
     return {
@@ -998,6 +1009,12 @@ function setWelcomeDeckCollapsed(root, collapsed, { persist = true } = {}) {
     if (toggleButton instanceof HTMLButtonElement) {
         toggleButton.setAttribute('aria-expanded', String(!collapsed));
         toggleButton.setAttribute('title', collapsed ? 'Open Launchpad' : 'Close Launchpad');
+    }
+
+    // Update active state on Open Launchpad button in hero section
+    const openLaunchpadButton = root.querySelector('.openLaunchpad');
+    if (openLaunchpadButton instanceof HTMLElement) {
+        openLaunchpadButton.classList.toggle('is-active', !collapsed);
     }
 
     if (persist) {
@@ -1158,8 +1175,13 @@ async function handleWelcomeAction(button, sendTextArea) {
             break;
         case 'open-launchpad':
             if (welcomePanel instanceof HTMLElement) {
-                setWelcomeDeckView(welcomePanel, welcomePanel.dataset.activeDeckView || getInitialDeckView());
-                setWelcomeDeckCollapsed(welcomePanel, false);
+                const isCurrentlyCollapsed = await isWelcomeDeckCollapsed();
+                if (isCurrentlyCollapsed) {
+                    setWelcomeDeckView(welcomePanel, welcomePanel.dataset.activeDeckView || getInitialDeckView());
+                    setWelcomeDeckCollapsed(welcomePanel, false);
+                } else {
+                    setWelcomeDeckCollapsed(welcomePanel, true);
+                }
             }
             break;
         case 'close-guide':
@@ -1217,7 +1239,7 @@ async function sendWelcomePanel(chats, expand = false) {
             console.error('Chat element not found');
             return;
         }
-        const templateData = buildWelcomeTemplateData(chats);
+        const templateData = await buildWelcomeTemplateData(chats);
         const template = await renderTemplateAsync('/scripts/templates/welcomePanelOnboarding.html?v=20260421a', templateData, true, true, true);
         const fragment = document.createRange().createContextualFragment(template);
         fragment.querySelectorAll('.welcomePanel').forEach((root) => {
@@ -1248,7 +1270,7 @@ async function sendWelcomePanel(chats, expand = false) {
             const tutorialPanel = root.querySelector('.welcomeTourPanel');
             setWelcomePanelMode(root, root.dataset.homePanelMode || getWelcomePanelMode(), { persist: false });
             setWelcomeDeckView(root, root.dataset.activeDeckView || getInitialDeckView(), { persist: false });
-            setWelcomeDeckCollapsed(root, deck instanceof HTMLElement ? deck.dataset.collapsed === 'true' : isWelcomeDeckCollapsed(), { persist: false });
+            setWelcomeDeckCollapsed(root, deck instanceof HTMLElement ? deck.dataset.collapsed === 'true' : await isWelcomeDeckCollapsed(), { persist: false });
 
             root.querySelectorAll('.welcomeDeckTab').forEach((button) => {
                 button.addEventListener('click', () => {

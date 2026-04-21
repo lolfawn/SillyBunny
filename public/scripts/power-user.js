@@ -271,7 +271,7 @@ export const power_user = {
     movingUIState: {},
     movingUIPreset: '',
     noShadows: false,
-    theme: 'Default (Dark) 1.7.1',
+    theme: 'Dark V 1.0',
 
     gestures: true,
     auto_swipe: false,
@@ -4019,13 +4019,9 @@ jQuery(async () => {
     });
 
     $(document).on('click', '.sb-theme-preset-reset', function () {
-        if (!power_user.theme) {
-            toastr.warning('No active theme to restore.', 'SillyBunny palette');
-            return;
-        }
-        applyTheme(power_user.theme);
+        applyTheme('Dark V 1.0');
         saveSettingsDebounced();
-        toastr.info('Theme colors restored.', 'SillyBunny palette');
+        toastr.info('Theme colors reset to Dark V 1.0.', 'SillyBunny palette');
     });
 
     $('#media_display').on('input', async function () {
