@@ -369,8 +369,12 @@ body.sb-topbar-compact #sb-chatbar-layer {
     z-index: -1;
     border-radius: inherit;
     pointer-events: none;
-    background: var(--sb-chatbar-surface-bg, color-mix(in srgb, var(--sb-shell-main-bg) 94%, transparent));
-    opacity: var(--sb-shell-control-opacity);
+    background: color-mix(
+        in srgb,
+        rgb(from var(--SmartThemeBlurTintColor) r g b / 1) 98%,
+        rgb(from var(--SmartThemeBodyColor) r g b / 1) 2%
+    );
+    opacity: 1;
 }
 
 .sb-universal-search-field i {
@@ -1740,8 +1744,12 @@ body.sb-shell-resizing * {
     z-index: -1;
     border-radius: inherit;
     pointer-events: none;
-    background: color-mix(in srgb, var(--sb-shell-main-bg) 96%, transparent);
-    opacity: var(--sb-shell-control-opacity);
+    background: color-mix(
+        in srgb,
+        rgb(from var(--SmartThemeBlurTintColor) r g b / 1) 97%,
+        rgb(from var(--SmartThemeBodyColor) r g b / 1) 3%
+    );
+    opacity: 1;
 }
 
 .sb-search-results.is-visible {
@@ -1763,8 +1771,12 @@ body.sb-shell-resizing * {
     z-index: -1;
     border-radius: inherit;
     pointer-events: none;
-    background: color-mix(in srgb, var(--sb-shell-nav-bg) 88%, transparent);
-    opacity: var(--sb-shell-control-opacity);
+    background: color-mix(
+        in srgb,
+        rgb(from var(--SmartThemeChatTintColor) r g b / 1) 94%,
+        rgb(from var(--SmartThemeBodyColor) r g b / 1) 6%
+    );
+    opacity: 1;
 }
 
 .sb-search-result {

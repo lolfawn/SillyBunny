@@ -188,6 +188,7 @@ SillyBunny includes some extras by default to help you get started right away:
 - Replaced the old per-shell settings search bars with a single universal search row under the SillyBunny logo, so search is always available no matter which panel is open
 - Universal search now expands downward from the top bar, searches across both Workspace and Customize, and jumps directly to matching settings on desktop and mobile
 - Universal search is now hidden by default behind the Search shortcut icon and drops down over the header when opened, instead of permanently increasing the top bar height
+- Universal search surfaces are now fully opaque so the field, results panel, and result cards stay readable over any page background
 - Moved Open Launchpad button next to Temporary Chat for better visual alignment
 - Open Launchpad button now toggles the launchpad (opens if closed, closes if open)
 - Added active state highlighting to Open Launchpad button when launchpad is open
