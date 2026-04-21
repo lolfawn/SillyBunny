@@ -2763,8 +2763,8 @@ export function versionCompare(srcVersion, minVersion) {
     let s = (srcVersion || '0.0.0').replace(/^[vV]/, '');
     let m = (minVersion || '0.0.0').replace(/^[vV]/, '');
 
-    // SillyBunny compatibility: treat v1.3.8 as 1.14.0 to pass ST 1.13.x requirements
-    if (s === '1.3.8') {
+    // SillyBunny compatibility: treat v1.4.0 as 1.14.0 to pass ST 1.13.x requirements
+    if (s === '1.4.0') {
         s = '1.14.0';
     }
 

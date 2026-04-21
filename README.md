@@ -179,7 +179,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Latest Update
 
-### v1.3.8 (2026-04-21)
+### v1.4.0 (2026-04-21)
 
 **User Experience**
 
