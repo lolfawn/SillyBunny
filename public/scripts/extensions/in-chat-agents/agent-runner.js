@@ -43,6 +43,7 @@ const PREPEND_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
     'tpl-time-tracker',
 ]);
 const PREPEND_PROMPT_TRANSFORM_TAG_RE = /\[(?:SCENE|TIME)\|/;
+const ASSISTANT_RESPONSE_WRAPPER_RE = /^\s*<assistant_response>\s*([\s\S]*?)\s*<\/assistant_response>\s*$/i;
 
 /** @type {{ generationType: string, activeAgentIds: string[] } | null} */
 let pendingGenerationSnapshot = null;
@@ -543,11 +544,30 @@ function updatePromptTransformHistory(message, run) {
     return true;
 }
 
+function unwrapAssistantResponseWrapper(value) {
+    let text = normalizeContentText(value);
+    let previousText = null;
+    let passCount = 0;
+
+    while (text !== previousText && passCount < 8) {
+        previousText = text;
+        const match = text.match(ASSISTANT_RESPONSE_WRAPPER_RE);
+        if (!match) {
+            break;
+        }
+
+        text = match[1];
+        passCount += 1;
+    }
+
+    return text;
+}
+
 function buildPromptTransformMessages(agentPrompt, messageText, assistantName, generationType, mode) {
     const actionInstruction = mode === 'append'
         ? 'Generate only the new content that should be appended after the assistant response according to the instructions above. Do not repeat, rewrite, summarize, or quote the original assistant response. Return only the appended content, with no labels or commentary unless the appended content itself requires them.'
         : 'Rewrite the assistant response according to the instructions above. Return only the final rewritten assistant response. If no changes are needed, return the original response verbatim. Do not add commentary, labels, or code fences unless the response itself requires them.';
-    const currentAssistantResponse = normalizeContentText(messageText);
+    const currentAssistantResponse = unwrapAssistantResponseWrapper(messageText);
 
     return [
         {
@@ -562,8 +582,8 @@ function buildPromptTransformMessages(agentPrompt, messageText, assistantName, g
 }
 
 function appendPromptTransformOutput(originalText, appendedText) {
-    const baseText = normalizeContentText(originalText);
-    const addition = normalizeContentText(appendedText).trim();
+    const baseText = unwrapAssistantResponseWrapper(originalText);
+    const addition = unwrapAssistantResponseWrapper(appendedText).trim();
 
     if (!addition) {
         return baseText;
@@ -585,8 +605,8 @@ function appendPromptTransformOutput(originalText, appendedText) {
 }
 
 function joinPromptTransformText(leftText, rightText) {
-    const left = normalizeContentText(leftText);
-    const right = normalizeContentText(rightText);
+    const left = unwrapAssistantResponseWrapper(leftText);
+    const right = unwrapAssistantResponseWrapper(rightText);
 
     if (!left) {
         return right;
@@ -632,10 +652,10 @@ function consolidateAppendPromptTransformOutputs(baseText, agents, results) {
     const appendSegments = [];
     const seenSegments = new Set();
     const agentMap = new Map((Array.isArray(agents) ? agents : []).map(agent => [agent.id, agent]));
-    const normalizedBaseText = normalizeContentText(baseText);
+    const normalizedBaseText = unwrapAssistantResponseWrapper(baseText);
 
     for (const result of Array.isArray(results) ? results : []) {
-        const outputText = normalizeContentText(result?.outputText).trim();
+        const outputText = unwrapAssistantResponseWrapper(result?.outputText).trim();
         if (!outputText) {
             continue;
         }
@@ -792,7 +812,9 @@ async function requestPromptTransform(agent, promptMessages, maxTokens) {
 
 async function runPromptTransformAgent(agent, message, generationType, messageTextOverride = null, messageIndex = null, options = {}) {
     const applyToMessage = options.applyToMessage !== false;
-    const currentMessageText = messageTextOverride !== null ? normalizeContentText(messageTextOverride) : normalizeContentText(message?.mes);
+    const currentMessageText = unwrapAssistantResponseWrapper(
+        messageTextOverride !== null ? messageTextOverride : message?.mes,
+    );
     const normalizedGenerationType = normalizeGenerationType(generationType);
     const promptTransformMode = getPromptTransformMode(agent);
     const profileId = resolveAgentConnectionProfile(agent);
@@ -854,7 +876,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
     try {
         const maxTokens = normalizePromptTransformMaxTokens(agent.postProcess?.promptTransformMaxTokens);
         const response = await requestPromptTransform(agent, promptMessages, maxTokens);
-        const promptOutputText = normalizeContentText(response.output).trim();
+        const promptOutputText = unwrapAssistantResponseWrapper(response.output).trim();
 
         if (!promptOutputText) {
             console.warn(`[InChatAgents] ${describePromptTransformMode(promptTransformMode)} agent "${agent.name}" returned an empty response.`);
@@ -937,7 +959,9 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
 }
 
 async function runPromptTransformAppendBatch(agents, message, generationType, messageTextOverride = null, messageIndex = null) {
-    const currentMessageText = messageTextOverride !== null ? normalizeContentText(messageTextOverride) : normalizeContentText(message?.mes);
+    const currentMessageText = unwrapAssistantResponseWrapper(
+        messageTextOverride !== null ? messageTextOverride : message?.mes,
+    );
     const globalSettings = getGlobalSettings();
     const executionMode = globalSettings.appendAgentsExecutionMode === 'sequential' ? 'sequential' : 'parallel';
 
@@ -1177,7 +1201,13 @@ async function processReceivedMessage(messageIndex, generationType) {
     let messageDisplayChanged = false;
 
     const promptRuns = [];
-    let currentPromptTransformText = normalizeContentText(message.mes);
+    let currentPromptTransformText = unwrapAssistantResponseWrapper(message.mes);
+    if (currentPromptTransformText !== normalizeContentText(message.mes)) {
+        message.mes = currentPromptTransformText;
+        syncPromptTransformMessageState(message, messageIndex);
+        chatStateChanged = true;
+        messageDisplayChanged = true;
+    }
     let appendBatch = [];
     const flushAppendBatch = async () => {
         if (appendBatch.length === 0) {

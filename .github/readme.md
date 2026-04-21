@@ -237,6 +237,7 @@ SillyBunny includes some extras by default to help you get started right away:
 - Updated agent transform diff styling to match recast-post-processing — more subtle colors with rgba transparency for cleaner visual appearance
 - Added a dedicated "View agent changes" message action and wired it to the same transform-history popup as the inline badge
 - Hardened agent error/result serialization for non-JSON values and updated adventure-helper status copy to be clearer in the UI
+- Post-generation prompt agents now strip repeated outer `<assistant_response>` wrappers before prompting or applying results, so duplicate transport tags no longer leak into chat output
 
 **Bottom bar and persona fixes**
 

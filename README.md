@@ -248,6 +248,7 @@ SillyBunny includes some extras by default to help you get started right away:
 - Added a dedicated "View agent changes" message action and wired it to the same transform-history popup as the inline badge
 - Hardened agent error/result serialization for non-JSON values and updated adventure-helper status copy to be clearer in the UI
 - Normalized structured agent/prompt content before text-completion fallback and post-generation passes, so XML-style prompts and appended assistant responses no longer degrade into `[object Object]`
+- Post-generation prompt agents now strip repeated outer `<assistant_response>` wrappers before prompting or applying results, so duplicate transport tags no longer leak into chat output
 
 **Bottom bar and persona fixes**
 
