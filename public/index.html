@@ -4886,6 +4886,16 @@
                                 <div id="world_apply_current_sorting" class="menu_button fa-solid fa-solid fa-arrow-down-9-1" title="Apply current sorting as Order" data-i18n="[title]Apply current sorting as Order"></div>
                                 <div id="world_refresh" class="menu_button fa-solid fa-arrows-rotate" title="Refresh" data-i18n="[title]Refresh"></div>
                             </div>
+                            <div class="world_popup_action_group world_popup_action_group--view">
+                                <div id="world_info_results_summary" class="world_info_results_summary">0 entries</div>
+                                <div id="world_info_view_filters" class="world_info_view_filters" role="group" aria-label="Entry filters">
+                                    <button type="button" class="world_info_view_filter is-active" data-filter="all">All</button>
+                                    <button type="button" class="world_info_view_filter" data-filter="active">Active</button>
+                                    <button type="button" class="world_info_view_filter" data-filter="disabled">Disabled</button>
+                                    <button type="button" class="world_info_view_filter" data-filter="constant">Constant</button>
+                                    <button type="button" class="world_info_view_filter" data-filter="vectorized">Vectorized</button>
+                                </div>
+                            </div>
                             <div class="world_popup_action_group world_popup_action_group--filters">
                                 <input type="search" class="text_pole textarea_compact" data-i18n="[placeholder]Search..." id="world_info_search" placeholder="Search...">
                                 <select id="world_info_sort_order" class="text_pole textarea_compact">
@@ -7322,24 +7332,27 @@
             </div>
             <div class="world_entry">
                 <form class="world_entry_form  wi-card-entry">
-                    <div class="inline-drawer wide100p">
-                        <div class="inline-drawer-header gap5px padding0">
-                            <span class="drag-handle">&#9776;</span>
-                            <div class="gap5px world_entry_thin_controls wide100p alignitemscenter WIEntryHeaderMain">
-                                <div class="inline-drawer-toggle fa-fw fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
-                                <div class="fa-solid fa-toggle-on killSwitch" name="entryKillSwitch" data-i18n="[title]Toggle entry's active state." title="Toggle entry's active state."></div>
-                                <div class="flex-container alignitemscenter wide100p WIEntryHeaderBody">
-                                    <div class="WIEntryTitleAndStatus flex-container flex1 alignitemscenter">
-                                        <div class="flex-container flex1">
-                                            <textarea class="text_pole" rows="1" name="comment" data-i18n="[placeholder]Entry Title/Memo" placeholder="Entry Title/Memo"></textarea>
+                        <div class="inline-drawer wide100p">
+                            <div class="inline-drawer-header gap5px padding0">
+                                <span class="drag-handle">&#9776;</span>
+                                <div class="gap5px world_entry_thin_controls wide100p alignitemscenter WIEntryHeaderMain">
+                                    <div class="inline-drawer-toggle fa-fw fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
+                                    <button type="button" class="killSwitch menu_button menu_button_icon" name="entryKillSwitch" data-i18n="[title]Toggle entry's active state." title="Toggle entry's active state." aria-pressed="true">
+                                        <i class="fa-solid fa-toggle-on" aria-hidden="true"></i>
+                                        <span class="killSwitchLabel">Enabled</span>
+                                    </button>
+                                    <div class="flex-container alignitemscenter wide100p WIEntryHeaderBody">
+                                        <div class="WIEntryTitleAndStatus flex-container flex1 alignitemscenter">
+                                            <div class="flex-container flex1">
+                                                <textarea class="text_pole" rows="1" name="comment" data-i18n="[placeholder]Entry Title/Memo" placeholder="Entry Title/Memo"></textarea>
+                                            </div>
+                                            <!-- <span class="world_entry_form_position_value"></span> -->
+                                            <select data-i18n="[title]WI Entry Status: constant, normal, or vectorized" title="WI Entry Status:&#13;Constant&#13;Normal&#13;Vectorized" name="entryStateSelector" class="text_pole widthNatural margin0">
+                                                <option value="constant" title="Constant" data-i18n="[title]WI_Entry_Status_Constant">Constant</option>
+                                                <option value="normal" title="Normal" data-i18n="[title]WI_Entry_Status_Normal">Normal</option>
+                                                <option value="vectorized" title="Vectorized" data-i18n="[title]WI_Entry_Status_Vectorized">Vectorized</option>
+                                            </select>
                                         </div>
-                                        <!-- <span class="world_entry_form_position_value"></span> -->
-                                        <select data-i18n="[title]WI Entry Status:🔵 Constant🟢 Normal🔗 Vectorized" title="WI Entry Status:&#13;🔵 Constant&#13;🟢 Normal&#13;🔗 Vectorized" name="entryStateSelector" class="text_pole widthNatural margin0">
-                                            <option value="constant" title="Constant" data-i18n="[title]WI_Entry_Status_Constant">🔵</option>
-                                            <option value="normal" title="Normal" data-i18n="[title]WI_Entry_Status_Normal">🟢</option>
-                                            <option value="vectorized" title="Vectorized" data-i18n="[title]WI_Entry_Status_Vectorized">🔗</option>
-                                        </select>
-                                    </div>
                                     <div class="WIEnteryHeaderControls flex-container">
                                         <div name="PositionBlock" class="world_entry_form_control world_entry_form_radios wi-enter-footer-text">
                                             <label for="position" class="WIEntryHeaderTitleMobile" data-i18n="Position:">Position:</label>

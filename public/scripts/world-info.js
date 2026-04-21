@@ -94,12 +94,21 @@ let desktopSelectedWorldInfoUid = null;
 export const worldInfoFilter = new FilterHelper(() => updateEditor());
 export const SORT_ORDER_KEY = 'world_info_sort_order';
 export const METADATA_KEY = 'world_info';
+const WORLD_INFO_LIST_VIEW_FILTERS = Object.freeze({
+    all: 'all',
+    active: 'active',
+    disabled: 'disabled',
+    constant: 'constant',
+    vectorized: 'vectorized',
+});
+const WORLD_INFO_LIST_VIEW_FILTER_KEY = 'world_info_list_view_filter';
 
 export const DEFAULT_DEPTH = 4;
 export const DEFAULT_WEIGHT = 100;
 export const MAX_SCAN_DEPTH = 1000;
 const MAX_COMMENT_LENGTH = 100;
 const KNOWN_DECORATORS = ['@@activate', '@@dont_activate'];
+let worldInfoListViewFilter = WORLD_INFO_LIST_VIEW_FILTERS.all;
 
 // Typedef area
 /**
@@ -2114,6 +2123,64 @@ function clearWorldInfoDesktopEditor() {
     uid.text('');
 }
 
+function getWorldInfoListViewFilter() {
+    const savedFilter = accountStorage.getItem(WORLD_INFO_LIST_VIEW_FILTER_KEY);
+    return Object.values(WORLD_INFO_LIST_VIEW_FILTERS).includes(savedFilter)
+        ? savedFilter
+        : WORLD_INFO_LIST_VIEW_FILTERS.all;
+}
+
+function updateWorldInfoViewFilterButtons() {
+    $('.world_info_view_filter').each(function () {
+        const isActive = $(this).data('filter') === worldInfoListViewFilter;
+        $(this).toggleClass('is-active', isActive);
+        $(this).attr('aria-pressed', String(isActive));
+    });
+}
+
+function filterWorldInfoEntriesByView(entries) {
+    switch (worldInfoListViewFilter) {
+        case WORLD_INFO_LIST_VIEW_FILTERS.active:
+            return entries.filter(entry => !entry.disable);
+        case WORLD_INFO_LIST_VIEW_FILTERS.disabled:
+            return entries.filter(entry => entry.disable);
+        case WORLD_INFO_LIST_VIEW_FILTERS.constant:
+            return entries.filter(entry => entry.constant);
+        case WORLD_INFO_LIST_VIEW_FILTERS.vectorized:
+            return entries.filter(entry => entry.vectorized);
+        default:
+            return entries;
+    }
+}
+
+function updateWorldInfoResultsSummary({ totalEntries = 0, filteredEntries = 0, pageEntries = 0 } = {}) {
+    const summary = $('#world_info_results_summary');
+    if (!summary.length) {
+        return;
+    }
+
+    const viewLabel = worldInfoListViewFilter === WORLD_INFO_LIST_VIEW_FILTERS.all
+        ? 'all'
+        : worldInfoListViewFilter;
+    const baseText = filteredEntries === totalEntries
+        ? `${filteredEntries} entries`
+        : `${filteredEntries} of ${totalEntries} entries`;
+    const pageText = filteredEntries > pageEntries ? ` • showing ${pageEntries} on this page` : '';
+    summary.text(`${baseText} • ${viewLabel}${pageText}`);
+}
+
+function shouldRefreshWorldInfoListForViewFilter(entry) {
+    if (!entry) {
+        return false;
+    }
+
+    if (worldInfoListViewFilter === WORLD_INFO_LIST_VIEW_FILTERS.all) {
+        return false;
+    }
+
+    return !filterWorldInfoEntriesByView([entry]).length;
+}
+
 function setWorldInfoDesktopEditorMeta(entry) {
     const { workspace, title, uid } = getWorldInfoDesktopEditorElements();
     const fallbackTitle = Array.isArray(entry?.key) && entry.key.length > 0 ? entry.key.join(', ') : t`Untitled entry`;
@@ -2242,6 +2309,16 @@ export function sortWorldInfoEntries(data, { customSort = null } = {}) {
     });
 
     return data;
+}
+
+function updateEntryHeaderBadges(template, entry) {
+    const stateSelect = template.find('select[name="entryStateSelector"]');
+    const state = entry.constant === true ? 'constant' : entry.vectorized === true ? 'vectorized' : 'normal';
+    template
+        .toggleClass('wi-entry-state-constant', state === 'constant')
+        .toggleClass('wi-entry-state-normal', state === 'normal')
+        .toggleClass('wi-entry-state-vectorized', state === 'vectorized');
+    stateSelect.attr('data-state', state);
 }
 
 function nullWorldInfo() {
@@ -2416,6 +2493,7 @@ async function displayWorldEntries(name, data, navigation = navigation_option.no
         // Apply the filter and do the chosen sorting
         entriesArray = addMissingWorldInfoFields(entriesArray);
         entriesArray = worldInfoFilter.applyFilters(entriesArray);
+        entriesArray = filterWorldInfoEntriesByView(entriesArray);
         entriesArray = sortWorldInfoEntries(entriesArray);
 
         // Cache keys
@@ -2499,6 +2577,13 @@ async function displayWorldEntries(name, data, navigation = navigation_option.no
                         clearWorldInfoDesktopEditor();
                     }
                 }
+
+                const filteredEntryCount = getDataArray().length;
+                updateWorldInfoResultsSummary({
+                    totalEntries: Object.keys(data.entries).length,
+                    filteredEntries: filteredEntryCount,
+                    pageEntries: page.length,
+                });
             } catch (error) {
                 console.error('Error while rendering WI entries:', error);
             }
@@ -3299,7 +3384,11 @@ function handleEntryStateSelectorHelper({ entryStateSelector, entry, data, name 
                 setWIOriginalDataValue(data, uid, 'extensions.vectorized', true);
                 break;
         }
+        updateEntryHeaderBadges(entryStateSelector.closest('.world_entry'), data.entries[uid]);
         !noSave && await saveWorldInfo(name, data);
+        if (!noSave && shouldRefreshWorldInfoListForViewFilter(data.entries[uid])) {
+            updateEditor(navigation_option.none, false);
+        }
     });
     const entryState = () => entry.constant === true ? 'constant' : entry.vectorized === true ? 'vectorized' : 'normal';
     entryStateSelector.find(`option[value=${entryState()}]`).prop('selected', true).trigger('input', { noSave: true });
@@ -3322,14 +3411,25 @@ function handleEntryKillSwitchHelper({ entryKillSwitch, entry, data, name, templ
         const isActive = !data.entries[uid].disable;
         setWIOriginalDataValue(data, uid, 'enabled', isActive);
         template.toggleClass('disabledWIEntry', !isActive);
-        entryKillSwitch.toggleClass('fa-toggle-off', !isActive);
-        entryKillSwitch.toggleClass('fa-toggle-on', isActive);
+        entryKillSwitch.attr('aria-pressed', String(isActive));
+        entryKillSwitch.toggleClass('is-disabled', !isActive);
+        entryKillSwitch.find('i')
+            .toggleClass('fa-toggle-off', !isActive)
+            .toggleClass('fa-toggle-on', isActive);
+        entryKillSwitch.find('.killSwitchLabel').text(isActive ? 'Enabled' : 'Disabled');
         await saveWorldInfo(name, data);
+        if (shouldRefreshWorldInfoListForViewFilter(data.entries[uid])) {
+            updateEditor(navigation_option.none, false);
+        }
     });
     const isActive = !entry.disable;
     template.toggleClass('disabledWIEntry', !isActive);
-    entryKillSwitch.toggleClass('fa-toggle-off', !isActive);
-    entryKillSwitch.toggleClass('fa-toggle-on', isActive);
+    entryKillSwitch.attr('aria-pressed', String(isActive));
+    entryKillSwitch.toggleClass('is-disabled', !isActive);
+    entryKillSwitch.find('i')
+        .toggleClass('fa-toggle-off', !isActive)
+        .toggleClass('fa-toggle-on', isActive);
+    entryKillSwitch.find('.killSwitchLabel').text(isActive ? 'Enabled' : 'Disabled');
 }
 
 /**
@@ -3361,6 +3461,7 @@ export async function getWorldEntry(name, data, entry, options = {}) {
     const headerTemplate = WI_ENTRY_HEADER_TEMPLATE.clone();
     headerTemplate.data('uid', entry.uid);
     headerTemplate.attr('uid', entry.uid);
+    updateEntryHeaderBadges(headerTemplate, entry);
 
     if (typeof power_user.wi_key_input_plaintext === 'undefined') power_user.wi_key_input_plaintext = true;
 
@@ -6171,6 +6272,9 @@ function updateAuxBooks(fileName, computeNext) {
 }
 
 export function initWorldInfo() {
+    worldInfoListViewFilter = getWorldInfoListViewFilter();
+    updateWorldInfoViewFilterButtons();
+
     $('#world_info').on('mousedown change', async function (e) {
         // If there's no world names, don't do anything
         if (world_names.length === 0) {
@@ -6346,6 +6450,18 @@ export function initWorldInfo() {
     $('#world_info_search').on('input', function () {
         const searchQuery = $(this).val();
         debouncedWorldInfoSearch(searchQuery);
+    });
+
+    $('.world_info_view_filter').on('click', function () {
+        const nextFilter = String($(this).data('filter') || WORLD_INFO_LIST_VIEW_FILTERS.all);
+        if (!Object.values(WORLD_INFO_LIST_VIEW_FILTERS).includes(nextFilter)) {
+            return;
+        }
+
+        worldInfoListViewFilter = nextFilter;
+        accountStorage.setItem(WORLD_INFO_LIST_VIEW_FILTER_KEY, nextFilter);
+        updateWorldInfoViewFilterButtons();
+        updateEditor(navigation_option.none, false);
     });
 
     $('#world_refresh').on('click', () => {

@@ -356,6 +356,40 @@
     color: var(--SmartThemeQuoteColor);
 }
 
+.world_entry .killSwitch {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.world_entry .killSwitch i {
+    font-size: calc(var(--mainFontSize) * 1.15);
+}
+
+.world_entry .killSwitch.is-disabled {
+    opacity: 0.78;
+}
+
+.world_entry .killSwitch.is-disabled i {
+    color: color-mix(in srgb, #d16b6b 78%, var(--SmartThemeBodyColor));
+}
+
+.world_entry .killSwitch:not(.is-disabled) i {
+    color: var(--SmartThemeQuoteColor);
+}
+
+.killSwitchLabel {
+    font-size: calc(var(--mainFontSize) * 0.76);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
 .wi-card-entry {
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 84%, transparent);
     border-radius: 18px;
@@ -415,7 +449,7 @@
 
 .WIEntryTitleAndStatus {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 52px;
+    grid-template-columns: minmax(0, 1fr) minmax(116px, auto);
     gap: 10px;
     align-items: center;
     min-width: 0;
@@ -433,17 +467,32 @@
 }
 
 .WIEntryTitleAndStatus select {
-    min-width: 52px;
+    min-width: 116px;
     min-height: 42px;
-    padding: 0;
-    text-align: center;
-    text-align-last: center;
+    padding-inline: 10px;
+    text-align: left;
+    text-align-last: left;
 }
 
 .WIEntryTitleAndStatus select[name="entryStateSelector"] {
-    width: 52px;
-    font-size: calc(var(--mainFontSize) * 1.04);
-    line-height: 1;
+    width: 116px;
+    font-size: calc(var(--mainFontSize) * 0.8);
+    font-weight: 600;
+    line-height: 1.1;
+}
+
+.world_entry.wi-entry-state-constant .WIEntryTitleAndStatus select[name="entryStateSelector"] {
+    border-color: color-mix(in srgb, #5aa9ff 58%, transparent);
+    background: color-mix(in srgb, #5aa9ff 12%, transparent);
+}
+
+.world_entry.wi-entry-state-normal .WIEntryTitleAndStatus select[name="entryStateSelector"] {
+    border-color: color-mix(in srgb, var(--SmartThemeBorderColor) 68%, transparent);
+}
+
+.world_entry.wi-entry-state-vectorized .WIEntryTitleAndStatus select[name="entryStateSelector"] {
+    border-color: color-mix(in srgb, #8ecf7a 58%, transparent);
+    background: color-mix(in srgb, #8ecf7a 12%, transparent);
 }
 
 .WIEnteryHeaderControls {
@@ -629,8 +678,14 @@ select.keyselect+span.select2-container .select2-selection--multiple {
 }
 
 .world_popup_action_group--library,
-.world_popup_action_group--entry {
+.world_popup_action_group--entry,
+.world_popup_action_group--view {
     flex: 1 1 220px;
+}
+
+.world_popup_action_group--view {
+    justify-content: space-between;
+    align-items: center;
 }
 
 .world_popup_action_group--filters {
@@ -663,6 +718,51 @@ select.keyselect+span.select2-container .select2-selection--multiple {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+.world_info_results_summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 42px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 68%, transparent);
+    font-size: calc(var(--mainFontSize) * 0.78);
+    line-height: 1.2;
+    opacity: 0.82;
+    white-space: nowrap;
+}
+
+.world_info_view_filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.world_info_view_filter {
+    min-height: 38px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 68%, transparent);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: calc(var(--mainFontSize) * 0.78);
+    cursor: pointer;
+    transition: border-color var(--animation-duration-2x), background var(--animation-duration-2x), opacity var(--animation-duration-2x);
+    opacity: 0.76;
+}
+
+.world_info_view_filter:hover,
+.world_info_view_filter.is-active {
+    opacity: 1;
+}
+
+.world_info_view_filter.is-active {
+    border-color: color-mix(in srgb, var(--SmartThemeQuoteColor) 56%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor) 14%, transparent);
 }
 
 .world_entry:has(input[name="delay_until_recursion"]:not(:checked)) .world_entry_form_control:has(input[name="delayUntilRecursionLevel"]) {
@@ -898,7 +998,8 @@ select.keyselect+span.select2-container .select2-selection--multiple {
     }
 
     .world_popup_action_group--select,
-    .world_popup_action_group--filters {
+    .world_popup_action_group--filters,
+    .world_popup_action_group--view {
         flex-basis: 100%;
     }
 
@@ -935,12 +1036,12 @@ select.keyselect+span.select2-container .select2-selection--multiple {
 
 @media screen and (max-width: 620px) {
     .WIEntryTitleAndStatus {
-        grid-template-columns: minmax(0, 1fr) 48px;
+        grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
     }
 
     .WIEntryTitleAndStatus select[name="entryStateSelector"] {
-        width: 48px;
-        min-width: 48px;
+        width: 100%;
+        min-width: 96px;
     }
 
     .WIEnteryHeaderControls {
@@ -984,7 +1085,8 @@ select.keyselect+span.select2-container .select2-selection--multiple {
     }
 
     #WorldInfo.sb-shell-embedded-content .world_popup_action_group--select,
-    #WorldInfo.sb-shell-embedded-content .world_popup_action_group--filters {
+    #WorldInfo.sb-shell-embedded-content .world_popup_action_group--filters,
+    #WorldInfo.sb-shell-embedded-content .world_popup_action_group--view {
         flex-basis: 100%;
     }
 
@@ -1087,11 +1189,11 @@ select.keyselect+span.select2-container .select2-selection--multiple {
     }
 
     #WorldInfo.sb-shell-embedded-content .WIEntryTitleAndStatus {
-        grid-template-columns: minmax(0, 1fr) 48px;
+        grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
     }
 
     #WorldInfo.sb-shell-embedded-content .WIEntryTitleAndStatus select[name="entryStateSelector"] {
-        width: 48px;
-        min-width: 48px;
+        width: 100%;
+        min-width: 96px;
     }
 }
