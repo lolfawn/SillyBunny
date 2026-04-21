@@ -84,10 +84,71 @@
     opacity: var(--sb-page-card-opacity, 1);
 }
 
-.welcomePanel.recentHidden .welcomeRecentShell,
+.welcomePanel.recentHidden:not(.welcomePanel--listOnly) .welcomeRecentShell,
 .welcomePanel.recentHidden .hideRecentChats,
 .welcomePanel:not(.recentHidden) .showRecentChats {
     display: none;
+}
+
+.welcomePanel--compact {
+    gap: 12px;
+    padding: 14px;
+}
+
+.welcomePanel--compact .welcomeHero {
+    display: block;
+}
+
+.welcomePanel--compact .welcomeHeroMedia,
+.welcomePanel--compact .welcomeHeroBlurb,
+.welcomePanel--compact .welcomeForkNotice,
+.welcomePanel--compact .welcomeActionGrid,
+.welcomePanel--compact .welcomeShortcuts,
+.welcomePanel--compact .welcomeDeck,
+.welcomePanel--listOnly .welcomeHero,
+.welcomePanel--listOnly .welcomeDeck {
+    display: none;
+}
+
+.welcomePanel--compact .welcomeHeroCopy {
+    gap: 0;
+}
+
+.welcomePanel--compact .welcomeHeaderTitle {
+    align-items: center;
+}
+
+.welcomePanel--compact .welcomeHeaderLogo {
+    width: 48px;
+    height: 48px;
+    padding: 6px;
+    border-radius: 16px;
+}
+
+.welcomePanel--compact .welcomeHeaderVersionDisplay {
+    font-size: calc(var(--mainFontSize) * 1.16);
+}
+
+.welcomePanel--compact .welcomeHeroTitleGroup::after {
+    content: "Home panel minimized. Recent chats stay below.";
+    display: block;
+    margin-top: 4px;
+    color: var(--welcome-muted-fg);
+    font-size: calc(var(--mainFontSize) * 0.76);
+    line-height: 1.35;
+}
+
+.welcomePanel--listOnly {
+    gap: 0;
+    padding: 10px;
+    border-radius: 22px;
+}
+
+.welcomePanelModeToggle.is-active,
+.welcomePanelModeChip.is-active {
+    color: var(--welcome-strong-fg);
+    border-color: color-mix(in srgb, var(--color-primary, #f1b285) 42%, var(--sb-shell-border, var(--SmartThemeBorderColor)));
+    box-shadow: 0 10px 20px color-mix(in srgb, var(--color-primary, #f1b285) 14%, transparent);
 }
 
 #chat:has(.welcomePanel) {
@@ -596,6 +657,31 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     color: var(--welcome-muted-fg);
     font-size: calc(var(--mainFontSize) * 0.82);
     line-height: 1.45;
+}
+
+.welcomeRecentControls {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.welcomePanelModeChip {
+    min-height: 36px;
+    gap: 8px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: calc(var(--mainFontSize) * 0.78);
+    white-space: nowrap;
+}
+
+.welcomePanelModeChip i {
+    font-size: calc(var(--mainFontSize) * 0.82);
+}
+
+.welcomePanelModeChip.is-active {
+    background: color-mix(in srgb, var(--color-primary, #f1b285) 18%, transparent);
 }
 
 .welcomeRecent .recentChatList {
@@ -1842,6 +1928,45 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
         border-radius: 20px;
     }
 
+    .welcomePanel--compact .welcomePanelToggles {
+        width: auto;
+        margin-left: auto;
+    }
+
+    .welcomePanel--compact .welcomeHeaderTitle {
+        flex-wrap: nowrap;
+    }
+
+    .welcomePanel--compact .welcomeHeaderLogo {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+    }
+
+    .welcomePanel--compact .welcomeHeaderVersionDisplay {
+        font-size: calc(var(--mainFontSize) * 1);
+    }
+
+    .welcomePanel--compact .welcomeHeroTitleGroup::after {
+        content: "Home minimized.";
+    }
+
+    .welcomeRecentControls {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .welcomeHeader {
+        flex-wrap: wrap;
+    }
+
+    .welcomePanelModeChip {
+        flex: 1 1 auto;
+        justify-content: center;
+        min-height: 34px;
+        padding: 0 10px;
+    }
+
     .recentChatsTitle {
         font-size: calc(var(--mainFontSize) * 1);
     }
@@ -1975,5 +2100,30 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
     .welcomeRecent {
         max-height: min(26vh, 210px);
         max-height: min(26dvh, 210px);
+    }
+
+    .welcomePanel--compact,
+    .welcomePanel--listOnly {
+        padding: 10px;
+    }
+
+    .welcomePanel--compact .welcomeHeaderLogo {
+        display: none;
+    }
+
+    .welcomePanel--compact .welcomeHeaderTitle {
+        flex-wrap: wrap;
+    }
+
+    .welcomePanel--compact .welcomePanelToggles {
+        width: 100%;
+    }
+
+    .welcomePanelModeChip span {
+        display: none;
+    }
+
+    .welcomePanelModeChip {
+        min-width: 42px;
     }
 }

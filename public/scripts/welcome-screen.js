@@ -39,6 +39,7 @@ const pinnedChatsKey = 'pinnedChats';
 const tutorialStatusKey = 'WelcomePage_TutorialStatus';
 const welcomeDeckViewKey = 'WelcomePage_DeckView';
 const welcomeDeckCollapsedKey = 'WelcomePage_DeckCollapsed';
+const welcomePanelModeKey = 'WelcomePage_PanelMode';
 const DEFAULT_BUNDLED_ASSISTANT_ID = 'guide';
 const bundledAssistantNahidaAvatarKey = 'bundledAssistantNahidaAvatar';
 const DEFAULT_NEUTRAL_ASSISTANT_NAME = 'Assistant';
@@ -250,6 +251,12 @@ const WELCOME_DECK_VIEWS = Object.freeze([
     },
 ]);
 
+const WELCOME_PANEL_MODES = Object.freeze({
+    full: 'full',
+    compact: 'compact',
+    list: 'list',
+});
+
 /**
  * @typedef {Pick<RecentChat, 'group' | 'avatar' | 'file_name'>} PinnedChat
  */
@@ -442,10 +449,6 @@ async function ensureBundledAssistantCharacter(config, { tryCreate = true, creat
     }
 }
 
-function getTutorialStatus() {
-    return getWelcomeUiPreference(tutorialStatusKey) || '';
-}
-
 function isWelcomeDeckView(view) {
     return WELCOME_DECK_VIEWS.some(item => item.id === view);
 }
@@ -463,6 +466,15 @@ function getInitialDeckView() {
 function isWelcomeDeckCollapsed() {
     const stored = getWelcomeUiPreference(welcomeDeckCollapsedKey);
     return stored === null ? true : stored === 'true';
+}
+
+function isWelcomePanelMode(mode) {
+    return Object.values(WELCOME_PANEL_MODES).includes(mode);
+}
+
+function getWelcomePanelMode() {
+    const storedMode = getWelcomeUiPreference(welcomePanelModeKey) || WELCOME_PANEL_MODES.full;
+    return isWelcomePanelMode(storedMode) ? storedMode : WELCOME_PANEL_MODES.full;
 }
 
 function getWelcomeUiPreference(key) {
@@ -798,6 +810,7 @@ function buildStarterPackItems() {
 function buildWelcomeTemplateData(chats) {
     const activeDeckView = getInitialDeckView();
     const deckCollapsed = isWelcomeDeckCollapsed();
+    const welcomePanelMode = getWelcomePanelMode();
 
     return {
         chats,
@@ -806,6 +819,10 @@ function buildWelcomeTemplateData(chats) {
         more: chats.some(chat => chat.hidden),
         activeDeckView,
         deckCollapsed,
+        welcomePanelMode,
+        welcomePanelFull: welcomePanelMode === WELCOME_PANEL_MODES.full,
+        welcomePanelCompact: welcomePanelMode === WELCOME_PANEL_MODES.compact,
+        welcomePanelListOnly: welcomePanelMode === WELCOME_PANEL_MODES.list,
         deckTabs: buildDeckTabs(activeDeckView),
         deckTourActive: activeDeckView === 'tour',
         deckBasicsActive: activeDeckView === 'basics',
@@ -930,6 +947,31 @@ function setWelcomeDeckCollapsed(root, collapsed, { persist = true } = {}) {
 
     if (persist) {
         setWelcomeUiPreference(welcomeDeckCollapsedKey, collapsed ? 'true' : 'false');
+    }
+}
+
+function setWelcomePanelMode(root, mode, { persist = true } = {}) {
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+
+    const safeMode = isWelcomePanelMode(mode) ? mode : WELCOME_PANEL_MODES.full;
+
+    root.dataset.homePanelMode = safeMode;
+    root.classList.toggle('welcomePanel--compact', safeMode === WELCOME_PANEL_MODES.compact);
+    root.classList.toggle('welcomePanel--listOnly', safeMode === WELCOME_PANEL_MODES.list);
+
+    root.querySelectorAll('[data-welcome-panel-mode-target]').forEach((button) => {
+        const isActive = button.getAttribute('data-welcome-panel-mode-target') === safeMode;
+        button.classList.toggle('is-active', isActive);
+
+        if (button instanceof HTMLButtonElement) {
+            button.setAttribute('aria-pressed', String(isActive));
+        }
+    });
+
+    if (persist) {
+        setWelcomeUiPreference(welcomePanelModeKey, safeMode);
     }
 }
 
@@ -1121,7 +1163,7 @@ async function sendWelcomePanel(chats, expand = false) {
             return;
         }
         const templateData = buildWelcomeTemplateData(chats);
-        const template = await renderTemplateAsync('/scripts/templates/welcomePanelOnboarding.html?v=20260408a', templateData, true, true, true);
+        const template = await renderTemplateAsync('/scripts/templates/welcomePanelOnboarding.html?v=20260421a', templateData, true, true, true);
         const fragment = document.createRange().createContextualFragment(template);
         fragment.querySelectorAll('.welcomePanel').forEach((root) => {
             const recentHiddenClass = 'recentHidden';
@@ -1142,8 +1184,14 @@ async function sendWelcomePanel(chats, expand = false) {
                     setWelcomeUiPreference(recentHiddenKey, 'true');
                 });
             });
+            root.querySelectorAll('[data-welcome-panel-mode-target]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    setWelcomePanelMode(root, button.getAttribute('data-welcome-panel-mode-target') || WELCOME_PANEL_MODES.full);
+                });
+            });
 
             const tutorialPanel = root.querySelector('.welcomeTourPanel');
+            setWelcomePanelMode(root, root.dataset.homePanelMode || getWelcomePanelMode(), { persist: false });
             setWelcomeDeckView(root, root.dataset.activeDeckView || getInitialDeckView(), { persist: false });
             setWelcomeDeckCollapsed(root, deck instanceof HTMLElement ? deck.dataset.collapsed === 'true' : isWelcomeDeckCollapsed(), { persist: false });
 

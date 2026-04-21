@@ -200,6 +200,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 **UI polish**
 
+- Added persistent Full Home, Compact, and List only display modes for the Home welcome panel so recent chats can stay visible without the large onboarding card taking over the chat area
 - Tightened the World Info workspace layout so the entry list and editor pane fit better on desktop-sized windows
 - Improved checkbox alignment, mobile/editor layout behavior, and escaped macro braces in the in-chat agent prompt placeholder so template tokens display literally
 
