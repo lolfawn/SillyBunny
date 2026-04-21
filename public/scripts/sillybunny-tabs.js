@@ -374,6 +374,7 @@ const sbState = {
     },
     shells: {},
     universalSearch: {
+        row: null,
         root: null,
         input: null,
         results: null,
@@ -868,20 +869,28 @@ function renderSearchEmptyState(container, title, detail) {
 
 function setUniversalSearchOpenState(isOpen, { focusInput = false } = {}) {
     const searchState = getUniversalSearchState();
+    const row = searchState.row;
     const root = searchState.root;
+    const input = searchState.input;
     const nextOpenState = Boolean(isOpen);
 
     searchState.expanded = nextOpenState;
+    row?.classList.toggle('is-open', nextOpenState);
+    row?.setAttribute('aria-hidden', String(!nextOpenState));
     root?.classList.toggle('is-open', nextOpenState);
+    root?.setAttribute('aria-expanded', String(nextOpenState));
+    if (input instanceof HTMLInputElement) {
+        input.tabIndex = nextOpenState ? 0 : -1;
+    }
 
     if (!nextOpenState) {
         searchState.results?.classList.remove('is-visible');
     } else {
-        renderUniversalSearchResults(searchState.input?.value ?? '');
+        renderUniversalSearchResults(input?.value ?? '');
     }
 
-    if (focusInput && searchState.input instanceof HTMLInputElement) {
-        searchState.input.focus({ preventScroll: true });
+    if (focusInput && input instanceof HTMLInputElement) {
+        input.focus({ preventScroll: true });
     }
 
     syncShortcutButtonActiveStates();
@@ -3711,6 +3720,11 @@ function buildUniversalSearchRow() {
     search.append(field, panel);
     row.appendChild(search);
 
+    row.setAttribute('aria-hidden', 'true');
+    search.setAttribute('aria-expanded', 'false');
+    searchInput.tabIndex = -1;
+
+    sbState.universalSearch.row = row;
     sbState.universalSearch.root = search;
     sbState.universalSearch.input = searchInput;
     sbState.universalSearch.results = searchResults;
@@ -3750,6 +3764,13 @@ function buildUniversalSearchRow() {
             const searchState = getUniversalSearchState();
 
             if (!searchState.expanded || !(searchState.root instanceof HTMLElement)) {
+                return;
+            }
+
+            const searchTrigger = event.target instanceof Element
+                ? event.target.closest('[data-sb-universal-search-trigger="true"]')
+                : null;
+            if (searchTrigger instanceof HTMLElement) {
                 return;
             }
 
@@ -5774,7 +5795,8 @@ function updateShortcutButton(side) {
     const button = document.getElementById(buttonId);
     if (!(button instanceof HTMLElement)) return;
 
-    const config = getShortcutConfig(getShortcutTarget(side));
+    const target = getShortcutTarget(side);
+    const config = getShortcutConfig(target);
     const icon = button.querySelector('i');
     const span = button.querySelector('span');
 
@@ -5786,6 +5808,7 @@ function updateShortcutButton(side) {
     }
     button.title = `Quick access: ${config.label}`;
     button.setAttribute('aria-label', `Quick access: ${config.label}`);
+    button.dataset.sbUniversalSearchTrigger = String(isSearchShortcutTarget(target));
     syncShortcutButtonActiveStates();
 }
 
