@@ -932,6 +932,10 @@
         background: var(--SmartThemeBlurTintColor);
     }
 
+    #character_popup {
+        z-index: 9100 !important;
+    }
+
     /*
      * Prevent original ST drawers from flashing on mobile before the
      * SillyBunny shell system initializes (~120ms after page load).
@@ -948,6 +952,16 @@
     .select2-search--dropdown .select2-search__field {
         display: block !important;
         width: 100% !important;
+
+    /* Reduce Import Folder and Sync Extensions button sizes on mobile */
+    .sb-server-action {
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+    }
+
+    .sb-server-action i {
+        font-size: 14px !important;
+    }
         padding: 10px !important;
         font-size: 16px !important; /* Prevents zoom on iOS */
         -webkit-appearance: none;

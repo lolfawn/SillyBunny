@@ -2732,7 +2732,11 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
     messageElement.find('.ch_name .name_text').text(mes.name);
     messageElement.find('.timestamp').text(timestamp).attr('title', `${mes.extra?.api ? mes.extra.api + ' - ' : ''}${mes.extra?.model ?? ''}`);
     messageElement.find('.mesIDDisplay').text(`#${messageId}`);
-    tokenCount && messageElement.find('.tokenCounterDisplay').text(`${tokenCount}t`);
+    if (tokenCount) {
+        const reasoningTokens = mes.extra?.reasoning_tokens;
+        const tokenDisplay = reasoningTokens > 0 ? `${tokenCount}t (${reasoningTokens}r)` : `${tokenCount}t`;
+        messageElement.find('.tokenCounterDisplay').text(tokenDisplay);
+    }
     updateMessageMetaBadges(messageElement, mes);
 
     mes.title && messageElement.attr('title', mes.title);
@@ -3807,7 +3811,9 @@ class StreamingProcessor {
             if (currentTokenCount) {
                 chat[messageId].extra.token_count = currentTokenCount;
                 if (this.messageTokenCounterDom instanceof HTMLElement) {
-                    this.messageTokenCounterDom.textContent = `${currentTokenCount}t`;
+                    const reasoningTokens = this.reasoningTokens || 0;
+                    const tokenDisplay = reasoningTokens > 0 ? `${currentTokenCount}t (${reasoningTokens}r)` : `${currentTokenCount}t`;
+                    this.messageTokenCounterDom.textContent = tokenDisplay;
                 }
             }
 
@@ -8400,6 +8406,13 @@ async function maybeAutoClearCacheOnVersionChange(isVersionChanged) {
         return false;
     }
 
+    // Prevent cache clear loop on fresh instances by checking if settings exist
+    const hasExistingSettings = localStorage.getItem('settings') !== null;
+    if (!hasExistingSettings) {
+        console.log('[Cache] Skipping auto-clear on fresh instance');
+        return false;
+    }
+
     const didClear = await clearFrontendCache({
         skipConfirmation: true,
         saveBeforeClear: false,
@@ -8410,7 +8423,7 @@ async function maybeAutoClearCacheOnVersionChange(isVersionChanged) {
     }
 
     toastr.info(t`SillyBunny updated. Clearing cached UI data and reloading...`, t`Update detected`);
-    window.setTimeout(() => window.location.reload(), 450);
+    window.setTimeout(() => window.location.reload(true), 450);
     return true;
 }
 

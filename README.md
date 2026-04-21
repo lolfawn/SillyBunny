@@ -180,6 +180,16 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ### v1.3.8 (2026-04-21)
 
+**Bug fixes**
+
+- Fixed extensions disappearing from UI after updates — stale entries in the disabled-extensions list are now automatically cleaned on reload
+- Fixed Advanced Definitions modal appearing behind Characters drawer on mobile by increasing z-index
+- Fixed reasoning token counts not displaying separately — now shows format like `150t (45r)` where 45r is reasoning tokens
+- Fixed auto-cache refresh causing initialization loop on fresh instances by skipping cache clear when no prior settings exist
+- Fixed auto-cache refresh not fully clearing cached assets by using hard reload instead of soft reload
+- Reduced Import Folder and Sync Extensions button sizes on mobile for better fit
+- Removed bloated search hint text and tab descriptions on mobile for cleaner UI
+
 **Reasoning and provider compatibility**
 
 - Added a separate "Show thought in chat" toggle so reasoning can be requested without forcing returned thought text to stay visible in chat

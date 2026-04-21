@@ -1608,7 +1608,21 @@ export async function loadExtensionSettings(settings, versionChanged, enableAuto
     extensionNames = extensions.map(x => x.name);
     extensionTypes = Object.fromEntries(extensions.map(x => [x.name, x.type]));
     manifests = await getManifests(extensionNames);
+
+    // Clean stale entries from disabledExtensions list
+    const originalDisabledCount = extension_settings.disabledExtensions.length;
+    extension_settings.disabledExtensions = extension_settings.disabledExtensions.filter(name => {
+        const exists = extensionNames.includes(name);
+        if (!exists) {
+            console.log(`[Extensions] Removed stale disabled extension: ${name}`);
+        }
+        return exists;
+    });
+    const removedCount = originalDisabledCount - extension_settings.disabledExtensions.length;
+
     if (applyBundledOptInDefaults()) {
+        saveSettingsDebounced();
+    } else if (removedCount > 0) {
         saveSettingsDebounced();
     }
 
