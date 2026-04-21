@@ -6,6 +6,7 @@ import {
     doNewChat,
     event_types,
     eventSource,
+    firstRun,
     getCharacters,
     getCurrentChatId,
     getRequestHeaders,
@@ -483,18 +484,12 @@ function getInitialDeckView() {
     return 'tour';
 }
 
-async function isWelcomeDeckCollapsed() {
+function isWelcomeDeckCollapsed() {
     const stored = getWelcomeUiPreference(welcomeDeckCollapsedKey);
     if (stored === null) {
         // Check if this is first run - if so, default to expanded (false)
         // Otherwise default to collapsed (true)
-        try {
-            // Import firstRun from script.js
-            const { firstRun } = await import('../script.js');
-            return firstRun ? false : true;
-        } catch {
-            return true;
-        }
+        return firstRun ? false : true;
     }
     return stored === 'true';
 }
@@ -873,9 +868,9 @@ function buildStarterPackItems() {
     };
 }
 
-async function buildWelcomeTemplateData(chats) {
+function buildWelcomeTemplateData(chats) {
     const activeDeckView = getInitialDeckView();
-    const deckCollapsed = await isWelcomeDeckCollapsed();
+    const deckCollapsed = isWelcomeDeckCollapsed();
     const welcomePanelMode = getWelcomePanelMode();
 
     return {
@@ -1175,7 +1170,7 @@ async function handleWelcomeAction(button, sendTextArea) {
             break;
         case 'open-launchpad':
             if (welcomePanel instanceof HTMLElement) {
-                const isCurrentlyCollapsed = await isWelcomeDeckCollapsed();
+                const isCurrentlyCollapsed = isWelcomeDeckCollapsed();
                 if (isCurrentlyCollapsed) {
                     setWelcomeDeckView(welcomePanel, welcomePanel.dataset.activeDeckView || getInitialDeckView());
                     setWelcomeDeckCollapsed(welcomePanel, false);
@@ -1239,7 +1234,7 @@ async function sendWelcomePanel(chats, expand = false) {
             console.error('Chat element not found');
             return;
         }
-        const templateData = await buildWelcomeTemplateData(chats);
+        const templateData = buildWelcomeTemplateData(chats);
         const template = await renderTemplateAsync('/scripts/templates/welcomePanelOnboarding.html?v=20260421a', templateData, true, true, true);
         const fragment = document.createRange().createContextualFragment(template);
         fragment.querySelectorAll('.welcomePanel').forEach((root) => {
@@ -1270,7 +1265,7 @@ async function sendWelcomePanel(chats, expand = false) {
             const tutorialPanel = root.querySelector('.welcomeTourPanel');
             setWelcomePanelMode(root, root.dataset.homePanelMode || getWelcomePanelMode(), { persist: false });
             setWelcomeDeckView(root, root.dataset.activeDeckView || getInitialDeckView(), { persist: false });
-            setWelcomeDeckCollapsed(root, deck instanceof HTMLElement ? deck.dataset.collapsed === 'true' : await isWelcomeDeckCollapsed(), { persist: false });
+            setWelcomeDeckCollapsed(root, deck instanceof HTMLElement ? deck.dataset.collapsed === 'true' : isWelcomeDeckCollapsed(), { persist: false });
 
             root.querySelectorAll('.welcomeDeckTab').forEach((button) => {
                 button.addEventListener('click', () => {
