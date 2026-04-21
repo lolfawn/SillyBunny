@@ -180,10 +180,11 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Latest Update
 
-### v1.3.8 (2026-04-21)
+### v1.4.0 (2026-04-21)
 
 **User Experience**
 
+- Bunny Preset Tools now treats Geechan-style `🌱 ━+` prompt headers as built-in collapsible sections, so those preset groups open as dropdowns automatically
 - Moved Open Launchpad button next to Temporary Chat for better visual alignment
 - Open Launchpad button now toggles the launchpad (opens if closed, closes if open)
 - Added active state highlighting to Open Launchpad button when launchpad is open

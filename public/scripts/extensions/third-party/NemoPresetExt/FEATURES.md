@@ -37,11 +37,11 @@ The core feature of NemoPresetExt. Transforms SillyTavern's flat prompt list int
 
 ### Capabilities
 
-- **Collapsible Sections** — Prompt names starting with divider patterns (`=`, `⭐─`, `━`) become section headers. Click to expand/collapse. Section state persists across sessions.
+- **Collapsible Sections** — Prompt names starting with divider patterns (`===`, `---`, `***`, `⭐─+`, `🌱 ━+`, `━+`) become section headers. Click to expand/collapse. Section state persists across sessions.
 - **Section Status** — Headers display enabled count (e.g., "5/12 enabled").
 - **Search & Filter** — Real-time case-insensitive search by prompt name. Clear button to reset.
 - **Drag-and-Drop Reordering** — Reorder prompts within and between sections via Sortable.js.
-- **Custom Divider Patterns** — Add custom regex patterns via settings (comma-separated). Combined with built-in patterns: `=+`, `⭐─+`, `━+`.
+- **Custom Divider Patterns** — Add custom regex patterns via settings (comma-separated). Combined with built-in patterns: `=+`, `---`, `***`, `⭐─+`, `🌱 ━+`, `━+`.
 - **Tooltip Extraction** — Hover tooltips from `@tooltip` directive or `{{// note }}` syntax. Lazy-loaded on first hover for performance.
 - **Snapshot System** — Save/restore prompt enabled states. Take a snapshot before experimenting, apply to roll back.
 - **Display Modes** — Toggle between "Tray" (overlay panels) and "Accordion" (inline collapsible) views.

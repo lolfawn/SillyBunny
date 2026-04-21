@@ -12,7 +12,7 @@ import { parsePromptDirectives } from '../directives/prompt-directives.js';
 import { disableTrayMode } from './category-tray.js';
 
 // 1. CONFIGURATION & STATE
-const NEMO_BUILT_IN_PATTERNS = ['=+', '⭐─+', '━+'];
+const NEMO_BUILT_IN_PATTERNS = ['=+', '-{3,}', '\\*{3,}', '(?:[^\\w\\s]+\\s*)?[─━—-]\\+'];
 
 const SELECTORS = {
     promptsContainer: '#completion_prompt_manager_list',
@@ -46,10 +46,10 @@ export async function loadAndSetDividerRegex() {
     }
     const combinedPatternString = [...new Set(finalPatterns)].join('|');
     try {
-        DIVIDER_PREFIX_REGEX = new RegExp(`^(${combinedPatternString})`);
+        DIVIDER_PREFIX_REGEX = new RegExp(`^(${combinedPatternString})`, 'u');
     } catch (e) {
         logger.error('Invalid regex pattern. Using built-ins only', e);
-        DIVIDER_PREFIX_REGEX = new RegExp(`^(${NEMO_BUILT_IN_PATTERNS.join('|')})`);
+        DIVIDER_PREFIX_REGEX = new RegExp(`^(${NEMO_BUILT_IN_PATTERNS.join('|')})`, 'u');
     }
 }
 

@@ -10,7 +10,7 @@ import { background_settings } from '../../../backgrounds.js';
 import { promptManager } from '../../../openai.js';
 
 const EXTENSION_NAME = 'NemoPresetExt';
-const BUILT_IN_DIVIDER_PATTERNS = ['=+', '-{3,}', '\\*{3,}', '[^\\w\\s]*[─—-]\\+'];
+const BUILT_IN_DIVIDER_PATTERNS = ['=+', '-{3,}', '\\*{3,}', '(?:[^\\w\\s]+\\s*)?[─━—-]\\+'];
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'ogv', 'm4v']);
 const BACKGROUND_LOCK_KEY = 'custom_background';
 
@@ -1181,7 +1181,7 @@ function injectSettingsPanel() {
                         <span>Save</span>
                     </button>
                 </div>
-                <div class="nemo-presetext-settings-help">Built-in divider patterns include headings that start with <code>===</code>, <code>---</code>, <code>***</code>, or symbol prefixes like <code>⭐─+</code>.</div>
+                <div class="nemo-presetext-settings-help">Built-in divider patterns include headings that start with <code>===</code>, <code>---</code>, <code>***</code>, or symbol prefixes like <code>⭐─+</code>, <code>🌱 ━+</code>, and <code>━+</code>.</div>
             </div>
         </div>
     `;

@@ -183,6 +183,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 **User Experience**
 
+- Bunny Preset Tools now treats Geechan-style `🌱 ━+` prompt headers as built-in collapsible sections, so those preset groups open as dropdowns automatically
 - Replaced the old per-shell settings search bars with a single universal search row under the SillyBunny logo, so search is always available no matter which panel is open
 - Universal search now expands downward from the top bar, searches across both Workspace and Customize, and jumps directly to matching settings on desktop and mobile
 - Moved Open Launchpad button next to Temporary Chat for better visual alignment
