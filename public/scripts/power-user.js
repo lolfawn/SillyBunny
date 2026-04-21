@@ -4030,17 +4030,41 @@ jQuery(async () => {
         let quoteColor, underlineColor;
 
         switch (accent) {
-            case 'forest':
-                quoteColor = 'rgba(114, 192, 144, 1)';
-                underlineColor = 'rgba(131, 179, 142, 1)';
+            case 'blue':
+                quoteColor = 'rgba(59, 130, 246, 1)';
+                underlineColor = 'rgba(96, 165, 250, 1)';
                 break;
-            case 'rose':
-                quoteColor = 'rgba(156, 207, 216, 1)';
-                underlineColor = 'rgba(235, 188, 186, 1)';
+            case 'cyan':
+                quoteColor = 'rgba(6, 182, 212, 1)';
+                underlineColor = 'rgba(34, 211, 238, 1)';
                 break;
-            case 'amber':
-                quoteColor = 'rgba(241, 178, 133, 1)';
-                underlineColor = 'rgba(223, 142, 112, 1)';
+            case 'green':
+                quoteColor = 'rgba(16, 185, 129, 1)';
+                underlineColor = 'rgba(52, 211, 153, 1)';
+                break;
+            case 'yellow':
+                quoteColor = 'rgba(245, 158, 11, 1)';
+                underlineColor = 'rgba(251, 191, 36, 1)';
+                break;
+            case 'orange':
+                quoteColor = 'rgba(249, 115, 22, 1)';
+                underlineColor = 'rgba(251, 146, 60, 1)';
+                break;
+            case 'red':
+                quoteColor = 'rgba(239, 68, 68, 1)';
+                underlineColor = 'rgba(248, 113, 113, 1)';
+                break;
+            case 'pink':
+                quoteColor = 'rgba(236, 72, 153, 1)';
+                underlineColor = 'rgba(244, 114, 182, 1)';
+                break;
+            case 'purple':
+                quoteColor = 'rgba(168, 85, 247, 1)';
+                underlineColor = 'rgba(192, 132, 252, 1)';
+                break;
+            case 'gray':
+                quoteColor = 'rgba(107, 114, 128, 1)';
+                underlineColor = 'rgba(156, 163, 175, 1)';
                 break;
         }
 
