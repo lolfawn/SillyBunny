@@ -442,6 +442,7 @@ async function sendMakerSuiteRequest(request, response) {
     const requestImages = Boolean(request.body.request_images);
     const reasoningEffort = String(request.body.reasoning_effort);
     const includeReasoning = Boolean(request.body.include_reasoning);
+    const showThoughtsInChat = request.body.show_thoughts_ui !== false;
     const aspectRatio = String(request.body.request_image_aspect_ratio);
     const imageSize = String(request.body.request_image_resolution);
     const isGemma = model.includes('gemma');
@@ -543,7 +544,8 @@ async function sendMakerSuiteRequest(request, response) {
         }
 
         if (isThinkingConfigModel(model)) {
-            const thinkingConfig = { includeThoughts: includeReasoning };
+            const thinkingConfig = {};
+            const shouldIncludeThoughts = includeReasoning && showThoughtsInChat;
 
             const thinkingBudget = calculateGoogleBudgetTokens(generationConfig.maxOutputTokens, reasoningEffort, model);
             if (typeof thinkingBudget === 'number' && Number.isInteger(thinkingBudget)) {
@@ -555,12 +557,15 @@ async function sendMakerSuiteRequest(request, response) {
             }
 
             // Vertex doesn't allow mixing disabled thinking with includeThoughts
-            if (useVertexAi && thinkingBudget === 0 && thinkingConfig.includeThoughts) {
+            if (shouldIncludeThoughts && useVertexAi && thinkingBudget === 0) {
                 console.info('Thinking budget is 0, but includeThoughts is true. Thoughts will not be included in the response.');
-                thinkingConfig.includeThoughts = false;
+            } else if (shouldIncludeThoughts) {
+                thinkingConfig.includeThoughts = true;
             }
 
-            generationConfig.thinkingConfig = thinkingConfig;
+            if (Object.keys(thinkingConfig).length > 0) {
+                generationConfig.thinkingConfig = thinkingConfig;
+            }
         }
 
         let body = {

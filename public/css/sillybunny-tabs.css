@@ -1153,6 +1153,46 @@ body.sb-shell-resizing * {
     flex-shrink: 0;
 }
 
+.sb-shell-nav-scroll {
+    position: absolute;
+    top: 50%;
+    z-index: 3;
+    width: 28px;
+    height: 28px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in srgb, var(--sb-shell-border) 86%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sb-surface-strong) 84%, transparent);
+    color: var(--SmartThemeBodyColor);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--SmartThemeShadowColor) 24%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+    transition: opacity 180ms ease, transform 180ms ease, background-color 180ms ease;
+    touch-action: manipulation;
+}
+
+.sb-shell-nav-scroll:disabled {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sb-shell-nav-scroll-left {
+    left: 6px;
+}
+
+.sb-shell-nav-scroll-right {
+    right: 6px;
+}
+
+.sb-shell-nav-wrapper.sb-can-scroll-left .sb-shell-nav-scroll-left,
+.sb-shell-nav-wrapper.sb-can-scroll-right .sb-shell-nav-scroll-right {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 .sb-shell-nav-wrapper::before,
 .sb-shell-nav-wrapper::after {
     content: '';
@@ -2751,6 +2791,8 @@ body.sb-shell-resizing * {
     }
 
     .sb-shell-nav {
+        justify-content: flex-start;
+        scroll-padding-inline: 32px;
         touch-action: pan-x;
     }
 
@@ -3283,8 +3325,9 @@ body.sb-shell-resizing * {
     }
 
     .sb-shell-nav {
+        justify-content: flex-start;
         gap: 2px;
-        padding: 3px 3px 5px;
+        padding: 3px 32px 5px;
     }
 
     .sb-shell-tab {
@@ -3408,6 +3451,12 @@ body.sb-shell-resizing * {
         opacity: 1 !important;
         visibility: visible !important;
         pointer-events: auto !important;
+    }
+}
+
+@media (pointer: coarse), screen and (max-width: 1000px) {
+    .sb-shell-nav-scroll {
+        display: inline-flex;
     }
 }
 

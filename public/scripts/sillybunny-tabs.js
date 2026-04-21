@@ -5728,6 +5728,12 @@ function setActiveTab(shellKey, tabId, { focusButton = false } = {}) {
     shellState.headerTitle.textContent = activeTab.label;
     shellState.headerSubtitle.textContent = activeTab.description;
     updateShellSearchAssist(shellKey);
+    activeTab.button?.scrollIntoView({
+        block: 'nearest',
+        inline: 'nearest',
+        behavior: focusButton ? 'smooth' : 'auto',
+    });
+    shellState.updateNavScrollIndicators?.();
 
     if (focusButton) {
         activeTab.button?.focus();
@@ -5829,6 +5835,13 @@ function buildShell(shellKey) {
 
     const frame = createElement('div', { className: 'sb-shell-frame' });
     const navWrapper = createElement('div', { className: 'sb-shell-nav-wrapper' });
+    const navScrollLeft = createElement('button', {
+        className: 'sb-shell-nav-scroll sb-shell-nav-scroll-left',
+        attrs: {
+            type: 'button',
+            'aria-label': `Scroll ${shellConfig.title} sections left`,
+        },
+    });
     const nav = createElement('nav', {
         className: 'sb-shell-nav',
         attrs: {
@@ -5837,17 +5850,37 @@ function buildShell(shellKey) {
             'aria-orientation': 'horizontal',
         },
     });
-    navWrapper.appendChild(nav);
+    const navScrollRight = createElement('button', {
+        className: 'sb-shell-nav-scroll sb-shell-nav-scroll-right',
+        attrs: {
+            type: 'button',
+            'aria-label': `Scroll ${shellConfig.title} sections right`,
+        },
+    });
+    navScrollLeft.innerHTML = '<i class="fa-solid fa-chevron-left" aria-hidden="true"></i>';
+    navScrollRight.innerHTML = '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
+    navWrapper.append(navScrollLeft, nav, navScrollRight);
+
+    const scrollNavByPage = direction => {
+        nav.scrollBy({
+            left: direction * Math.max(nav.clientWidth * 0.72, 160),
+            behavior: 'smooth',
+        });
+    };
 
     const updateNavScrollIndicators = () => {
         const canScrollLeft = nav.scrollLeft > 0;
         const canScrollRight = Math.ceil(nav.scrollLeft + nav.clientWidth) < nav.scrollWidth;
         navWrapper.classList.toggle('sb-can-scroll-left', canScrollLeft);
         navWrapper.classList.toggle('sb-can-scroll-right', canScrollRight);
+        navScrollLeft.disabled = !canScrollLeft;
+        navScrollRight.disabled = !canScrollRight;
     };
 
     nav.addEventListener('scroll', updateNavScrollIndicators, { passive: true });
     window.addEventListener('resize', updateNavScrollIndicators, { passive: true });
+    navScrollLeft.addEventListener('click', () => scrollNavByPage(-1));
+    navScrollRight.addEventListener('click', () => scrollNavByPage(1));
 
     setTimeout(updateNavScrollIndicators, 100);
 
@@ -5909,6 +5942,7 @@ function buildShell(shellKey) {
         searchResults,
         root: shellRoot,
         resizeHandle,
+        updateNavScrollIndicators,
     };
 
     sbState.shells[shellKey] = shellState;
@@ -6061,6 +6095,7 @@ function registerShellTab(shellKey, tabConfig, panelBundle, explicitSearchRoot =
     });
 
     shellState.nav.appendChild(button);
+    shellState.updateNavScrollIndicators?.();
     shellState.tabs.set(tabConfig.id, {
         ...tabConfig,
         button,

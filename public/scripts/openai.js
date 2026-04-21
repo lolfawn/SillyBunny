@@ -3226,22 +3226,22 @@ function saveModelList(data) {
     if (oai_settings.chat_completion_source == chat_completion_sources.CLAUDE) {
         // Clear only dynamic models from "Other" optgroup
         $('#claude_other_models').empty();
-        
+
         // Get static model option values to avoid duplicates
         const staticClaudeModels = [];
-        $('#model_claude_select option').each(function() {
+        $('#model_claude_select option').each(function () {
             staticClaudeModels.push($(this).val());
         });
-        
+
         // Add dynamic models not already in static list
         model_list.forEach((model) => {
             if (!staticClaudeModels.includes(model.id)) {
                 $('#claude_other_models').append(
-                    $('<option>', { value: model.id, text: model.id })
+                    $('<option>', { value: model.id, text: model.id }),
                 );
             }
         });
-        
+
         // If no models loaded, static list remains as fallback
         if (model_list.length > 0) {
             const selectedModel = [...staticClaudeModels, ...model_list.map(m => m.id)].includes(oai_settings.claude_model)
@@ -3256,13 +3256,13 @@ function saveModelList(data) {
     if (oai_settings.chat_completion_source == chat_completion_sources.AI21) {
         $('#ai21_other_models').empty();
         const staticAI21Models = [];
-        $('#model_ai21_select option').each(function() {
+        $('#model_ai21_select option').each(function () {
             staticAI21Models.push($(this).val());
         });
         model_list.forEach((model) => {
             if (!staticAI21Models.includes(model.id)) {
                 $('#ai21_other_models').append(
-                    $('<option>', { value: model.id, text: model.id })
+                    $('<option>', { value: model.id, text: model.id }),
                 );
             }
         });
@@ -3279,13 +3279,13 @@ function saveModelList(data) {
     if (oai_settings.chat_completion_source == chat_completion_sources.COHERE) {
         $('#cohere_other_models').empty();
         const staticCohereModels = [];
-        $('#model_cohere_select option').each(function() {
+        $('#model_cohere_select option').each(function () {
             staticCohereModels.push($(this).val());
         });
         model_list.forEach((model) => {
             if (!staticCohereModels.includes(model.id)) {
                 $('#cohere_other_models').append(
-                    $('<option>', { value: model.id, text: model.id })
+                    $('<option>', { value: model.id, text: model.id }),
                 );
             }
         });
@@ -3302,13 +3302,13 @@ function saveModelList(data) {
     if (oai_settings.chat_completion_source == chat_completion_sources.PERPLEXITY) {
         $('#perplexity_other_models').empty();
         const staticPerplexityModels = [];
-        $('#model_perplexity_select option').each(function() {
+        $('#model_perplexity_select option').each(function () {
             staticPerplexityModels.push($(this).val());
         });
         model_list.forEach((model) => {
             if (!staticPerplexityModels.includes(model.id)) {
                 $('#perplexity_other_models').append(
-                    $('<option>', { value: model.id, text: model.id })
+                    $('<option>', { value: model.id, text: model.id }),
                 );
             }
         });
@@ -3325,13 +3325,13 @@ function saveModelList(data) {
     if (oai_settings.chat_completion_source == chat_completion_sources.ZAI) {
         $('#zai_other_models').empty();
         const staticZAIModels = [];
-        $('#model_zai_select option').each(function() {
+        $('#model_zai_select option').each(function () {
             staticZAIModels.push($(this).val());
         });
         model_list.forEach((model) => {
             if (!staticZAIModels.includes(model.id)) {
                 $('#zai_other_models').append(
-                    $('<option>', { value: model.id, text: model.id })
+                    $('<option>', { value: model.id, text: model.id }),
                 );
             }
         });
@@ -3351,7 +3351,7 @@ function saveModelList(data) {
 
         // Get static model option values to avoid duplicates
         const staticVertexAIModels = [];
-        $('#model_vertexai_select option').each(function() {
+        $('#model_vertexai_select option').each(function () {
             staticVertexAIModels.push($(this).val());
         });
 
@@ -3359,7 +3359,7 @@ function saveModelList(data) {
         model_list.forEach((model) => {
             if (!staticVertexAIModels.includes(model.id)) {
                 $('#vertexai_other_models').append(
-                    $('<option>', { value: model.id, text: model.id })
+                    $('<option>', { value: model.id, text: model.id }),
                 );
             }
         });
@@ -3766,6 +3766,7 @@ export async function createGenerationParameters(settings, model, type, messages
         'char_name': name2,
         'group_names': getGroupNames(),
         'include_reasoning': Boolean(settings.show_thoughts),
+        'show_thoughts_ui': Boolean(settings.show_thoughts_ui),
         'reasoning_effort': getReasoningEffort(settings, model),
         'enable_web_search': Boolean(settings.enable_web_search),
         'request_images': Boolean(settings.request_images),
