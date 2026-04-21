@@ -178,6 +178,31 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Latest Update
 
+### v1.3.8 (2026-04-21)
+
+**Reasoning and provider compatibility**
+
+- Added a separate "Show thought in chat" toggle so reasoning can be requested without forcing returned thought text to stay visible in chat
+- Fixed response text extraction for OpenAI-style and Gemini-style payloads so parts/content/candidates/tool-plan formats render correctly instead of collapsing into blank or broken output
+- Fixed Gemini thought-signature handling by reading `candidates[].content.parts` correctly and checking the `gemini.thoughtSignatures` config dynamically
+
+**Agents and message tools**
+
+- Fixed message metadata badges so reasoning-token counts and agent-change actions stay in sync during both initial render and later message updates
+- Upgraded in-chat agent transform history to show semantic diffs with insert/delete highlighting while keeping Undo/Redo actions
+- Added a dedicated "View agent changes" message action and wired it to the same transform-history popup as the inline badge
+- Hardened agent error/result serialization for non-JSON values and updated adventure-helper status copy to be clearer in the UI
+
+**Bottom bar and persona fixes**
+
+- Fixed bottom-bar chat switching to use the shared chat-opening flow and added retry refresh logic so chat lists populate more reliably after startup and chat events
+- Fixed bottom-bar persona switching by preferring `/persona-set` with safely quoted avatar ids and improving active persona detection
+
+**UI polish**
+
+- Tightened the World Info workspace layout so the entry list and editor pane fit better on desktop-sized windows
+- Improved checkbox alignment, mobile/editor layout behavior, and escaped macro braces in the in-chat agent prompt placeholder so template tokens display literally
+
 ### v1.3.7 (2026-04-17)
 
 **Tokenizer and compatibility**
