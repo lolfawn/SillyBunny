@@ -1,5 +1,5 @@
 import { getPresetManager } from './preset-manager.js';
-import { extractJsonFromData, extractMessageFromData, getGenerateUrl, getRequestHeaders, name1, name2 } from '../script.js';
+import { extractJsonFromData, extractMessageFromData, getGenerateUrl, getRequestHeaders, name1, name2, normalizeContentText } from '../script.js';
 import { getTextGenServer, createTextGenGenerationData, setting_names, textgenerationwebui_settings } from './textgen-settings.js';
 import { extractReasoningFromData } from './reasoning.js';
 import { formatInstructModeChat, formatInstructModePrompt, getInstructStoppingSequences } from './instruct-mode.js';
@@ -77,6 +77,17 @@ import EventSourceStream from './sse-stream.js';
  */
 export class TextCompletionService {
     static TYPE = 'textgenerationwebui';
+
+    /**
+     * Converts chat-style prompt messages into plain text without implicit object coercion.
+     * @param {ChatCompletionMessage[]} prompt
+     * @returns {string}
+     */
+    static flattenPromptMessages(prompt) {
+        return prompt
+            .map(message => normalizeContentText(message?.content))
+            .join('\n\n');
+    }
 
     /**
      * @param {Record<string, any> & TextCompletionRequestBase & {prompt: string}} custom
@@ -216,7 +227,8 @@ export class TextCompletionService {
         const formattedMessages = [];
         const prefillActive = prompt.length > 0 ? prompt[prompt.length - 1].role === 'assistant' : false;
         for (const message of prompt) {
-            let messageContent = message.content;
+            const rawMessageContent = normalizeContentText(message.content);
+            let messageContent = rawMessageContent;
             if (!message.ignoreInstruct) {
                 const isLastMessage = message === prompt[prompt.length - 1];
 
@@ -226,7 +238,7 @@ export class TextCompletionService {
                 if (!isLastMessage || !prefillActive) {
                     messageContent = formatInstructModeChat(
                         message.name ?? message.role,
-                        message.content,
+                        rawMessageContent,
                         message.role === 'user',
                         message.role === 'system',
                         undefined,
@@ -243,7 +255,7 @@ export class TextCompletionService {
                     let last_line = formatInstructModePrompt(
                         'assistant',  // for sequences using {{name}}
                         false,  // not an impersonation
-                        prefillActive ? message.content : undefined,  // if using prefill, last message is the prefill
+                        prefillActive ? rawMessageContent : undefined,  // if using prefill, last message is the prefill
                         name1,  // for macros
                         name2,  // for macros
                         true,   // quiet
@@ -252,7 +264,7 @@ export class TextCompletionService {
                     );
 
                     if (prefillActive) {  // content is the prefilled message
-                        if (last_line.endsWith('\n') && !message.content.endsWith('\n')) {
+                        if (last_line.endsWith('\n') && !rawMessageContent.endsWith('\n')) {
                             last_line = last_line.slice(0, -1);  // remove newline after prefill if it's not in the prefill itself
                         }
                         messageContent = last_line;
@@ -300,10 +312,10 @@ export class TextCompletionService {
                     requestData.stopping_strings = stoppingStrings;
                 } else {
                     console.warn(`Instruct preset "${instructName}" not found, using basic formatting`);
-                    requestData.prompt = prompt.map(x => x.content).join('\n\n');
+                    requestData.prompt = this.flattenPromptMessages(prompt);
                 }
             } else {
-                requestData.prompt = prompt.map(x => x.content).join('\n\n');
+                requestData.prompt = this.flattenPromptMessages(prompt);
             }
         } else if (typeof prompt === 'string') {
             requestData.prompt = prompt;

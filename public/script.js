@@ -4078,7 +4078,8 @@ export function createRawPrompt(prompt, api, instructOverride, quietToLoud, syst
         if (message.role === 'assistant') name = message.name ?? name2;
         if (message.role === 'system') name = message.name ?? '';
         const prefix = isInstruct || api === 'openai' ? '' : (name ? `${name}: ` : '');
-        message.content = prefix + substituteParams(message.content ?? '');
+        const messageContent = normalizeContentText(message.content);
+        message.content = prefix + substituteParams(messageContent);
         if (isInstruct) {  // instruct formatting for text completion
             const isUser = message.role === 'user';
             const isNarrator = message.role === 'system';
@@ -6407,72 +6408,106 @@ function parseAndSaveLogprobs(data, continueFrom) {
 }
 
 /**
+ * Stringifies an unknown value without falling back to implicit object coercion.
+ * @param {any} value
+ * @returns {string}
+ */
+export function stringifyUnknown(value) {
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    if (value == null) {
+        return '';
+    }
+
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return String(value);
+    }
+}
+
+/**
+ * Extracts plain text from common structured content payloads.
+ * @param {any} value
+ * @returns {string}
+ */
+export function normalizeContentText(value) {
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
+
+    if (value == null) {
+        return '';
+    }
+
+    if (Array.isArray(value)) {
+        return value
+            .map(item => normalizeContentText(item))
+            .filter(Boolean)
+            .join('\n\n');
+    }
+
+    if (typeof value === 'object') {
+        if (typeof value.text === 'string') {
+            return value.text;
+        }
+        if (typeof value.content === 'string') {
+            return value.content;
+        }
+        if (typeof value.thinking === 'string') {
+            return value.thinking;
+        }
+        if (typeof value.tool_plan === 'string') {
+            return value.tool_plan;
+        }
+        if (typeof value.reasoning === 'string') {
+            return value.reasoning;
+        }
+        if (typeof value.output === 'string') {
+            return value.output;
+        }
+        if (typeof value.message === 'string') {
+            return value.message;
+        }
+        if (Array.isArray(value.parts)) {
+            return normalizeContentText(value.parts);
+        }
+        if (Array.isArray(value.content)) {
+            return normalizeContentText(value.content);
+        }
+        if (typeof value.content === 'object' && value.content !== null) {
+            const nestedContent = normalizeContentText(value.content);
+            if (nestedContent) {
+                return nestedContent;
+            }
+        }
+        if (Array.isArray(value.tool_plan)) {
+            return normalizeContentText(value.tool_plan);
+        }
+        if (Array.isArray(value.reasoning)) {
+            return normalizeContentText(value.reasoning);
+        }
+        if (Array.isArray(value.output)) {
+            return normalizeContentText(value.output);
+        }
+    }
+
+    return '';
+}
+
+/**
  * Extracts the message from the response data.
  * @param {object} data Response data
  * @param {string} activeApi If it's set, ignores active API
  * @returns {string} Extracted message
  */
 export function extractMessageFromData(data, activeApi = null) {
-    const stringifyUnknown = (value) => {
-        if (typeof value === 'string') {
-            return value;
-        }
-
-        if (value == null) {
-            return '';
-        }
-
-        try {
-            return JSON.stringify(value);
-        } catch {
-            return String(value);
-        }
-    };
-
-    const normalizeContentText = (value) => {
-        if (typeof value === 'string') {
-            return value;
-        }
-
-        if (Array.isArray(value)) {
-            return value
-                .map(item => {
-                    if (typeof item === 'string') {
-                        return item;
-                    }
-                    if (typeof item?.text === 'string') {
-                        return item.text;
-                    }
-                    if (typeof item?.content === 'string') {
-                        return item.content;
-                    }
-                    if (typeof item?.thinking === 'string') {
-                        return item.thinking;
-                    }
-                    return '';
-                })
-                .filter(Boolean)
-                .join('\n\n');
-        }
-
-        if (typeof value === 'object') {
-            if (typeof value.text === 'string') {
-                return value.text;
-            }
-            if (Array.isArray(value.parts)) {
-                return value.parts
-                    .map(part => typeof part?.text === 'string' ? part.text : '')
-                    .filter(Boolean)
-                    .join('\n\n');
-            }
-            if (Array.isArray(value.content)) {
-                return normalizeContentText(value.content);
-            }
-        }
-
-        return '';
-    };
-
     function getResult() {
         if (typeof data === 'string') {
             return data;

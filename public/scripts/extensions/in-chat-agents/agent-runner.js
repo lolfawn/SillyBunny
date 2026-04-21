@@ -6,6 +6,7 @@ import {
     setExtensionPrompt,
     substituteParams,
     generateQuietPrompt,
+    normalizeContentText,
     saveChatDebounced,
     streamingProcessor,
     syncMesToSwipe,
@@ -529,8 +530,8 @@ function updatePromptTransformHistory(message, run) {
         agentId: run.agentId,
         agentName: run.agentName,
         mode: run.mode,
-        beforeText: String(run.beforeText ?? ''),
-        afterText: String(run.nextMessageText ?? ''),
+        beforeText: normalizeContentText(run.beforeText),
+        afterText: normalizeContentText(run.nextMessageText),
         timestamp: run.timestamp,
     });
 
@@ -546,6 +547,7 @@ function buildPromptTransformMessages(agentPrompt, messageText, assistantName, g
     const actionInstruction = mode === 'append'
         ? 'Generate only the new content that should be appended after the assistant response according to the instructions above. Do not repeat, rewrite, summarize, or quote the original assistant response. Return only the appended content, with no labels or commentary unless the appended content itself requires them.'
         : 'Rewrite the assistant response according to the instructions above. Return only the final rewritten assistant response. If no changes are needed, return the original response verbatim. Do not add commentary, labels, or code fences unless the response itself requires them.';
+    const currentAssistantResponse = normalizeContentText(messageText);
 
     return [
         {
@@ -554,14 +556,14 @@ function buildPromptTransformMessages(agentPrompt, messageText, assistantName, g
         },
         {
             role: 'user',
-            content: `Assistant name: ${assistantName || 'Assistant'}\nGeneration type: ${generationType}\n\nCurrent assistant response:\n<assistant_response>\n${messageText}\n</assistant_response>`,
+            content: `Assistant name: ${assistantName || 'Assistant'}\nGeneration type: ${generationType}\n\nCurrent assistant response:\n<assistant_response>\n${currentAssistantResponse}\n</assistant_response>`,
         },
     ];
 }
 
 function appendPromptTransformOutput(originalText, appendedText) {
-    const baseText = String(originalText ?? '');
-    const addition = String(appendedText ?? '').trim();
+    const baseText = normalizeContentText(originalText);
+    const addition = normalizeContentText(appendedText).trim();
 
     if (!addition) {
         return baseText;
@@ -583,8 +585,8 @@ function appendPromptTransformOutput(originalText, appendedText) {
 }
 
 function joinPromptTransformText(leftText, rightText) {
-    const left = String(leftText ?? '');
-    const right = String(rightText ?? '');
+    const left = normalizeContentText(leftText);
+    const right = normalizeContentText(rightText);
 
     if (!left) {
         return right;
@@ -611,7 +613,7 @@ function shouldPrependPromptTransformOutput(agent, outputText = '') {
         return true;
     }
 
-    return PREPEND_PROMPT_TRANSFORM_TAG_RE.test(String(outputText ?? ''));
+    return PREPEND_PROMPT_TRANSFORM_TAG_RE.test(normalizeContentText(outputText));
 }
 
 function sanitizePromptTransformRunForStorage(result) {
@@ -630,9 +632,10 @@ function consolidateAppendPromptTransformOutputs(baseText, agents, results) {
     const appendSegments = [];
     const seenSegments = new Set();
     const agentMap = new Map((Array.isArray(agents) ? agents : []).map(agent => [agent.id, agent]));
+    const normalizedBaseText = normalizeContentText(baseText);
 
     for (const result of Array.isArray(results) ? results : []) {
-        const outputText = String(result?.outputText ?? '').trim();
+        const outputText = normalizeContentText(result?.outputText).trim();
         if (!outputText) {
             continue;
         }
@@ -648,7 +651,7 @@ function consolidateAppendPromptTransformOutputs(baseText, agents, results) {
         (shouldPrepend ? prependSegments : appendSegments).push(outputText);
     }
 
-    let mergedText = String(baseText ?? '');
+    let mergedText = normalizedBaseText;
     if (prependSegments.length > 0) {
         mergedText = joinPromptTransformText(prependSegments.join('\n\n'), mergedText);
     }
@@ -658,98 +661,27 @@ function consolidateAppendPromptTransformOutputs(baseText, agents, results) {
 
     return {
         text: mergedText,
-        changed: mergedText !== String(baseText ?? ''),
-        beforeText: String(baseText ?? ''),
+        changed: mergedText !== normalizedBaseText,
+        beforeText: normalizedBaseText,
     };
 }
 
 function extractProfileResponseText(response) {
-    if (typeof response === 'string') {
-        return response;
-    }
-
-    if (response == null) {
-        return '';
-    }
-
-    // Handle ConnectionManager response: { content: string, reasoning: string }
-    if (typeof response.content === 'string') {
-        return response.content;
-    }
-
-    // Handle Gemini-style response: { content: { parts: [{ text: "..." }] } }
-    if (Array.isArray(response.content)) {
-        return response.content
-            .filter(part => typeof part?.text === 'string')
-            .map(part => part.text)
-            .join('\n\n');
-    }
-
-    // Handle response.content being an object with parts (Gemini format)
-    if (typeof response.content === 'object' && response.content !== null) {
-        if (Array.isArray(response.content.parts)) {
-            return response.content.parts
-                .filter(part => typeof part?.text === 'string')
-                .map(part => part.text)
-                .join('\n\n');
-        }
-        // Single text field inside content object
-        if (typeof response.content.text === 'string') {
-            return response.content.text;
-        }
-    }
-
-    // Handle direct Gemini candidates format: { candidates: [{ content: { parts: [...] } }] }
-    if (Array.isArray(response.candidates)) {
-        const candidate = response.candidates[0];
-        const parts = candidate?.content?.parts ?? candidate?.output?.parts ?? [];
-        if (Array.isArray(parts) && parts.length > 0) {
-            return parts
-                .filter(part => typeof part?.text === 'string')
-                .map(part => part.text)
-                .join('\n\n');
-        }
-        if (typeof candidate?.output === 'string') {
-            return candidate.output;
-        }
-    }
-
-    // Handle OpenAI-style: { choices: [{ message: { content: "..." } }] }
-    if (Array.isArray(response.choices)) {
-        const content = response.choices[0]?.message?.content;
-        if (typeof content === 'string') {
-            return content;
-        }
-        if (typeof content === 'object' && content !== null) {
-            if (Array.isArray(content)) {
-                return content
-                    .filter(part => typeof part?.text === 'string')
-                    .map(part => part.text)
-                    .join('\n\n');
-            }
-            if (typeof content.text === 'string') {
-                return content.text;
-            }
-        }
-    }
-
-    // Fallback: try common text fields before falling back to toString
-    if (typeof response.text === 'string') {
-        return response.text;
-    }
-    if (typeof response.output === 'string') {
-        return response.output;
-    }
-    if (typeof response.message === 'string') {
-        return response.message;
-    }
-
-    return '';
+    return normalizeContentText(response?.content)
+        || normalizeContentText(response?.choices?.[0]?.message?.content)
+        || normalizeContentText(response?.candidates?.[0]?.content?.parts)
+        || normalizeContentText(response?.candidates?.[0]?.output?.parts)
+        || normalizeContentText(response?.text)
+        || normalizeContentText(response?.output)
+        || normalizeContentText(response?.message?.content)
+        || normalizeContentText(response?.message?.tool_plan)
+        || normalizeContentText(response?.message)
+        || '';
 }
 
 function buildFallbackPromptText(promptMessages) {
     return promptMessages
-        .map(message => `${String(message?.role ?? 'user').toUpperCase()}:\n${String(message?.content ?? '')}`)
+        .map(message => `${String(message?.role ?? 'user').toUpperCase()}:\n${normalizeContentText(message?.content)}`)
         .join('\n\n');
 }
 
@@ -782,15 +714,15 @@ async function requestProfilePromptTransform(CMRS, profileId, promptMessages, ma
     let fallbackPrompt = '';
     if (typeof CMRS.constructPrompt === 'function') {
         try {
-            fallbackPrompt = String(CMRS.constructPrompt(promptMessages, profileId) ?? '');
+            fallbackPrompt = CMRS.constructPrompt(promptMessages, profileId) ?? '';
         } catch (error) {
             console.warn(`[InChatAgents] Failed to construct fallback prompt for ${describePromptTransformTarget(profileId, 'profile')}.`, error);
         }
     }
 
-    if (!fallbackPrompt.trim()) {
-        fallbackPrompt = buildFallbackPromptText(promptMessages);
-    }
+    const fallbackRequestPrompt = Array.isArray(fallbackPrompt)
+        ? fallbackPrompt
+        : (normalizeContentText(fallbackPrompt).trim() ? normalizeContentText(fallbackPrompt) : buildFallbackPromptText(promptMessages));
 
     const fallbackOptions = {
         extractData: true,
@@ -803,7 +735,7 @@ async function requestProfilePromptTransform(CMRS, profileId, promptMessages, ma
         fallbackOptions.modelOverride = modelOverride.trim();
     }
 
-    const fallbackResponse = await CMRS.sendRequest(profileId, fallbackPrompt, maxTokens, fallbackOptions);
+    const fallbackResponse = await CMRS.sendRequest(profileId, fallbackRequestPrompt, maxTokens, fallbackOptions);
 
     return {
         output: extractProfileResponseText(fallbackResponse),
@@ -827,7 +759,7 @@ async function requestPromptTransform(agent, promptMessages, maxTokens) {
     }
 
     const quietPrompt = promptMessages
-        .map(message => `${message.role.toUpperCase()}:\n${message.content}`)
+        .map(message => `${message.role.toUpperCase()}:\n${normalizeContentText(message?.content)}`)
         .join('\n\n');
     const preservedPrompts = Object.entries(extension_prompts)
         .filter(([key]) => key.startsWith(PROMPT_KEY_PREFIX));
@@ -860,7 +792,7 @@ async function requestPromptTransform(agent, promptMessages, maxTokens) {
 
 async function runPromptTransformAgent(agent, message, generationType, messageTextOverride = null, messageIndex = null, options = {}) {
     const applyToMessage = options.applyToMessage !== false;
-    const currentMessageText = messageTextOverride !== null ? String(messageTextOverride) : String(message?.mes ?? '');
+    const currentMessageText = messageTextOverride !== null ? normalizeContentText(messageTextOverride) : normalizeContentText(message?.mes);
     const normalizedGenerationType = normalizeGenerationType(generationType);
     const promptTransformMode = getPromptTransformMode(agent);
     const profileId = resolveAgentConnectionProfile(agent);
@@ -922,7 +854,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
     try {
         const maxTokens = normalizePromptTransformMaxTokens(agent.postProcess?.promptTransformMaxTokens);
         const response = await requestPromptTransform(agent, promptMessages, maxTokens);
-        const promptOutputText = String(response.output ?? '').trim();
+        const promptOutputText = normalizeContentText(response.output).trim();
 
         if (!promptOutputText) {
             console.warn(`[InChatAgents] ${describePromptTransformMode(promptTransformMode)} agent "${agent.name}" returned an empty response.`);
@@ -1005,7 +937,7 @@ async function runPromptTransformAgent(agent, message, generationType, messageTe
 }
 
 async function runPromptTransformAppendBatch(agents, message, generationType, messageTextOverride = null, messageIndex = null) {
-    const currentMessageText = messageTextOverride !== null ? String(messageTextOverride) : String(message?.mes ?? '');
+    const currentMessageText = messageTextOverride !== null ? normalizeContentText(messageTextOverride) : normalizeContentText(message?.mes);
     const globalSettings = getGlobalSettings();
     const executionMode = globalSettings.appendAgentsExecutionMode === 'sequential' ? 'sequential' : 'parallel';
 
@@ -1245,7 +1177,7 @@ async function processReceivedMessage(messageIndex, generationType) {
     let messageDisplayChanged = false;
 
     const promptRuns = [];
-    let currentPromptTransformText = String(message.mes ?? '');
+    let currentPromptTransformText = normalizeContentText(message.mes);
     let appendBatch = [];
     const flushAppendBatch = async () => {
         if (appendBatch.length === 0) {

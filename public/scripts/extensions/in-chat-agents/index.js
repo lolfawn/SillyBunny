@@ -2,7 +2,7 @@ import { DiffMatchPatch } from '../../../lib.js';
 import { extension_settings, renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../popup.js';
 import { download, getSortableDelay, uuidv4 } from '../../utils.js';
-import { CLIENT_VERSION, chat, getRequestHeaders, generateQuietPrompt, saveSettingsDebounced } from '../../../script.js';
+import { CLIENT_VERSION, chat, getRequestHeaders, generateQuietPrompt, normalizeContentText, saveSettingsDebounced } from '../../../script.js';
 import { eventSource, event_types } from '../../events.js';
 import {
     getAgents,
@@ -2494,18 +2494,21 @@ function populateGlobalExecutionModeDropdown() {
 }
 
 function extractProfileResponseText(response) {
-    if (typeof response === 'string') {
-        return response;
-    }
-
-    return typeof response?.content === 'string'
-        ? response.content
-        : (response?.toString?.() || '');
+    return normalizeContentText(response?.content)
+        || normalizeContentText(response?.choices?.[0]?.message?.content)
+        || normalizeContentText(response?.candidates?.[0]?.content?.parts)
+        || normalizeContentText(response?.candidates?.[0]?.output?.parts)
+        || normalizeContentText(response?.text)
+        || normalizeContentText(response?.output)
+        || normalizeContentText(response?.message?.content)
+        || normalizeContentText(response?.message?.tool_plan)
+        || normalizeContentText(response?.message)
+        || '';
 }
 
 function buildFallbackPromptText(messages) {
     return messages
-        .map(message => `${String(message?.role ?? 'user').toUpperCase()}:\n${String(message?.content ?? '')}`)
+        .map(message => `${String(message?.role ?? 'user').toUpperCase()}:\n${normalizeContentText(message?.content)}`)
         .join('\n\n');
 }
 
@@ -2557,14 +2560,17 @@ async function refineLLMCall(systemPrompt, userPrompt, connectionProfile = '') {
     let fallbackPrompt = '';
     if (typeof CMRS.constructPrompt === 'function') {
         try {
-            fallbackPrompt = String(CMRS.constructPrompt(messages, profileId) ?? '');
+            fallbackPrompt = CMRS.constructPrompt(messages, profileId) ?? '';
         } catch (error) {
             console.warn(`[InChatAgents] Failed to construct fallback prompt for profile "${profileId}" during prompt refinement.`, error);
         }
     }
+    const fallbackRequestPrompt = Array.isArray(fallbackPrompt)
+        ? fallbackPrompt
+        : (normalizeContentText(fallbackPrompt).trim() ? normalizeContentText(fallbackPrompt) : buildFallbackPromptText(messages));
     const fallbackResponse = await CMRS.sendRequest(
         profileId,
-        fallbackPrompt.trim() ? fallbackPrompt : buildFallbackPromptText(messages),
+        fallbackRequestPrompt,
         DEFAULT_AGENT_MAX_TOKENS,
         {
             extractData: true,
