@@ -218,6 +218,7 @@ SillyBunny includes some extras by default to help you get started right away:
 - Fixed reasoning token counts not displaying separately — now shows format like `150t (45r)` where 45r is reasoning tokens
 - Fixed auto-cache refresh causing initialization loop on fresh instances by skipping cache clear when no prior settings exist
 - Fixed auto-cache refresh not fully clearing cached assets by using hard reload instead of soft reload
+- Fixed bottom bar startup refresh on slow Node.js boots by giving it the same late-context binding and APP_READY retry behavior used by the top/chat bars
 - Reduced Import Folder and Sync Extensions button sizes on mobile for better fit
 - Removed bloated search hint text and tab descriptions on mobile for cleaner UI
 - Added reinstall button for third-party extensions to quickly fix corrupted extensions by deleting and reinstalling from repository

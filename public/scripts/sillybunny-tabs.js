@@ -417,7 +417,14 @@ const sbState = {
         chatbarToggleButton: null,
         dragHandleButton: null,
     },
-    bottomChatBar: null,
+    bottomChatBar: {
+        chatSelect: null,
+        personaBubble: null,
+        bindingRetryTimer: 0,
+        boundEventSource: null,
+        windowBindingsAttached: false,
+        outsideClickBound: false,
+    },
     serverAdmin: {
         refs: null,
         originalConfig: '',
@@ -7447,65 +7454,25 @@ function buildBottomChatBar() {
 
     container.append(personaBubble, chatSelect, newBtn, renameBtn, deleteBtn);
 
-    // Store reference for refresh
-    sbState.bottomChatBar = { chatSelect, personaBubble };
-
-    // Bind events to refresh the chat select when chats change
-    const context = getSillyTavernContext();
-    const eventSource = context?.eventSource;
-    const eventTypes = context?.eventTypes ?? context?.event_types;
-
-    if (eventSource && eventTypes) {
-        const refresh = () => refreshBottomChatSelect();
-        const events = [
-            eventTypes.APP_READY,
-            eventTypes.CHAT_CHANGED,
-            eventTypes.CHAT_CREATED,
-            eventTypes.GROUP_CHAT_CREATED,
-            eventTypes.CHAT_DELETED,
-            eventTypes.GROUP_CHAT_DELETED,
-        ].filter(Boolean);
-
-        // Check if APP_READY already fired before registering listener
-        if (context.appReady || window.SillyTavern?.appReady) {
-            // Already ready, trigger refresh immediately
-            refresh();
-        }
-
-        for (const eventName of new Set(events)) {
-            eventSource.on(eventName, refresh);
-        }
-
-        // Update persona bubble on persona change, chat change, and app init
-        const refreshPersona = () => updatePersonaBubble(personaBubble);
-        const personaEvents = [
-            eventTypes.PERSONA_CHANGED,
-            eventTypes.APP_READY,
-            eventTypes.CHAT_CHANGED,
-            eventTypes.CHAT_LOADED,
-        ].filter(Boolean);
-
-        // Check if APP_READY already fired for persona bubble too
-        if (context.appReady || window.SillyTavern?.appReady) {
-            refreshPersona();
-        }
-
-        for (const eventName of new Set(personaEvents)) {
-            eventSource.on(eventName, refreshPersona);
-        }
-    }
+    // Store references for refresh and late context binding retries.
+    Object.assign(getBottomChatBarState(), { chatSelect, personaBubble });
 
     // Defer initial persona bubble update in case user_avatar isn't ready yet
     setTimeout(() => updatePersonaBubble(personaBubble), 100);
 
     // Close persona picker when clicking outside
-    document.addEventListener('click', (e) => {
-        const picker = document.getElementById('sb-persona-picker');
-        if (picker && !picker.contains(e.target) && e.target !== personaBubble) {
-            picker.remove();
-        }
-    });
+    const bottomChatBarState = getBottomChatBarState();
+    if (!bottomChatBarState.outsideClickBound) {
+        document.addEventListener('click', (e) => {
+            const picker = document.getElementById('sb-persona-picker');
+            if (picker && !picker.contains(e.target) && e.target !== bottomChatBarState.personaBubble) {
+                picker.remove();
+            }
+        });
+        bottomChatBarState.outsideClickBound = true;
+    }
 
+    bindBottomChatBarEvents();
     scheduleBottomChatBarRefresh(0);
 }
 
@@ -7622,6 +7589,105 @@ function getCurrentPersonaSelection(context = getSillyTavernContext()) {
         currentAvatarId,
         currentName,
     };
+}
+
+function getBottomChatBarState() {
+    return sbState.bottomChatBar;
+}
+
+function scheduleBottomChatBarBindingRetry(delay = 240) {
+    const bottomChatBarState = getBottomChatBarState();
+
+    window.clearTimeout(bottomChatBarState.bindingRetryTimer);
+    bottomChatBarState.bindingRetryTimer = window.setTimeout(() => {
+        bindBottomChatBarEvents();
+    }, delay);
+}
+
+function bindBottomChatBarWindowEvents() {
+    const bottomChatBarState = getBottomChatBarState();
+
+    if (bottomChatBarState.windowBindingsAttached) {
+        return;
+    }
+
+    const refreshWithContext = () => {
+        scheduleBottomChatBarRefresh(0);
+        window.requestAnimationFrame(() => updatePersonaBubble(bottomChatBarState.personaBubble));
+        bindBottomChatBarEvents();
+    };
+
+    window.addEventListener('pageshow', refreshWithContext, { passive: true });
+    window.addEventListener('focus', refreshWithContext, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            refreshWithContext();
+        }
+    });
+
+    bottomChatBarState.windowBindingsAttached = true;
+}
+
+function bindBottomChatBarEvents() {
+    const bottomChatBarState = getBottomChatBarState();
+    const personaBubble = bottomChatBarState.personaBubble;
+    const context = getSillyTavernContext();
+    const eventSource = context?.eventSource;
+    const eventTypes = context?.eventTypes ?? context?.event_types;
+
+    bindBottomChatBarWindowEvents();
+
+    if (!eventSource || !eventTypes) {
+        scheduleBottomChatBarRefresh(0);
+        window.requestAnimationFrame(() => updatePersonaBubble(personaBubble));
+        scheduleBottomChatBarBindingRetry();
+        return;
+    }
+
+    window.clearTimeout(bottomChatBarState.bindingRetryTimer);
+
+    if (bottomChatBarState.boundEventSource === eventSource) {
+        scheduleBottomChatBarRefresh(0);
+        window.requestAnimationFrame(() => updatePersonaBubble(personaBubble));
+        return;
+    }
+
+    const refresh = () => scheduleBottomChatBarRefresh(0);
+    const refreshPersona = () => {
+        window.requestAnimationFrame(() => updatePersonaBubble(bottomChatBarState.personaBubble));
+    };
+    const events = [
+        eventTypes.APP_READY,
+        eventTypes.CHAT_CHANGED,
+        eventTypes.CHAT_LOADED,
+        eventTypes.CHAT_CREATED,
+        eventTypes.GROUP_CHAT_CREATED,
+        eventTypes.CHAT_DELETED,
+        eventTypes.GROUP_CHAT_DELETED,
+        eventTypes.MESSAGE_RECEIVED,
+        eventTypes.MESSAGE_UPDATED,
+        eventTypes.MESSAGE_EDITED,
+        eventTypes.MESSAGE_DELETED,
+    ].filter(Boolean);
+    const personaEvents = [
+        eventTypes.PERSONA_CHANGED,
+        eventTypes.APP_READY,
+        eventTypes.CHAT_CHANGED,
+        eventTypes.CHAT_LOADED,
+        eventTypes.SETTINGS_UPDATED,
+    ].filter(Boolean);
+
+    for (const eventName of new Set(events)) {
+        eventSource.on(eventName, refresh);
+    }
+
+    for (const eventName of new Set(personaEvents)) {
+        eventSource.on(eventName, refreshPersona);
+    }
+
+    bottomChatBarState.boundEventSource = eventSource;
+    scheduleBottomChatBarRefresh(0);
+    refreshPersona();
 }
 
 function togglePersonaPicker() {
