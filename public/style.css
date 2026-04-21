@@ -520,10 +520,6 @@ input[type='checkbox']:focus-visible {
     display: none;
 }
 
-#chat[data-show-thoughts-ui="false"]:not(:has(.reasoning_edit_textarea)) .mes_reasoning_details {
-    display: none;
-}
-
 .mes_reasoning_details .mes_reasoning_arrow {
     position: absolute;
     top: 50%;

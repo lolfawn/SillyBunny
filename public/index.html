@@ -2121,7 +2121,7 @@
                                                 Allows the model to return its thinking process.
                                             </span>
                                             <strong data-source-mode="except" data-source="zai,moonshot,openrouter">
-                                                Provider support varies. Use "Show thought in chat" to control UI visibility separately.
+                                                Provider support varies. Returned thought text appears in chat only when the provider exposes it.
                                             </strong>
                                             <div class="note-block marginTop5">
                                                 <small>
@@ -2130,13 +2130,6 @@
                                                     If your custom provider supports reasoning but uses a different model name, it may not receive the <code>reasoning_effort</code> parameter.
                                                 </small>
                                             </div>
-                                        </div>
-                                        <label for="openai_show_thoughts_ui" class="checkbox_label widthFreeExpand">
-                                            <input id="openai_show_thoughts_ui" type="checkbox" />
-                                            <span>Show thought in chat</span>
-                                        </label>
-                                        <div class="toggle-description justifyLeft">
-                                            <span>Controls whether returned thought text is shown in chat. Thought tokens and signatures remain available separately.</span>
                                         </div>
                                     </div>
                                     <div class="flex-container flexFlowColumn wide100p textAlignCenter marginTop10" data-source="openai,custom,claude,xai,makersuite,vertexai,aimlapi,openrouter,pollinations,perplexity,cometapi,electronhub,azure_openai,chutes,nanogpt">

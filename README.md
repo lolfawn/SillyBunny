@@ -224,7 +224,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 **Reasoning and provider compatibility**
 
-- Added a separate "Show thought in chat" toggle so reasoning can be requested without forcing returned thought text to stay visible in chat
+- Simplified reasoning controls by removing the separate "Show thought in chat" toggle, so "Request model reasoning" is the single control again
 - Fixed response text extraction for OpenAI-style and Gemini-style payloads so parts/content/candidates/tool-plan formats render correctly instead of collapsing into blank or broken output
 - Fixed Gemini thought-signature handling by reading `candidates[].content.parts` correctly and checking the `gemini.thoughtSignatures` config dynamically
 - Added clarification tooltip for "Request model reasoning" toggle explaining behavior for Custom OpenAI-compatible providers

@@ -442,7 +442,6 @@ async function sendMakerSuiteRequest(request, response) {
     const requestImages = Boolean(request.body.request_images);
     const reasoningEffort = String(request.body.reasoning_effort);
     const includeReasoning = Boolean(request.body.include_reasoning);
-    const showThoughtsInChat = request.body.show_thoughts_ui !== false;
     const aspectRatio = String(request.body.request_image_aspect_ratio);
     const imageSize = String(request.body.request_image_resolution);
     const isGemma = model.includes('gemma');
@@ -545,7 +544,7 @@ async function sendMakerSuiteRequest(request, response) {
 
         if (isThinkingConfigModel(model)) {
             const thinkingConfig = {};
-            const shouldIncludeThoughts = includeReasoning && showThoughtsInChat;
+            const shouldIncludeThoughts = includeReasoning;
 
             const thinkingBudget = calculateGoogleBudgetTokens(generationConfig.maxOutputTokens, reasoningEffort, model);
             if (typeof thinkingBudget === 'number' && Number.isInteger(thinkingBudget)) {
