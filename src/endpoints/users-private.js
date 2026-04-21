@@ -33,6 +33,7 @@ const LIKELY_IMPORT_MARKERS = [
     'themes',
     'extensions',
 ];
+const SKIPPABLE_IMPORT_DIRECTORY_NAMES = new Set(['.git']);
 
 export const router = express.Router();
 
@@ -139,17 +140,37 @@ async function getStableRealPath(targetPath) {
     }
 }
 
-async function copyDirectoryTree(sourceDirectory, destinationDirectory, { overwrite = false, protectedRoots = new Set(), visitedDirectories = new Set() } = {}) {
+function emitImportWarning(onWarning, message) {
+    const warningMessage = String(message ?? '').trim();
+    if (!warningMessage) {
+        return;
+    }
+
+    if (typeof onWarning === 'function') {
+        onWarning(warningMessage);
+        return;
+    }
+
+    console.warn(warningMessage);
+}
+
+async function copyDirectoryTree(sourceDirectory, destinationDirectory, {
+    overwrite = false,
+    protectedRoots = new Set(),
+    visitedDirectories = new Set(),
+    skipDirectoryNames = new Set(),
+    onWarning = null,
+} = {}) {
     const stableSourcePath = await getStableRealPath(sourceDirectory);
 
     if (visitedDirectories.has(stableSourcePath)) {
-        console.warn(`Skipping already-visited import directory: ${sourceDirectory}`);
+        emitImportWarning(onWarning, `Skipping already-visited import directory: ${sourceDirectory}`);
         return 0;
     }
 
     for (const protectedRoot of protectedRoots) {
         if (isSameOrNestedPath(stableSourcePath, protectedRoot)) {
-            console.warn(`Skipping import path that resolves into the current account: ${sourceDirectory}`);
+            emitImportWarning(onWarning, `Skipping import path that resolves into the current account: ${sourceDirectory}`);
             return 0;
         }
     }
@@ -165,21 +186,28 @@ async function copyDirectoryTree(sourceDirectory, destinationDirectory, { overwr
         const destinationPath = path.join(destinationDirectory, dirent.name);
 
         if (dirent.isSymbolicLink()) {
-            console.warn(`Skipping symbolic link during SillyTavern import: ${sourcePath}`);
+            emitImportWarning(onWarning, `Skipping symbolic link during SillyTavern import: ${sourcePath}`);
             continue;
         }
 
         if (dirent.isDirectory()) {
+            if (skipDirectoryNames.has(dirent.name)) {
+                emitImportWarning(onWarning, `Skipping ${dirent.name} metadata during SillyTavern import: ${sourcePath}`);
+                continue;
+            }
+
             copiedFiles += await copyDirectoryTree(sourcePath, destinationPath, {
                 overwrite,
                 protectedRoots,
                 visitedDirectories,
+                skipDirectoryNames,
+                onWarning,
             });
             continue;
         }
 
         if (!dirent.isFile()) {
-            console.warn(`Skipping unsupported import entry: ${sourcePath}`);
+            emitImportWarning(onWarning, `Skipping unsupported import entry: ${sourcePath}`);
             continue;
         }
 
@@ -214,6 +242,10 @@ async function copyAllowedFolderContents(sourceRoot, targetRoot) {
                 overwrite: true,
                 protectedRoots,
                 visitedDirectories,
+                skipDirectoryNames: relativePath === USER_DIRECTORY_TEMPLATE.extensions
+                    ? SKIPPABLE_IMPORT_DIRECTORY_NAMES
+                    : new Set(),
+                onWarning: warning => console.warn(warning),
             });
             if (copiedFiles > 0 || await pathExists(destinationPath)) {
                 copiedEntries++;
@@ -231,6 +263,198 @@ async function copyAllowedFolderContents(sourceRoot, targetRoot) {
     }
 
     return copiedEntries;
+}
+
+async function inspectExtensionDirectory(extensionPath, extensionName) {
+    const manifestPath = path.join(extensionPath, 'manifest.json');
+    const details = {
+        displayName: extensionName,
+        version: '',
+        author: '',
+        manifestFound: false,
+        manifestValid: false,
+        jsEntry: '',
+        jsEntryExists: false,
+        warnings: [],
+    };
+
+    if (!(await pathExists(manifestPath))) {
+        details.warnings.push('Missing manifest.json. SillyBunny cannot discover this extension until it is restored.');
+        return details;
+    }
+
+    details.manifestFound = true;
+
+    try {
+        const manifest = JSON.parse(await fsPromises.readFile(manifestPath, 'utf8'));
+        details.manifestValid = true;
+        details.displayName = typeof manifest?.display_name === 'string' && manifest.display_name.trim()
+            ? manifest.display_name.trim()
+            : extensionName;
+        details.version = typeof manifest?.version === 'string' ? manifest.version : '';
+        details.author = typeof manifest?.author === 'string' ? manifest.author : '';
+        details.jsEntry = typeof manifest?.js === 'string' && manifest.js.trim() ? manifest.js.trim() : '';
+
+        if (!details.jsEntry) {
+            details.warnings.push('manifest.json is missing a "js" entry, so this extension may not load.');
+            return details;
+        }
+
+        details.jsEntryExists = await pathExists(path.join(extensionPath, details.jsEntry));
+        if (!details.jsEntryExists) {
+            details.warnings.push(`The manifest JS entry "${details.jsEntry}" could not be found in the synced files.`);
+        }
+    } catch (error) {
+        details.warnings.push(`manifest.json could not be parsed: ${error.message}`);
+    }
+
+    return details;
+}
+
+function buildExtensionSyncMessage({ readyCount, warningCount, failedCount }) {
+    const parts = [];
+    const syncedCount = readyCount + warningCount;
+
+    parts.push(`Synced ${syncedCount} third-party extension${syncedCount === 1 ? '' : 's'}.`);
+
+    if (warningCount > 0) {
+        parts.push(`${warningCount} ${warningCount === 1 ? 'needs' : 'need'} attention.`);
+    }
+
+    if (failedCount > 0) {
+        parts.push(`${failedCount} failed.`);
+    }
+
+    parts.push('Review the sync report before reloading.');
+    return parts.join(' ');
+}
+
+async function syncThirdPartyExtension(sourcePath, targetPath, protectedRoots) {
+    const extensionName = path.basename(sourcePath);
+    const warnings = [];
+    const sourceGitDirectory = path.join(sourcePath, '.git');
+    const gitMetadataSkipped = await pathExists(sourceGitDirectory);
+    const tempTargetPath = await fsPromises.mkdtemp(path.join(path.dirname(targetPath), `.${extensionName}-sync-`));
+
+    try {
+        const copiedFiles = await copyDirectoryTree(sourcePath, tempTargetPath, {
+            overwrite: true,
+            protectedRoots,
+            skipDirectoryNames: SKIPPABLE_IMPORT_DIRECTORY_NAMES,
+            onWarning: warning => warnings.push(warning),
+        });
+
+        const details = await inspectExtensionDirectory(tempTargetPath, extensionName);
+        warnings.push(...details.warnings);
+
+        await fsPromises.rm(targetPath, { recursive: true, force: true });
+        await fsPromises.rename(tempTargetPath, targetPath);
+
+        const status = warnings.length > 0 ? 'warning' : 'ready';
+        return {
+            name: extensionName,
+            displayName: details.displayName,
+            version: details.version,
+            author: details.author,
+            sourcePath,
+            targetPath,
+            status,
+            copiedFiles,
+            warnings,
+            checks: {
+                manifestFound: details.manifestFound,
+                manifestValid: details.manifestValid,
+                jsEntry: details.jsEntry,
+                jsEntryExists: details.jsEntryExists,
+                gitMetadataSkipped,
+            },
+        };
+    } catch (error) {
+        return {
+            name: extensionName,
+            displayName: extensionName,
+            version: '',
+            author: '',
+            sourcePath,
+            targetPath,
+            status: 'failed',
+            copiedFiles: 0,
+            warnings,
+            checks: {
+                manifestFound: false,
+                manifestValid: false,
+                jsEntry: '',
+                jsEntryExists: false,
+                gitMetadataSkipped,
+            },
+            error: error.message || 'Failed to sync this extension.',
+        };
+    } finally {
+        await fsPromises.rm(tempTargetPath, { recursive: true, force: true }).catch(() => { });
+    }
+}
+
+async function syncThirdPartyExtensions(sourceRoot, targetExtensionsRoot) {
+    const sourceExtensionsRoot = path.join(sourceRoot, USER_DIRECTORY_TEMPLATE.extensions);
+    const sourceExtensionsRealPath = await getStableRealPath(sourceExtensionsRoot);
+    const targetExtensionsRealPath = await getStableRealPath(targetExtensionsRoot);
+
+    if (sourceExtensionsRealPath === targetExtensionsRealPath) {
+        throw new Error('That extensions folder already belongs to the current SillyBunny account.');
+    }
+
+    if (!(await pathExists(sourceExtensionsRoot))) {
+        throw new Error('No third-party extensions folder was found in that SillyTavern account.');
+    }
+
+    await fsPromises.mkdir(targetExtensionsRoot, { recursive: true });
+
+    const dirents = await fsPromises.readdir(sourceExtensionsRoot, { withFileTypes: true });
+    const extensionDirectories = dirents
+        .filter(dirent => dirent.isDirectory() && !dirent.name.startsWith('.'))
+        .sort((left, right) => left.name.localeCompare(right.name));
+
+    if (extensionDirectories.length === 0) {
+        throw new Error('No third-party extensions were found in that SillyTavern account.');
+    }
+
+    const protectedRoots = new Set([await getStableRealPath(targetExtensionsRoot)]);
+    const results = [];
+
+    for (const dirent of extensionDirectories) {
+        const sourcePath = path.join(sourceExtensionsRoot, dirent.name);
+        const targetPath = path.join(targetExtensionsRoot, dirent.name);
+        const result = await syncThirdPartyExtension(sourcePath, targetPath, protectedRoots);
+        results.push(result);
+
+        if (result.status === 'failed') {
+            console.error(`Failed to sync third-party extension "${dirent.name}" from ${sourcePath}: ${result.error}`);
+            continue;
+        }
+
+        if (result.warnings.length > 0) {
+            console.warn(`Synced third-party extension "${dirent.name}" with warnings: ${result.warnings.join(' | ')}`);
+        } else {
+            console.info(`Synced third-party extension "${dirent.name}" from ${sourcePath}`);
+        }
+    }
+
+    const readyCount = results.filter(result => result.status === 'ready').length;
+    const warningCount = results.filter(result => result.status === 'warning').length;
+    const failedCount = results.filter(result => result.status === 'failed').length;
+    const gitMetadataSkippedCount = results.filter(result => result?.checks?.gitMetadataSkipped === true).length;
+
+    return {
+        sourceRoot,
+        sourceExtensionsRoot,
+        targetExtensionsRoot,
+        results,
+        readyCount,
+        warningCount,
+        failedCount,
+        gitMetadataSkippedCount,
+        message: buildExtensionSyncMessage({ readyCount, warningCount, failedCount }),
+    };
 }
 
 function isDefaultUserImportBase(basePath) {
@@ -547,6 +771,25 @@ router.post('/import-sillytavern/folder', async (request, response) => {
     } catch (error) {
         console.error('SillyTavern folder import failed:', error);
         return response.status(400).json({ error: error.message || 'Failed to import that SillyTavern folder.' });
+    }
+});
+
+router.post('/import-sillytavern/extensions', async (request, response) => {
+    try {
+        const sourceRoot = await resolveSillyTavernFolderImportRoot(request.body?.sourcePath);
+        const targetRoot = path.resolve(request.user.directories.root);
+
+        if (path.resolve(sourceRoot) === targetRoot) {
+            return response.status(400).json({ error: 'That folder is already the current SillyBunny account.' });
+        }
+
+        const syncReport = await syncThirdPartyExtensions(sourceRoot, path.resolve(request.user.directories.extensions));
+        await checkForNewContent([request.user.directories]);
+
+        return response.json(syncReport);
+    } catch (error) {
+        console.error('SillyTavern extension sync failed:', error);
+        return response.status(400).json({ error: error.message || 'Failed to sync third-party extensions from that SillyTavern folder.' });
     }
 });
 
