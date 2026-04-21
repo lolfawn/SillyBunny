@@ -16,6 +16,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     shortcutLeft: 'sb-shortcut-left',
     shortcutRight: 'sb-shortcut-right',
     bottomBarScale: 'sb-bottom-bar-scale',
+    settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
 });
 
 const SB_SHORTCUT_TARGETS = Object.freeze([
@@ -315,6 +316,7 @@ const sbState = {
     initRetryTimer: 0,
     initRetryCount: 0,
     initObserver: null,
+    inlineDrawerAutoClose: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.settingsDrawerAutoClose), false),
     theme: normalizeTheme(safeGetItem(SB_STORAGE_KEYS.theme)),
     surfaceTransparency: normalizeSurfaceTransparency(safeGetItem(SB_STORAGE_KEYS.surfaceTransparency)),
     topbarScale: {
@@ -6447,6 +6449,7 @@ function interceptDrawerOpeners() {
         if (!(event.target instanceof Element)) return;
         const toggle = event.target.closest('.inline-drawer-toggle');
         if (!toggle) return;
+        if (!sbState.inlineDrawerAutoClose) return;
 
         const thisDrawer = toggle.closest('.inline-drawer');
         if (!thisDrawer) return;
@@ -6476,6 +6479,26 @@ function interceptDrawerOpeners() {
             }
         });
     }, true);
+}
+
+function bindInlineDrawerAutoCloseToggle() {
+    const checkbox = document.getElementById('sb_auto_close_inline_drawers');
+    if (!(checkbox instanceof HTMLInputElement)) {
+        return;
+    }
+
+    checkbox.checked = sbState.inlineDrawerAutoClose;
+
+    if (checkbox.dataset.sbBound === 'true') {
+        return;
+    }
+
+    checkbox.addEventListener('change', () => {
+        sbState.inlineDrawerAutoClose = checkbox.checked;
+        safeSetItem(SB_STORAGE_KEYS.settingsDrawerAutoClose, String(sbState.inlineDrawerAutoClose));
+    });
+
+    checkbox.dataset.sbBound = 'true';
 }
 
 function bindWorldInfoRoute() {
@@ -7431,6 +7454,7 @@ function initAll() {
     interceptDrawerOpeners();
     bindWorldInfoRoute();
     applyDefaultDrawerStates();
+    bindInlineDrawerAutoCloseToggle();
     syncMobileViewportState();
 
     window.addEventListener('resize', syncMobileViewportState, { passive: true });

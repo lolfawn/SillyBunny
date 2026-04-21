@@ -155,6 +155,18 @@ const SILLYBUNNY_PALETTE_BINDINGS = Object.freeze([
     ['shadow_color', '#shadow-color-picker', 'shadow'],
     ['border_color', '#border-color-picker', 'border'],
 ]);
+const THEME_COLOR_PROPERTIES = Object.freeze([
+    { key: 'main_text_color', selector: '#main-text-color-picker', type: 'main' },
+    { key: 'italics_text_color', selector: '#italics-color-picker', type: 'italics' },
+    { key: 'underline_text_color', selector: '#underline-color-picker', type: 'underline' },
+    { key: 'quote_text_color', selector: '#quote-color-picker', type: 'quote' },
+    { key: 'blur_tint_color', selector: '#blur-tint-color-picker', type: 'blurTint' },
+    { key: 'chat_tint_color', selector: '#chat-tint-color-picker', type: 'chatTint' },
+    { key: 'user_mes_blur_tint_color', selector: '#user-mes-blur-tint-color-picker', type: 'userMesBlurTint' },
+    { key: 'bot_mes_blur_tint_color', selector: '#bot-mes-blur-tint-color-picker', type: 'botMesBlurTint' },
+    { key: 'shadow_color', selector: '#shadow-color-picker', type: 'shadow' },
+    { key: 'border_color', selector: '#border-color-picker', type: 'border' },
+]);
 
 const avatar_styles = {
     ROUND: 0,
@@ -1399,207 +1411,12 @@ function applyTheme(name) {
         return;
     }
 
-    const themeProperties = [
-        { key: 'main_text_color', selector: '#main-text-color-picker', type: 'main' },
-        { key: 'italics_text_color', selector: '#italics-color-picker', type: 'italics' },
-        { key: 'underline_text_color', selector: '#underline-color-picker', type: 'underline' },
-        { key: 'quote_text_color', selector: '#quote-color-picker', type: 'quote' },
-        { key: 'blur_tint_color', selector: '#blur-tint-color-picker', type: 'blurTint' },
-        { key: 'chat_tint_color', selector: '#chat-tint-color-picker', type: 'chatTint' },
-        { key: 'user_mes_blur_tint_color', selector: '#user-mes-blur-tint-color-picker', type: 'userMesBlurTint' },
-        { key: 'bot_mes_blur_tint_color', selector: '#bot-mes-blur-tint-color-picker', type: 'botMesBlurTint' },
-        { key: 'shadow_color', selector: '#shadow-color-picker', type: 'shadow' },
-        { key: 'border_color', selector: '#border-color-picker', type: 'border' },
-        {
-            key: 'blur_strength',
-            action: () => {
-                applyBlurStrength();
-            },
-        },
-        {
-            key: 'custom_css',
-            action: () => {
-                applyCustomCSS();
-            },
-        },
-        {
-            key: 'shadow_width',
-            action: () => {
-                applyShadowWidth();
-            },
-        },
-        {
-            key: 'font_scale',
-            action: () => {
-                applyFontScale('forced');
-            },
-        },
-        {
-            key: 'fast_ui_mode',
-            action: () => {
-                switchUiMode();
-            },
-        },
-        {
-            key: 'waifuMode',
-            action: () => {
-                switchWaifuMode();
-            },
-        },
-        {
-            key: 'chat_display',
-            action: () => {
-                applyChatDisplay();
-            },
-        },
-        {
-            key: 'toastr_position',
-            action: () => {
-                applyToastrPosition();
-            },
-        },
-        {
-            key: 'avatar_style',
-            action: () => {
-                applyAvatarStyle();
-            },
-        },
-        {
-            key: 'noShadows',
-            action: () => {
-                applyNoShadows();
-            },
-        },
-        {
-            key: 'chat_width',
-            action: () => {
-                // If chat width is not set, use the full-width default.
-                if (!power_user.chat_width) {
-                    power_user.chat_width = 100;
-                }
-                applyChatWidth('forced');
-            },
-        },
-        {
-            key: 'timer_enabled',
-            action: () => {
-                switchTimer();
-            },
-        },
-        {
-            key: 'timestamps_enabled',
-            action: () => {
-                switchTimestamps();
-            },
-        },
-        {
-            key: 'timestamp_model_icon',
-            action: () => {
-                switchIcons();
-            },
-        },
-        {
-            key: 'message_token_count_enabled',
-            action: () => {
-                switchTokenCount();
-            },
-        },
-        {
-            key: 'mesIDDisplay_enabled',
-            action: () => {
-                switchMesIDDisplay();
-            },
-        },
-        {
-            key: 'hideChatAvatars_enabled',
-            action: () => {
-                switchHideChatAvatars();
-            },
-        },
-        {
-            key: 'expand_message_actions',
-            action: () => {
-                switchMessageActions();
-            },
-        },
-        {
-            key: 'enableZenSliders',
-            action: () => {
-                switchMessageActions();
-            },
-        },
-        {
-            key: 'enableLabMode',
-            action: () => {
-                switchMessageActions();
-            },
-        },
-        {
-            key: 'hotswap_enabled',
-            action: () => {
-                switchHotswap();
-            },
-        },
-        {
-            key: 'bogus_folders',
-            action: () => {
-                $('#bogus_folders').prop('checked', power_user.bogus_folders);
-                printCharactersDebounced();
-            },
-        },
-        {
-            key: 'zoomed_avatar_magnification',
-            action: () => {
-                $('#zoomed_avatar_magnification').prop('checked', power_user.zoomed_avatar_magnification);
-                printCharactersDebounced();
-            },
-        },
-        {
-            key: 'reduced_motion',
-            action: () => {
-                $('#reduced_motion').prop('checked', power_user.reduced_motion);
-                switchReducedMotion();
-            },
-        },
-        {
-            key: 'compact_input_area',
-            action: () => {
-                $('#compact_input_area').prop('checked', power_user.compact_input_area);
-                switchCompactInputArea();
-            },
-        },
-        {
-            key: 'show_swipe_num_all_messages',
-            action: () => {
-                $('#show_swipe_num_all_messages').prop('checked', power_user.show_swipe_num_all_messages);
-                switchSwipeNumAllMessages();
-            },
-        },
-        {
-            key: 'click_to_edit',
-            action: () => {
-                $('#click_to_edit').prop('checked', power_user.click_to_edit);
-            },
-        },
-        {
-            key: 'media_display',
-            action: (oldValue, newValue) => {
-                $('#media_display').val(power_user.media_display);
-                if (oldValue !== newValue) {
-                    showMediaDisplayReloadPrompt();
-                }
-            },
-        },
-    ];
-
-    for (const { key, selector, type, action } of themeProperties) {
+    for (const { key, selector, type } of THEME_COLOR_PROPERTIES) {
         if (theme[key] !== undefined) {
-            const oldValue = power_user[key];
             const newValue = theme[key];
             power_user[key] = newValue;
             if (selector) $(selector).attr('color', newValue);
             if (type) applyThemeColor(type);
-            if (action) action(oldValue, newValue);
         } else {
             console.debug(`Empty theme key: ${key}`);
         }
@@ -2699,48 +2516,13 @@ async function saveTheme(name = undefined, theme = undefined) {
  * @param {string} name Name of the theme
  */
 export function getThemeObject(name) {
-    return {
-        name,
-        blur_strength: power_user.blur_strength,
-        main_text_color: power_user.main_text_color,
-        italics_text_color: power_user.italics_text_color,
-        underline_text_color: power_user.underline_text_color,
-        quote_text_color: power_user.quote_text_color,
-        blur_tint_color: power_user.blur_tint_color,
-        chat_tint_color: power_user.chat_tint_color,
-        user_mes_blur_tint_color: power_user.user_mes_blur_tint_color,
-        bot_mes_blur_tint_color: power_user.bot_mes_blur_tint_color,
-        shadow_color: power_user.shadow_color,
-        shadow_width: power_user.shadow_width,
-        border_color: power_user.border_color,
-        font_scale: power_user.font_scale,
-        fast_ui_mode: power_user.fast_ui_mode,
-        waifuMode: power_user.waifuMode,
-        avatar_style: power_user.avatar_style,
-        chat_display: power_user.chat_display,
-        toastr_position: power_user.toastr_position,
-        noShadows: power_user.noShadows,
-        chat_width: power_user.chat_width,
-        timer_enabled: power_user.timer_enabled,
-        timestamps_enabled: power_user.timestamps_enabled,
-        timestamp_model_icon: power_user.timestamp_model_icon,
+    const theme = { name };
 
-        mesIDDisplay_enabled: power_user.mesIDDisplay_enabled,
-        hideChatAvatars_enabled: power_user.hideChatAvatars_enabled,
-        message_token_count_enabled: power_user.message_token_count_enabled,
-        expand_message_actions: power_user.expand_message_actions,
-        enableZenSliders: power_user.enableZenSliders,
-        enableLabMode: power_user.enableLabMode,
-        hotswap_enabled: power_user.hotswap_enabled,
-        custom_css: power_user.custom_css,
-        bogus_folders: power_user.bogus_folders,
-        zoomed_avatar_magnification: power_user.zoomed_avatar_magnification,
-        reduced_motion: power_user.reduced_motion,
-        compact_input_area: power_user.compact_input_area,
-        show_swipe_num_all_messages: power_user.show_swipe_num_all_messages,
-        click_to_edit: power_user.click_to_edit,
-        media_display: power_user.media_display,
-    };
+    for (const { key } of THEME_COLOR_PROPERTIES) {
+        theme[key] = power_user[key];
+    }
+
+    return theme;
 }
 
 /**

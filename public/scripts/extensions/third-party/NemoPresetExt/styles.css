@@ -281,24 +281,33 @@ body.nemo-animated-bg-active #bg1 {
 }
 
 #nemo-presetext-settings {
-    margin-top: 0;
+    margin-top: 12px;
 }
 
 .nemo-presetext-settings-heading {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    flex: 1 1 auto;
     min-width: 0;
+}
+
+.nemo-presetext-settings-heading > b {
+    justify-content: flex-start;
+    padding-left: 0;
+    padding-right: 0;
+    text-align: left;
 }
 
 .nemo-presetext-settings-subtitle {
     color: var(--SmartThemeEmColor);
     font-size: 0.9em;
     line-height: 1.35;
+    text-align: left;
 }
 
 #nemo-presetext-settings .inline-drawer-content {
-    padding-top: 8px;
+    padding-top: 0;
 }
 
 .nemo-presetext-settings-body {
@@ -306,9 +315,9 @@ body.nemo-animated-bg-active #bg1 {
     flex-direction: column;
     gap: 12px;
     padding: 14px;
-    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 80%, transparent);
-    border-radius: 18px;
-    background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 86%, transparent);
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 74%, transparent);
+    border-radius: var(--sb-radius-md);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
 }
 
 .nemo-presetext-settings-help {

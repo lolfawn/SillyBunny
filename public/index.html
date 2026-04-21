@@ -5171,7 +5171,7 @@
                                             <input class="neo-range-input" type="number" min="0.5" max="1.5" step="0.01" data-for="font_scale" id="font_scale_counter">
                                         </div>
 
-                                        <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
+                                        <div id="blur-strength-block" class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
                                             <small>
                                                 <span data-i18n="Blur Strength">Blur Strength</span>
                                                 <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Blur strength on UI panels." title="Blur strength on UI panels."></div>
@@ -5180,7 +5180,7 @@
                                             <input class="neo-range-input" type="number" min="0" max="30" step="1" data-for="blur_strength" id="blur_strength_counter">
                                         </div>
 
-                                        <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
+                                        <div id="shadow-width-block" class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
                                             <small>
                                                 <span data-i18n="Text Shadow Width">Shadow Width</span>
                                                 <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Strength of the text shadows" title="Strength of the text shadows"></div>
@@ -5215,6 +5215,10 @@
                                 <label for="noShadowsmode" class="checkbox_label" title="Remove text shadow effect." data-i18n="[title]Remove text shadow effect">
                                     <input id="noShadowsmode" type="checkbox" />
                                     <small data-i18n="No Text Shadows">No Text Shadows</small>
+                                </label>
+                                <label for="sb_auto_close_inline_drawers" class="checkbox_label" title="Automatically collapse sibling settings drawers when you open another one.">
+                                    <input id="sb_auto_close_inline_drawers" type="checkbox" />
+                                    <small>Auto-close setting drawers</small>
                                 </label>
                                 <label for="waifuMode" class="checkbox_label" title="Reduce chat height, and put a static sprite behind the chat window." data-i18n="[title]Reduce chat height, and put a static sprite behind the chat window">
                                     <input id="waifuMode" type="checkbox" />

@@ -1154,16 +1154,16 @@ function injectSettingsPanel() {
 
     const panel = document.createElement('div');
     panel.id = 'nemo-presetext-settings';
-    panel.className = 'inline-drawer wide100p flexFlowColumn';
+    panel.className = 'inline-drawer wide100p flexFlowColumn sb-settings-subdrawer';
     panel.innerHTML = `
-        <div class="inline-drawer-header" role="button" tabindex="0" aria-expanded="false">
+        <div class="inline-drawer-header userSettingsInnerExpandable" role="button" tabindex="0" aria-expanded="false">
             <div class="nemo-presetext-settings-heading">
-                <strong>Bunny Preset Tools</strong>
+                <b><span>Bunny Preset Tools</span></b>
                 <div class="nemo-presetext-settings-subtitle">Prompt sections and animated backgrounds</div>
             </div>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
-        <div class="inline-drawer-content" style="display:none;">
+        <div class="inline-drawer-content sb-settings-subdrawer-body" style="display:none;">
             <div class="nemo-presetext-settings-body">
                 <div class="nemo-presetext-settings-help">Prompt sections are added directly to the prompt manager. Animated background controls live in the Backgrounds drawer.</div>
                 <div class="nemo-presetext-settings-row">
