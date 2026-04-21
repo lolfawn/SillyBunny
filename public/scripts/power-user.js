@@ -4024,6 +4024,59 @@ jQuery(async () => {
         toastr.info('Theme colors reset to Dark V 1.0.', 'SillyBunny palette');
     });
 
+    // Accent color presets
+    $(document).on('click', '.sb-accent-preset', function () {
+        const accent = $(this).data('accent');
+        let quoteColor, underlineColor;
+
+        switch (accent) {
+            case 'forest':
+                quoteColor = 'rgba(114, 192, 144, 1)';
+                underlineColor = 'rgba(131, 179, 142, 1)';
+                break;
+            case 'rose':
+                quoteColor = 'rgba(156, 207, 216, 1)';
+                underlineColor = 'rgba(235, 188, 186, 1)';
+                break;
+            case 'amber':
+                quoteColor = 'rgba(241, 178, 133, 1)';
+                underlineColor = 'rgba(223, 142, 112, 1)';
+                break;
+        }
+
+        if (quoteColor && underlineColor) {
+            power_user.quote_text_color = quoteColor;
+            power_user.underline_text_color = underlineColor;
+            applyThemeColor('quote');
+            applyThemeColor('underline');
+            saveSettingsDebounced();
+            toastr.info('Accent colors applied.', 'SillyBunny palette');
+        }
+    });
+
+    // Custom RGB accent toggle
+    $('#sb-custom-accent-mode').on('change', function () {
+        const customPickers = $('#sb-custom-accent-pickers');
+        if ($(this).is(':checked')) {
+            customPickers.show();
+        } else {
+            customPickers.hide();
+        }
+    });
+
+    // Custom accent color pickers
+    $('#sb-accent-primary-picker').on('change', (/** @type {ColorPickerEvent} */ evt) => {
+        power_user.quote_text_color = evt.detail.rgba;
+        applyThemeColor('quote');
+        saveSettingsDebounced();
+    });
+
+    $('#sb-accent-secondary-picker').on('change', (/** @type {ColorPickerEvent} */ evt) => {
+        power_user.underline_text_color = evt.detail.rgba;
+        applyThemeColor('underline');
+        saveSettingsDebounced();
+    });
+
     $('#media_display').on('input', async function () {
         power_user.media_display = $(this).val().toString();
         saveSettingsDebounced();

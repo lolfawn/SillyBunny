@@ -5063,6 +5063,28 @@
                                         <span>Reset</span>
                                     </button>
                                 </div>
+                                <div class="sb-accent-color-controls" style="margin-top: 12px;">
+                                    <div class="flex-container alignItemsBaseline" style="gap: 8px;">
+                                        <span style="font-size: 0.9em;">Accent Colors:</span>
+                                        <button type="button" class="menu_button menu_button_icon sb-accent-preset" data-accent="forest" title="Forest Green" style="background: linear-gradient(135deg, #83b38e 0%, #72c090 100%); width: 32px; height: 32px; padding: 0; border-radius: 6px;"></button>
+                                        <button type="button" class="menu_button menu_button_icon sb-accent-preset" data-accent="rose" title="Rose Pink" style="background: linear-gradient(135deg, #ebbcba 0%, #9ccfd8 100%); width: 32px; height: 32px; padding: 0; border-radius: 6px;"></button>
+                                        <button type="button" class="menu_button menu_button_icon sb-accent-preset" data-accent="amber" title="Warm Amber" style="background: linear-gradient(135deg, #f1b285 0%, #df8e70 100%); width: 32px; height: 32px; padding: 0; border-radius: 6px;"></button>
+                                    </div>
+                                    <label class="checkbox_label flexBasis100p" style="margin-top: 8px;">
+                                        <input type="checkbox" id="sb-custom-accent-mode" />
+                                        <span data-i18n="Custom RGB Accent">Custom RGB Accent</span>
+                                    </label>
+                                    <div id="sb-custom-accent-pickers" style="display: none; margin-top: 8px; gap: 8px;" class="flex-container flexFlowColumn">
+                                        <div class="flex-container" style="gap: 8px;">
+                                            <toolcool-color-picker id="sb-accent-primary-picker"></toolcool-color-picker>
+                                            <span style="font-size: 0.9em;">Primary Accent</span>
+                                        </div>
+                                        <div class="flex-container" style="gap: 8px;">
+                                            <toolcool-color-picker id="sb-accent-secondary-picker"></toolcool-color-picker>
+                                            <span style="font-size: 0.9em;">Secondary Accent</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div name="themeElements" class="flex-container flexFlowColumn flexNoGap">
