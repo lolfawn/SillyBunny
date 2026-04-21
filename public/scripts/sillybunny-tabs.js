@@ -4217,7 +4217,30 @@ function renderServerAdminStatus(data) {
 
     appendServerAdminStat(statusGrid, 'Runtime', data?.runtime || 'Unknown');
     appendServerAdminStat(statusGrid, 'Version', version?.pkgVersion ? `v${version.pkgVersion}` : 'Unknown');
-    appendServerAdminStat(statusGrid, 'Branch', repository?.branch || version?.gitBranch || 'Unknown');
+
+    // Branch selector instead of static text
+    const branchContainer = createElement('div', { className: 'sb-server-stat' });
+    const branchLabel = createElement('div', { className: 'sb-server-stat-label' });
+    branchLabel.textContent = 'Branch';
+    const branchValue = createElement('div', { className: 'sb-server-stat-value' });
+    const branchSelect = createElement('select', {
+        id: 'sb-branch-select',
+        className: 'text_pole',
+        attrs: { style: 'width: 100%; max-width: 200px;' }
+    });
+    const currentBranch = repository?.branch || version?.gitBranch || 'Unknown';
+    const currentOption = createElement('option', { attrs: { value: currentBranch, selected: 'selected' } });
+    currentOption.textContent = currentBranch;
+    branchSelect.appendChild(currentOption);
+    branchValue.appendChild(branchSelect);
+    branchContainer.append(branchLabel, branchValue);
+    statusGrid.appendChild(branchContainer);
+
+    // Load available branches
+    if (repository?.supported && repository?.isRepo) {
+        loadServerAdminBranches(branchSelect, currentBranch);
+    }
+
     appendServerAdminStat(statusGrid, 'Commit', repository?.currentCommit || version?.gitRevision || 'Unknown');
     appendServerAdminStat(statusGrid, 'Tracking', repository?.trackingBranch || 'Not set');
     appendServerAdminStat(statusGrid, 'Ahead', String(repository?.ahead ?? 0));
@@ -4560,6 +4583,106 @@ async function handleServerAdminUpdate() {
             state.busy = false;
             updateServerAdminInteractivity();
         }
+    }
+}
+
+async function loadServerAdminBranches(selectElement, currentBranch) {
+    try {
+        const result = await requestServerAdmin('/api/server-admin/branches');
+        const branches = result?.branches || [];
+
+        selectElement.replaceChildren();
+
+        for (const branch of branches) {
+            const option = createElement('option', { attrs: { value: branch } });
+            option.textContent = branch;
+            if (branch === currentBranch) {
+                option.selected = true;
+            }
+            selectElement.appendChild(option);
+        }
+
+        // Add change handler
+        selectElement.addEventListener('change', () => handleServerAdminBranchSwitch(selectElement));
+    } catch (error) {
+        console.error('Failed to load branches.', error);
+        // Keep the current branch option if loading fails
+    }
+}
+
+async function handleServerAdminBranchSwitch(selectElement) {
+    const state = getServerAdminState();
+    const refs = getServerAdminRefs();
+
+    if (!refs || state.busy || state.restarting) {
+        return;
+    }
+
+    const targetBranch = selectElement.value;
+    const currentBranch = state.lastStatusData?.repository?.branch || '';
+
+    if (targetBranch === currentBranch) {
+        return;
+    }
+
+    // Show confirmation dialog
+    const hasLocalChanges = state.lastStatusData?.repository?.hasLocalChanges || false;
+    const changedFiles = state.lastStatusData?.repository?.changedFiles || [];
+    const changedFilesText = changedFiles.length > 0
+        ? `\n\nChanged files: ${changedFiles.map(f => f.path).join(', ')}`
+        : '';
+
+    const confirmMessage = hasLocalChanges
+        ? `You have local changes.${changedFilesText}\n\nDo you want to auto-stash your changes and switch to "${targetBranch}"?\n\nThe server will restart after switching.`
+        : `Switch to branch "${targetBranch}"?\n\nThe server will restart after switching.`;
+
+    const confirmed = confirm(confirmMessage);
+
+    if (!confirmed) {
+        // Reset select to current branch
+        selectElement.value = currentBranch;
+        return;
+    }
+
+    state.busy = true;
+    updateServerAdminInteractivity();
+    setServerAdminMessage(refs.updateNote, `Switching to branch "${targetBranch}"…`);
+
+    try {
+        const result = await requestServerAdmin('/api/server-admin/switch-branch', {
+            branch: targetBranch,
+            autoStash: hasLocalChanges,
+        });
+
+        state.busy = false;
+        state.restarting = true;
+        updateServerAdminInteractivity();
+
+        const message = result?.message || `Switched to branch "${targetBranch}". Restarting…`;
+        setServerAdminMessage(refs.updateNote, message, 'warn');
+        toastr.info(message, 'Branch Switch');
+
+        if (result?.stashed && !result?.stashRestored) {
+            toastr.warning('Your changes were stashed but could not be automatically restored. Use "git stash pop" after restart.', 'Stash Warning', { timeOut: 10000 });
+        }
+
+        const restarted = await waitForServerReturn();
+        if (!restarted) {
+            state.restarting = false;
+            setServerAdminMessage(refs.updateNote, 'Branch switched, but restart is taking longer than expected. Refresh manually once the server is back.', 'warn');
+            toastr.warning('Branch switched, but restart is taking longer than expected. Refresh manually once the server is back.', 'Restart pending');
+        }
+    } catch (error) {
+        console.error('Failed to switch branch.', error);
+        state.busy = false;
+        updateServerAdminInteractivity();
+
+        // Reset select to current branch
+        selectElement.value = currentBranch;
+
+        const errorMessage = error.message || 'Failed to switch branch.';
+        setServerAdminMessage(refs.updateNote, errorMessage, 'danger');
+        toastr.error(errorMessage, 'Branch Switch');
     }
 }
 
@@ -7151,6 +7274,12 @@ function buildBottomChatBar() {
             eventTypes.GROUP_CHAT_DELETED,
         ].filter(Boolean);
 
+        // Check if APP_READY already fired before registering listener
+        if (context.appReady || window.SillyTavern?.appReady) {
+            // Already ready, trigger refresh immediately
+            refresh();
+        }
+
         for (const eventName of new Set(events)) {
             eventSource.on(eventName, refresh);
         }
@@ -7163,6 +7292,11 @@ function buildBottomChatBar() {
             eventTypes.CHAT_CHANGED,
             eventTypes.CHAT_LOADED,
         ].filter(Boolean);
+
+        // Check if APP_READY already fired for persona bubble too
+        if (context.appReady || window.SillyTavern?.appReady) {
+            refreshPersona();
+        }
 
         for (const eventName of new Set(personaEvents)) {
             eventSource.on(eventName, refreshPersona);
@@ -7240,18 +7374,18 @@ async function refreshBottomChatSelect() {
 
         if (chatContext.canBrowseChats && chats.length === 0) {
             const attempts = Number(sbState.bottomChatBarRefreshAttempts ?? 0);
-            if (attempts < 8) {
+            if (attempts < 30) {
                 sbState.bottomChatBarRefreshAttempts = attempts + 1;
-                scheduleBottomChatBarRefresh(200);
+                scheduleBottomChatBarRefresh(200 + Math.random() * 50);
             }
         } else {
             sbState.bottomChatBarRefreshAttempts = 0;
         }
     } catch {
         const attempts = Number(sbState.bottomChatBarRefreshAttempts ?? 0);
-        if (attempts < 8) {
+        if (attempts < 30) {
             sbState.bottomChatBarRefreshAttempts = attempts + 1;
-            scheduleBottomChatBarRefresh(250);
+            scheduleBottomChatBarRefresh(250 + Math.random() * 50);
         }
     }
 }
