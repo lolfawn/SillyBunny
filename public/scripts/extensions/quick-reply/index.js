@@ -317,7 +317,9 @@ eventSource.on(event_types.GROUP_CHAT_CREATED, (...args) => executeIfReadyElseQu
 
 const onBeforeGeneration = async (_generationType, _options = {}, isDryRun = false) => {
     if (isDryRun) {
-        log('Before-generation hook skipped due to dryRun.');
+        // SillyBunny: prompt previews and topbar token refreshes legitimately use dry-runs,
+        // so keep this at debug level instead of spamming the normal log stream.
+        debug('Before-generation hook skipped due to dryRun.');
         return;
     }
     if (selected_group && this_chid === undefined) {

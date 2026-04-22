@@ -2,10 +2,15 @@ import { getTree, findNodeById, getAllEntryUids, getSettings } from './tree-stor
 import { getReadableBooks, getEntryContent } from './pathfinder-tool-bridge.js';
 import { sidecarGenerate } from './llm-sidecar.js';
 import { logSidecarRetrieval, logPipelineStart, logPipelineComplete, setSidecarActive } from './activity-feed.js';
+import { buildTreeFromMetadata } from './tree-builder.js';
 import { runPipeline } from './prompts/pipeline-runner.js';
 
 const RETRIEVAL_PROMPT_KEY = 'pathfinder_sidecar_retrieval';
 const PIPELINE_RETRIEVAL_KEY = 'pathfinder_pipeline_retrieval';
+export const PATHFINDER_RETRIEVAL_PROMPT_KEYS = Object.freeze([
+    RETRIEVAL_PROMPT_KEY,
+    PIPELINE_RETRIEVAL_KEY,
+]);
 
 function formatCollapsedGuide(tree, bookName) {
     if (!tree) return '';
@@ -24,6 +29,42 @@ function formatCollapsedGuide(tree, bookName) {
     return lines.join('\n');
 }
 
+async function ensureLorebookTree(bookName) {
+    if (getTree(bookName)) {
+        return true;
+    }
+
+    const ctx = window?.SillyTavern?.getContext?.();
+    if (typeof ctx?.loadWorldInfo !== 'function') {
+        console.warn(`[Pathfinder] Could not build a tree for "${bookName}" because loadWorldInfo is unavailable.`);
+        return false;
+    }
+
+    try {
+        const bookData = await ctx.loadWorldInfo(bookName);
+        if (!bookData?.entries) {
+            console.warn(`[Pathfinder] Could not build a tree for "${bookName}" because no lorebook entries were found.`);
+            return false;
+        }
+
+        await buildTreeFromMetadata(bookName, bookData);
+        return true;
+    } catch (err) {
+        console.warn(`[Pathfinder] Failed to build a tree for "${bookName}".`, err);
+        return false;
+    }
+}
+
+async function ensureReadableBookTrees(bookNames) {
+    const readableBooks = Array.from(new Set((bookNames ?? []).filter(Boolean)));
+
+    for (const bookName of readableBooks) {
+        await ensureLorebookTree(bookName);
+    }
+
+    return readableBooks.filter(bookName => getTree(bookName));
+}
+
 /**
  * Run predictive pipeline retrieval
  * @param {Function} setExtensionPrompt
@@ -34,10 +75,16 @@ function formatCollapsedGuide(tree, bookName) {
 async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles) {
     const s = getSettings();
     const pipelineId = s.pipelineId || 'default';
+    const books = await ensureReadableBookTrees(getReadableBooks());
 
     // Get chat messages from context
     const ctx = window?.SillyTavern?.getContext?.();
     const chatMessages = ctx?.chat ?? [];
+
+    if (books.length === 0) {
+        console.log('[Pathfinder] No readable lorebooks with built trees for pipeline retrieval');
+        return;
+    }
 
     if (chatMessages.length === 0) {
         console.log('[Pathfinder] No chat messages for pipeline retrieval');
@@ -61,7 +108,6 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
     }
 
     // Build content for injection - fetch actual entry content
-    const books = getReadableBooks();
     const entryContents = [];
 
     for (const entryName of result.selectedEntries) {
@@ -110,7 +156,7 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
  * @returns {Promise<void>}
  */
 async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles) {
-    const books = getReadableBooks();
+    const books = await ensureReadableBookTrees(getReadableBooks());
     if (books.length === 0) return;
 
     let contextText = '';
@@ -152,9 +198,9 @@ async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptType
     }
 }
 
-export async function runSidecarRetrieval(_getExtensionPrompt, setExtensionPrompt, extensionPromptTypes, extensionPromptRoles) {
+export async function runSidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles) {
     const s = getSettings();
-    if (!s.sidecarEnabled) return;
+    if (!(s.sidecarEnabled || s.pipelineEnabled)) return;
 
     const books = getReadableBooks();
     if (books.length === 0) return;

@@ -2,6 +2,8 @@ import {
     chat,
     chat_metadata,
     ensureSwipes,
+    extension_prompt_roles,
+    extension_prompt_types,
     extension_prompts,
     setExtensionPrompt,
     substituteParams,
@@ -28,7 +30,13 @@ import {
     getToolAction,
     getToolFormatter,
 } from './tool-action-registry.js';
-import { getTree as pfGetTree, getAllEntryUids as pfGetAllEntryUids } from './pathfinder/tree-store.js';
+import {
+    getAllEntryUids as pfGetAllEntryUids,
+    getSettings as getPathfinderRuntimeSettings,
+    getTree as pfGetTree,
+    setSettings as setPathfinderRuntimeSettings,
+} from './pathfinder/tree-store.js';
+import { PATHFINDER_RETRIEVAL_PROMPT_KEYS, runSidecarRetrieval } from './pathfinder/sidecar-retrieval.js';
 
 const PROMPT_KEY_PREFIX = 'inchat_agent_';
 const MESSAGE_EXTRA_KEY = 'inChatAgents';
@@ -62,6 +70,40 @@ let toolSyncDuringGeneration = false;
 /** Recursion depth tracker for tool-call passes. */
 let toolRecursionDepth = 0;
 
+function isPathfinderToolAgent(agent) {
+    return agent?.sourceTemplateId === 'tpl-pathfinder' ||
+        agent?.name === 'Pathfinder' ||
+        (agent?.category === 'tool' && agent?.tools?.some(tool => tool.name?.startsWith('Pathfinder_')));
+}
+
+function getPathfinderRuntimeAgent(agents = getEnabledToolAgents()) {
+    return agents.find(isPathfinderToolAgent) ?? null;
+}
+
+function syncPathfinderRuntimeSettings(agent = getPathfinderRuntimeAgent()) {
+    const currentRuntimeSettings = getPathfinderRuntimeSettings();
+    const nextRuntimeSettings = agent?.settings
+        ? {
+            ...agent.settings,
+            pipelinePrompts: currentRuntimeSettings.pipelinePrompts,
+            pipelines: currentRuntimeSettings.pipelines,
+        }
+        : {
+            pipelinePrompts: currentRuntimeSettings.pipelinePrompts,
+            pipelines: currentRuntimeSettings.pipelines,
+        };
+
+    setPathfinderRuntimeSettings(nextRuntimeSettings);
+}
+
+function getRegisterableAgentTools(agent) {
+    if (isPathfinderToolAgent(agent) && !agent?.settings?.sidecarEnabled) {
+        return [];
+    }
+
+    return (agent.tools ?? []).filter(tool => tool.enabled !== false);
+}
+
 /**
  * Syncs tool registrations for all enabled tool-category agents.
  * Unregisters tools from disabled agents, registers tools from enabled ones.
@@ -73,9 +115,10 @@ export function syncToolAgentRegistrations() {
 
     const desiredTools = new Set();
     const enabledToolAgents = getEnabledToolAgents();
+    syncPathfinderRuntimeSettings(getPathfinderRuntimeAgent(enabledToolAgents));
 
     for (const agent of enabledToolAgents) {
-        const enabledTools = (agent.tools ?? []).filter(tool => tool.enabled !== false);
+        const enabledTools = getRegisterableAgentTools(agent);
         for (const tool of enabledTools) {
             desiredTools.add(tool.name);
         }
@@ -89,7 +132,7 @@ export function syncToolAgentRegistrations() {
     }
 
     for (const agent of enabledToolAgents) {
-        const enabledTools = (agent.tools ?? []).filter(tool => tool.enabled !== false);
+        const enabledTools = getRegisterableAgentTools(agent);
         for (const toolDef of enabledTools) {
             const action = getToolAction(toolDef.actionKey);
             if (!action) {
@@ -1106,7 +1149,7 @@ function onGenerationStarted() {
     }
 
     for (const key of Object.keys(extension_prompts)) {
-        if (key.startsWith(PROMPT_KEY_PREFIX)) {
+        if (key.startsWith(PROMPT_KEY_PREFIX) || PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(key)) {
             delete extension_prompts[key];
         }
     }
@@ -1139,13 +1182,20 @@ function onGenerationStopped() {
  * @param {object} _options
  * @param {boolean} dryRun
  */
-function onGenerationAfterCommands(generationType, _options, dryRun) {
+async function onGenerationAfterCommands(generationType, _options, dryRun) {
     if (dryRun || internalPromptTransformDepth > 0) {
         return;
     }
 
     pendingGenerationSnapshot = buildActivationSnapshot(generationType);
     const activeAgents = getSnapshotAgents(pendingGenerationSnapshot);
+    const pathfinderAgent = getPathfinderRuntimeAgent(activeAgents);
+
+    if (pathfinderAgent) {
+        syncPathfinderRuntimeSettings(pathfinderAgent);
+        await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles);
+    }
+
     const promptAgents = activeAgents.filter(agent => agent.phase === 'pre' || agent.phase === 'both');
 
     for (const agent of promptAgents) {

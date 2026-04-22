@@ -1,5 +1,6 @@
 import { getTree, findNodeById, getSettings } from '../tree-store.js';
 import { getReadableBooks, TOOL_NAMES, getBookListWithDescriptions } from '../pathfinder-tool-bridge.js';
+import { buildTreeFromMetadata } from '../tree-builder.js';
 import { registerToolAction, registerToolFormatter } from '../../tool-action-registry.js';
 import { logToolCallStarted, logToolCallCompleted, logToolCallError } from '../activity-feed.js';
 
@@ -77,7 +78,7 @@ async function searchAction(args) {
     if (!nodeId) {
         const results = [];
         for (const bookName of books) {
-            const tree = getTree(bookName);
+            const tree = await getTreeWithAutoBuild(bookName);
             if (!tree) continue;
             results.push(`=== ${bookName} ===\n${getTreeOverview(tree, bookName, s.searchMode)}`);
         }
@@ -89,7 +90,7 @@ async function searchAction(args) {
 
     let allEntries = [];
     for (const bookName of books) {
-        const tree = getTree(bookName);
+        const tree = await getTreeWithAutoBuild(bookName);
         if (!tree) continue;
         const node = findNodeById(tree, nodeId);
         if (!node) continue;
@@ -128,6 +129,20 @@ async function loadWorldInfoSafe(name) {
     } catch {
         return null;
     }
+}
+
+async function getTreeWithAutoBuild(bookName) {
+    const cachedTree = getTree(bookName);
+    if (cachedTree) {
+        return cachedTree;
+    }
+
+    const bookData = await loadWorldInfoSafe(bookName);
+    if (!bookData?.entries) {
+        return null;
+    }
+
+    return await buildTreeFromMetadata(bookName, bookData);
 }
 
 function findEntrySafe(entries, uid) {

@@ -226,21 +226,35 @@ export function setConnectionProfileId(id) {
     getSettings().connectionProfile = id ?? '';
 }
 
-export function findConnectionProfile(profileId) {
+function getConnectionProfilesFromService() {
     const context = window?.SillyTavern?.getContext?.();
-    if (!context) return null;
+    if (!context) return [];
+
     const cm = context.ConnectionManagerRequestService;
-    if (!cm) return null;
-    const profiles = cm.getProfiles?.() ?? [];
+    if (!cm) return [];
+
+    try {
+        if (typeof cm.getSupportedProfiles === 'function') {
+            return cm.getSupportedProfiles() ?? [];
+        }
+
+        if (typeof cm.getProfiles === 'function') {
+            return cm.getProfiles() ?? [];
+        }
+    } catch {
+        return [];
+    }
+
+    return [];
+}
+
+export function findConnectionProfile(profileId) {
+    const profiles = getConnectionProfilesFromService();
     return profiles.find(p => p.id === profileId) ?? null;
 }
 
 export function listConnectionProfiles() {
-    const context = window?.SillyTavern?.getContext?.();
-    if (!context) return [];
-    const cm = context.ConnectionManagerRequestService;
-    if (!cm) return [];
-    return cm.getProfiles?.() ?? [];
+    return getConnectionProfilesFromService();
 }
 
 export function getBookPermission(bookName, permission) {

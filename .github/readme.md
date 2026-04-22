@@ -257,6 +257,10 @@ SillyBunny includes some extras by default to help you get started right away:
 
 **Bug fixes**
 
+- Fixed Pathfinder pipeline mode so the saved lorebook and connection-profile settings are rehydrated on startup, predictive retrieval runs again during real generations, and pipeline-only mode no longer depends on Tool Mode being enabled
+- Fixed Pathfinder connection-profile dropdowns in both the main settings panel and prompt editor by switching them back to the supported Connection Manager profile API
+- Fixed Pathfinder lorebook trees not rebuilding after reloads by auto-building missing trees on demand for predictive retrieval and Search tool calls
+- Reduced noisy `dryRun` before-generation logs during prompt previews and topbar token refreshes so normal generation logging stays readable
 - Fixed mobile preset menu folders accidentally toggling when a scroll gesture ended on a folder header by suppressing synthetic post-scroll summary clicks
 - Fixed repo lint regressions across Pathfinder follow-up changes and existing workspace files so the full `npm run lint` pass succeeds again
 - Fixed duplicate third-party extension cards in the Extensions panel by deduplicating manifest and render entries before they reach the UI
