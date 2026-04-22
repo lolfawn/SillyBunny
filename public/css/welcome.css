@@ -491,9 +491,11 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     position: relative;
     display: grid;
     place-items: center;
+    justify-items: center;
     width: min(100%, 312px);
     min-height: clamp(188px, 25vw, 248px);
     padding: var(--spacing-md, 12px) var(--spacing-sm, 8px) var(--spacing-md, 12px);
+    margin-inline: auto;
 }
 
 .welcomeHeroScene::before,
@@ -1922,6 +1924,7 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
         min-height: 166px;
         padding: 12px 10px 10px;
         border-radius: 20px;
+        margin-inline: auto;
     }
 
     .welcomeActionGrid,
@@ -1958,6 +1961,7 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
         width: min(100%, 188px);
         min-height: 136px;
         padding-bottom: 14px;
+        margin-inline: auto;
     }
 
     .welcomeHeroMascot {

@@ -171,7 +171,7 @@ const WELCOME_GUIDE_CARDS = Object.freeze([
         chips: ['Character Cards', 'Create Character', 'Delete Character', 'Open Character'],
         icon: 'fa-solid fa-id-card',
         actionLabel: 'Open the Characters menu',
-        actionType: '',
+        actionType: 'open-characters-menu',
         actionValue: '',
     },
     {
@@ -180,13 +180,13 @@ const WELCOME_GUIDE_CARDS = Object.freeze([
         chips: ['Global Search', 'Fuzzy Search', 'Settings', 'Top Bar'],
         icon: 'fa-search',
         actionLabel: 'Open the Search bar',
-        actionType: '',
+        actionType: 'open-global-search',
         actionValue: '',
     },
     {
         title: 'Quick-access Buttons',
-        body: 'We have a few quick access buttons for your convenience in the home screen. Temporary Chat opens a quick burner chat. Open Assistant and Open Assistant Nahida brings up one of our built-in assistants. Sample Characters and Import Characters bring in a character of your choosing.',
-        chips: ['Temporary Chat', 'Open Assistant', 'Sample Characters', 'Import Characters'],
+        body: 'We have a few quick access buttons for your convenience in the home screen. Temporary Chat opens a quick burner chat. Open Assistant brings up one of our built-in assistants. Import Characters lets you bring in a character of your choosing.',
+        chips: ['Temporary Chat', 'Open Assistant', 'Import Characters'],
         icon: 'fa-hand-pointer',
         actionLabel: 'Import a character',
         actionType: 'open-import-characters',
@@ -255,7 +255,7 @@ const WELCOME_BUNDLED_ASSISTANTS = Object.freeze([
             'Can you help me make sense of my current system prompt?',
             'What should I tune first: model, preset, or prompt settings?',
             'Do large language models feel emotions?',
-            'Are larger parameter models better in all cases?'
+            'Are larger parameter models better in all cases?',
         ]),
         actionLabel: 'Open Assistant Nahida',
         actionIcon: 'fa-leaf',
@@ -706,13 +706,13 @@ function buildPresetStarterPackItem() {
             statusLabel: selectedVariant ? `Selected: ${selectedVariant}` : 'Preset Pack',
             statusTone: selectedVariant ? 'good' : 'warm',
             actionIcon: 'fa-wand-magic-sparkles',
-            actionLabel: 'Apply SillyBunny',
+            actionLabel: 'Apply preset',
             actionType: 'apply-preset',
             actionValue: STARTER_PACK_PRESET_NAME_SILLYBUNNY,
-            secondaryActionLabel: 'Apply SillyTavern',
-            secondaryActionIcon: 'fa-wand-magic-sparkles',
-            secondaryActionType: 'apply-preset',
-            secondaryActionValue: STARTER_PACK_PRESET_NAME_SILLYTAVERN,
+            secondaryActionLabel: 'Visit site',
+            secondaryActionIcon: 'fa-arrow-up-right-from-square',
+            secondaryActionType: 'open-link',
+            secondaryActionValue: STARTER_PACK_SITE_URL,
         };
     }
 
@@ -762,30 +762,24 @@ function buildLinkStarterPackItem({
     };
 }
 
-function buildSiteStarterPackItem() {
-    return buildLinkStarterPackItem({
-        title: `${STARTER_PACK_CREATOR_NAME}'s site`,
-        body: `${STARTER_PACK_CREATOR_NAME}'s main site collects the preset, extensions, themes, cards, and other SillyBunny-adjacent tools in one easy place.`,
-        icon: 'fa-globe',
-        chips: ['Site', 'Cards', 'Themes', 'Extensions'],
-        statusLabel: 'Creator hub',
-        statusTone: 'warm',
-        actionLabel: 'Visit site',
-        actionValue: STARTER_PACK_SITE_URL,
-    });
-}
-
 function buildGeechanStarterPackItem() {
-    return buildLinkStarterPackItem({
+    return {
         title: 'Geechan',
         body: 'Geechan\'s Rentry highlights his well-written character cards and guides, alongside his prompts and presets. He also made our bundled Assistant Nahida card and Prose Polisher agent. SillyBunny includes his Universal Roleplay v5.0 preset across Chat Completions, plus the matching Text Completions variant for context, system prompt, and instruct pieces.',
         icon: 'fa-leaf',
         chips: ['Character cards', 'Assistant Nahida', 'Prose Polisher', 'Rentry'],
+        chipColumnCount: 4,
         statusLabel: 'Preset pack',
         statusTone: 'warm',
-        actionLabel: 'Visit Geechan',
-        actionValue: GEECHAN_SITE_URL,
-    });
+        actionLabel: 'Apply preset',
+        actionIcon: 'fa-wand-magic-sparkles',
+        actionType: 'apply-preset',
+        actionValue: 'Geechan - Universal Roleplay (Chat Completions) (v5.0)',
+        secondaryActionLabel: 'Visit Geechan',
+        secondaryActionIcon: 'fa-arrow-up-right-from-square',
+        secondaryActionType: 'open-link',
+        secondaryActionValue: GEECHAN_SITE_URL,
+    };
 }
 
 function buildTldStarterPackItem() {
@@ -807,7 +801,6 @@ function buildStarterPackItems() {
     return {
         preInstalled: [
             buildPresetStarterPackItem(),
-            buildSiteStarterPackItem(),
             buildGeechanStarterPackItem(),
             buildTldStarterPackItem(),
         ],
@@ -1174,6 +1167,20 @@ async function handleWelcomeAction(button, sendTextArea) {
                 sendTextArea.focus();
             }
             break;
+        case 'open-characters-menu':
+            window.SillyBunnyShell?.openCharacters?.();
+            break;
+        case 'open-global-search':
+            window.SillyBunnyShell?.openGlobalSearch?.({ focusInput: true });
+            break;
+        case 'open-import-characters': {
+            window.SillyBunnyShell?.openCharacters?.();
+            const importButton = document.getElementById('character_import_button')
+                || document.getElementById('character_import_paste_button')
+                || document.querySelector('.open_characters_library');
+            importButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            break;
+        }
         case 'open-sample-characters':
             document.querySelector('.open_characters_library')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             break;

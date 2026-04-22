@@ -6070,7 +6070,7 @@ function createSearchIndex(tabState) {
             continue;
         }
 
-        if (element.closest('.sb-search-result, .sb-theme-card, #settingsSearch')) {
+        if (element.closest('.sb-search-result, .sb-theme-card, .sb-legacy-search-hidden')) {
             continue;
         }
 
@@ -7878,6 +7878,13 @@ function initAll() {
             if (SB_SHELLS[shellKey]) {
                 openShell(shellKey, tabId);
             }
+        },
+        openCharacters() {
+            toggleCharacterPanel();
+        },
+        openGlobalSearch({ focusInput = true } = {}) {
+            closeAllDropdowns({ except: 'search' });
+            setUniversalSearchOpenState(true, { focusInput });
         },
         applyTheme(themeId) {
             setShellTheme(themeId);
