@@ -5,7 +5,7 @@ import { chat, closeMessageEditor, event_types, eventSource, main_api, messageFo
 import { getRegexedString, regex_placement } from './extensions/regex/engine.js';
 import { getCurrentLocale, t, translate } from './i18n.js';
 import { macros, MacroCategory } from './macros/macro-system.js';
-import { chat_completion_sources, getChatCompletionModel, oai_settings, reasoning_tag_styles } from './openai.js';
+import { chat_completion_sources, getChatCompletionModel, oai_settings } from './openai.js';
 import { Popup } from './popup.js';
 import { performFuzzySearch, power_user } from './power-user.js';
 import { getPresetManager } from './preset-manager.js';
@@ -49,10 +49,10 @@ const UI = {
     $maxAdditions: $('#reasoning_max_additions'),
 };
 
-const AUTO_APPEND_REASONING_TAGS = [reasoning_tag_styles.think, reasoning_tag_styles.thinking, reasoning_tag_styles.thought];
+const AUTO_APPEND_REASONING_TAGS = ['think', 'thinking', 'thought'];
 
 function getAutoAppendReasoningTagOrder() {
-    const preferredTag = String(oai_settings.auto_append_reasoning_tag_style ?? reasoning_tag_styles.think).trim().toLowerCase();
+    const preferredTag = String(oai_settings.auto_append_reasoning_tag_style ?? AUTO_APPEND_REASONING_TAGS[0]).trim().toLowerCase();
     return [preferredTag, ...AUTO_APPEND_REASONING_TAGS].filter((tag, index, allTags) => AUTO_APPEND_REASONING_TAGS.includes(tag) && allTags.indexOf(tag) === index);
 }
 

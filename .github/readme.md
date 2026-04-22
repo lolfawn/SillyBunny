@@ -197,7 +197,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Latest Update
 
-### v1.4.0 (2026-04-21)
+### v1.4.0 (2026-04-22)
 
 **Documentation**
 
@@ -286,6 +286,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 **Reasoning and provider compatibility**
 
+- Fixed the startup blank screen introduced by visible reasoning-tag support by making the tag parser bootstrap lazy-safe across the existing `script.js`/`openai.js`/`reasoning.js` module cycle
 - Simplified reasoning controls by removing the separate "Show thought in chat" toggle, so "Request model reasoning" is the single control again
 - Fixed response text extraction for OpenAI-style and Gemini-style payloads so parts/content/candidates/tool-plan formats render correctly instead of collapsing into blank or broken output
 - Fixed Gemini thought-signature handling by reading `candidates[].content.parts` correctly and checking the `gemini.thoughtSignatures` config dynamically
