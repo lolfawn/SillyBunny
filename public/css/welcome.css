@@ -189,6 +189,8 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     flex-direction: column;
     gap: 16px;
     min-width: 0;
+    align-items: flex-start;
+    text-align: left;
 }
 
 .welcomeHeroEyebrow {
@@ -202,6 +204,7 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 .welcomeHeaderTitle {
     display: flex;
     align-items: flex-start;
+    justify-content: flex-start;
     gap: 16px;
     min-width: 0;
 }
@@ -222,6 +225,7 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 .welcomeHeroTitleGroup {
     flex: 1 1 auto;
     min-width: 0;
+    text-align: center;
 }
 
 .welcomeHeaderVersionDisplay {
@@ -240,29 +244,27 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     font-size: calc(var(--mainFontSize) * 0.96);
     line-height: 1.55;
     color: var(--welcome-muted-fg);
+    text-align: center;
 }
 
 .welcomeForkNotice {
     margin-top: 14px;
-    max-width: 100%;
-    padding: 12px 14px;
+    max-width: min(100%, 600px);
+    padding: 10px 12px;
     border-radius: 16px;
     font-size: calc(var(--mainFontSize) * 0.82);
     line-height: 1.5;
     color: var(--welcome-strong-fg);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    flex-wrap: wrap;
+    display: block;
+    align-self: center;
     background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 9%, transparent);
     border: 1px solid color-mix(in srgb, var(--color-primary, var(--sb-accent)) 28%, var(--sb-shell-border, var(--SmartThemeBorderColor)));
     box-shadow: 0 12px 24px color-mix(in srgb, var(--SmartThemeShadowColor) 10%, transparent);
+    text-align: center;
 }
 
 .welcomeForkNoticeCopy {
-    flex: 1 1 34ch;
-    min-width: min(100%, 24ch);
+    min-width: 0;
 }
 
 .welcomeForkNotice strong {
@@ -271,11 +273,12 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 
 .welcomeForkNotice a {
     font-weight: 700;
+    white-space: nowrap;
 }
 
 .welcomePanelToggles {
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
     width: 100%;
     margin-top: -6px;
 }
@@ -326,16 +329,6 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     justify-content: center;
 }
 
-.welcomeForkNotice .welcomePanelModeControls {
-    flex: 0 1 auto;
-    justify-content: flex-end;
-    flex-wrap: nowrap;
-}
-
-.welcomeForkNotice .welcomePanelModeToggle {
-    flex: 0 1 auto;
-}
-
 .welcomePanel--compact .welcomeForkNotice .welcomePanelModeControls,
 .welcomePanel--listOnly .welcomeForkNotice .welcomePanelModeControls {
     display: none;
@@ -348,7 +341,7 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 
 .welcomeActionGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-auto-rows: 1fr;
     gap: 14px;
 }
@@ -755,23 +748,13 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
         width: 100%;
     }
 
+    .welcomeActionGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .welcomeHeaderTitle {
         flex-wrap: wrap;
         gap: 12px;
-    }
-
-    .welcomePanelToggles {
-        justify-content: center;
-    }
-
-    .welcomeForkNotice {
-        align-items: flex-start;
-    }
-
-    .welcomeForkNotice .welcomePanelModeControls {
-        width: 100%;
-        justify-content: flex-start;
-        flex-wrap: wrap;
     }
 
     .welcomeHeroMedia {
@@ -806,6 +789,12 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     .welcomeHeroScene::after {
         width: min(100%, 156px);
         height: 24px;
+    }
+}
+
+@container welcome-home (max-width: 760px) {
+    .welcomeActionGrid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -1897,16 +1886,6 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
 
     .welcomePanelToggles {
         justify-content: center;
-    }
-
-    .welcomeForkNotice {
-        align-items: flex-start;
-    }
-
-    .welcomeForkNotice .welcomePanelModeControls {
-        width: 100%;
-        justify-content: flex-start;
-        flex-wrap: wrap;
     }
 
     .welcomePanelToggles .mes_button {
