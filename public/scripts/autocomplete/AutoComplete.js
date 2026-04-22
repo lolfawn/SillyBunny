@@ -41,6 +41,8 @@ export class AutoComplete {
     /**@type {boolean}*/ wasForced = false;
     /**@type {boolean}*/ isForceHidden = false;
     /**@type {boolean}*/ canBeAutoHidden = false;
+    /**@type {boolean}*/ isNativeReplacing = false;
+    /**@type {boolean}*/ isComposing = false;
 
     /**@type {string}*/ text;
     /**@type {AutoCompleteNameResult}*/ parserResult;
@@ -51,6 +53,7 @@ export class AutoComplete {
     /**@type {boolean}*/ startQuote;
     /**@type {boolean}*/ endQuote;
     /**@type {number}*/ selectionStart;
+    /**@type {number}*/ selectionEnd;
 
     /**@type {RegExp}*/ fuzzyRegex;
 
@@ -115,13 +118,47 @@ export class AutoComplete {
         this.updateDetailsPositionDebounced = debounce(this.updateDetailsPosition.bind(this), 10);
         this.updateFloatingPositionDebounced = debounce(this.updateFloatingPosition.bind(this), 10);
 
-        textarea.addEventListener('input', () => {
+        textarea.addEventListener('beforeinput', (evt) => {
             this.selectionStart = this.textarea.selectionStart;
+            this.selectionEnd = this.textarea.selectionEnd;
+            this.isNativeReplacing = evt.inputType === 'insertReplacementText';
+        });
+        textarea.addEventListener('compositionstart', () => {
+            this.isComposing = true;
+        });
+        textarea.addEventListener('compositionend', () => {
+            this.isComposing = false;
+            this.selectionStart = this.textarea.selectionStart;
+            this.selectionEnd = this.textarea.selectionEnd;
+        });
+        textarea.addEventListener('input', (evt) => {
+            this.selectionStart = this.textarea.selectionStart;
+            this.selectionEnd = this.textarea.selectionEnd;
+
+            if (this.isComposing || this.isNativeReplacing) {
+                this.text = this.textarea.value;
+                this.isNativeReplacing = false;
+                return;
+            }
+
+            const allowedInputTypes = new Set([
+                'insertText',
+                'insertLineBreak',
+                'deleteContentBackward',
+                'deleteContentForward',
+            ]);
+            const shouldProcessInput = !evt.inputType || allowedInputTypes.has(evt.inputType);
+            if (!shouldProcessInput) {
+                this.text = this.textarea.value;
+                return;
+            }
+
             if (this.text != this.textarea.value) this.show(true, this.wasForced);
         });
         textarea.addEventListener('keydown', (evt) => this.handleKeyDown(evt));
         textarea.addEventListener('click', () => {
             this.selectionStart = this.textarea.selectionStart;
+            this.selectionEnd = this.textarea.selectionEnd;
             if (this.isActive) this.show();
         });
         textarea.addEventListener('blur', () => this.hide());
@@ -276,6 +313,8 @@ export class AutoComplete {
     async show(isInput = false, isForced = false, isSelect = false) {
         //TODO check if isInput and isForced are both required
         this.text = this.textarea.value;
+        this.selectionStart = this.textarea.selectionStart;
+        this.selectionEnd = this.textarea.selectionEnd;
         this.isReplaceable = false;
         this.isShowForced = isForced; // Store forced state for checkIfActivate to access
 
@@ -706,12 +745,28 @@ export class AutoComplete {
      * Select an item for autocomplete and put text into textarea.
      */
     async select() {
+        let didUseNativeInsert = false;
         if (this.isReplaceable && this.selectedItem.value !== null) {
             // Apply per-option replacement offset (e.g., for closing tags that need to replace leading whitespace)
             const effectiveStart = this.effectiveParserResult.start + (this.selectedItem.replacementStartOffset ?? 0);
-            this.textarea.value = `${this.text.slice(0, effectiveStart)}${this.selectedItem.replacer}${this.text.slice(this.effectiveParserResult.start + this.effectiveParserResult.name.length + (this.startQuote ? 1 : 0) + (this.endQuote ? 1 : 0))}`;
-            this.textarea.selectionStart = effectiveStart + this.selectedItem.replacer.length;
-            this.textarea.selectionEnd = this.textarea.selectionStart;
+            const replaceEnd = this.effectiveParserResult.start + this.effectiveParserResult.name.length + (this.startQuote ? 1 : 0) + (this.endQuote ? 1 : 0);
+            const replacementText = this.selectedItem.replacer;
+            const nextCursor = effectiveStart + replacementText.length;
+            const supportsExecCommand = !this.isNativeReplacing && !this.isComposing && typeof document.execCommand === 'function';
+
+            this.textarea.focus();
+            this.textarea.setSelectionRange(effectiveStart, replaceEnd);
+
+            if (supportsExecCommand && document.execCommand('insertText', false, replacementText)) {
+                this.text = this.textarea.value;
+                didUseNativeInsert = true;
+            } else {
+                this.textarea.value = `${this.text.slice(0, effectiveStart)}${replacementText}${this.text.slice(replaceEnd)}`;
+                this.text = this.textarea.value;
+            }
+
+            this.textarea.selectionStart = nextCursor;
+            this.textarea.selectionEnd = nextCursor;
             this.show(false, false, true);
         } else {
             const selectionStart = this.textarea.selectionStart;
@@ -720,7 +775,9 @@ export class AutoComplete {
             this.textarea.selectionDirection = selectionEnd;
         }
         this.wasForced = false;
-        this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        if (!didUseNativeInsert) {
+            this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
         this.onSelect?.(this.selectedItem);
     }
 

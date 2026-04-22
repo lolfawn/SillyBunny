@@ -5,6 +5,7 @@
 
 ## SillyBunny Fork Changelog
 
+- 2026-04-22: Hardened SillyBunny's shared autocomplete input handling around native keyboard replacement and IME composition events, so Android and Termux autocorrect suggestions can replace text in place without appending at the end of the field.
 - 2026-04-22: Switched SillyBunny's default UI font back to Figtree after testing Noto Sans, so fresh loads and theme fallbacks again use Figtree across desktop and mobile.
 - 2026-04-22: Switched SillyBunny's default UI font from Figtree to Noto Sans so fresh loads and theme fallbacks use Noto Sans across desktop and mobile.
 - 2026-04-22: Split the `Custom CSS` settings drawer out from `Chat & Characters`, and tightened the mobile SillyTavern import card/button sizing so the path field plus `Import Folder` and `Sync Extensions` controls no longer dominate the viewport.

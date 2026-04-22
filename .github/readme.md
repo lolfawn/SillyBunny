@@ -210,6 +210,8 @@ SillyBunny includes some extras by default to help you get started right away:
 
 **User Experience**
 
+- Fixed a Termux/Android mobile typing bug where accepting keyboard autocorrect suggestions could append the replacement text to the end of the message instead of replacing the misspelled word in place
+- Hardened the shared autocomplete engine around native replacement and IME composition events, so Android/Termux keyboard corrections can finish in place without slash-command or name autocomplete interrupting the browser's own text replacement flow
 - Fixed mobile checkbox and toggle alignment across the shared UI, Extensions panel, World Info, and Prompt Manager so labels stay vertically centered and spacing stays consistent on narrow screens
 - Fine-tuned the OpenAI reasoning settings on mobile so the reasoning checkboxes stay centered against their labels and the tag-style dropdown stacks cleanly with symmetrical spacing on phone widths
 - Reduced mobile checkbox row heights at the 620px and 450px breakpoints so dense settings panels feel cleaner on phones
@@ -268,6 +270,9 @@ SillyBunny includes some extras by default to help you get started right away:
 - Fixed Pathfinder lorebook trees not rebuilding after reloads by auto-building missing trees on demand for predictive retrieval and Search tool calls
 - Reduced noisy `dryRun` before-generation logs during prompt previews and topbar token refreshes so normal generation logging stays readable
 - Fixed mobile preset menu folders accidentally toggling when a scroll gesture ended on a folder header by suppressing synthetic post-scroll summary clicks
+- Separated the `Custom CSS` drawer from the `Chat & Characters` settings group and reduced the mobile SillyTavern import card/button sizing so the path field, `Import Folder`, and `Sync Extensions` controls fit cleanly on small screens
+- Switched the default SillyBunny UI font back to Figtree after testing Noto Sans, so fresh sessions and fallback theme loads again use Figtree across desktop and mobile
+- Switched the default SillyBunny UI font from Figtree to Noto Sans so fresh sessions and fallback theme loads use Noto Sans across desktop and mobile
 - Fixed repo lint regressions across Pathfinder follow-up changes and existing workspace files so the full `npm run lint` pass succeeds again
 - Fixed duplicate third-party extension cards in the Extensions panel by deduplicating manifest and render entries before they reach the UI
 - Fixed SillyBunny-to-SillyTavern minimum version compatibility checks so third-party extensions like JS Slash Runner no longer fail against the forked client version
@@ -303,6 +308,7 @@ SillyBunny includes some extras by default to help you get started right away:
 **Agents and message tools**
 
 - Fixed in-chat agent running toasts so cancelling or stopping a prompt-based post-processing pass clears any stuck "Running ..." notification, and the toast can now also be dismissed manually on desktop and mobile
+- Restored the in-chat agent post-processing running toast for profile-backed prompt transforms by treating those internal requests like other agent-owned generations, so the active status stays visible on desktop and mobile until the pass finishes
 - Fixed message metadata badges so reasoning-token counts and agent-change actions stay in sync during both initial render and later message updates
 - Upgraded in-chat agent transform history to show semantic diffs with insert/delete highlighting while keeping Undo/Redo actions
 - Updated agent transform diff styling to match recast-post-processing — more subtle colors with rgba transparency for cleaner visual appearance
