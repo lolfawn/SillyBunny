@@ -93,7 +93,6 @@ import {
     resetMovableStyles,
     forceCharacterEditorTokenize,
     applyPowerUserSettings,
-    applyCustomThemeStyleEntriesFromExtensionSettings,
     generatedTextFiltered,
     applyStylePins,
 } from './scripts/power-user.js';
@@ -8279,7 +8278,7 @@ export async function getSettings(initLoaderHandle = null) {
             }
             await loadExtensionSettings(settings, isVersionChanged, enableAutoUpdate);
             await eventSource.emit(event_types.EXTENSION_SETTINGS_LOADED);
-            applyCustomThemeStyleEntriesFromExtensionSettings(extension_settings);
+            applyPowerUserSettings();
         }
 
         firstRun = !!settings.firstRun;
