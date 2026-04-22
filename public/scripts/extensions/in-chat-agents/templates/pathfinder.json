@@ -1,7 +1,7 @@
 {
     "id": "tpl-pathfinder",
     "name": "Pathfinder",
-    "description": "Agentic lorebook retrieval — the AI pathfinds through your knowledge base, retrieves context on demand, and maintains living memory. Gives the AI a waypoint map to your lorebook and a remote control to browse, remember, update, summarize, reorganize, merge, split, and keep a private notebook.",
+    "description": "Automatic agentic lorebook retrieval. Lets a model actively browse, search, and modify your lorebook using function tools.",
     "icon": "fa-route",
     "category": "tool",
     "tags": [

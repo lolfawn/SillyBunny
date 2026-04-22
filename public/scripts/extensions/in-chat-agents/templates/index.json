@@ -547,7 +547,7 @@
   {
     "id": "tpl-prose-polisher",
     "name": "Prose Polisher",
-    "description": "Post-generation prose cleanup that rewrites repetitive tropes and cliched wording",
+    "description": "Post-generation prose cleanup that rewrites repetitive tropes and cliched wording. Created by Geechan.",
     "icon": "",
     "category": "content",
     "tags": [
@@ -1213,7 +1213,7 @@
   {
     "id": "tpl-pathfinder",
     "name": "Pathfinder",
-    "description": "Agentic lorebook retrieval - the AI pathfinds through your knowledge base, retrieves context on demand, and maintains living memory. (Tool agent - requires API with tool calling support)",
+    "description": "Automatic agentic lorebook retrieval. Lets a model actively browse, search, and modify your lorebook using function tools. (Tool agent - requires API with tool calling support)",
     "icon": "fa-route",
     "category": "tool",
     "tags": [

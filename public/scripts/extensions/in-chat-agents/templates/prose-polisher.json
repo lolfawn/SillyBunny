@@ -1,7 +1,7 @@
 {
     "id": "tpl-prose-polisher",
     "name": "Prose Polisher",
-    "description": "Post-generation prose cleanup that rewrites repetitive tropes and cliched wording",
+    "description": "Post-generation prose cleanup that rewrites repetitive tropes and cliched wording. Created by Geechan.",
     "icon": "",
     "category": "content",
     "tags": [

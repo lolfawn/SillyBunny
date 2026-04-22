@@ -167,17 +167,17 @@ const SB_THEMES = Object.freeze([
     {
         id: 'modern-glass',
         label: 'Modern Glass',
-        description: 'Premium glass panels, layered depth, and a more cinematic desktop feel.',
+        description: 'A theme with a premium, modern glassy aesthetic.',
     },
     {
         id: 'clean-minimal',
         label: 'Clean Minimal',
-        description: 'Softer surfaces, calmer contrast, and lower visual noise for long sessions.',
+        description: 'A minimal theme with flatter surfaces, calmer contrast, and lower visual noise.',
     },
     {
         id: 'bold-stylized',
         label: 'Bold Stylized',
-        description: 'Sharper accents, stronger contrast, and more expressive active states.',
+        description: 'A theme that highlights accent colours and provides stronger contrast',
     },
 ]);
 
@@ -197,7 +197,7 @@ const SB_SHELLS = Object.freeze({
         proxyIcon: 'fa-bars',
         proxyLabel: 'Navigate',
         title: 'Workspace',
-        subtitle: 'Model behavior, presets, lore, and formatting tools live here.',
+        subtitle: 'Back end modifications, model setup, presets, lorebooks, and formatting tools live here.',
         searchPlaceholder: 'Quick find presets, samplers, lorebooks...',
         storageKey: SB_STORAGE_KEYS.leftTab,
         defaultTabId: 'presets',
@@ -205,7 +205,7 @@ const SB_SHELLS = Object.freeze({
             id: 'presets',
             label: 'Presets',
             icon: 'fa-sliders',
-            description: 'Swap presets, tune generation controls, and keep your most-used setups close.',
+            description: 'Change presets, tune sampling parameters, and modify other output settings here.',
         },
         embeddedTabs: [
             {
@@ -213,21 +213,21 @@ const SB_SHELLS = Object.freeze({
                 drawerId: 'sys-settings-button',
                 label: 'API',
                 icon: 'fa-plug',
-                description: 'Connect providers, select models, and manage backend-specific options.',
+                description: 'Connect providers, select models, and manage backend-specific options here.',
             },
             {
                 id: 'advanced-formatting',
                 drawerId: 'advanced-formatting-button',
                 label: 'Advanced Formatting',
                 icon: 'fa-font',
-                description: 'Fine-tune instruct templates, formatting rules, and prompt shaping.',
+                description: 'Fine-tune instruct templates, formatting rules, and prompt design for Text Completions here.',
             },
             {
                 id: 'world-info',
                 drawerId: 'WI-SP-button',
                 label: 'World Info',
                 icon: 'fa-book-atlas',
-                description: 'Edit lorebooks, world entries, and retrieval-friendly context.',
+                description: 'Edit and access lorebooks and world entries here.',
             },
         ],
         customTabs: [
@@ -248,7 +248,7 @@ const SB_SHELLS = Object.freeze({
         proxyIcon: 'fa-gear',
         proxyLabel: 'Customize',
         title: 'Customize',
-        subtitle: 'Personalize the workspace, extensions, persona flow, and atmosphere.',
+        subtitle: 'Personalize your workspace, add/remove extensions, change personas, modify server settings, or check logs here.',
         searchPlaceholder: 'Search themes, top bar, personas, backgrounds, or extensions',
         searchExamples: ['Moonlit', 'top bar', 'Appearance', 'notify extension updates', 'persona'],
         storageKey: SB_STORAGE_KEYS.rightTab,
@@ -333,10 +333,10 @@ const SB_SEARCH_TARGET_SELECTOR = [
     '.ch_name',
 ].join(', ');
 
-const SB_UNIVERSAL_SEARCH_PLACEHOLDER = 'Search every setting, extension, or config';
-const SB_UNIVERSAL_SEARCH_IDLE_TITLE = 'Search every setting';
+const SB_UNIVERSAL_SEARCH_PLACEHOLDER = 'Type to search...';
+const SB_UNIVERSAL_SEARCH_IDLE_TITLE = 'Search all settings';
 const SB_UNIVERSAL_SEARCH_IDLE_HINT = 'Jump to any workspace or customization control from one place.';
-const SB_UNIVERSAL_SEARCH_EMPTY_HINT = 'Try a broader term or a different setting name.';
+const SB_UNIVERSAL_SEARCH_EMPTY_HINT = 'Could not find query. Try a broader term or a different setting name.';
 const SB_UNIVERSAL_SEARCH_RESULT_LIMIT = 10;
 
 const sbState = {
