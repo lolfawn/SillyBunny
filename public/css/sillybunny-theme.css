@@ -2417,9 +2417,41 @@ input[type='range']::-moz-range-thumb {
     flex-direction: column;
 }
 
+
+.sb-settings-topdrawer-centered > .inline-drawer-header {
+    justify-content: center;
+    text-align: center;
+}
+
+.sb-settings-topdrawer-centered > .inline-drawer-header > b {
+    flex: 1 1 auto;
+    text-align: center;
+}
+
+.sb-settings-topdrawer-centered > .inline-drawer-header > .inline-drawer-icon {
+    flex: 0 0 auto;
+}
+
+.sb-settings-topdrawer > .inline-drawer-content {
+    padding: 14px 16px 16px;
+}
+
 #CustomCSS-textAreaBlock {
     display: flex;
     align-items: stretch;
+}
+
+.sb-appearance-select-group {
+    gap: 10px;
+}
+
+.sb-appearance-select-row {
+    gap: 12px;
+    padding-inline: 10px;
+}
+
+.sb-appearance-select-row > span {
+    flex: 0 0 auto;
 }
 
 #rm_extensions_block {

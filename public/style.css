@@ -5715,7 +5715,6 @@ body:not(.caption) .mes_img_caption {
 }
 
 #user-settings-block [name="MiscellaneousToggles"],
-#CustomCSS-block,
 #CustomCSS-textAreaBlock {
     display: contents;
 }

@@ -244,15 +244,25 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 
 .welcomeForkNotice {
     margin-top: 14px;
-    max-width: 64ch;
+    max-width: 100%;
     padding: 12px 14px;
     border-radius: 16px;
     font-size: calc(var(--mainFontSize) * 0.82);
     line-height: 1.5;
     color: var(--welcome-strong-fg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
     background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 9%, transparent);
     border: 1px solid color-mix(in srgb, var(--color-primary, var(--sb-accent)) 28%, var(--sb-shell-border, var(--SmartThemeBorderColor)));
     box-shadow: 0 12px 24px color-mix(in srgb, var(--SmartThemeShadowColor) 10%, transparent);
+}
+
+.welcomeForkNoticeCopy {
+    flex: 1 1 34ch;
+    min-width: min(100%, 24ch);
 }
 
 .welcomeForkNotice strong {
@@ -264,15 +274,29 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 }
 
 .welcomePanelToggles {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 12px;
+    display: flex;
+    justify-content: flex-end;
     width: 100%;
+    margin-top: -6px;
+}
+
+.welcomePanel--compact .welcomePanelToggles,
+.welcomePanel--listOnly .welcomePanelToggles {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+    margin-top: 0;
+}
+
+.welcomePanel--compact .welcomePanelVisibilityControls,
+.welcomePanel--listOnly .welcomePanelVisibilityControls {
+    display: none;
 }
 
 .welcomePanelModeControls {
-    grid-column: 2;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -280,9 +304,11 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     gap: 8px;
 }
 
+.welcomePanelModeControls--listOnly {
+    display: none;
+}
+
 .welcomePanelVisibilityControls {
-    grid-column: 3;
-    justify-self: end;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -298,6 +324,26 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+.welcomeForkNotice .welcomePanelModeControls {
+    flex: 0 1 auto;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+
+.welcomeForkNotice .welcomePanelModeToggle {
+    flex: 0 1 auto;
+}
+
+.welcomePanel--compact .welcomeForkNotice .welcomePanelModeControls,
+.welcomePanel--listOnly .welcomeForkNotice .welcomePanelModeControls {
+    display: none;
+}
+
+.welcomePanel--compact .welcomePanelModeControls--listOnly,
+.welcomePanel--listOnly .welcomePanelModeControls--listOnly {
+    display: flex;
 }
 
 .welcomeActionGrid {
@@ -713,18 +759,17 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     }
 
     .welcomePanelToggles {
-        grid-template-columns: 1fr;
-        justify-items: center;
-        gap: 10px;
+        justify-content: center;
     }
 
-    .welcomePanelModeControls,
-    .welcomePanelVisibilityControls {
-        grid-column: auto;
+    .welcomeForkNotice {
+        align-items: flex-start;
     }
 
-    .welcomePanelVisibilityControls {
-        justify-self: center;
+    .welcomeForkNotice .welcomePanelModeControls {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
     }
 
     .welcomeHeroMedia {
@@ -1849,18 +1894,17 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
     }
 
     .welcomePanelToggles {
-        grid-template-columns: 1fr;
-        justify-items: center;
-        gap: 10px;
+        justify-content: center;
     }
 
-    .welcomePanelModeControls,
-    .welcomePanelVisibilityControls {
-        grid-column: auto;
+    .welcomeForkNotice {
+        align-items: flex-start;
     }
 
-    .welcomePanelVisibilityControls {
-        justify-self: center;
+    .welcomeForkNotice .welcomePanelModeControls {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
     }
 
     .welcomePanelToggles .mes_button {

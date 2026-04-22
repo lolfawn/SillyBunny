@@ -265,6 +265,7 @@ export const power_user = {
     border_color: `${getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeBorderColor').trim()}`,
 
     custom_css: '',
+    google_font: '',
 
     waifuMode: false,
     movingUI: false,
@@ -1341,6 +1342,58 @@ function applyCustomCSS() {
     applyCustomThemeStyleEntries();
 }
 
+function getGoogleFontStylesheetId() {
+    return 'google-font-style';
+}
+
+function buildGoogleFontHref(fontName) {
+    const family = String(fontName ?? '').trim();
+
+    if (!family) {
+        return '';
+    }
+
+    const encodedFamily = family.split(/\s+/).filter(Boolean).join('+');
+    return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(encodedFamily)}:wght@400;500;600;700&display=swap`;
+}
+
+function applyGoogleFont(fontName = power_user.google_font) {
+    const normalizedFontName = String(fontName ?? '').trim();
+    const styleId = getGoogleFontStylesheetId();
+    let link = document.getElementById(styleId);
+    const presetSelect = $('#google_font_preset');
+    const hasPresetMatch = normalizedFontName && presetSelect.find(`option[value="${CSS.escape(normalizedFontName)}"]`).length > 0;
+
+    if (!normalizedFontName) {
+        if (link) {
+            link.remove();
+        }
+
+        if (customThemeStyleEntries?.mainFont) {
+            document.documentElement.style.setProperty('--mainFontFamily', customThemeStyleEntries.mainFont);
+        } else {
+            document.documentElement.style.removeProperty('--mainFontFamily');
+        }
+
+        presetSelect.val('');
+        $('#google_font_custom').val('');
+        return;
+    }
+
+    if (!link) {
+        link = document.createElement('link');
+        link.id = styleId;
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+    }
+
+    link.href = buildGoogleFontHref(normalizedFontName);
+    document.documentElement.style.setProperty('--mainFontFamily', `'${normalizedFontName}', sans-serif`);
+
+    presetSelect.val(hasPresetMatch ? normalizedFontName : '');
+    $('#google_font_custom').val(normalizedFontName);
+}
+
 function applyCustomThemeStyleEntries() {
     const customThemeEntries = customThemeStyleEntries;
     if (!customThemeEntries || typeof customThemeEntries !== 'object') {
@@ -1477,6 +1530,7 @@ export function applyPowerUserSettings() {
     applyLandingContrastPalette();
     applyShadowWidth();
     applyCustomCSS();
+    applyGoogleFont();
     switchMovingUI();
     applyNoShadows();
     switchHotswap();
@@ -1694,6 +1748,8 @@ export async function loadPowerUserSettings(settings, data) {
     $('#waifuMode').prop('checked', power_user.waifuMode);
     $('#movingUImode').prop('checked', power_user.movingUI);
     $('#noShadowsmode').prop('checked', power_user.noShadows);
+    $('#google_font_preset').val(power_user.google_font);
+    $('#google_font_custom').val(power_user.google_font);
     $('#start_reply_with').text(power_user.user_prompt_bias);
     $('#chat-show-reply-prefix-checkbox').prop('checked', power_user.show_user_prompt_bias);
     $('#auto_continue_enabled').prop('checked', power_user.auto_continue.enabled);
@@ -1811,6 +1867,7 @@ export async function loadPowerUserSettings(settings, data) {
     loadMaxContextUnlocked();
     switchWaifuMode();
     switchSpoilerMode();
+    applyGoogleFont();
     loadMovingUIState();
     loadCharListState();
     toggleMDHotkeyIconDisplay();
@@ -1839,11 +1896,17 @@ export function loadMovingUIState() {
         for (var elmntName of Object.keys(power_user.movingUIState)) {
             var elmntState = power_user.movingUIState[elmntName];
             try {
-                var elmnt = $('#' + $.escapeSelector(elmntName));
-                if (elmnt.length) {
-                    console.debug(`loading state for ${elmntName}`);
-                    elmnt.css(elmntState);
-                } else {
+                const targetNames = elmntName === 'nav-panel-shared-size' ? ['left-nav-panel', 'right-nav-panel'] : [elmntName];
+                let applied = false;
+                for (const targetName of targetNames) {
+                    var elmnt = $('#' + $.escapeSelector(targetName));
+                    if (elmnt.length) {
+                        console.debug(`loading state for ${targetName} from ${elmntName}`);
+                        elmnt.css(elmntState);
+                        applied = true;
+                    }
+                }
+                if (!applied) {
                     console.debug(`skipping ${elmntName} because it doesn't exist in the DOM`);
                 }
             } catch (err) {
@@ -3139,12 +3202,23 @@ jQuery(async () => {
                 newBottom = Number(oldBottom * scaleY).toFixed(0);
                 newRight = Number(oldRight * scaleX).toFixed(0);
                 try {
-                    var elmnt = $('#' + $.escapeSelector(elmntName));
-                    if (elmnt.length) {
-                        console.log(`scaling ${elmntName} by ${scaleX}x${scaleY} to ${newWidth}x${newHeight}`);
+                    const targetNames = elmntName === 'nav-panel-shared-size' ? ['left-nav-panel', 'right-nav-panel'] : [elmntName];
+                    let applied = false;
+
+                    for (const targetName of targetNames) {
+                        const elmnt = $('#' + $.escapeSelector(targetName));
+                        if (!elmnt.length) {
+                            continue;
+                        }
+
+                        console.log(`scaling ${targetName} by ${scaleX}x${scaleY} to ${newWidth}x${newHeight}`);
                         elmnt.css('height', newHeight);
                         elmnt.css('width', newWidth);
                         elmnt.css('inset', `${newTop}px ${newRight}px ${newBottom}px ${newLeft}px`);
+                        applied = true;
+                    }
+
+                    if (applied) {
                         power_user.movingUIState[elmntName].height = newHeight;
                         power_user.movingUIState[elmntName].width = newWidth;
                         power_user.movingUIState[elmntName].top = newTop;
@@ -3307,6 +3381,21 @@ jQuery(async () => {
         power_user.custom_css = String($('#customCSS').val());
         saveSettingsDebounced();
         applyCustomCSS();
+    });
+
+    $('#google_font_preset').on('change', function () {
+        const selectedFont = String($(this).val() ?? '').trim();
+        $('#google_font_custom').val(selectedFont);
+        power_user.google_font = selectedFont;
+        applyGoogleFont(selectedFont);
+        saveSettingsDebounced();
+    });
+
+    $('#apply_google_font').on('click', function () {
+        const customFont = String($('#google_font_custom').val() ?? '').trim();
+        power_user.google_font = customFont;
+        applyGoogleFont(customFont);
+        saveSettingsDebounced();
     });
 
     $('#movingUImode').on('change', function () {

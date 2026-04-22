@@ -1237,6 +1237,7 @@ async function sendWelcomePanel(chats, expand = false) {
         const templateData = buildWelcomeTemplateData(chats);
         const template = await renderTemplateAsync('/scripts/templates/welcomePanelOnboarding.html?v=20260421a', templateData, true, true, true);
         const fragment = document.createRange().createContextualFragment(template);
+        const nextPanel = fragment.querySelector('.welcomePanel');
         fragment.querySelectorAll('.welcomePanel').forEach((root) => {
             const recentHiddenClass = 'recentHidden';
             const recentHiddenKey = 'WelcomePage_RecentChatsHidden';
@@ -1421,7 +1422,12 @@ async function sendWelcomePanel(chats, expand = false) {
                 await refreshWelcomeScreen({ flashChat: recentChat });
             });
         });
-        chatElement.append(fragment.firstChild);
+        const existingPanel = chatElement.querySelector('.welcomePanel');
+        if (existingPanel && nextPanel) {
+            existingPanel.replaceWith(nextPanel);
+        } else if (nextPanel) {
+            chatElement.append(nextPanel);
+        }
         if (expand) {
             chatElement.querySelectorAll('button.showMoreChats').forEach((button) => {
                 if (button instanceof HTMLButtonElement) {
@@ -1889,6 +1895,10 @@ export function initWelcomeScreen() {
     eventSource.on(event_types.APP_READY, async () => {
         for (const assistant of WELCOME_BUNDLED_ASSISTANTS) {
             await ensureBundledAssistantCharacter(assistant, { tryCreate: true });
+        }
+
+        if (getCurrentChatId() === undefined && chat.length === 0) {
+            await openWelcomeScreen({ force: true });
         }
     });
 

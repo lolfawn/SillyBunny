@@ -44,6 +44,24 @@ import { accountStorage } from './util/AccountStorage.js';
 import { getCurrentUserHandle } from './user.js';
 import { kai_settings } from './kai-settings.js';
 
+const MOVING_UI_SHARED_KEYS = Object.freeze({
+    'left-nav-panel': 'nav-panel-shared-size',
+    'right-nav-panel': 'nav-panel-shared-size',
+});
+
+function getMovingUIStateKey(elementId) {
+    return MOVING_UI_SHARED_KEYS[elementId] ?? elementId;
+}
+
+function getMovingUISiblingTargets(elementId) {
+    const sharedKey = MOVING_UI_SHARED_KEYS[elementId];
+    if (!sharedKey) {
+        return [];
+    }
+
+    return Object.keys(MOVING_UI_SHARED_KEYS).filter(id => id !== elementId && MOVING_UI_SHARED_KEYS[id] === sharedKey);
+}
+
 var RPanelPin = document.getElementById('rm_button_panel_pin');
 var LPanelPin = document.getElementById('lm_button_panel_pin');
 var WIPanelPin = document.getElementById('WI_panel_pin');
@@ -485,20 +503,30 @@ export function dragElement($elmnt) {
         maxX, maxY, winHeight, winWidth;
 
     const elmntName = $elmnt.attr('id');
+    const stateKey = getMovingUIStateKey(elmntName);
     const elmntNameEscaped = $.escapeSelector(elmntName);
     const $elmntHeader = $(`#${elmntNameEscaped}header`);
 
     // Helper: Save position/size to state and emit events
     function savePositionAndSize() {
-        if (!power_user.movingUIState[elmntName]) power_user.movingUIState[elmntName] = {};
-        power_user.movingUIState[elmntName].top = top;
-        power_user.movingUIState[elmntName].left = left;
-        power_user.movingUIState[elmntName].right = right;
-        power_user.movingUIState[elmntName].bottom = bottom;
-        power_user.movingUIState[elmntName].margin = 'unset';
+        if (!power_user.movingUIState[stateKey]) power_user.movingUIState[stateKey] = {};
+        power_user.movingUIState[stateKey].top = top;
+        power_user.movingUIState[stateKey].left = left;
+        power_user.movingUIState[stateKey].right = right;
+        power_user.movingUIState[stateKey].bottom = bottom;
+        power_user.movingUIState[stateKey].margin = 'unset';
         if (actionType === 'resize') {
-            power_user.movingUIState[elmntName].width = width;
-            power_user.movingUIState[elmntName].height = height;
+            power_user.movingUIState[stateKey].width = width;
+            power_user.movingUIState[stateKey].height = height;
+            for (const siblingId of getMovingUISiblingTargets(elmntName)) {
+                const sibling = document.getElementById(siblingId);
+                if (!sibling) {
+                    continue;
+                }
+
+                sibling.style.width = `${width}px`;
+                sibling.style.height = `${height}px`;
+            }
             eventSource.emit('resizeUI', elmntName);
         }
         saveSettingsDebounced();
@@ -542,7 +570,7 @@ export function dragElement($elmnt) {
         winHeight = window.innerHeight;
 
         // Prepare state object if missing
-        if (!power_user.movingUIState[elmntName]) power_user.movingUIState[elmntName] = {};
+        if (!power_user.movingUIState[stateKey]) power_user.movingUIState[stateKey] = {};
 
         if (actionType === 'resize') {
             let containerAspectRatio = height / width;
@@ -573,8 +601,8 @@ export function dragElement($elmnt) {
             $elmnt.css({ left, top });
             $elmnt.off('mouseup').on('mouseup', () => {
                 if (
-                    power_user.movingUIState[elmntName].width === $elmnt.width() &&
-                    power_user.movingUIState[elmntName].height === $elmnt.height()
+                    power_user.movingUIState[stateKey].width === $elmnt.width() &&
+                    power_user.movingUIState[stateKey].height === $elmnt.height()
                 ) return;
                 savePositionAndSize();
                 observer.disconnect();
@@ -601,7 +629,7 @@ export function dragElement($elmnt) {
     }
 
     function elementDrag(e) {
-        if (!power_user.movingUIState[elmntName]) power_user.movingUIState[elmntName] = {};
+        if (!power_user.movingUIState[stateKey]) power_user.movingUIState[stateKey] = {};
         e.preventDefault();
         pos1 = pos3 - e.clientX;
         pos2 = pos4 - e.clientY;
@@ -896,13 +924,15 @@ export function initRossMods() {
             return;
         }
 
-        const hasContent = sendTextArea.value !== '';
-        const fitsCurrentSize = sendTextArea.scrollHeight <= sendTextArea.offsetHeight;
-        const isScrollbarShown = sendTextArea.clientWidth < sendTextArea.offsetWidth;
-        const isHalfScreenHeight = sendTextArea.offsetHeight >= window.innerHeight / 2;
-        const needsDebounce = hasContent && (fitsCurrentSize || (isScrollbarShown && isHalfScreenHeight));
-        if (needsDebounce) autoFitSendTextAreaDebounced();
-        else autoFitSendTextArea();
+        requestAnimationFrame(() => {
+            const hasContent = sendTextArea.value !== '';
+            const fitsCurrentSize = sendTextArea.scrollHeight <= sendTextArea.offsetHeight;
+            const isScrollbarShown = sendTextArea.clientWidth < sendTextArea.offsetWidth;
+            const isHalfScreenHeight = sendTextArea.offsetHeight >= window.innerHeight / 2;
+            const needsDebounce = hasContent && (fitsCurrentSize || (isScrollbarShown && isHalfScreenHeight));
+            if (needsDebounce) autoFitSendTextAreaDebounced();
+            else autoFitSendTextArea();
+        });
     });
 
     restoreUserInput();

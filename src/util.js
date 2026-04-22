@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import readline from 'node:readline';
 
 import yaml from 'yaml';
+import util from 'node:util';
 import { sync as commandExistsSync } from 'command-exists';
 import _ from 'lodash';
 import yauzl from 'yauzl';
@@ -1634,7 +1635,7 @@ export function summarizeLlmPayloadForLog(payload) {
         summary.otherKeys = otherKeys;
     }
 
-    return summary;
+    return util.inspect(summary, { depth: null, colors: true });
 }
 
 /**
