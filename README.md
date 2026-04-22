@@ -268,6 +268,7 @@ SillyBunny includes some extras by default to help you get started right away:
 - Reduced noisy `dryRun` before-generation logs during prompt previews and topbar token refreshes so normal generation logging stays readable
 - Fixed mobile preset menu folders accidentally toggling when a scroll gesture ended on a folder header by suppressing synthetic post-scroll summary clicks
 - Separated the `Custom CSS` drawer from the `Chat & Characters` settings group and reduced the mobile SillyTavern import card/button sizing so the path field, `Import Folder`, and `Sync Extensions` controls fit cleanly on small screens
+- Switched the default SillyBunny UI font from Figtree to Noto Sans so fresh sessions and fallback theme loads use Noto Sans across desktop and mobile
 - Fixed repo lint regressions across Pathfinder follow-up changes and existing workspace files so the full `npm run lint` pass succeeds again
 - Fixed duplicate third-party extension cards in the Extensions panel by deduplicating manifest and render entries before they reach the UI
 - Fixed SillyBunny-to-SillyTavern minimum version compatibility checks so third-party extensions like JS Slash Runner no longer fail against the forked client version
