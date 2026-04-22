@@ -194,7 +194,7 @@ const WELCOME_GUIDE_CARDS = Object.freeze([
     },
     {
         title: 'Confused?',
-        body: 'If you are ever confused, check through our launchpad documentation, ask one of our assistants a question, or open our documentation. It is not necessary to memorize the whole interface to start using it!',
+        body: 'If you are ever confused, check through our launchpad documentation or ask one of our assistants a question. It is not necessary to memorize the whole interface to start using it!',
         chips: ['Open Launchpad', 'Bunny guide', 'Docs', 'Start small'],
         icon: 'fa-life-ring',
         actionLabel: 'Open Launchpad',
