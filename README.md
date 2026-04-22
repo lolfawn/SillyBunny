@@ -287,6 +287,9 @@ SillyBunny includes some extras by default to help you get started right away:
 - Fixed response text extraction for OpenAI-style and Gemini-style payloads so parts/content/candidates/tool-plan formats render correctly instead of collapsing into blank or broken output
 - Fixed Gemini thought-signature handling by reading `candidates[].content.parts` correctly and checking the `gemini.thoughtSignatures` config dynamically
 - Added clarification tooltip for "Request model reasoning" toggle explaining behavior for Custom OpenAI-compatible providers
+- Added configurable visible reasoning-tag prompts for hidden-thinking models, with built-in `<think>`, `<thinking>`, and `<thought>` wrapper options plus parsing support for those tag variants
+- Added Custom OpenAI-compatible reasoning presets for GLM 5.1 and Kimi K2.5/K2.6 in Additional Parameters, including provider-specific `thinking` object support without manual YAML edits
+- Cleaned up token counters so message metadata shows `Xt` while the brain badge keeps live reasoning-token counts in sync during streaming
 
 **Agents and message tools**
 
@@ -294,6 +297,8 @@ SillyBunny includes some extras by default to help you get started right away:
 - Upgraded in-chat agent transform history to show semantic diffs with insert/delete highlighting while keeping Undo/Redo actions
 - Updated agent transform diff styling to match recast-post-processing — more subtle colors with rgba transparency for cleaner visual appearance
 - Added a dedicated "View agent changes" message action and wired it to the same transform-history popup as the inline badge
+- Added an in-chat agent cancel button so active agent-driven generations can be stopped directly from the Agents panel
+- Added Quick Toggle robot actions for pinned agents so "Apply to Last Reply" is available in the compact view too, with responsive action layout that keeps the shared UI usable on mobile-sized screens
 - Hardened agent error/result serialization for non-JSON values and updated adventure-helper status copy to be clearer in the UI
 - Normalized structured agent/prompt content before text-completion fallback and post-generation passes, so XML-style prompts and appended assistant responses no longer degrade into `[object Object]`
 - Post-generation prompt agents now strip repeated outer `<assistant_response>` wrappers before prompting or applying results, so duplicate transport tags no longer leak into chat output

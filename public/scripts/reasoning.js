@@ -5,7 +5,7 @@ import { chat, closeMessageEditor, event_types, eventSource, main_api, messageFo
 import { getRegexedString, regex_placement } from './extensions/regex/engine.js';
 import { getCurrentLocale, t, translate } from './i18n.js';
 import { macros, MacroCategory } from './macros/macro-system.js';
-import { chat_completion_sources, getChatCompletionModel, oai_settings } from './openai.js';
+import { chat_completion_sources, getChatCompletionModel, oai_settings, reasoning_tag_styles } from './openai.js';
 import { Popup } from './popup.js';
 import { performFuzzySearch, power_user } from './power-user.js';
 import { getPresetManager } from './preset-manager.js';
@@ -48,6 +48,51 @@ const UI = {
     $addToPrompts: $('#reasoning_add_to_prompts'),
     $maxAdditions: $('#reasoning_max_additions'),
 };
+
+const AUTO_APPEND_REASONING_TAGS = [reasoning_tag_styles.think, reasoning_tag_styles.thinking, reasoning_tag_styles.thought];
+
+function getAutoAppendReasoningTagOrder() {
+    const preferredTag = String(oai_settings.auto_append_reasoning_tag_style ?? reasoning_tag_styles.think).trim().toLowerCase();
+    return [preferredTag, ...AUTO_APPEND_REASONING_TAGS].filter((tag, index, allTags) => AUTO_APPEND_REASONING_TAGS.includes(tag) && allTags.indexOf(tag) === index);
+}
+
+function getAutoAppendReasoningTemplates() {
+    if (!oai_settings.auto_append_reasoning_tags) {
+        return [];
+    }
+
+    return getAutoAppendReasoningTagOrder().map(tagName => ({
+        name: `${tagName}-xml`,
+        prefix: `<${tagName}>`,
+        suffix: `</${tagName}>`,
+        separator: '\n',
+    }));
+}
+
+function isReasoningAutoParseEnabled() {
+    return Boolean(power_user.reasoning.auto_parse || oai_settings.auto_append_reasoning_tags);
+}
+
+function getReasoningParseTemplates() {
+    const templates = [];
+
+    if (power_user.reasoning.auto_parse && power_user.reasoning.prefix && power_user.reasoning.suffix) {
+        templates.push({
+            prefix: power_user.reasoning.prefix,
+            suffix: power_user.reasoning.suffix,
+            separator: power_user.reasoning.separator,
+        });
+    }
+
+    for (const template of getAutoAppendReasoningTemplates()) {
+        templates.push(template);
+    }
+
+    return templates.filter((template, index, allTemplates) => {
+        const key = `${template.prefix}\u0000${template.suffix}`;
+        return allTemplates.findIndex(candidate => `${candidate.prefix}\u0000${candidate.suffix}` === key) === index;
+    });
+}
 
 /**
  * Enum representing the type of the reasoning for a message (where it came from)
@@ -107,7 +152,7 @@ export function extractReasoningFromData(data, {
             break;
 
         case 'openai':
-            if (!ignoreShowThoughts && !oai_settings.show_thoughts) break;
+            if (!ignoreShowThoughts && !oai_settings.show_thoughts && !oai_settings.auto_append_reasoning_tags) break;
 
             switch (chatCompletionSource ?? oai_settings.chat_completion_source) {
                 case chat_completion_sources.DEEPSEEK:
@@ -260,6 +305,8 @@ export class ReasoningHandler {
     #isParsingReasoning = false;
     /** @type {number?} When reasoning is being parsed manually, and the reasoning has ended, this will be the index at which the actual messages starts */
     #parsingReasoningMesStartIndex = null;
+    /** @type {ReasoningTemplate?} The template currently being parsed from streamed message text */
+    #activeStreamingTemplate = null;
 
     /**
      * @param {Date?} [timeStarted=null] - When the generation started
@@ -360,6 +407,9 @@ export class ReasoningHandler {
             this.initialTime = new Date();
             this.startTime = null;
             this.endTime = null;
+            this.#isParsingReasoning = false;
+            this.#parsingReasoningMesStartIndex = null;
+            this.#activeStreamingTemplate = null;
         }
 
         this.updateDom(messageId);
@@ -458,16 +508,17 @@ export class ReasoningHandler {
      * @returns {boolean} Whether the message has changed after reasoning parsing
      */
     #autoParseReasoningFromMessage(messageId, mesChanged, promptReasoning) {
-        if (!power_user.reasoning.auto_parse)
-            return;
-        if (!power_user.reasoning.prefix || !power_user.reasoning.suffix)
+        const templates = getReasoningParseTemplates();
+        if (templates.length === 0) {
             return mesChanged;
+        }
 
         /** @type {ChatMessage} */
         const message = chat[messageId];
         if (!message) return mesChanged;
 
         const parseTarget = promptReasoning?.prefixIncomplete ? (promptReasoning.prefixReasoningFormatted + message.mes) : message.mes;
+        const activeTemplate = this.#activeStreamingTemplate;
 
         // If we are done with reasoning parse, we just split the message correctly so the reasoning doesn't show up inside of it.
         if (this.#parsingReasoningMesStartIndex) {
@@ -476,30 +527,38 @@ export class ReasoningHandler {
         }
 
         if (this.state === ReasoningState.None || this.#isHiddenReasoningModel) {
-            // If streamed message starts with the opening, cut it out and put all inside reasoning
-            if (parseTarget.startsWith(power_user.reasoning.prefix) && parseTarget.length > power_user.reasoning.prefix.length) {
-                this.#isParsingReasoning = true;
+            if (!this.#isParsingReasoning) {
+                for (const template of templates) {
+                    if (parseTarget.startsWith(template.prefix) && parseTarget.length > template.prefix.length) {
+                        this.#isParsingReasoning = true;
+                        this.#activeStreamingTemplate = template;
 
-                // Manually set starting state here, as we might already have received the ending suffix
-                this.state = ReasoningState.Thinking;
-                this.startTime = this.startTime ?? this.initialTime;
-                this.endTime = null;
+                        // Manually set starting state here, as we might already have received the ending suffix
+                        this.state = ReasoningState.Thinking;
+                        this.startTime = this.startTime ?? this.initialTime;
+                        this.endTime = null;
+                        break;
+                    }
+                }
             }
         }
 
-        if (!this.#isParsingReasoning)
+        if (!this.#isParsingReasoning || !activeTemplate && !this.#activeStreamingTemplate)
             return mesChanged;
 
+        const template = this.#activeStreamingTemplate ?? activeTemplate;
+
         // If we are in manual parsing mode, all currently streaming mes tokens will go to the reasoning block
-        this.reasoning = parseTarget.slice(power_user.reasoning.prefix.length);
+        this.reasoning = parseTarget.slice(template.prefix.length);
         message.mes = '';
 
         // If the reasoning contains the ending suffix, we cut that off and continue as message streaming
-        if (this.reasoning.includes(power_user.reasoning.suffix)) {
-            this.reasoning = this.reasoning.slice(0, this.reasoning.indexOf(power_user.reasoning.suffix));
-            this.#parsingReasoningMesStartIndex = parseTarget.indexOf(power_user.reasoning.suffix) + power_user.reasoning.suffix.length;
+        if (this.reasoning.includes(template.suffix)) {
+            this.reasoning = this.reasoning.slice(0, this.reasoning.indexOf(template.suffix));
+            this.#parsingReasoningMesStartIndex = parseTarget.indexOf(template.suffix) + template.suffix.length;
             message.mes = trimSpaces(parseTarget.slice(this.#parsingReasoningMesStartIndex));
             this.#isParsingReasoning = false;
+            this.#activeStreamingTemplate = null;
         }
 
         // Only return the original mesChanged value if we haven't cut off the complete message
@@ -1349,11 +1408,11 @@ function setReasoningEventHandlers() {
  * @returns {string} Output string
  */
 export function removeReasoningFromString(str) {
-    if (!power_user.reasoning.auto_parse) {
+    if (!isReasoningAutoParseEnabled()) {
         return str;
     }
 
-    const parsedReasoning = parseReasoningFromString(str);
+    const parsedReasoning = parseReasoningFromStringWithFallbacks(str);
     return parsedReasoning?.content ?? str;
 }
 
@@ -1411,6 +1470,19 @@ export function parseReasoningFromString(str, { strict = true } = {}, template =
     }
 }
 
+function parseReasoningFromStringWithFallbacks(str, options = {}) {
+    const original = String(str);
+
+    for (const template of getReasoningParseTemplates()) {
+        const parsedReasoning = parseReasoningFromString(original, options, template);
+        if (parsedReasoning && (parsedReasoning.reasoning || parsedReasoning.content !== original)) {
+            return parsedReasoning;
+        }
+    }
+
+    return null;
+}
+
 /**
  * Parse reasoning in an array of swipe strings if auto-parsing is enabled.
  * @param {string[]} swipes Array of swipe strings
@@ -1445,7 +1517,7 @@ export function parseReasoningInSwipes(swipes, swipeInfoArray, duration) {
 
 function registerReasoningAppEvents() {
     const eventHandler = (/** @type {string} */ type, /** @type {number} */ idx) => {
-        if (!power_user.reasoning.auto_parse) {
+        if (!isReasoningAutoParseEnabled()) {
             return;
         }
 
@@ -1468,7 +1540,7 @@ function registerReasoningAppEvents() {
             return null;
         }
 
-        const parsedReasoning = parseReasoningFromString(prefix + message.mes);
+        const parsedReasoning = parseReasoningFromStringWithFallbacks(prefix + message.mes);
 
         // No reasoning block found
         if (!parsedReasoning) {
@@ -1515,7 +1587,7 @@ function registerReasoningAppEvents() {
     }
 
     eventSource.makeFirst(event_types.IMPERSONATE_READY, async () => {
-        if (!power_user.reasoning.auto_parse) {
+        if (!isReasoningAutoParseEnabled()) {
             return;
         }
 

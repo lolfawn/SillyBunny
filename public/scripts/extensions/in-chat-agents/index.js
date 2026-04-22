@@ -30,7 +30,16 @@ import {
     deleteGroup,
     createDefaultGroup,
 } from './agent-store.js';
-import { initAgentRunner, runAgentOnMessage, syncToolAgentRegistrations, undoPromptTransform, redoPromptTransform, PROMPT_TRANSFORM_HISTORY_KEY } from './agent-runner.js';
+import {
+    cancelAgentGeneration,
+    initAgentRunner,
+    isAgentGenerationActive,
+    runAgentOnMessage,
+    syncToolAgentRegistrations,
+    undoPromptTransform,
+    redoPromptTransform,
+    PROMPT_TRANSFORM_HISTORY_KEY,
+} from './agent-runner.js';
 import {
     AGENT_REGEX_PLACEMENT,
     AGENT_REGEX_SUBSTITUTE,
@@ -118,6 +127,14 @@ function restoreAutoSeededTemplateIds(savedState) {
 function stopEvent(event) {
     event.preventDefault();
     event.stopPropagation();
+}
+
+function getLastAssistantMessageIndex() {
+    return chat.findLastIndex(message => message && !message.is_user && !message.is_system);
+}
+
+function updateCancelGenerationButton() {
+    $('#ica--cancelGeneration').toggle(isAgentGenerationActive());
 }
 
 function sortAgentsByOrder(agentList = []) {
@@ -1056,6 +1073,7 @@ function renderAgentList() {
     const container = $('#ica--agentList');
     const scrollState = captureAgentListScrollState(container[0]);
     container.empty();
+    updateCancelGenerationButton();
     const profileNames = buildProfileNameMap();
     const allAgents = sortAgentsByOrder(getAgents());
 
@@ -1099,6 +1117,7 @@ function renderAgentList() {
                 const enabledClass = agent.enabled ? 'is-enabled' : '';
                 const categoryLabel = AGENT_CATEGORIES[agent.category]?.label ?? 'Custom';
                 const phaseLabel = AGENT_PHASE_LABELS[agent.phase] || agent.phase;
+                const canApplyToLastReply = !isPathfinderAgent(agent);
                 const quickItem = $(`
                     <div class="ica--quick-chip ${enabledClass}">
                         <button type="button" class="ica--quick-chip-main" title="${agent.enabled ? 'Disable agent' : 'Enable agent'}">
@@ -1110,15 +1129,32 @@ function renderAgentList() {
                                 <span class="ica--quick-chip-meta">${escapeHtml(categoryLabel)} • ${escapeHtml(phaseLabel)}</span>
                             </span>
                         </button>
-                        <button type="button" class="ica--quick-chip-pin is-active" title="Remove from Quick Toggles">
-                            <i class="fa-solid fa-star"></i>
-                        </button>
+                        <div class="ica--quick-chip-actions">
+                            ${canApplyToLastReply ? `
+                                <button type="button" class="ica--quick-chip-apply" title="Apply to Last Reply">
+                                    <i class="fa-solid fa-robot"></i>
+                                </button>
+                            ` : ''}
+                            <button type="button" class="ica--quick-chip-pin is-active" title="Remove from Quick Toggles">
+                                <i class="fa-solid fa-star"></i>
+                            </button>
+                        </div>
                     </div>
                 `);
 
                 quickItem.find('.ica--quick-chip-main').on('click', async event => {
                     stopEvent(event);
                     await toggleAgentEnabled(agent);
+                });
+
+                quickItem.find('.ica--quick-chip-apply').on('click', async event => {
+                    stopEvent(event);
+                    const lastCharMessageIndex = getLastAssistantMessageIndex();
+                    if (lastCharMessageIndex < 0) {
+                        toastr.warning('No assistant reply yet to manually apply this agent to.');
+                        return;
+                    }
+                    await runAgentOnMessage(agent.id, lastCharMessageIndex);
                 });
 
                 quickItem.find('.ica--quick-chip-pin').on('click', async event => {
@@ -1269,7 +1305,7 @@ function renderAgentList() {
 
             card.find('.ica--btn-run').on('click', async event => {
                 stopEvent(event);
-                const lastCharMessageIndex = chat.findLastIndex(m => m && !m.is_user && !m.is_system);
+                const lastCharMessageIndex = getLastAssistantMessageIndex();
                 if (lastCharMessageIndex < 0) {
                     toastr.warning('No assistant reply yet to manually apply this agent to.');
                     return;
@@ -2895,6 +2931,10 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     $('#ica--exportAll').on('click', handleExportAll);
     $('#ica--templates').on('click', openTemplateBrowser);
     $('#ica--templatesCallout').on('click', openTemplateBrowser);
+    $('#ica--cancelGeneration').on('click', () => {
+        cancelAgentGeneration();
+        updateCancelGenerationButton();
+    });
     $('#ica--selectMode').on('click', () => {
         selectModeActive = !selectModeActive;
         if (!selectModeActive) {
@@ -3065,6 +3105,15 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
 
     for (const eventName of connectionProfileEvents) {
         eventSource.on(eventName, refreshProfileUi);
+    }
+
+    const refreshGenerationUi = () => updateCancelGenerationButton();
+    for (const eventName of [
+        event_types.GENERATION_STARTED,
+        event_types.GENERATION_ENDED,
+        event_types.GENERATION_STOPPED,
+    ]) {
+        eventSource.on(eventName, refreshGenerationUi);
     }
 
     // Listen for Prompt Manager "Send to Agents" events

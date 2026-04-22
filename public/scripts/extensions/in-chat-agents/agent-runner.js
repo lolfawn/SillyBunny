@@ -10,6 +10,7 @@ import {
     generateQuietPrompt,
     normalizeContentText,
     saveChatDebounced,
+    stopGeneration,
     streamingProcessor,
     syncMesToSwipe,
 } from '../../../script.js';
@@ -69,6 +70,25 @@ let toolSyncDuringGeneration = false;
 
 /** Recursion depth tracker for tool-call passes. */
 let toolRecursionDepth = 0;
+
+export function isAgentGenerationActive() {
+    return internalPromptTransformDepth > 0 || isGenerationInProgress;
+}
+
+export function cancelAgentGeneration() {
+    const wasActive = isAgentGenerationActive() || Boolean(streamingProcessor);
+    generationStopRequested = true;
+    clearDeferredPostProcessing();
+
+    const stopped = stopGeneration();
+    if (stopped || wasActive) {
+        toastr.info('Stopping agent generation...');
+        return true;
+    }
+
+    toastr.info('No agent generation is currently running.');
+    return false;
+}
 
 function isPathfinderToolAgent(agent) {
     return agent?.sourceTemplateId === 'tpl-pathfinder' ||

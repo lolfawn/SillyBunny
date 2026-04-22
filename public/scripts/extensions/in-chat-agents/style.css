@@ -71,6 +71,7 @@
 .ica--toolbar-actions {
     display: flex;
     gap: 6px;
+    flex-wrap: wrap;
 }
 
 .ica--toolbar-secondary {
@@ -186,7 +187,8 @@
 }
 
 .ica--quick-chip-main,
-.ica--quick-chip-pin {
+.ica--quick-chip-pin,
+.ica--quick-chip-apply {
     border: none;
     color: inherit;
     appearance: none;
@@ -207,7 +209,8 @@
 }
 
 .ica--quick-chip-main:hover,
-.ica--quick-chip-pin:hover {
+.ica--quick-chip-pin:hover,
+.ica--quick-chip-apply:hover {
     background: color-mix(in srgb, var(--SmartThemeBorderColor, #555) 18%, transparent);
 }
 
@@ -261,9 +264,34 @@
     opacity: 0.7;
 }
 
+.ica--quick-chip-actions {
+    display: inline-flex;
+    align-items: stretch;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+.ica--quick-chip-apply {
+    width: 38px;
+    min-width: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0.78;
+}
+
 .ica--quick-chip-pin.is-active {
     color: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 72%, #f7d774 28%);
     opacity: 1;
+}
+
+.ica--quick-chip-apply:hover,
+.ica--quick-chip-apply:focus-visible {
+    opacity: 1;
+    color: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 78%, var(--SmartThemeBodyColor, #ddd) 22%);
 }
 
 /* Category section */

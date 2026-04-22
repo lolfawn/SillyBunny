@@ -184,6 +184,67 @@ function getOpenRouterPlugins(request) {
     return plugins;
 }
 
+function hasCustomReasoningParamConfig(requestBody) {
+    return requestBody.chat_completion_source === CHAT_COMPLETION_SOURCES.CUSTOM
+        && typeof requestBody.custom_reasoning_param_name === 'string'
+        && requestBody.custom_reasoning_param_name.trim().length > 0
+        && typeof requestBody.custom_reasoning_param_format === 'string'
+        && requestBody.custom_reasoning_param_format.trim().length > 0;
+}
+
+function resolveCustomOpenAiReasoningEffort(requestBody) {
+    if (!requestBody.reasoning_effort) {
+        return undefined;
+    }
+
+    return OPENAI_FIXED_REASONING_EFFORT[requestBody.model]
+        ?? OPENAI_REASONING_EFFORT_MAP[requestBody.reasoning_effort]
+        ?? requestBody.reasoning_effort;
+}
+
+function shouldEnableCustomReasoning(requestBody) {
+    if (typeof requestBody.include_reasoning === 'boolean') {
+        return requestBody.include_reasoning;
+    }
+
+    return Boolean(requestBody.reasoning_effort && !['auto', 'none'].includes(String(requestBody.reasoning_effort)));
+}
+
+function applyCustomReasoningParameters(bodyParams, requestBody) {
+    if (!hasCustomReasoningParamConfig(requestBody)) {
+        return;
+    }
+
+    const paramName = String(requestBody.custom_reasoning_param_name ?? '').trim();
+    const format = String(requestBody.custom_reasoning_param_format ?? '').trim();
+    if (!paramName || !format) {
+        return;
+    }
+
+    const enabledValue = String(requestBody.custom_reasoning_enabled_value ?? 'enabled').trim() || 'enabled';
+    const disabledValue = String(requestBody.custom_reasoning_disabled_value ?? 'disabled').trim() || 'disabled';
+    const isEnabled = shouldEnableCustomReasoning(requestBody);
+
+    switch (format) {
+        case 'openai': {
+            const reasoningEffort = resolveCustomOpenAiReasoningEffort(requestBody);
+            if (reasoningEffort !== undefined) {
+                bodyParams[paramName] = reasoningEffort;
+            }
+            break;
+        }
+        case 'boolean':
+            bodyParams[paramName] = isEnabled;
+            break;
+        case 'string':
+            bodyParams[paramName] = isEnabled ? enabledValue : disabledValue;
+            break;
+        case 'thinking_object':
+            bodyParams[paramName] = { type: isEnabled ? enabledValue : disabledValue };
+            break;
+    }
+}
+
 /**
  * Hacky way to use JSON schema only if json_object format is supported.
  * @param {object} bodyParams Additional body parameters
@@ -2536,6 +2597,7 @@ router.post('/generate', async function (request, response) {
                 bodyParams.logprobs = true;
             }
 
+            applyCustomReasoningParameters(bodyParams, request.body);
             mergeObjectWithYaml(bodyParams, request.body.custom_include_body);
             mergeObjectWithYaml(headers, request.body.custom_include_headers);
             embedOpenRouterMedia(request.body.messages, { audio: true, video: false });
@@ -2683,10 +2745,13 @@ router.post('/generate', async function (request, response) {
         }
 
         // A few of OpenAIs reasoning models support reasoning effort
-        if (request.body.reasoning_effort && [CHAT_COMPLETION_SOURCES.CUSTOM, CHAT_COMPLETION_SOURCES.OPENAI, CHAT_COMPLETION_SOURCES.OPENAI_RESPONSES].includes(request.body.chat_completion_source)) {
-            if (OPENAI_REASONING_EFFORT_MODELS.includes(request.body.model)) {
-                bodyParams['reasoning_effort'] = OPENAI_FIXED_REASONING_EFFORT[request.body.model] ?? OPENAI_REASONING_EFFORT_MAP[request.body.reasoning_effort] ?? request.body.reasoning_effort;
-            }
+        const shouldUseDefaultOpenAiReasoningEffort = request.body.chat_completion_source !== CHAT_COMPLETION_SOURCES.CUSTOM
+            || !hasCustomReasoningParamConfig(request.body);
+        if (request.body.reasoning_effort
+            && shouldUseDefaultOpenAiReasoningEffort
+            && [CHAT_COMPLETION_SOURCES.CUSTOM, CHAT_COMPLETION_SOURCES.OPENAI, CHAT_COMPLETION_SOURCES.OPENAI_RESPONSES].includes(request.body.chat_completion_source)
+            && OPENAI_REASONING_EFFORT_MODELS.includes(request.body.model)) {
+            bodyParams['reasoning_effort'] = OPENAI_FIXED_REASONING_EFFORT[request.body.model] ?? OPENAI_REASONING_EFFORT_MAP[request.body.reasoning_effort] ?? request.body.reasoning_effort;
         }
 
         if (request.body.verbosity && [CHAT_COMPLETION_SOURCES.CUSTOM, CHAT_COMPLETION_SOURCES.OPENAI, CHAT_COMPLETION_SOURCES.OPENAI_RESPONSES].includes(request.body.chat_completion_source)) {

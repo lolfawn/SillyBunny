@@ -2132,6 +2132,25 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="range-block" data-source="openai,custom,azure_openai,makersuite,vertexai">
+                                        <label for="openai_auto_append_reasoning_tags" class="checkbox_label widthFreeExpand">
+                                            <input id="openai_auto_append_reasoning_tags" type="checkbox" />
+                                            <span>Auto-append visible reasoning tags</span>
+                                        </label>
+                                        <div class="toggle-description justifyLeft marginBot5">
+                                            Ask models that hide their reasoning to place visible thinking inside XML tags before the final answer.
+                                        </div>
+                                        <div class="flex-container oneline-dropdown marginTop5">
+                                            <label for="openai_reasoning_tag_style">
+                                                <span>Reasoning Tag Style</span>
+                                            </label>
+                                            <select id="openai_reasoning_tag_style">
+                                                <option value="think">&lt;think&gt;...&lt;/think&gt;</option>
+                                                <option value="thinking">&lt;thinking&gt;...&lt;/thinking&gt;</option>
+                                                <option value="thought">&lt;thought&gt;...&lt;/thought&gt;</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                     <div class="flex-container flexFlowColumn wide100p textAlignCenter marginTop10" data-source="openai,custom,claude,xai,makersuite,vertexai,aimlapi,openrouter,pollinations,perplexity,cometapi,electronhub,azure_openai,chutes,nanogpt">
                                         <div class="flex-container oneline-dropdown" title="Constrains effort on reasoning for reasoning models.&#10;Reducing reasoning effort can result in faster responses and fewer tokens used on reasoning in a response." data-i18n="[title]Constrains effort on reasoning for reasoning models.">
                                             <label for="openai_reasoning_effort">

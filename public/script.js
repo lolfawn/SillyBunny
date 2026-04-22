@@ -2733,9 +2733,7 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
     messageElement.find('.timestamp').text(timestamp).attr('title', `${mes.extra?.api ? mes.extra.api + ' - ' : ''}${mes.extra?.model ?? ''}`);
     messageElement.find('.mesIDDisplay').text(`#${messageId}`);
     if (tokenCount) {
-        const reasoningTokens = mes.extra?.reasoning_tokens;
-        const tokenDisplay = reasoningTokens > 0 ? `${tokenCount}t (${reasoningTokens}r)` : `${tokenCount}t`;
-        messageElement.find('.tokenCounterDisplay').text(tokenDisplay);
+        messageElement.find('.tokenCounterDisplay').text(`${tokenCount}t`);
     }
     updateMessageMetaBadges(messageElement, mes);
 
@@ -2792,7 +2790,13 @@ function updateMessageMetaBadges(messageElement, message) {
         return;
     }
 
-    const reasoningTokens = Number(message?.extra?.reasoning_tokens ?? 0);
+    const messageId = Number($messageElement.attr('mesid'));
+    const liveStreamingProcessor = Number.isInteger(messageId) && streamingProcessor && Number(streamingProcessor.messageId) === messageId
+        ? streamingProcessor
+        : null;
+    const persistedReasoningTokens = Number(message?.extra?.reasoning_tokens ?? 0);
+    const liveReasoningTokens = Number(liveStreamingProcessor?.reasoningTokens ?? 0);
+    const reasoningTokens = Math.max(persistedReasoningTokens, liveReasoningTokens);
     if (reasoningTokens > 0) {
         let badge = $messageElement.find('.reasoning-tokens-badge');
         if (!badge.length) {
@@ -3811,11 +3815,11 @@ class StreamingProcessor {
             if (currentTokenCount) {
                 chat[messageId].extra.token_count = currentTokenCount;
                 if (this.messageTokenCounterDom instanceof HTMLElement) {
-                    const reasoningTokens = this.reasoningTokens || 0;
-                    const tokenDisplay = reasoningTokens > 0 ? `${currentTokenCount}t (${reasoningTokens}r)` : `${currentTokenCount}t`;
-                    this.messageTokenCounterDom.textContent = tokenDisplay;
+                    this.messageTokenCounterDom.textContent = `${currentTokenCount}t`;
                 }
             }
+
+            updateMessageMetaBadges(this.messageDom, chat[messageId]);
 
             if ((this.type == 'swipe' || this.type === 'continue') && Array.isArray(chat[messageId].swipes)) {
                 chat[messageId].swipes[chat[messageId].swipe_id] = processedText;

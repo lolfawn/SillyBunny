@@ -265,6 +265,26 @@ export const reasoning_effort_types = {
     max: 'max',
 };
 
+export const reasoning_tag_styles = {
+    think: 'think',
+    thinking: 'thinking',
+    thought: 'thought',
+};
+
+export const custom_reasoning_preset_types = {
+    OPENAI: 'openai',
+    GLM_5_1: 'glm_5_1',
+    KIMI_K2: 'kimi_k2',
+    CUSTOM: 'custom',
+};
+
+export const custom_reasoning_param_formats = {
+    OPENAI: 'openai',
+    BOOLEAN: 'boolean',
+    STRING: 'string',
+    THINKING_OBJECT: 'thinking_object',
+};
+
 export const verbosity_levels = {
     auto: 'auto',
     low: 'low',
@@ -396,6 +416,8 @@ export const settingsToUpdate = {
     continue_postfix: ['#continue_postfix', 'continue_postfix', false, false],
     function_calling: ['#openai_function_calling', 'function_calling', true, false],
     show_thoughts: ['#openai_show_thoughts', 'show_thoughts', true, false],
+    auto_append_reasoning_tags: ['#openai_auto_append_reasoning_tags', 'auto_append_reasoning_tags', true, false],
+    auto_append_reasoning_tag_style: ['#openai_reasoning_tag_style', 'auto_append_reasoning_tag_style', false, false],
     reasoning_effort: ['#openai_reasoning_effort', 'reasoning_effort', false, false],
     verbosity: ['#openai_verbosity', 'verbosity', false, false],
     enable_web_search: ['#openai_enable_web_search', 'enable_web_search', true, false],
@@ -505,8 +527,15 @@ const default_settings = {
     continue_postfix: continue_postfix_types.SPACE,
     custom_prompt_post_processing: custom_prompt_post_processing_types.NONE,
     show_thoughts: true,
+    auto_append_reasoning_tags: false,
+    auto_append_reasoning_tag_style: reasoning_tag_styles.think,
     reasoning_effort: reasoning_effort_types.auto,
     verbosity: verbosity_levels.auto,
+    custom_reasoning_preset: custom_reasoning_preset_types.OPENAI,
+    custom_reasoning_param_name: 'reasoning_effort',
+    custom_reasoning_param_format: custom_reasoning_param_formats.OPENAI,
+    custom_reasoning_enabled_value: 'enabled',
+    custom_reasoning_disabled_value: 'disabled',
     enable_web_search: false,
     request_images: false,
     request_image_aspect_ratio: '',
@@ -519,6 +548,27 @@ const default_settings = {
 };
 
 const oai_settings = structuredClone(default_settings);
+
+const CUSTOM_REASONING_PRESETS = {
+    [custom_reasoning_preset_types.OPENAI]: {
+        paramName: 'reasoning_effort',
+        format: custom_reasoning_param_formats.OPENAI,
+        enabledValue: 'enabled',
+        disabledValue: 'disabled',
+    },
+    [custom_reasoning_preset_types.GLM_5_1]: {
+        paramName: 'thinking',
+        format: custom_reasoning_param_formats.THINKING_OBJECT,
+        enabledValue: 'enabled',
+        disabledValue: 'disabled',
+    },
+    [custom_reasoning_preset_types.KIMI_K2]: {
+        paramName: 'thinking',
+        format: custom_reasoning_param_formats.THINKING_OBJECT,
+        enabledValue: 'enabled',
+        disabledValue: 'disabled',
+    },
+};
 
 export let proxies = [
     {
@@ -1765,6 +1815,80 @@ function ensureAlwaysUnlockedContext(settings = oai_settings) {
     return settings;
 }
 
+function shouldRequestReasoning(settings = oai_settings) {
+    return Boolean(settings.show_thoughts || settings.auto_append_reasoning_tags);
+}
+
+function getAutoAppendReasoningTagStyle(settings = oai_settings) {
+    const style = String(settings.auto_append_reasoning_tag_style ?? '').trim().toLowerCase();
+    if (Object.values(reasoning_tag_styles).includes(style)) {
+        return style;
+    }
+
+    return reasoning_tag_styles.think;
+}
+
+function getAutoAppendReasoningTagPair(settings = oai_settings) {
+    const tagName = getAutoAppendReasoningTagStyle(settings);
+    return {
+        openTag: `<${tagName}>`,
+        closeTag: `</${tagName}>`,
+    };
+}
+
+function shouldInjectAutoAppendReasoningInstruction(settings = oai_settings, model = null, type = 'normal') {
+    if (!settings.auto_append_reasoning_tags || type === 'quiet') {
+        return false;
+    }
+
+    const source = settings.chat_completion_source;
+    if (source === chat_completion_sources.CUSTOM) {
+        return true;
+    }
+
+    const normalizedModel = String(model ?? getChatCompletionModel(settings) ?? '').trim().toLowerCase();
+    if (!normalizedModel) {
+        return false;
+    }
+
+    if ([chat_completion_sources.OPENAI, chat_completion_sources.OPENAI_RESPONSES, chat_completion_sources.AZURE_OPENAI].includes(source)) {
+        return ['gpt-4.5', 'o1', 'o3'].some(prefix => normalizedModel.startsWith(prefix));
+    }
+
+    if ([chat_completion_sources.MAKERSUITE, chat_completion_sources.VERTEXAI].includes(source)) {
+        return ['gemini-2.0-flash-thinking-exp', 'gemini-2.0-pro-exp'].some(prefix => normalizedModel.startsWith(prefix));
+    }
+
+    return false;
+}
+
+function appendAutoAppendReasoningInstruction(messages, settings = oai_settings, model = null, type = 'normal') {
+    if (!shouldInjectAutoAppendReasoningInstruction(settings, model, type)) {
+        return messages;
+    }
+
+    const { openTag, closeTag } = getAutoAppendReasoningTagPair(settings);
+    const instruction = `Before your final answer, place any visible reasoning inside ${openTag}...${closeTag}. Put the user-facing reply after ${closeTag}, and always close the tag before the final reply.`;
+    const nextMessages = structuredClone(messages);
+    const systemMessage = nextMessages.find(message => message?.role === 'system' && typeof message?.content === 'string');
+
+    if (systemMessage) {
+        const existingContent = String(systemMessage.content ?? '').trim();
+        systemMessage.content = existingContent ? `${existingContent}\n\n${instruction}` : instruction;
+        return nextMessages;
+    }
+
+    nextMessages.unshift({
+        role: 'system',
+        content: instruction,
+    });
+    return nextMessages;
+}
+
+function getCustomReasoningPresetConfig(preset = custom_reasoning_preset_types.OPENAI) {
+    return CUSTOM_REASONING_PRESETS[preset] ?? CUSTOM_REASONING_PRESETS[custom_reasoning_preset_types.OPENAI];
+}
+
 function ensureModelFavoritesStore(settings = oai_settings) {
     if (!settings.model_favorites || typeof settings.model_favorites !== 'object' || Array.isArray(settings.model_favorites)) {
         settings.model_favorites = {};
@@ -2209,7 +2333,9 @@ function groupOpenAISettingsIntoDrawers() {
                 '#openai_settings > div > .range-block:has(#openai_media_inlining)',
                 '#openai_settings > div > #request_images_block',
                 '#openai_settings > div > .range-block:has(#openai_show_thoughts)',
+                '#openai_settings > div > .range-block:has(#openai_auto_append_reasoning_tags)',
                 '#openai_settings > div > .flex-container:has(#openai_reasoning_effort)',
+                '#openai_settings > div > .range-block:has(#openai_reasoning_tag_style)',
                 '#openai_settings > div > .flex-container:has(#openai_verbosity)',
                 '#openai_settings > div > .range-block:has(#claude_assistant_prefill)',
                 '#openai_settings > .range-block:has(#openai_logit_bias_preset)',
@@ -3592,7 +3718,7 @@ function getReasoningEffort(settings = null, model = null) {
             case reasoning_effort_types.auto:
                 return undefined;
             case reasoning_effort_types.min:
-                if (chat_completion_sources.OPENROUTER === settings.chat_completion_source && !settings.show_thoughts) {
+                if (chat_completion_sources.OPENROUTER === settings.chat_completion_source && !shouldRequestReasoning(settings)) {
                     return 'none';
                 }
 
@@ -3654,6 +3780,7 @@ export async function createGenerationParameters(settings, model, type, messages
         throw new Error('messages must be an array');
     }
     messages = messages.filter(msg => msg && typeof msg === 'object');
+    messages = appendAutoAppendReasoningInstruction(messages, settings, model, type);
 
     // "OpenAI-like" sources
     const gptSources = [
@@ -3764,7 +3891,7 @@ export async function createGenerationParameters(settings, model, type, messages
         'user_name': name1,
         'char_name': name2,
         'group_names': getGroupNames(),
-        'include_reasoning': Boolean(settings.show_thoughts),
+        'include_reasoning': shouldRequestReasoning(settings),
         'reasoning_effort': getReasoningEffort(settings, model),
         'enable_web_search': Boolean(settings.enable_web_search),
         'request_images': Boolean(settings.request_images),
@@ -3862,6 +3989,11 @@ export async function createGenerationParameters(settings, model, type, messages
         generate_data.custom_include_body = settings.custom_include_body;
         generate_data.custom_exclude_body = settings.custom_exclude_body;
         generate_data.custom_include_headers = settings.custom_include_headers;
+        generate_data.custom_reasoning_preset = settings.custom_reasoning_preset;
+        generate_data.custom_reasoning_param_name = settings.custom_reasoning_param_name;
+        generate_data.custom_reasoning_param_format = settings.custom_reasoning_param_format;
+        generate_data.custom_reasoning_enabled_value = settings.custom_reasoning_enabled_value;
+        generate_data.custom_reasoning_disabled_value = settings.custom_reasoning_disabled_value;
     }
 
     if (settings.chat_completion_source === chat_completion_sources.COHERE) {
@@ -4120,7 +4252,7 @@ async function sendOpenAIRequest(type, messages, signal, { jsonSchema = null } =
  */
 export function getStreamingReply(data, state, { chatCompletionSource = null, overrideShowThoughts = null } = {}) {
     const chat_completion_source = chatCompletionSource ?? oai_settings.chat_completion_source;
-    const show_thoughts = overrideShowThoughts ?? oai_settings.show_thoughts;
+    const show_thoughts = overrideShowThoughts ?? shouldRequestReasoning(oai_settings);
 
     if (chat_completion_source === chat_completion_sources.CLAUDE) {
         if (show_thoughts) {
@@ -5288,6 +5420,7 @@ function loadOpenAISettings(data, settings) {
     setNamesBehaviorControls();
     setContinuePostfixControls();
     setToolReasoningControls();
+    setAutoAppendReasoningTagControls();
 
     $('#openrouter_providers_chat').trigger('change');
     $('#openrouter_quantizations_chat').trigger('change');
@@ -5381,9 +5514,13 @@ function setContinuePostfixControls() {
 }
 
 function setToolReasoningControls() {
-    const isEnabled = oai_settings.show_thoughts;
+    const isEnabled = shouldRequestReasoning(oai_settings);
     $('#tool_reasoning_mode').prop('disabled', !isEnabled);
     $('#openrouter_interleaved_thinking_disabled_hint').toggle(!isEnabled);
+}
+
+function setAutoAppendReasoningTagControls() {
+    $('#openai_reasoning_tag_style').prop('disabled', !oai_settings.auto_append_reasoning_tags);
 }
 
 async function getStatusOpen() {
@@ -7101,6 +7238,69 @@ async function onCustomizeParametersClick() {
         saveSettingsDebounced();
     });
 
+    const syncCustomReasoningPopup = () => {
+        template.find('#custom_reasoning_preset').val(oai_settings.custom_reasoning_preset);
+        template.find('#custom_reasoning_param_name').val(oai_settings.custom_reasoning_param_name);
+        template.find('#custom_reasoning_param_format').val(oai_settings.custom_reasoning_param_format);
+        template.find('#custom_reasoning_enabled_value').val(oai_settings.custom_reasoning_enabled_value);
+        template.find('#custom_reasoning_disabled_value').val(oai_settings.custom_reasoning_disabled_value);
+
+        const format = String(oai_settings.custom_reasoning_param_format ?? custom_reasoning_param_formats.OPENAI);
+        const showToggleValues = [custom_reasoning_param_formats.STRING, custom_reasoning_param_formats.THINKING_OBJECT].includes(format);
+        template.find('.sb-custom-reasoning-toggle-values').toggle(showToggleValues);
+    };
+
+    const applyCustomReasoningPreset = (preset, { preserveValues = false } = {}) => {
+        oai_settings.custom_reasoning_preset = preset;
+
+        if (preset !== custom_reasoning_preset_types.CUSTOM) {
+            const presetConfig = getCustomReasoningPresetConfig(preset);
+            oai_settings.custom_reasoning_param_name = presetConfig.paramName;
+            oai_settings.custom_reasoning_param_format = presetConfig.format;
+            if (!preserveValues) {
+                oai_settings.custom_reasoning_enabled_value = presetConfig.enabledValue;
+                oai_settings.custom_reasoning_disabled_value = presetConfig.disabledValue;
+            }
+        }
+
+        syncCustomReasoningPopup();
+        saveSettingsDebounced();
+    };
+
+    template.find('#custom_reasoning_preset').on('input', function () {
+        applyCustomReasoningPreset(String($(this).val()));
+    });
+
+    template.find('#custom_reasoning_param_name').on('input', function () {
+        oai_settings.custom_reasoning_preset = custom_reasoning_preset_types.CUSTOM;
+        oai_settings.custom_reasoning_param_name = String($(this).val()).trim();
+        syncCustomReasoningPopup();
+        saveSettingsDebounced();
+    });
+
+    template.find('#custom_reasoning_param_format').on('input', function () {
+        oai_settings.custom_reasoning_preset = custom_reasoning_preset_types.CUSTOM;
+        oai_settings.custom_reasoning_param_format = String($(this).val());
+        syncCustomReasoningPopup();
+        saveSettingsDebounced();
+    });
+
+    template.find('#custom_reasoning_enabled_value').on('input', function () {
+        oai_settings.custom_reasoning_preset = custom_reasoning_preset_types.CUSTOM;
+        oai_settings.custom_reasoning_enabled_value = String($(this).val()).trim();
+        syncCustomReasoningPopup();
+        saveSettingsDebounced();
+    });
+
+    template.find('#custom_reasoning_disabled_value').on('input', function () {
+        oai_settings.custom_reasoning_preset = custom_reasoning_preset_types.CUSTOM;
+        oai_settings.custom_reasoning_disabled_value = String($(this).val()).trim();
+        syncCustomReasoningPopup();
+        saveSettingsDebounced();
+    });
+
+    syncCustomReasoningPopup();
+
     await callGenericPopup(template, POPUP_TYPE.TEXT, '', { wide: true, large: true });
 }
 
@@ -7327,7 +7527,7 @@ function getToolReasoningMode(settings = oai_settings) {
  * @returns {string} Effective reasoning forwarding mode
  */
 function getEffectiveToolReasoningMode(settings = oai_settings) {
-    if (!settings.show_thoughts) {
+    if (!shouldRequestReasoning(settings)) {
         return tool_reasoning_modes.DISABLED;
     }
 
@@ -8083,6 +8283,18 @@ export function initOpenAI() {
     $('#openai_show_thoughts').on('input', function () {
         oai_settings.show_thoughts = !!$(this).prop('checked');
         setToolReasoningControls();
+        saveSettingsDebounced();
+    });
+
+    $('#openai_auto_append_reasoning_tags').on('input', function () {
+        oai_settings.auto_append_reasoning_tags = !!$(this).prop('checked');
+        setToolReasoningControls();
+        setAutoAppendReasoningTagControls();
+        saveSettingsDebounced();
+    });
+
+    $('#openai_reasoning_tag_style').on('input', function () {
+        oai_settings.auto_append_reasoning_tag_style = String($(this).val());
         saveSettingsDebounced();
     });
 
