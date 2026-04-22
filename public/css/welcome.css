@@ -364,9 +364,9 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     height: 100%;
     padding: 12px 14px;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
-    text-align: left;
+    text-align: center;
     border-radius: 20px;
     text-decoration: none;
     background: transparent;
@@ -387,7 +387,6 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 
 .welcomeActionCard i {
     width: 20px;
-    margin-top: 2px;
     font-size: calc(var(--mainFontSize) * 1.04);
     text-align: center;
     color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 64%, var(--SmartThemeBodyColor));
@@ -397,11 +396,12 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    align-items: flex-start;
-    text-align: left;
+    align-items: center;
+    text-align: center;
     gap: 5px;
     min-width: 0;
     min-height: 100%;
+    flex: 1 1 auto;
     white-space: normal;
 }
 
