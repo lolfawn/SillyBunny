@@ -199,10 +199,8 @@ SillyBunny includes some extras by default to help you get started right away:
 
 **Documentation**
 
-- Added Playwright automation script for screenshot capture (`tests/capture-screenshots.js`)
-- Added comprehensive manual screenshot guide (`docs/SCREENSHOT_GUIDE.md`)
-- Screenshot tools support both desktop (1920x1080) and mobile (390x844) viewports
-- Automated script captures all 5 UI sections with proper navigation and timing
+- Removed the broken screenshot automation script and outdated screenshot guide after the shell controls diverged from those instructions
+- Replaced all `v1.4.0` README gallery screenshots with fresh live captures across desktop and mobile
 
 **User Experience**
 
