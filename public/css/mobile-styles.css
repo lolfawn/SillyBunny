@@ -952,6 +952,11 @@
     .select2-search--dropdown .select2-search__field {
         display: block !important;
         width: 100% !important;
+        padding: 10px !important;
+        font-size: 16px !important; /* Prevents zoom on iOS */
+        -webkit-appearance: none;
+        appearance: none;
+    }
 
     /* Reduce Import Folder and Sync Extensions button sizes on mobile */
     .sb-server-action {
@@ -962,10 +967,23 @@
     .sb-server-action i {
         font-size: 14px !important;
     }
-        padding: 10px !important;
-        font-size: 16px !important; /* Prevents zoom on iOS */
-        -webkit-appearance: none;
-        appearance: none;
+
+    .sb-import-path-input {
+        min-height: 42px !important;
+        padding: 10px 12px !important;
+        font-size: 15px !important;
+    }
+
+    .sb-import-action-row .sb-server-action,
+    .sb-import-pane > .sb-server-action {
+        min-height: 42px !important;
+    }
+
+    .sb-import-card .sb-admin-card-header,
+    .sb-import-card .sb-admin-card-copy,
+    .sb-import-card .sb-import-path-row,
+    .sb-import-card .sb-import-action-row {
+        gap: 8px !important;
     }
 
     .select2-dropdown {

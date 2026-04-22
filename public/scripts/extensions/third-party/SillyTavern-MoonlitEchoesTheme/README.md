@@ -5,6 +5,7 @@
 
 ## SillyBunny Fork Changelog
 
+- 2026-04-22: Split the `Custom CSS` settings drawer out from `Chat & Characters`, and tightened the mobile SillyTavern import card/button sizing so the path field plus `Import Folder` and `Sync Extensions` controls no longer dominate the viewport.
 - 2026-04-22: Restored the in-chat agent post-processing running toast for profile-backed prompt transforms so the active agent status stays visible through completion on desktop and mobile.
 - 2026-04-22: Guarded SillyBunny's mobile viewport reposition workaround during active text entry so Android and Termux keyboard autocorrect replacements stop appending corrected words to the end of the chat input.
 - 2026-04-22: Fixed ARM/Node launcher restarts dirtying the tracked `package-lock.json` by using lockfile-driven Node installs and auto-restoring the tracked lockfile after npm-only metadata churn, which keeps PM2/self-update server checkouts clean for later pulls.
