@@ -194,11 +194,19 @@ fi
 
 export NODE_ENV=production
 install_args=()
+restore_package_lock_after_install=0
 if [[ "$runtime_kind" == node ]]; then
     if [[ -f package-lock.json ]]; then
         install_args=(ci --no-audit --no-fund --omit=dev)
     else
         install_args=(install --no-audit --no-fund --omit=dev)
+    fi
+
+    if command -v git >/dev/null 2>&1 \
+        && git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+        && git ls-files --error-unmatch package-lock.json >/dev/null 2>&1 \
+        && git diff --quiet -- package-lock.json; then
+        restore_package_lock_after_install=1
     fi
 else
     install_args=(install --frozen-lockfile --production)
@@ -207,6 +215,11 @@ else
     fi
 fi
 "$PACKAGE_MANAGER_CMD" "${install_args[@]}"
+
+if (( restore_package_lock_after_install )) && ! git diff --quiet -- package-lock.json; then
+    echo "Restoring tracked package-lock.json after npm metadata rewrite..."
+    git restore -- package-lock.json
+fi
 
 echo "Entering SillyBunny..."
 export NODE_NO_WARNINGS=1
