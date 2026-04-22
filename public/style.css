@@ -113,6 +113,9 @@
     --mainFontSize: calc(var(--fontScale) * 15px);
     --mainFontFamily: 'Figtree', 'Noto Sans', sans-serif;
     --monoFontFamily: 'Red Hat Mono', 'Noto Sans Mono', 'Courier New', Consolas, monospace;
+    /* Compatibility aliases for older imported themes and Moonlit-style presets. */
+    --mainFont: var(--mainFontFamily);
+    --headerFont: var(--mainFontFamily);
 
     /* base variable for blur strength slider calculations */
     --blurStrength: 10;

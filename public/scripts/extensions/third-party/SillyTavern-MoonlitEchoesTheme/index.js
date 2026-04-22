@@ -113,8 +113,7 @@ export function initExtensionUI() {
         initializeSlashCommands();
 
         const context = SillyTavern.getContext();
-        const settings = getExtensionSettings(context) || {};
-        applyRawCustomCss(settings.rawCustomCss || '');
+        syncRawCustomCss(context);
     });
 
 }
@@ -471,6 +470,7 @@ export function toggleCss(shouldLoad) {
 
         // Re-apply all checkbox styles if they were enabled
         updateAllCheckboxStyles(true);
+        syncRawCustomCss();
     } else {
         // Remove CSS
         if (existingLinkStyle) existingLinkStyle.remove();
@@ -482,6 +482,7 @@ export function toggleCss(shouldLoad) {
 
         // Clear all checkbox styles
         clearAllCheckboxStyles();
+        syncRawCustomCss();
     }
 }
 
@@ -926,20 +927,18 @@ export function applyThemeSetting(varId, value) {
     }));
 }
 
-function normalizeMoonlitFontFamilyDeclarations(cssText) {
-    return String(cssText || '').replace(/font-family\s*:\s*([^;]+);/gi, (fullMatch, rawValue) => {
-        const normalizedValue = String(rawValue || '').toLowerCase();
+function getMoonlitRawCustomCssState(context = SillyTavern.getContext()) {
+    const settings = getExtensionSettings(context) || {};
 
-        if (
-            normalizedValue.includes('font awesome')
-            || normalizedValue.includes('var(--monofontfamily)')
-            || normalizedValue.includes('monospace')
-        ) {
-            return fullMatch;
-        }
+    return {
+        enabled: settings.enabled === true,
+        cssText: String(settings.rawCustomCss || ''),
+    };
+}
 
-        return 'font-family: var(--mainFontFamily) !important;';
-    });
+function syncRawCustomCss(context = SillyTavern.getContext()) {
+    const { enabled, cssText } = getMoonlitRawCustomCssState(context);
+    applyRawCustomCss(enabled ? cssText : '');
 }
 
 // Inject raw CSS (unfiltered) into the page via a dedicated <style> tag
@@ -952,20 +951,14 @@ function applyRawCustomCss(cssText) {
         document.head.appendChild(rawStyle);
     }
 
-    const normalizedCss = String(cssText || '')
-        .replace(/@import\s+url\((['"])?https?:\/\/fonts\.(?:googleapis|gstatic)\.com[\s\S]*?\)\s*;?/gi, '')
-        .replace(/font-family:\s*var\(--mainFont\)\s*!important\s*;/gi, 'font-family: var(--mainFontFamily) !important;')
-        .replace(/font-family:\s*var\(--mainFont\)\s*;/gi, 'font-family: var(--mainFontFamily);')
-        .replace(/font-family:\s*var\(--headerFont\)\s*!important\s*;/gi, 'font-family: var(--mainFontFamily) !important;')
-        .replace(/font-family:\s*var\(--headerFont\)\s*;/gi, 'font-family: var(--mainFontFamily);');
-
-    rawStyle.textContent = normalizeMoonlitFontFamilyDeclarations(normalizedCss);
+    rawStyle.textContent = String(cssText || '');
 }
 // Re-apply when the setting changes (optional safety net)
 document.addEventListener('themeSettingChanged', (ev) => {
     const { varId, value } = ev.detail || {};
     if (varId === 'rawCustomCss') {
-        applyRawCustomCss(value);
+        void value;
+        syncRawCustomCss();
     }
 });
 

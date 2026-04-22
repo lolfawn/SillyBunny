@@ -3,6 +3,10 @@
 > [!NOTE]
 > This vendored copy ships with SillyBunny and includes compatibility patches for SillyBunny's shell, chat-style switching, font handling, and mobile layouts. Upstream project: https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme
 
+## SillyBunny Fork Changelog
+
+- 2026-04-22: Fixed Moonlit raw custom CSS so it only applies while Moonlit Echoes is enabled, and restored legacy `--mainFont` / `--headerFont` compatibility so older Moonlit-style themes stop falling back to browser default fonts on desktop and mobile.
+
 **English** | [繁體中文](https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme/blob/main/.github/README-zh_Hant.md)
 
 ![](https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme/blob/main/.github/ImagePreview/visual_novel_mode.png)

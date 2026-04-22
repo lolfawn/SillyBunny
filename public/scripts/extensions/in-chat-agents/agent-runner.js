@@ -61,6 +61,7 @@ let isGenerationInProgress = false;
 let generationStopRequested = false;
 let deferredPostProcessing = null;
 let deferredPostProcessingTimeout = null;
+const activePromptTransformToasts = new Set();
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -79,6 +80,7 @@ export function cancelAgentGeneration() {
     const wasActive = isAgentGenerationActive() || Boolean(streamingProcessor);
     generationStopRequested = true;
     clearDeferredPostProcessing();
+    clearAllPromptTransformRunningToasts();
 
     const stopped = stopGeneration();
     if (stopped || wasActive) {
@@ -478,13 +480,19 @@ function showPromptTransformRunningToast(agent, mode, profileId = '') {
     const modeLabel = describePromptTransformMode(mode);
     const targetLabel = describePromptTransformTarget(profileId, profileId ? 'profile' : 'main');
 
-    return toastr.info(`Running ${modeLabel} via ${targetLabel}...`, agentName, {
+    const toast = toastr.info(`Running ${modeLabel} via ${targetLabel}...`, agentName, {
         timeOut: 0,
         extendedTimeOut: 0,
-        tapToDismiss: false,
-        closeButton: false,
+        tapToDismiss: true,
+        closeButton: true,
         escapeHtml: true,
     });
+
+    if (toast) {
+        activePromptTransformToasts.add(toast);
+    }
+
+    return toast;
 }
 
 function clearPromptTransformRunningToast(toast) {
@@ -492,7 +500,20 @@ function clearPromptTransformRunningToast(toast) {
         return;
     }
 
+    activePromptTransformToasts.delete(toast);
     toastr.clear(toast);
+}
+
+function clearAllPromptTransformRunningToasts() {
+    if (activePromptTransformToasts.size === 0) {
+        return;
+    }
+
+    for (const toast of activePromptTransformToasts) {
+        toastr.clear(toast);
+    }
+
+    activePromptTransformToasts.clear();
 }
 
 async function commitOpenEditorForMessage(messageIndex) {
@@ -1158,6 +1179,7 @@ function onGenerationStarted() {
     toolSyncDuringGeneration = true;
     generationStopRequested = false;
     clearDeferredPostProcessing();
+    clearAllPromptTransformRunningToasts();
     pendingGenerationSnapshot = null;
 
     const lastMsg = chat[chat.length - 1];
@@ -1183,6 +1205,7 @@ function onGenerationEnded() {
     isGenerationInProgress = false;
     toolSyncDuringGeneration = false;
     generationStopRequested = false;
+    clearAllPromptTransformRunningToasts();
     scheduleDeferredPostProcessingFlush();
 }
 
@@ -1194,6 +1217,7 @@ function onGenerationStopped() {
     generationStopRequested = true;
     isGenerationInProgress = false;
     clearDeferredPostProcessing();
+    clearAllPromptTransformRunningToasts();
 }
 
 /**
