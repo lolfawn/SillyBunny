@@ -30,17 +30,25 @@ These screenshots show the refreshed `v1.4.0` shell-based UI across Navigate, Cu
 
 #### Desktop
 
-| Navigation Menu | Customize Menu |
-| :---: | :---: |
-| <img src="https://raw.githubusercontent.com/platberlitz/SillyBunny/main/screenshots/sillybunny-ui-desktop-navigate-v1.4.0.png" alt="Desktop Navigation Menu" width="100%"> | <img src="https://raw.githubusercontent.com/platberlitz/SillyBunny/main/screenshots/sillybunny-ui-desktop-customize-v1.4.0.png" alt="Desktop Customize Menu" width="100%"> |
+**Navigation Menu**
 
-| Agents Menu | Characters Menu |
-| :---: | :---: |
-| <img src="https://raw.githubusercontent.com/platberlitz/SillyBunny/main/screenshots/sillybunny-ui-desktop-agents-v1.4.0.png" alt="Desktop Agents Menu" width="100%"> | <img src="https://raw.githubusercontent.com/platberlitz/SillyBunny/main/screenshots/sillybunny-ui-desktop-characters-v1.4.0.png" alt="Desktop Characters Menu" width="100%"> |
+<img src="https://raw.githubusercontent.com/platberlitz/SillyBunny/main/screenshots/sillybunny-ui-desktop-navigate-v1.4.0.png" alt="Desktop Navigation Menu" width="100%">
 
-| Bunny Guide In-Chat |
-| :---: |
-| <img src="https://raw.githubusercontent.com/platberlitz/SillyBunny/main/screenshots/sillybunny-ui-desktop-in-chat-v1.4.0.png" alt="Desktop Bunny Guide Chat" width="100%"> |
+**Customize Menu**
+
+<img src="https://raw.githubusercontent.com/platberlitz/SillyBunny/main/screenshots/sillybunny-ui-desktop-customize-v1.4.0.png" alt="Desktop Customize Menu" width="100%">
+
+**Agents Menu**
+
+<img src="https://raw.githubusercontent.com/platberlitz/SillyBunny/main/screenshots/sillybunny-ui-desktop-agents-v1.4.0.png" alt="Desktop Agents Menu" width="100%">
+
+**Characters Menu**
+
+<img src="https://raw.githubusercontent.com/platberlitz/SillyBunny/main/screenshots/sillybunny-ui-desktop-characters-v1.4.0.png" alt="Desktop Characters Menu" width="100%">
+
+**Bunny Guide In-Chat**
+
+<img src="https://raw.githubusercontent.com/platberlitz/SillyBunny/main/screenshots/sillybunny-ui-desktop-in-chat-v1.4.0.png" alt="Desktop Bunny Guide Chat" width="100%">
 
 #### Mobile
 
@@ -204,6 +212,7 @@ SillyBunny includes some extras by default to help you get started right away:
 - Home display toggles now render once in a centered top row instead of duplicating again above Recent Chats
 - Refreshed the README gallery for v1.4.0 with updated desktop/mobile shell captures and new Bunny Guide in-chat screenshots
 - Corrected the v1.4.0 README shell captures so the mobile gallery and Characters views no longer show broken overlay states
+- Replaced the empty desktop Agents capture with a populated in-chat agents workspace and switched the desktop README gallery to full-width rows so the 1920x1080 screenshots render at readable size
 
 **Themes and Appearance**
 
