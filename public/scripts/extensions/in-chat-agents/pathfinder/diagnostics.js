@@ -78,7 +78,7 @@ export async function runDiagnostics() {
         } else if (enabledAgents.length === 0) {
             results['Tool Registration'] = {
                 ok: false,
-                message: 'No tool agents are enabled. Enable at least one agent in the Agents section.',
+                message: 'Tool mode is enabled, but no tool agents are enabled. Tool agents are only needed for Pathfinder tool mode; pipeline lorebook retrieval can still work without them.',
             };
         } else if (registeredTools.length === 0) {
             results['Tool Registration'] = {
@@ -96,7 +96,7 @@ export async function runDiagnostics() {
     } else {
         results['Tool Registration'] = {
             ok: true,
-            message: 'Tool mode disabled - skipped',
+            message: 'Tool mode disabled - skipped. Tool agents are not required unless you want Pathfinder tools.',
         };
     }
 

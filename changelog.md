@@ -1,14 +1,20 @@
 # Changelog
 
-## Unreleased
+## v1.4.1
 
-- Updated the launchpad quick-access and guide cards so Characters Menu, Global Search, and Import Character shortcuts now trigger the real panels/actions instead of dead placeholders.
-- Simplified the launchpad bundled extras cards by merging purachina's site link into the Director Presets card, renaming the preset action to `Apply preset`, and adding a matching `Apply preset` action to the Geechan card.
-- Removed stale launchpad wording around sample characters, reduced one remaining legacy settings-search dependency in `sillybunny-tabs.js`, and tightened hero centering on mobile so the bar beneath the mascot stays visually centered.
-- Fixed Android/Termux IME autocomplete so replacements no longer append extra words while typing in the main send box.
-- Fixed self-hosted Figtree fallback behavior on iOS/Safari and restored stronger default weights so the app no longer falls back to Noto Sans.
-- Flattened AI Studio debug payload logging so complex request summaries print readably instead of collapsing into `[Object ...]`.
-- Added a Google Font picker with preset and custom font support, plus persistent application through power-user settings.
-- Reworked Customize > Settings drawer structure and spacing, including centered `Custom CSS` and `Google Font` headers and less cramped appearance rows.
-- Fixed the welcome/home panel to auto-open on fresh installs, avoid duplicate insertion, remove the stale legacy template, and keep home mode controls visible in full, compact, and list-only layouts.
-- Synced shared resizing behavior between the Navigate and Customize side panels.
+Date: 2026-04-23
+
+Changes:
+- Fixed the World Info entry enable/disable regression by restoring the kill-switch event binding to the current button markup.
+- Reworked the World Info entry header layout so controls stack more cleanly on narrower desktop widths and mobile screens.
+- Added bulk delete actions for saved presets in the OpenAI and Text Completion preset pickers.
+- Added a bulk delete action for saved connection profiles in Connection Manager.
+- Clarified Pathfinder diagnostics so the UI explains that Tool Agents are only required for Pathfinder tool mode, not for pipeline lorebook retrieval.
+- Added compact home shortcut buttons for Sample Characters, Import Character, Open API, and Extensions.
+- Aligned the reasoning token badge more evenly with the standard token counter.
+- Based bottom-bar sizing on the top-bar size variable so the shell chrome stays visually consistent across desktop and mobile.
+- Preserved transparency for cropped avatar images and alpha-capable thumbnails instead of flattening them to opaque backgrounds.
+- Bumped the app version strings and default-user settings version to `1.4.1`.
+
+Commits:
+- `fix(ui): ship v1.4.1 lorebook and shell polish`

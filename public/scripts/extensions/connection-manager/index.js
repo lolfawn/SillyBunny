@@ -343,6 +343,38 @@ async function deleteConnectionProfile() {
 }
 
 /**
+ * Deletes every saved connection profile.
+ * @returns {Promise<void>}
+ */
+async function deleteAllConnectionProfiles() {
+    const profiles = extension_settings.connectionManager.profiles;
+    if (!Array.isArray(profiles) || profiles.length === 0) {
+        toastr.info(t`No connection profiles to delete.`);
+        return;
+    }
+
+    const confirm = await Popup.show.confirm(
+        t`Delete all connection profiles?`,
+        t`This will permanently delete ${profiles.length} saved connection profile(s).`,
+    );
+
+    if (!confirm) {
+        return;
+    }
+
+    const deletedProfiles = [...profiles];
+    extension_settings.connectionManager.profiles = [];
+    extension_settings.connectionManager.selectedProfile = null;
+    saveSettingsDebounced();
+
+    for (const profile of deletedProfiles) {
+        await eventSource.emit(event_types.CONNECTION_PROFILE_DELETED, profile);
+    }
+
+    toastr.success(t`Deleted ${deletedProfiles.length} connection profile(s).`);
+}
+
+/**
  * Formats the connection profile for display.
  * @param {ConnectionProfile} profile Connection profile
  * @returns {Object} Fancy profile
@@ -617,6 +649,15 @@ async function renderDetailsContent(detailsContent) {
         await eventSource.emit(event_types.CONNECTION_PROFILE_UPDATED, oldProfile, profile);
         await eventSource.emit(event_types.CONNECTION_PROFILE_LOADED, profile.name);
         toastr.success('Connection profile updated', '', { timeOut: 1500 });
+    });
+
+    const deleteAllButton = document.getElementById('delete_all_connection_profiles');
+    deleteAllButton?.addEventListener('click', async () => {
+        await deleteAllConnectionProfiles();
+        renderConnectionProfiles(profiles);
+        await renderDetailsContent(detailsContent);
+        toggleProfileSpecificButtons();
+        await eventSource.emit(event_types.CONNECTION_PROFILE_LOADED, NONE);
     });
 
     const deleteButton = document.getElementById('delete_connection_profile');

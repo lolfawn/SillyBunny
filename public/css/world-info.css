@@ -435,6 +435,7 @@
 .WIEntryHeaderMain {
     display: flex;
     align-items: flex-start;
+    flex-wrap: wrap;
     gap: 12px;
     min-width: 0;
 }
@@ -444,6 +445,7 @@
     grid-template-columns: minmax(240px, 1.2fr) minmax(300px, 1fr);
     gap: 12px;
     align-items: start;
+    flex: 1 1 100%;
     min-width: 0;
 }
 
@@ -505,6 +507,47 @@
     border-radius: 16px;
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 74%, transparent);
+}
+
+@media screen and (max-width: 1000px) {
+    .world_entry .inline-drawer-header,
+    .world_entry .inline-drawer-header:hover {
+        grid-template-columns: 1fr;
+    }
+
+    .WIEntryHeaderMain {
+        width: 100%;
+    }
+
+    .WIEntryHeaderBody {
+        grid-template-columns: 1fr;
+    }
+
+    .WIEntryTitleAndStatus {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .WIEnteryHeaderControls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .WIEntryHeaderActions {
+        justify-content: flex-start;
+        width: 100%;
+        padding-top: 0;
+    }
+}
+
+@media screen and (max-width: 760px) {
+    .WIEnteryHeaderControls {
+        grid-template-columns: 1fr;
+    }
+
+    .world_entry .killSwitch {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 .WIEnteryHeaderControls > [name="PositionBlock"] {

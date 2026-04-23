@@ -104,10 +104,13 @@
 .welcomePanel--compact .welcomeHeroBlurb,
 .welcomePanel--compact .welcomeForkNotice,
 .welcomePanel--compact .welcomeActionGrid,
-.welcomePanel--compact .welcomeShortcuts,
 .welcomePanel--compact .welcomeDeck,
 .welcomePanel--listOnly .welcomeHero,
 .welcomePanel--listOnly .welcomeDeck {
+    display: none;
+}
+
+.welcomeCompactShortcuts {
     display: none;
 }
 
@@ -145,6 +148,14 @@
     color: var(--welcome-muted-fg);
     font-size: calc(var(--mainFontSize) * 0.76);
     line-height: 1.35;
+}
+
+.welcomePanel--compact .welcomeCompactShortcuts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: 100%;
+    margin-top: 12px;
 }
 
 .welcomePanel--listOnly {
@@ -438,6 +449,25 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     max-width: 220px;
     width: auto;
     text-decoration: none;
+}
+
+.welcomeShortcut--compact {
+    max-width: none;
+    width: 100%;
+    min-height: 42px;
+    padding: 0 12px;
+}
+
+.welcomePanel--compact .welcomeShortcut span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media screen and (max-width: 760px) {
+    .welcomePanel--compact .welcomeCompactShortcuts {
+        grid-template-columns: 1fr;
+    }
 }
 
 .welcomeShortcut i {
