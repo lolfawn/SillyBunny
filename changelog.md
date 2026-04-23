@@ -14,8 +14,8 @@ Changes:
 - Clarified Pathfinder diagnostics so the UI explains that Tool Agents are only required for Pathfinder tool mode, not for pipeline lorebook retrieval.
 - Fixed Pathfinder tool diagnostics to look at the active Pathfinder tool agent and its enabled tool toggles instead of incorrectly claiming no tools were enabled.
 - Persisted Pathfinder tool checkbox choices like Update and Forget so they stay off after reopening settings.
-- Removed the duplicate compact-mode shortcut strip and added the full shortcut row to List Only mode.
-- Forced List Only home shortcuts into a single horizontal row instead of wrapping into uneven rows.
+- Removed the List Only home shortcut row entirely so List Only mode stays focused on recent chats.
+- Added a detailed Pathfinder retrieval log UI that shows selected lore entries, stage results, and injected Pathfinder prompt payloads.
 - Removed future-facing home-screen references to Pura's SillyTavern Director preset so only the bundled SillyBunny-tuned preset is promoted.
 - Aligned the reasoning token badge more evenly with the standard token counter.
 - Based bottom-bar sizing on the top-bar size variable so the shell chrome stays visually consistent across desktop and mobile.
@@ -28,3 +28,4 @@ Commits:
 - `fix(ui): ship v1.4.1 lorebook and shell polish`
 - `fix(ui): tighten home and updater polish`
 - `fix(ui): refine pathfinder and selective deletes`
+- `fix(ui): add pathfinder retrieval logging`

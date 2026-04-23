@@ -110,10 +110,6 @@
     display: none;
 }
 
-.welcomeListShortcuts {
-    display: none;
-}
-
 .welcomePanel--compact .welcomeHeroCopy {
     gap: 0;
     align-items: flex-start;
@@ -156,23 +152,6 @@
     border-radius: 22px;
 }
 
-.welcomePanel--listOnly .welcomeListShortcuts {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    margin: 10px 0 14px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
-}
-
-.welcomePanel--listOnly .welcomeListShortcuts .welcomeShortcut {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 0;
-}
 
 .welcomePanelModeToggle.is-active,
 .welcomePanelModeChip.is-active {
