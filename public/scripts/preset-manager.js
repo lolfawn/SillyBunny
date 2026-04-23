@@ -844,6 +844,51 @@ class PresetManager {
     }
 
     /**
+     * Opens a checkbox picker for deleting multiple presets.
+     * @returns {Promise<string[]>}
+     */
+    async selectPresetsForDeletion() {
+        const presetNames = this.getAllPresets().filter(name => name !== 'gui');
+
+        if (presetNames.length === 0) {
+            toastr.info(t`No deletable presets found.`);
+            return [];
+        }
+
+        const escapeAttr = value => String(value)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;');
+
+        const html = $(
+            `<div class="flex-container flexFlowColumn flexGap10">
+                <div>${t`Select the presets you want to delete.`}</div>
+                <div class="flex-container flexFlowColumn flexGap5">
+                    ${presetNames.map(name => `
+                        <label class="checkbox_label justifyStart">
+                            <input type="checkbox" value="${escapeAttr(name)}" />
+                            <span>${escapeAttr(name)}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            </div>`,
+        );
+
+        const result = await new Popup(html, POPUP_TYPE.CONFIRM, '', {
+            okButton: t`Delete selected`,
+            cancelButton: t`Cancel`,
+            wide: true,
+        }).show();
+
+        if (result !== POPUP_RESULT.AFFIRMATIVE) {
+            return [];
+        }
+
+        return html.find('input:checked').map((_, el) => String($(el).val())).get();
+    }
+
+    /**
      * Retrieves the default preset for the API from the server.
      * @param {string} name Name of the preset to restore
      * @returns {Promise<any>} Default preset object, or undefined if the request fails
@@ -1189,17 +1234,16 @@ export async function initPresetManager() {
             return;
         }
 
-        const presetNames = presetManager.getAllPresets().filter(name => name !== 'gui');
+        const presetNames = await presetManager.selectPresetsForDeletion();
         if (presetNames.length === 0) {
-            toastr.info(t`No deletable presets found.`);
             return;
         }
 
         const noun = presetManager.isAdvancedFormatting() ? t`template` : t`preset`;
         const pluralNoun = presetManager.isAdvancedFormatting() ? t`templates` : t`presets`;
         const confirm = await Popup.show.confirm(
-            t`Delete all saved ${pluralNoun}?`,
-            t`This will permanently delete ${presetNames.length} saved ${pluralNoun} for this section. The built-in GUI preset is kept.`,
+            t`Delete selected ${pluralNoun}?`,
+            t`This will permanently delete ${presetNames.length} selected ${pluralNoun} for this section. The built-in GUI preset is kept.`,
         );
 
         if (!confirm) {

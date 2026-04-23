@@ -5,6 +5,7 @@
 import { renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { saveSettingsDebounced } from '../../../script.js';
 import { world_names, loadWorldInfo } from '../../world-info.js';
+import { saveAgent } from '../agent-store.js';
 import {
     getPathfinderSettings,
     setPathfinderSettings,
@@ -456,7 +457,7 @@ function bindEvents() {
         updateAgentSettings();
     });
 
-    settingsEl.find('.pf--tool-list input[data-tool]').on('change', function () {
+    settingsEl.find('.pf--tool-list input[data-tool]').on('change', async function () {
         const toolName = $(this).data('tool');
         const enabled = $(this).prop('checked');
 
@@ -468,7 +469,7 @@ function bindEvents() {
         }
 
         logPathfinder('Tool availability changed.', { toolName, enabled });
-        updateAgentSettings();
+        await updateAgentSettings();
         syncToolAgentRegistrations();
     });
 
@@ -584,7 +585,7 @@ function updateDualModeWarning() {
 /**
  * Update agent settings object and trigger save
  */
-function updateAgentSettings() {
+async function updateAgentSettings() {
     if (!currentAgent) return;
 
     const s = getPathfinderSettings();
@@ -601,6 +602,7 @@ function updateAgentSettings() {
         autoUseAttachedLorebook: Boolean(s.autoUseAttachedLorebook),
     });
 
+    await saveAgent(currentAgent);
     saveSettingsDebounced();
 }
 
