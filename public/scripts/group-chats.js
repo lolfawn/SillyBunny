@@ -262,6 +262,14 @@ function getNarratableGroupTurnMessages(startIndex) {
     return chat.slice(startIndex).filter(message => message && !message.is_user && !message.is_system && message.extra?.type !== 'group_narrator_consolidation' && String(message.mes ?? '').trim());
 }
 
+function getDraftTextFromGenerationResult(result) {
+    if (result === undefined || result === null) {
+        return '';
+    }
+
+    return String(result).trim();
+}
+
 function removeNarratedDraftMessages(startIndex) {
     for (let index = chat.length - 1; index >= startIndex; index--) {
         const message = chat[index];
@@ -271,22 +279,39 @@ function removeNarratedDraftMessages(startIndex) {
     }
 }
 
-function buildNarratorConsolidationPrompt(group, startIndex) {
-    const messages = getNarratableGroupTurnMessages(startIndex);
-    const transcript = messages.map(message => `${message.name || 'Character'}: ${message.mes}`).join('\n\n');
+function formatNarratorPromptMessages(messages) {
+    return messages.map(message => `${message.name || 'Character'}: ${message.mes}`).join('\n\n');
+}
+
+function getNarratorRecentContext(startIndex) {
+    const contextStart = Math.max(0, startIndex - 8);
+    return chat.slice(contextStart, startIndex)
+        .filter(message => message && message.extra?.type !== 'group_narrator_consolidation' && String(message.mes ?? '').trim())
+        .map(message => ({ name: message.name || (message.is_user ? 'User' : 'Character'), mes: message.mes }));
+}
+
+function buildNarratorConsolidationPrompt(group, startIndex, draftMessages = null) {
+    const messages = Array.isArray(draftMessages) && draftMessages.length ? draftMessages : getNarratableGroupTurnMessages(startIndex);
+    const transcript = formatNarratorPromptMessages(messages);
+    const recentContext = formatNarratorPromptMessages(getNarratorRecentContext(startIndex));
     const memberNames = getGroupEnabledMembers(group)
         .map(avatar => characters.find(character => character.avatar === avatar)?.name)
         .filter(Boolean)
         .join(', ');
 
-    return `Consolidate the following group-chat character replies into one cohesive narrator-style response. Preserve important actions, dialogue, tone, and continuity. Do not add new events beyond a light connective narration. Characters in this scene: ${memberNames || group.name}.
+    return `Consolidate the following group-chat character replies into one cohesive narrator-style response. Preserve important actions, dialogue, tone, and continuity. Use the recent conversation for context so the narration flows naturally, but do not restate unrelated old details or add new events beyond light connective narration. Characters in this scene: ${memberNames || group.name}.
 
+Recent conversation before this turn:
+${recentContext || '(No prior context.)'}
+
+Character replies to merge:
 ${transcript}`;
 }
 
-async function consolidateGroupTurnAsNarrator(group, startIndex, params = {}) {
-    const prompt = buildNarratorConsolidationPrompt(group, startIndex);
-    if (!getNarratableGroupTurnMessages(startIndex).length) {
+async function consolidateGroupTurnAsNarrator(group, startIndex, params = {}, draftMessages = null) {
+    const narratableMessages = Array.isArray(draftMessages) && draftMessages.length ? draftMessages : getNarratableGroupTurnMessages(startIndex);
+    const prompt = buildNarratorConsolidationPrompt(group, startIndex, narratableMessages);
+    if (!narratableMessages.length) {
         toastr.warning(t`There are no group replies to narrate yet.`);
         return;
     }
@@ -1410,6 +1435,7 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             }
         }
         const turnStartIndex = chat.length;
+        const narratorDraftMessages = [];
         await eventSource.emit(event_types.GROUP_WRAPPER_STARTED, { selected_group, type });
         // now the real generation begins: cycle through every activated character
         for (const chId of activatedMembers) {
@@ -1425,11 +1451,29 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             // Wait for generation to finish
             const generateType = ['swipe', 'impersonate', 'quiet', 'continue'].includes(type) ? type : 'normal';
             textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...(params || {}) }));
+            const shouldNarrateMerge = groupNarratorConsolidation && activatedMembers.length > 1 && type !== 'quiet';
+            let currentDraftMessage = null;
+            if (shouldNarrateMerge) {
+                const draftText = getDraftTextFromGenerationResult(textResult);
+                if (draftText) {
+                    currentDraftMessage = { name: characters[chId]?.name || 'Character', mes: draftText };
+                    narratorDraftMessages.push(currentDraftMessage);
+                }
+            }
             let messageChunk = textResult?.messageChunk;
 
             if (messageChunk) {
                 while (shouldAutoContinue(messageChunk, type === 'impersonate')) {
                     textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => Generate('continue', { automatic_trigger: byAutoMode, ...(params || {}) }));
+                    const continuedText = getDraftTextFromGenerationResult(textResult);
+                    if (shouldNarrateMerge && continuedText) {
+                        if (currentDraftMessage) {
+                            currentDraftMessage.mes += continuedText;
+                        } else {
+                            currentDraftMessage = { name: characters[chId]?.name || 'Character', mes: continuedText };
+                            narratorDraftMessages.push(currentDraftMessage);
+                        }
+                    }
                     messageChunk = textResult?.messageChunk;
                 }
             }
@@ -1440,7 +1484,7 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
         }
 
         if (groupNarratorConsolidation && activatedMembers.length > 1 && type !== 'quiet') {
-            await consolidateGroupTurnAsNarrator(group, turnStartIndex, params);
+            await consolidateGroupTurnAsNarrator(group, turnStartIndex, params, narratorDraftMessages);
         }
 
         if (selectedSpeakerChid !== -1 && !(params && typeof params.force_chid == 'number')) {
