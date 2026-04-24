@@ -6,11 +6,13 @@ import {
     chat_metadata,
     createOrEditCharacter,
     default_user_avatar,
+    getCharacters,
     eventSource,
     event_types,
     getCurrentChatId,
     getRequestHeaders,
     getThumbnailUrl,
+    getCharaFilename,
     groupToEntity,
     menu_type,
     name1,
@@ -18,7 +20,9 @@ import {
     reloadCurrentChat,
     saveChatConditional,
     saveMetadata,
+    saveSettings,
     saveSettingsDebounced,
+    select_rm_info,
     setUserName,
     this_chid,
 } from '../script.js';
@@ -30,7 +34,7 @@ import { FILTER_TYPES, FilterHelper } from './filters.js';
 import { groups, selected_group } from './group-chats.js';
 import { POPUP_RESULT, POPUP_TYPE, Popup, callGenericPopup } from './popup.js';
 import { t } from './i18n.js';
-import { openWorldInfoEditor, world_names } from './world-info.js';
+import { openWorldInfoEditor, world_info, world_names } from './world-info.js';
 import { renderTemplateAsync } from './templates.js';
 import { saveMetadataDebounced } from './extensions.js';
 import { accountStorage } from './util/AccountStorage.js';
@@ -483,6 +487,147 @@ export function initPersona(avatarId, personaName, personaDescription, personaTi
     saveSettingsDebounced();
 }
 
+function getPersonaDescriptionEntry(avatarId) {
+    return power_user.persona_descriptions?.[avatarId] ?? {};
+}
+
+function createPersonaCharacterDescription(personaName, description) {
+    const trimmedDescription = String(description ?? '').trim();
+    if (trimmedDescription) {
+        return trimmedDescription;
+    }
+
+    return `${personaName} is available as a reusable character card converted from a persona.`;
+}
+
+async function uploadCharacterAvatarFromPersona(personaAvatarId, characterAvatarId) {
+    try {
+        const response = await fetch(getUserAvatar(personaAvatarId), { cache: 'reload' });
+        if (!response.ok) {
+            throw new Error(`Avatar fetch failed (${response.status})`);
+        }
+
+        const avatarBlob = await response.blob();
+        const formData = new FormData();
+        formData.append('avatar', avatarBlob, personaAvatarId || 'persona.png');
+        formData.append('avatar_url', characterAvatarId);
+
+        const uploadResponse = await fetch('/api/characters/edit-avatar', {
+            method: 'POST',
+            headers: getRequestHeaders({ omitContentType: true }),
+            body: formData,
+            cache: 'no-cache',
+        });
+
+        if (!uploadResponse.ok) {
+            throw new Error(`Avatar upload failed (${uploadResponse.status})`);
+        }
+
+        await fetch(getThumbnailUrl('avatar', characterAvatarId), { cache: 'reload' });
+        await fetch(`/characters/${characterAvatarId}`, { cache: 'reload' });
+    } catch (error) {
+        console.warn('Could not copy persona avatar to character card', error);
+        toastr.warning(t`Character card was created, but the persona avatar could not be copied.`);
+    }
+}
+
+function copyPersonaLorebookToCharacter(characterAvatarId, primaryLorebook) {
+    if (!primaryLorebook) {
+        return;
+    }
+
+    const characterFileName = getCharaFilename(null, { manualAvatarKey: characterAvatarId });
+    if (!characterFileName) {
+        return;
+    }
+
+    const charLore = Array.isArray(world_info.charLore) ? world_info.charLore : [];
+    const existing = charLore.find(entry => entry.name === characterFileName);
+    const extraBooks = existing?.extraBooks ?? [];
+
+    if (!extraBooks.includes(primaryLorebook)) {
+        if (existing) {
+            existing.extraBooks = [...extraBooks, primaryLorebook];
+        } else {
+            charLore.push({ name: characterFileName, extraBooks: [primaryLorebook] });
+        }
+        Object.assign(world_info, { charLore });
+        return true;
+    }
+
+    return false;
+}
+
+export async function convertPersonaToCharacter(avatarId = user_avatar) {
+    const personaName = power_user.personas?.[avatarId];
+    if (!personaName) {
+        toastr.warning(t`Choose a persona first.`, t`Persona Management`);
+        return false;
+    }
+
+    const descriptor = getPersonaDescriptionEntry(avatarId);
+    const popup = new Popup(t`Create Character Card from Persona`, POPUP_TYPE.CONFIRM, `
+        <p>${t`Create a normal character card from this persona?`}</p>
+        <p><strong>${personaName}</strong></p>
+    `, {
+        customInputs: [{
+            id: 'copy_lorebook',
+            type: 'checkbox',
+            label: t`Link this persona's lorebook to the new character`,
+            defaultState: Boolean(descriptor.lorebook),
+        }],
+    });
+    const confirmed = await popup.show();
+    if (confirmed !== POPUP_RESULT.AFFIRMATIVE) {
+        return false;
+    }
+
+    const formData = new FormData();
+    formData.append('ch_name', personaName);
+    formData.append('description', createPersonaCharacterDescription(personaName, descriptor.description));
+    formData.append('personality', '');
+    formData.append('scenario', '');
+    formData.append('first_mes', '');
+    formData.append('creator_notes', t`Created from persona: ${personaName}`);
+    formData.append('creator', 'SillyBunny Persona Converter');
+    formData.append('tags', 'persona-converted');
+    formData.append('fav', 'false');
+    formData.append('extensions', JSON.stringify({}));
+    formData.append('alternate_greetings', '');
+
+    const response = await fetch('/api/characters/create', {
+        method: 'POST',
+        headers: getRequestHeaders({ omitContentType: true }),
+        body: formData,
+        cache: 'no-cache',
+    });
+
+    if (!response.ok) {
+        toastr.error(t`Could not create character card from persona.`, t`Persona Management`);
+        return false;
+    }
+
+    const characterAvatarId = (await response.text()).trim();
+    if (!characterAvatarId) {
+        toastr.error(t`Character card was created, but SillyBunny could not find its avatar id.`, t`Persona Management`);
+        return false;
+    }
+
+    await uploadCharacterAvatarFromPersona(avatarId, characterAvatarId);
+
+    if (popup.inputResults.get('copy_lorebook') && descriptor.lorebook) {
+        const copiedLorebook = copyPersonaLorebookToCharacter(characterAvatarId, descriptor.lorebook);
+        if (copiedLorebook) {
+            await saveSettings();
+        }
+    }
+
+    await getCharacters();
+    select_rm_info('char_create', characterAvatarId);
+    return true;
+}
+
+
 /**
  * Converts a character given character (either by character id or the current character) to a persona.
  *
@@ -495,6 +640,7 @@ export function initPersona(avatarId, personaName, personaDescription, personaTi
  * @param {number} [characterId] - The ID of the character to convert to a persona. Defaults to the current character ID.
  * @returns {Promise<boolean>} A promise that resolves to true if the character was converted, false otherwise.
  */
+
 export async function convertCharacterToPersona(characterId = null) {
     if (null === characterId) characterId = Number(this_chid);
 
@@ -2029,6 +2175,7 @@ export async function initPersonas() {
     });
 
     $('#persona_duplicate_button').on('click', () => duplicatePersona(user_avatar));
+    $('#persona_to_character_button').on('click', () => convertPersonaToCharacter(user_avatar));
 
     $('#persona_set_image_button').on('click', function () {
         if (!user_avatar) {
