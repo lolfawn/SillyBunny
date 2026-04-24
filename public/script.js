@@ -424,210 +424,6 @@ const MESSAGE_SCREENSHOT_INPUT_IDS = Object.freeze({
 /** @type {ChatMessage[]} */
 export let chat = [];
 
-
-const CAST_METADATA_KEY = 'cast';
-
-function getCastUserActor() {
-    const actor = chat_metadata?.[CAST_METADATA_KEY]?.userActor;
-
-    if (!actor || actor.type !== 'character' || !actor.avatar) {
-        return null;
-    }
-
-    const character = characters.find(item => item?.avatar === actor.avatar);
-
-    if (!character) {
-        return null;
-    }
-
-    return {
-        type: 'character',
-        avatar: character.avatar,
-        name: actor.name || character.name,
-        character,
-    };
-}
-
-function normalizeCastAiActor(actor) {
-    if (!actor || !actor.avatar) {
-        return null;
-    }
-
-    if (actor.type === 'persona') {
-        const personaName = power_user.personas?.[actor.avatar];
-        if (!personaName) {
-            return null;
-        }
-        return {
-            type: 'persona',
-            avatar: actor.avatar,
-            name: actor.name || personaName,
-            primary: Boolean(actor.primary),
-            model: String(actor.model || '').trim(),
-            proxyAvatar: String(actor.proxyAvatar || '').trim(),
-            persona: {
-                avatar: actor.avatar,
-                name: personaName,
-                description: power_user.persona_descriptions?.[actor.avatar]?.description || '',
-            },
-        };
-    }
-
-    if (actor.type !== 'character') {
-        return null;
-    }
-
-    const character = characters.find(item => item?.avatar === actor.avatar);
-
-    if (!character) {
-        return null;
-    }
-
-    return {
-        type: 'character',
-        avatar: character.avatar,
-        name: actor.name || character.name,
-        primary: Boolean(actor.primary),
-        model: String(actor.model || '').trim(),
-        character,
-    };
-}
-
-function getCastAiActors() {
-    const actors = chat_metadata?.[CAST_METADATA_KEY]?.aiActors;
-
-    if (!Array.isArray(actors) || !actors.length) {
-        return [];
-    }
-
-    const normalized = actors.map(normalizeCastAiActor).filter(Boolean);
-    const primaryIndex = normalized.findIndex(actor => actor.primary);
-
-    if (primaryIndex > 0) {
-        const [primary] = normalized.splice(primaryIndex, 1);
-        normalized.unshift(primary);
-    }
-
-    return normalized;
-}
-
-function getCastPrimaryAiActor() {
-    return getCastAiActors()[0] || null;
-}
-
-
-function getCastPrimaryAiActorName() {
-    return getCastPrimaryAiActor()?.name?.trim() || name2;
-}
-
-function getCastPrimaryAiActorAvatar() {
-    return getCastPrimaryAiActor()?.avatar || '';
-}
-
-function getCastPrimaryAiActorChid() {
-    const actor = getCastPrimaryAiActor();
-    return actor?.type === 'character' && actor.avatar ? characters.findIndex(character => character?.avatar === actor.avatar) : -1;
-}
-
-function getCastUserActorName() {
-    return getCastUserActor()?.name?.trim() || name1;
-}
-
-function getCastUserActorAvatar() {
-    return getCastUserActor()?.avatar || user_avatar;
-}
-
-function getCastOptions() {
-    return chat_metadata?.[CAST_METADATA_KEY]?.options || {};
-}
-
-function getCastRoleInstruction(userName, aiActors) {
-    if (!aiActors.length) {
-        return `The human user is roleplaying as ${userName}.`;
-    }
-
-    if (aiActors.length === 1) {
-        return `The human user is roleplaying as ${userName}. The assistant is roleplaying as ${aiActors[0].name}.`;
-    }
-
-    const aiNames = aiActors.map(actor => actor.name).filter(Boolean);
-    const list = aiNames.length > 1
-        ? `${aiNames.slice(0, -1).join(', ')} and ${aiNames.at(-1)}`
-        : aiNames[0];
-    const splitHint = getCastOptions().splitMultiSpeakerReplies
-        ? ' When writing dialogue for AI-controlled actors, prefix each spoken turn with the speaker name.'
-        : '';
-
-    return `The human user controls ${userName}. The assistant controls ${list}.${splitHint}`;
-}
-
-function getCastAiActorSummaryPrompt(aiActors) {
-    if (aiActors.length <= 1) {
-        return '';
-    }
-
-    const summaries = aiActors.map((actor) => {
-        const character = actor.character;
-        const sections = [];
-        const addSection = (label, value) => {
-            const text = baseChatReplace(String(value || '').trim(), getCastUserActorName(), actor.name);
-            if (text) {
-                sections.push(`${label}: ${text}`);
-            }
-        };
-
-        addSection('Description', character.description);
-        addSection('Personality', character.personality);
-        return sections.length ? `${actor.name}:\n${sections.join('\n')}` : actor.name;
-    });
-
-    return `\n\nAI-controlled cast cards:\n${summaries.join('\n\n')}`;
-}
-
-function getCastUserActorPrompt() {
-    const actor = getCastUserActor();
-
-    if (!actor || getCastOptions().injectUserActorCard === false) {
-        return '';
-    }
-
-    const character = actor.character;
-    const aiActors = getCastAiActors();
-    const primaryAiActor = aiActors[0] || null;
-    const userName = actor.name || name1;
-    const aiName = primaryAiActor?.name || name2;
-    const sections = [];
-    const addSection = (label, value) => {
-        const text = baseChatReplace(String(value || '').trim(), userName, aiName);
-
-        if (text) {
-            sections.push(`${label}:\n${text}`);
-        }
-    };
-
-    addSection('Description', character.description);
-    addSection('Personality', character.personality);
-    addSection('Scenario', character.scenario);
-    addSection('Creator Notes', character.data?.creator_notes);
-
-    if (!sections.length) {
-        return '';
-    }
-
-    const header = getCastRoleInstruction(userName, aiActors);
-    const aiActorSummary = getCastAiActorSummaryPrompt(aiActors);
-    const guardrail = getCastOptions().preventAiUserControl === false
-        ? ''
-        : `\nDo not write ${userName}'s actions or dialogue unless explicitly requested.`;
-
-    return `${header}\n${userName}'s character card:\n${sections.join('\n\n')}${guardrail}`;
-}
-
-function getEffectiveUserPersonaPrompt() {
-    const castPrompt = getCastUserActorPrompt();
-    return castPrompt || power_user.persona_description?.trim() || '';
-}
-
 /**
  * @type {import('./scripts/constants.js').SWIPE_STATE}
  */
@@ -3277,8 +3073,8 @@ export function substituteParamsLegacy(content, _name1, _name2, _original, _grou
     }
 
     // Must be substituted last so that they're replaced inside {{description}}
-    environment.user = _name1 ?? getCastUserActorName();
-    environment.char = _name2 ?? getCastPrimaryAiActorName();
+    environment.user = _name1 ?? name1;
+    environment.char = _name2 ?? name2;
     environment.group = environment.charIfNotGroup = getGroupValue(true);
     environment.groupNotMuted = getGroupValue(false);
     environment.notChar = getNotCharValue();
@@ -3326,8 +3122,8 @@ export function substituteParams(content, options = {}) {
 
     const ctx = /** @type {import('./scripts/macros/engine/MacroEnvBuilder.js').MacroEnvRawContext} */ ({
         content,
-        name1Override: options.name1Override ?? getCastUserActorName(),
-        name2Override: options.name2Override ?? getCastPrimaryAiActorName(),
+        name1Override: options.name1Override,
+        name2Override: options.name2Override,
         original: options.original,
         groupOverride: options.groupOverride,
         replaceCharacterCard: options.replaceCharacterCard ?? true,
@@ -3357,8 +3153,8 @@ export function getStoppingStrings(isImpersonate, isContinue, api = main_api) {
     const result = [];
 
     if (power_user.context.names_as_stop_strings) {
-        const charString = `\n${getCastPrimaryAiActorName()}:`;
-        const userString = `\n${getCastUserActorName()}:`;
+        const charString = `\n${name2}:`;
+        const userString = `\n${name1}:`;
         result.push(isImpersonate ? charString : userString);
 
         result.push(userString);
@@ -3530,9 +3326,7 @@ function addPersonaDescriptionExtensionPrompt() {
     const INJECT_TAG = 'PERSONA_DESCRIPTION';
     setExtensionPrompt(INJECT_TAG, '', extension_prompt_types.IN_PROMPT, 0);
 
-    const personaPrompt = getEffectiveUserPersonaPrompt();
-
-    if (!personaPrompt || power_user.persona_description_position === persona_description_positions.NONE) {
+    if (!power_user.persona_description || power_user.persona_description_position === persona_description_positions.NONE) {
         return;
     }
 
@@ -3541,14 +3335,14 @@ function addPersonaDescriptionExtensionPrompt() {
     if (promptPositions.includes(power_user.persona_description_position) && shouldWIAddPrompt) {
         const originalAN = extension_prompts[NOTE_MODULE_NAME].value;
         const ANWithDesc = power_user.persona_description_position === persona_description_positions.TOP_AN
-            ? `${personaPrompt}\n${originalAN}`
-            : `${originalAN}\n${personaPrompt}`;
+            ? `${power_user.persona_description}\n${originalAN}`
+            : `${originalAN}\n${power_user.persona_description}`;
 
         setExtensionPrompt(NOTE_MODULE_NAME, ANWithDesc, chat_metadata[metadata_keys.position], chat_metadata[metadata_keys.depth], extension_settings.note.allowWIScan, chat_metadata[metadata_keys.role]);
     }
 
     if (power_user.persona_description_position === persona_description_positions.AT_DEPTH) {
-        setExtensionPrompt(INJECT_TAG, personaPrompt, extension_prompt_types.IN_CHAT, power_user.persona_description_depth, true, power_user.persona_description_role);
+        setExtensionPrompt(INJECT_TAG, power_user.persona_description, extension_prompt_types.IN_CHAT, power_user.persona_description_depth, true, power_user.persona_description_role);
     }
 }
 
@@ -3728,71 +3522,67 @@ export function createLazyFields(resolvers) {
  * @returns {CharacterCardFields} Character card fields with lazy evaluation
  */
 export function getCharacterCardFieldsLazy({ chid = undefined } = {}) {
-    const castAiActorChid = chid === undefined ? getCastPrimaryAiActorChid() : -1;
-    const currentChid = chid ?? (castAiActorChid >= 0 ? castAiActorChid : this_chid);
+    const currentChid = chid ?? this_chid;
     const character = characters[currentChid];
-    const castAiActorActive = chid === undefined && castAiActorChid >= 0;
-    const userActorName = getCastUserActorName();
-    const aiActorName = castAiActorActive ? getCastPrimaryAiActorName() : name2;
 
-    // For group chats, we need to check if group cards should be used. Cast AI assignments intentionally use the card directly.
-    const useGroupCards = selected_group && character && !castAiActorActive;
+    // For group chats, we need to check if group cards should be used
+    const useGroupCards = selected_group && character;
     const groupCardsLazy = useGroupCards ? getGroupCharacterCardsLazy(selected_group, Number(currentChid)) : null;
 
     /** @type {Record<string, () => string|string[]>} */
     const resolvers = {
-        persona: () => baseChatReplace(getEffectiveUserPersonaPrompt()),
+        persona: () => baseChatReplace(power_user.persona_description?.trim()),
         system: () => {
             if (!character) return '';
             const systemPrompt = chat_metadata.system_prompt || character.data?.system_prompt || '';
-            return power_user.prefer_character_prompt ? baseChatReplace(systemPrompt.trim(), userActorName, aiActorName) : '';
+            return power_user.prefer_character_prompt ? baseChatReplace(systemPrompt.trim()) : '';
         },
         jailbreak: () => {
             if (!character) return '';
-            return power_user.prefer_character_jailbreak ? baseChatReplace(character.data?.post_history_instructions?.trim(), userActorName, aiActorName) : '';
+            return power_user.prefer_character_jailbreak ? baseChatReplace(character.data?.post_history_instructions?.trim()) : '';
         },
         version: () => character?.data?.character_version ?? '',
         charDepthPrompt: () => {
             if (!character) return '';
-            return baseChatReplace(character.data?.extensions?.depth_prompt?.prompt?.trim(), userActorName, aiActorName);
+            return baseChatReplace(character.data?.extensions?.depth_prompt?.prompt?.trim());
         },
         creatorNotes: () => {
             if (!character) return '';
-            return baseChatReplace(character.data?.creator_notes?.trim(), userActorName, aiActorName);
+            return baseChatReplace(character.data?.creator_notes?.trim());
         },
         // These four fields may be overridden by group cards
         description: () => {
             if (groupCardsLazy) return groupCardsLazy.description;
             if (!character) return '';
-            return baseChatReplace(character.description?.trim(), userActorName, aiActorName);
+            return baseChatReplace(character.description?.trim());
         },
         personality: () => {
             if (groupCardsLazy) return groupCardsLazy.personality;
             if (!character) return '';
-            return baseChatReplace(character.personality?.trim(), userActorName, aiActorName);
+            return baseChatReplace(character.personality?.trim());
         },
         scenario: () => {
             if (groupCardsLazy) return groupCardsLazy.scenario;
             if (!character) return '';
             const scenarioText = chat_metadata.scenario || character.scenario || '';
-            return baseChatReplace(scenarioText.trim(), userActorName, aiActorName);
+            return baseChatReplace(scenarioText.trim());
         },
         mesExamples: () => {
             if (groupCardsLazy) return groupCardsLazy.mesExamples;
             if (!character) return '';
             const exampleDialog = chat_metadata.mes_example || character.mes_example || '';
-            return baseChatReplace(exampleDialog.trim(), userActorName, aiActorName);
+            return baseChatReplace(exampleDialog.trim());
         },
         firstMessage: () => {
             if (!character) return '';
             const firstMes = character.first_mes?.trim() || '';
-            return baseChatReplace(firstMes, userActorName, aiActorName);
+            return baseChatReplace(firstMes);
         },
         alternateGreetings: () => {
             if (!character) return [];
             const altGreetings = character.data?.alternate_greetings;
             if (!Array.isArray(altGreetings)) return [];
-            return altGreetings.map(greeting => baseChatReplace(greeting?.trim(), userActorName, aiActorName));
+            return altGreetings.map(greeting => baseChatReplace(greeting?.trim()));
         },
     };
 
@@ -6247,7 +6037,7 @@ export function removeMacros(str) {
  * @param {string} [avatar] Avatar of the user sending the message. Defaults to user_avatar.
  * @returns {Promise<any>} A promise that resolves to the message when it is inserted.
  */
-export async function sendMessageAsUser(messageText, messageBias, insertAt = null, compact = false, name = getCastUserActorName(), avatar = getCastUserActorAvatar()) {
+export async function sendMessageAsUser(messageText, messageBias, insertAt = null, compact = false, name = name1, avatar = user_avatar) {
     messageText = getRegexedString(messageText, regex_placement.USER_INPUT);
 
     const message = {
@@ -6265,12 +6055,9 @@ export async function sendMessageAsUser(messageText, messageBias, insertAt = nul
         message.extra.token_count = await getTokenCountAsync(message.mes, 0);
     }
 
-    // Lock user avatar to a persona or a user-controlled character card.
+    // Lock user avatar to a persona.
     if (avatar in power_user.personas) {
         message.force_avatar = getThumbnailUrl('persona', avatar);
-    } else if (getCastUserActor()?.avatar === avatar) {
-        message.force_avatar = getThumbnailUrl('avatar', avatar);
-        message.original_avatar = avatar;
     }
 
     if (messageBias) {
@@ -6970,8 +6757,8 @@ export function cleanUpMessage({ getMessage, isImpersonate, isContinue, displayI
         // This only occurs if the corresponding "power_user.allow_nameX_display" is false.
 
         let wrongName = isImpersonate
-            ? (!power_user.allow_name2_display ? getCastPrimaryAiActorName() : '')  // char
-            : (!power_user.allow_name1_display ? getCastUserActorName() : '');  // user
+            ? (!power_user.allow_name2_display ? name2 : '')  // char
+            : (!power_user.allow_name1_display ? name1 : '');  // user
 
         if (wrongName) {
             // If the message starts with the wrong name, delete the entire response
@@ -7025,11 +6812,8 @@ export function cleanUpMessage({ getMessage, isImpersonate, isContinue, displayI
     }
 
     if (!power_user.allow_name2_display) {
-        const namesToStrip = [name2, getCastPrimaryAiActorName()].filter(onlyUnique);
-        for (const name of namesToStrip) {
-            const nameEscaped = escapeRegex(name);
-            getMessage = getMessage.replace(new RegExp(`(^|\n)${nameEscaped}:\\s*`, 'g'), '$1');
-        }
+        const name2Escaped = escapeRegex(name2);
+        getMessage = getMessage.replace(new RegExp(`(^|\n)${name2Escaped}:\\s*`, 'g'), '$1');
     }
 
     if (isImpersonate) {
@@ -7045,8 +6829,8 @@ export function cleanUpMessage({ getMessage, isImpersonate, isContinue, displayI
         // If this isn't an impersonation, trim "{{char}}:" from the beginning.
         // Only applied when the corresponding "power_user.allow_nameX_display" is false.
         const nameToTrim2 = isImpersonate
-            ? (!power_user.allow_name1_display ? getCastUserActorName() : '')  // user
-            : (!power_user.allow_name2_display ? getCastPrimaryAiActorName() : '');  // char
+            ? (!power_user.allow_name1_display ? name1 : '')  // user
+            : (!power_user.allow_name2_display ? name2 : '');  // char
 
         if (nameToTrim2 && getMessage.startsWith(nameToTrim2 + ':')) {
             getMessage = getMessage.replace(nameToTrim2 + ':', '');
@@ -7077,93 +6861,6 @@ export function cleanUpMessage({ getMessage, isImpersonate, isContinue, displayI
  *
  * @returns {Promise<void>}
  */
-function getCastActorForOriginalAvatar(avatar) {
-    const avatarKey = String(avatar || '');
-    if (!avatarKey) {
-        return null;
-    }
-
-    return getCastAiActors().find(actor => actor.avatar === avatarKey || actor.proxyAvatar === avatarKey) || null;
-}
-
-function getCastActorByName(name) {
-    const normalizedName = String(name || '').trim().toLowerCase();
-
-    if (!normalizedName) {
-        return null;
-    }
-
-    return getCastAiActors().find(actor => actor.name?.trim().toLowerCase() === normalizedName) || null;
-}
-
-function parseCastMultiSpeakerReply(messageText) {
-    if (!getCastOptions().splitMultiSpeakerReplies || getCastAiActors().length < 2) {
-        return [];
-    }
-
-    const lines = String(messageText || '').split('\n');
-    const segments = [];
-    let current = null;
-
-    for (const line of lines) {
-        const match = line.match(/^\s*([^:\n]{1,80}):\s*(.*)$/);
-        const actor = match ? getCastActorByName(match[1]) : null;
-
-        if (actor) {
-            if (current?.content.length) {
-                segments.push(current);
-            }
-            current = { actor, content: [match[2] || ''] };
-            continue;
-        }
-
-        if (current) {
-            current.content.push(line);
-        }
-    }
-
-    if (current?.content.length) {
-        segments.push(current);
-    }
-
-    return segments
-        .map(segment => ({
-            actor: segment.actor,
-            text: segment.content.join('\n').trim(),
-        }))
-        .filter(segment => segment.text);
-}
-
-function applyCastActorIdentityToMessage(message, actor) {
-    if (!actor?.avatar) {
-        return;
-    }
-
-    message.name = actor.name || message.name;
-    message.force_avatar = getThumbnailUrl(actor.type === 'persona' ? 'persona' : 'avatar', actor.avatar);
-    message.original_avatar = actor.avatar;
-}
-
-function createAiReplyMessage({ name, text, title, generationFinished, reasoning = '', reasoningSignature = null, reasoningTokens = 0 }) {
-    return {
-        name,
-        is_user: false,
-        send_date: getMessageTimeStamp(),
-        mes: text,
-        title,
-        gen_started: generation_started,
-        gen_finished: generationFinished,
-        extra: {
-            api: getGeneratingApi(),
-            model: getGeneratingModel(),
-            reasoning,
-            reasoning_duration: null,
-            reasoning_signature: reasoningSignature,
-            reasoning_tokens: reasoningTokens,
-        },
-    };
-}
-
 async function processImageAttachment(message, { imageUrls }) {
     if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
         return;
@@ -7306,64 +7003,48 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         !fromStreaming && await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, chat_id, type);
     } else {
         console.debug('entering chat update routine for non-swipe post');
+        const newMessage = {};
+        chat.push(newMessage);
+        newMessage.extra = {};
+        newMessage.name = name2;
+        newMessage.is_user = false;
+        newMessage.send_date = getMessageTimeStamp();
+        newMessage.extra.api = getGeneratingApi();
+        newMessage.extra.model = getGeneratingModel();
+        newMessage.extra.reasoning = reasoning;
+        newMessage.extra.reasoning_duration = null;
+        newMessage.extra.reasoning_signature = reasoningSignature;
+        newMessage.extra.reasoning_tokens = reasoningTokens;
         if (power_user.trim_spaces) {
             getMessage = getMessage.trim();
         }
+        newMessage.mes = getMessage;
+        newMessage.title = title;
+        newMessage.gen_started = generation_started;
+        newMessage.gen_finished = generationFinished;
 
-        const splitSegments = parseCastMultiSpeakerReply(getMessage);
-        const messagesToInsert = splitSegments.length > 1
-            ? splitSegments.map((segment, index) => {
-                const message = createAiReplyMessage({
-                    name: segment.actor.name,
-                    text: segment.text,
-                    title: index === 0 ? title : '',
-                    generationFinished,
-                    reasoning: index === 0 ? reasoning : '',
-                    reasoningSignature: index === 0 ? reasoningSignature : null,
-                    reasoningTokens: index === 0 ? reasoningTokens : 0,
-                });
-                applyCastActorIdentityToMessage(message, segment.actor);
-                return message;
-            })
-            : [createAiReplyMessage({
-                name: (getCastActorForOriginalAvatar(characters[this_chid]?.avatar) || getCastPrimaryAiActor())?.name || name2,
-                text: getMessage,
-                title,
-                generationFinished,
-                reasoning,
-                reasoningSignature,
-                reasoningTokens,
-            })];
-
-        for (const [index, newMessage] of messagesToInsert.entries()) {
-            const castAiActor = splitSegments.length > 1 ? splitSegments[index].actor : (getCastActorForOriginalAvatar(characters[this_chid]?.avatar) || getCastPrimaryAiActor());
-
-            if (power_user.message_token_count_enabled) {
-                const tokenCountText = (newMessage.extra.reasoning || '') + newMessage.mes;
-                newMessage.extra.token_count = await getTokenCountAsync(tokenCountText, 0);
-            }
-
-            if (castAiActor?.avatar) {
-                applyCastActorIdentityToMessage(newMessage, castAiActor);
-            } else if (selected_group) {
-                console.debug('entering chat update for groups');
-                let avatarImg = 'img/ai4.png';
-                if (characters[this_chid].avatar != 'none') {
-                    avatarImg = getThumbnailUrl('avatar', characters[this_chid].avatar);
-                }
-                newMessage.force_avatar = avatarImg;
-                newMessage.original_avatar = characters[this_chid].avatar;
-                newMessage.extra.gen_id = group_generation_id;
-            }
-
-            await processImageAttachment(newMessage, { imageUrls: index === 0 ? imageUrls : [] });
-            chat.push(newMessage);
-            const chat_id = (chat.length - 1);
-
-            !fromStreaming && await eventSource.emit(event_types.MESSAGE_RECEIVED, chat_id, type);
-            addOneMessage(chat[chat_id]);
-            !fromStreaming && await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, chat_id, type);
+        if (power_user.message_token_count_enabled) {
+            const tokenCountText = (reasoning || '') + newMessage.mes;
+            newMessage.extra.token_count = await getTokenCountAsync(tokenCountText, 0);
         }
+
+        if (selected_group) {
+            console.debug('entering chat update for groups');
+            let avatarImg = 'img/ai4.png';
+            if (characters[this_chid].avatar != 'none') {
+                avatarImg = getThumbnailUrl('avatar', characters[this_chid].avatar);
+            }
+            newMessage.force_avatar = avatarImg;
+            newMessage.original_avatar = characters[this_chid].avatar;
+            newMessage.extra.gen_id = group_generation_id;
+        }
+
+        await processImageAttachment(newMessage, { imageUrls });
+        const chat_id = (chat.length - 1);
+
+        !fromStreaming && await eventSource.emit(event_types.MESSAGE_RECEIVED, chat_id, type);
+        addOneMessage(chat[chat_id]);
+        !fromStreaming && await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, chat_id, type);
     }
 
     const item = chat[chat.length - 1];

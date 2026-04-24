@@ -87,7 +87,6 @@ import { POPUP_TYPE, Popup, callGenericPopup } from './popup.js';
 import { t } from './i18n.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { compressRequest } from './request-compression.js';
-import { chat_completion_sources, oai_settings } from './openai.js';
 
 export {
     selected_group,
@@ -1007,68 +1006,6 @@ function getGroupChatNames(groupId) {
     return names;
 }
 
-const CAST_METADATA_KEY = 'cast';
-
-function getCastActorModelForCharacter(character) {
-    const actors = chat_metadata?.[CAST_METADATA_KEY]?.aiActors;
-
-    if (!character?.avatar || !Array.isArray(actors)) {
-        return '';
-    }
-
-    const actor = actors.find(item => item?.type === 'character' && item.avatar === character.avatar);
-    return String(actor?.model || '').trim();
-}
-
-function getCurrentChatCompletionModelSettingKey() {
-    switch (oai_settings.chat_completion_source) {
-        case chat_completion_sources.CLAUDE: return 'claude_model';
-        case chat_completion_sources.OPENAI:
-        case chat_completion_sources.OPENAI_RESPONSES: return 'openai_model';
-        case chat_completion_sources.MAKERSUITE: return 'google_model';
-        case chat_completion_sources.VERTEXAI: return 'vertexai_model';
-        case chat_completion_sources.OPENROUTER: return 'openrouter_model';
-        case chat_completion_sources.AI21: return 'ai21_model';
-        case chat_completion_sources.MISTRALAI: return 'mistralai_model';
-        case chat_completion_sources.CUSTOM: return 'custom_model';
-        case chat_completion_sources.COHERE: return 'cohere_model';
-        case chat_completion_sources.PERPLEXITY: return 'perplexity_model';
-        case chat_completion_sources.GROQ: return 'groq_model';
-        case chat_completion_sources.SILICONFLOW: return 'siliconflow_model';
-        case chat_completion_sources.ELECTRONHUB: return 'electronhub_model';
-        case chat_completion_sources.CHUTES: return 'chutes_model';
-        case chat_completion_sources.NANOGPT: return 'nanogpt_model';
-        case chat_completion_sources.DEEPSEEK: return 'deepseek_model';
-        case chat_completion_sources.AIMLAPI: return 'aimlapi_model';
-        case chat_completion_sources.XAI: return 'xai_model';
-        case chat_completion_sources.POLLINATIONS: return 'pollinations_model';
-        case chat_completion_sources.COMETAPI: return 'cometapi_model';
-        case chat_completion_sources.MOONSHOT: return 'moonshot_model';
-        case chat_completion_sources.FIREWORKS: return 'fireworks_model';
-        case chat_completion_sources.AZURE_OPENAI: return 'azure_openai_model';
-        case chat_completion_sources.ZAI: return 'zai_model';
-        default: return '';
-    }
-}
-
-async function runWithCastModelOverride(character, callback) {
-    const model = getCastActorModelForCharacter(character);
-    const settingKey = model ? getCurrentChatCompletionModelSettingKey() : '';
-
-    if (!model || !settingKey) {
-        return callback();
-    }
-
-    const previousModel = oai_settings[settingKey];
-    oai_settings[settingKey] = model;
-    try {
-        console.debug(`[Cast] Using model override for ${character.name}: ${model}`);
-        return await callback();
-    } finally {
-        oai_settings[settingKey] = previousModel;
-    }
-}
-
 /**
  * Generates text for the group chat by queueing members according to the activation strategy.
  * @param {boolean} byAutoMode If the generation was triggered by the auto mode.
@@ -1194,7 +1131,7 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
 
             // Wait for generation to finish
             const generateType = ['swipe', 'impersonate', 'quiet', 'continue'].includes(type) ? type : 'normal';
-            textResult = await runWithCastModelOverride(characters[chId], () => Generate(generateType, { automatic_trigger: byAutoMode, ...(params || {}) }));
+            textResult = await Generate(generateType, { automatic_trigger: byAutoMode, ...(params || {}) });
             let messageChunk = textResult?.messageChunk;
 
             if (messageChunk) {
