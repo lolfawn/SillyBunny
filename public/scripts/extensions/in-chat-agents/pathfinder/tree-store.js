@@ -32,6 +32,7 @@ export const SETTING_DEFAULTS = {
     maxCandidates: 20,
     entryContentMode: 'full',  // 'full' | 'truncated'
     truncateLength: 500,
+    retrievalTimeoutSeconds: 8,
     // Per-prompt storage (managed by prompt-store.js)
     pipelinePrompts: {},
     pipelines: {},

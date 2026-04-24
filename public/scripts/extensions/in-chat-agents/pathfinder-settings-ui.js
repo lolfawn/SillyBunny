@@ -342,6 +342,7 @@ function loadSettingsIntoUI() {
     settingsEl.find('#pf--content-mode').val(s.entryContentMode || 'full');
     settingsEl.find('#pf--truncate-length').val(s.truncateLength || 500);
     settingsEl.find('#pf--max-candidates').val(s.maxCandidates || 20);
+    settingsEl.find('#pf--retrieval-timeout').val(s.retrievalTimeoutSeconds || 8);
 
     // Tool settings
     settingsEl.find('#pf--enable-tools').prop('checked', s.sidecarEnabled || false);
@@ -464,6 +465,14 @@ function bindEvents() {
         s.maxCandidates = parseInt($(this).val()) || 20;
         setPathfinderSettings(s);
         logPathfinder('Pipeline max candidates changed.', { maxCandidates: s.maxCandidates });
+        updateAgentSettings();
+    });
+
+    settingsEl.find('#pf--retrieval-timeout').on('change', function () {
+        const s = getPathfinderSettings();
+        s.retrievalTimeoutSeconds = Math.max(1, Math.min(60, parseInt($(this).val()) || 8));
+        setPathfinderSettings(s);
+        logPathfinder('Pipeline retrieval timeout changed.', { retrievalTimeoutSeconds: s.retrievalTimeoutSeconds });
         updateAgentSettings();
     });
 

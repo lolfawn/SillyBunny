@@ -4344,6 +4344,7 @@ export function createRawPrompt(prompt, api, instructOverride, quietToLoud, syst
  * @prop {boolean} [trimNames] Whether to allow trimming "{{user}}:" and "{{char}}:" from the response.
  * @prop {string} [prefill] An optional prefill for the prompt.
  * @prop {object} [jsonSchema] JSON schema to use for the structured generation. Usually requires a special instruction.
+ * @prop {AbortSignal} [signal] Optional signal to abort the request.
  */
 
 /**
@@ -4352,12 +4353,21 @@ export function createRawPrompt(prompt, api, instructOverride, quietToLoud, syst
  * @param {GenerateRawParams} params Parameters for generating a message
  * @returns {Promise<object | string>} Raw API response data, or a JSON string extracted from the response when `jsonSchema` is provided.
  */
-export async function generateRawData({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, prefill = '', jsonSchema = null } = {}) {
+export async function generateRawData({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, prefill = '', jsonSchema = null, signal = null } = {}) {
     if (!api) {
         api = main_api;
     }
 
     const abortController = new AbortController();
+    const externalSignal = signal instanceof AbortSignal ? signal : null;
+    const abortFromExternalSignal = () => abortController.abort(externalSignal.reason ?? new Error('Cancelled by external signal'));
+    if (externalSignal) {
+        if (externalSignal.aborted) {
+            abortFromExternalSignal();
+        } else {
+            externalSignal.addEventListener('abort', abortFromExternalSignal, { once: true });
+        }
+    }
     const responseLengthCustomized = typeof responseLength === 'number' && responseLength > 0;
     let eventHook = () => { };
 
@@ -4461,6 +4471,9 @@ export async function generateRawData({ prompt = '', api = null, instructOverrid
         return data;
     } finally {
         eventSource.removeListener(event_types.GENERATION_STOPPED, abortHook);
+        if (externalSignal) {
+            externalSignal.removeEventListener('abort', abortFromExternalSignal);
+        }
         if (responseLengthCustomized && TempResponseLength.isCustomized()) {
             TempResponseLength.restore(api);
             TempResponseLength.removeEventHook(api, eventHook);
@@ -4474,13 +4487,13 @@ export async function generateRawData({ prompt = '', api = null, instructOverrid
  * @param {GenerateRawParams} params Parameters for generating a message
  * @returns {Promise<string>} Generated output: a cleaned-up message string when `jsonSchema` is not provided, or an extracted JSON string conforming to `jsonSchema` when it is.
  */
-export async function generateRaw({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, trimNames = true, prefill = '', jsonSchema = null } = {}) {
+export async function generateRaw({ prompt = '', api = null, instructOverride = false, quietToLoud = false, systemPrompt = '', responseLength = null, trimNames = true, prefill = '', jsonSchema = null, signal = null } = {}) {
     if (arguments.length > 0 && typeof arguments[0] !== 'object') {
         console.trace('generateRaw called with positional arguments. Please use an object instead.');
         [prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength, trimNames, prefill, jsonSchema] = arguments;
     }
 
-    const data = await generateRawData({ prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength, prefill, jsonSchema });
+    const data = await generateRawData({ prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength, prefill, jsonSchema, signal });
 
     // JSON string (matching the provided schema) will already be extracted.
     if (jsonSchema) {

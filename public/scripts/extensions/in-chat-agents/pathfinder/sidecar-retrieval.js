@@ -12,6 +12,42 @@ export const PATHFINDER_RETRIEVAL_PROMPT_KEYS = Object.freeze([
     PIPELINE_RETRIEVAL_KEY,
 ]);
 
+function getRetrievalTimeoutMs() {
+    const seconds = Number(getSettings().retrievalTimeoutSeconds ?? 8);
+    return Math.max(1, Math.min(60, Number.isFinite(seconds) ? seconds : 8)) * 1000;
+}
+
+async function withRetrievalTimeout(task, mode = 'retrieval') {
+    const controller = new AbortController();
+    const timeoutMs = getRetrievalTimeoutMs();
+    let timeoutId = null;
+
+    const timeoutPromise = new Promise((resolve) => {
+        timeoutId = setTimeout(() => {
+            controller.abort(new Error(`Pathfinder ${mode} timed out after ${timeoutMs / 1000}s`));
+            console.warn(`[Pathfinder] ${mode} timed out after ${timeoutMs / 1000}s; continuing without retrieval.`);
+            logPathfinderRetrievalDetail({
+                mode,
+                books: getReadableBooks(),
+                selectedEntries: [],
+                stageResults: [],
+                injectedPrompt: '',
+                metadata: { timedOut: true, timeoutSeconds: timeoutMs / 1000 },
+            });
+            resolve(false);
+        }, timeoutMs);
+    });
+
+    try {
+        return await Promise.race([
+            task(controller.signal).then(() => true),
+            timeoutPromise,
+        ]);
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
 function formatCollapsedGuide(tree, bookName) {
     if (!tree) return '';
     const lines = [];
@@ -72,7 +108,7 @@ async function ensureReadableBookTrees(bookNames) {
  * @param {Object} extensionPromptRoles
  * @returns {Promise<void>}
  */
-async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles) {
+async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal = null) {
     const s = getSettings();
     const pipelineId = s.pipelineId || 'default';
     const books = await ensureReadableBookTrees(getReadableBooks());
@@ -109,7 +145,7 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
 
     logPipelineStart(pipelineId, 2); // Assuming 2-stage pipeline
 
-    const result = await runPipeline(pipelineId, chatMessages, 10);
+    const result = await runPipeline(pipelineId, chatMessages, 10, signal);
 
     logPipelineComplete(pipelineId, result.selectedEntries?.length ?? 0, result.stageResults);
 
@@ -219,7 +255,7 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
  * @param {Object} extensionPromptRoles
  * @returns {Promise<void>}
  */
-async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles) {
+async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal = null) {
     const books = await ensureReadableBookTrees(getReadableBooks());
     if (books.length === 0) return;
 
@@ -236,7 +272,7 @@ async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptType
     const prompt = `Given the current conversation context, which of these lorebook waypoints contain information relevant to what's happening right now? List the waypoint/node IDs you'd retrieve.\n\n${contextText}`;
 
     try {
-        const response = await sidecarGenerate(prompt, 'You are a lorebook retrieval assistant. Analyze the conversation and identify which waypoints are relevant. Respond with waypoint/node IDs, one per line.');
+        const response = await sidecarGenerate(prompt, 'You are a lorebook retrieval assistant. Analyze the conversation and identify which waypoints are relevant. Respond with waypoint/node IDs, one per line.', signal);
         const nodeIds = response.split('\n').map(l => l.trim()).filter(Boolean);
         const allEntries = [];
 
@@ -293,12 +329,13 @@ export async function runSidecarRetrieval(setExtensionPrompt, extensionPromptTyp
     setSidecarActive(true);
 
     try {
-        // Use pipeline if enabled, otherwise fall back to legacy
-        if (s.pipelineEnabled) {
-            await runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles);
-        } else {
-            await runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles);
-        }
+        await withRetrievalTimeout(async (signal) => {
+            if (s.pipelineEnabled) {
+                await runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal);
+            } else {
+                await runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal);
+            }
+        }, s.pipelineEnabled ? 'pipeline' : 'tool-retrieval');
     } catch (err) {
         console.warn('[Pathfinder] Retrieval failed:', err);
     } finally {
