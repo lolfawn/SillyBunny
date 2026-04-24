@@ -423,10 +423,18 @@ function initGroupSpeakerControls() {
 
     container.on('change', '#group_speaker_single', function () {
         groupSingleSpeakerMode = $(this).prop('checked');
+        if (groupSingleSpeakerMode) {
+            groupNarratorConsolidation = false;
+        }
+        updateGroupSpeakerControls();
     });
 
     container.on('change', '#group_speaker_narrator', function () {
         groupNarratorConsolidation = $(this).prop('checked');
+        if (groupNarratorConsolidation) {
+            groupSingleSpeakerMode = false;
+        }
+        updateGroupSpeakerControls();
     });
 }
 
