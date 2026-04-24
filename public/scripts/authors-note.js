@@ -273,6 +273,8 @@ function onExtensionFloatingCharaPromptInput() {
     let tempCharaNote = {
         name: avatarName,
         prompt: tempPrompt,
+        useChara: Boolean($('#extension_use_floating_chara').prop('checked')),
+        position: Number($('input[name="extension_floating_char_position"]:checked').val() ?? chara_note_position.replace),
     };
 
     setCharaPromptTokenCounterDebounced(tempPrompt);
@@ -297,8 +299,6 @@ function onExtensionFloatingCharaPromptInput() {
         if (!extension_settings.note.chara) {
             extension_settings.note.chara = [];
         }
-        Object.assign(tempCharaNote, { useChara: false, position: chara_note_position.replace });
-
         extension_settings.note.chara.push(tempCharaNote);
     } else {
         console.log('Character author\'s note error: No avatar name key could be found.');
