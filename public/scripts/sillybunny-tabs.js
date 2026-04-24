@@ -4159,7 +4159,7 @@ function setCastPanelMessage(message, tone = '') {
 function setCastPanelBusy(isBusy) {
     const refs = getCastRolesRefs();
 
-    for (const element of [refs?.userSelect, refs?.aiSelect, refs?.resetButton, refs?.refreshButton, ...(refs?.optionCheckboxes || [])]) {
+    for (const element of [refs?.userSelect, refs?.aiSelect, refs?.resetButton, refs?.refreshButton, refs?.groupButton, ...(refs?.optionCheckboxes || [])]) {
         if (element instanceof HTMLButtonElement || element instanceof HTMLSelectElement) {
             element.disabled = Boolean(isBusy);
         }
@@ -4386,6 +4386,46 @@ function createCastOptionCheckbox({ key, label, description }) {
     return { option, checkbox };
 }
 
+function findCastGroupForAvatars(context, avatars) {
+    const desired = [...avatars].sort().join('|');
+    return context?.groups?.find(group => Array.isArray(group.members)
+        && group.members.length === avatars.length
+        && [...group.members].sort().join('|') === desired) || null;
+}
+
+async function openCastGroupChat() {
+    setCastPanelBusy(true);
+
+    try {
+        const context = getSillyTavernContext();
+        const castRoles = await loadCastRolesModule();
+        const cast = castRoles.getCastAssignments();
+        const avatars = cast.aiActors.map(actor => actor.avatar).filter(Boolean);
+
+        if (!context || avatars.length < 2) {
+            setCastPanelMessage('Select at least two AI actors to open a matching group chat.', 'warn');
+            return;
+        }
+
+        const existingGroup = findCastGroupForAvatars(context, avatars);
+
+        if (existingGroup) {
+            const chatId = existingGroup.chat_id || existingGroup.chats?.[0];
+            if (chatId) {
+                await context.openGroupChat?.(existingGroup.id, chatId);
+                setCastPanelMessage(`Opened group chat "${existingGroup.name}" for the selected AI cast.`, 'good');
+                return;
+            }
+        }
+
+        setCastPanelMessage('No existing group with exactly those AI actors was found. Open Characters → Groups to create one, then return here.', 'warn');
+    } catch (error) {
+        setCastPanelMessage(error.message || 'Failed to open Cast group chat.', 'danger');
+    } finally {
+        setCastPanelBusy(false);
+    }
+}
+
 async function resetCastAssignments() {
     setCastPanelBusy(true);
 
@@ -4450,6 +4490,7 @@ function buildCastRolesPanel() {
     const optionCheckboxes = [userCardOption.checkbox, lorebookOption.checkbox, controlOption.checkbox, splitOption.checkbox];
     const actions = createElement('div', { className: 'sb-server-actions sb-cast-actions' });
     const refreshButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Refresh cast', attrs: { type: 'button' } });
+    const groupButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Open matching group chat', attrs: { type: 'button' } });
     const resetButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Reset chat cast', attrs: { type: 'button' } });
     const statusNote = createElement('div', { className: 'sb-server-note', text: 'Loading Cast/Roles…' });
 
@@ -4459,7 +4500,7 @@ function buildCastRolesPanel() {
     aiField.append(aiFieldTitle, aiSelect, aiHint, aiSummary);
     grid.append(userField, aiField);
     optionsCard.append(optionsTitle, userCardOption.option, lorebookOption.option, controlOption.option, splitOption.option);
-    actions.append(refreshButton, resetButton);
+    actions.append(refreshButton, groupButton, resetButton);
     card.append(header, grid, optionsCard, actions, statusNote);
     column.append(callout, card);
     scroller.appendChild(column);
@@ -4474,6 +4515,7 @@ function buildCastRolesPanel() {
         aiHint,
         optionCheckboxes,
         refreshButton,
+        groupButton,
         resetButton,
     };
 
@@ -4484,6 +4526,9 @@ function buildCastRolesPanel() {
         void applyCastSelection('ai', getSelectedCastValues(aiSelect));
     });
     refreshButton.addEventListener('click', () => scheduleCastRolesRefresh(0));
+    groupButton.addEventListener('click', () => {
+        void openCastGroupChat();
+    });
     resetButton.addEventListener('click', () => {
         void resetCastAssignments();
     });
