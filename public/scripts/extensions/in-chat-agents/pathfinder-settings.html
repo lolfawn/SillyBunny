@@ -208,6 +208,38 @@
         </div>
     </div>
 
+    <!-- Memory Summary Settings -->
+    <div id="pf--memory-summary-settings" class="pf--section pf--section-collapsible">
+        <div class="pf--section-header pf--collapsible-header">
+            <i class="fa-solid fa-chevron-down pf--chevron"></i>
+            <strong>Memory Summaries</strong>
+            <span class="pf--badge">Lorebook</span>
+        </div>
+        <div class="pf--section-body">
+            <div class="pf--setting-group">
+                <label class="checkbox_label">
+                    <input type="checkbox" id="pf--enable-summarize-tool" />
+                    <span>Allow summary memory tool</span>
+                </label>
+                <div class="pf--setting-help">Lets Pathfinder write scene/event summaries into enabled lorebooks with the Summarize tool.</div>
+            </div>
+            <div class="pf--setting-row">
+                <div class="pf--setting-group">
+                    <label class="checkbox_label">
+                        <input type="checkbox" id="pf--auto-summary" />
+                        <span>Auto-track summary interval</span>
+                    </label>
+                    <div class="pf--setting-help">Counts sent/received messages toward automatic summary prompts.</div>
+                </div>
+                <div class="pf--setting-group">
+                    <label class="pf--setting-label" for="pf--auto-summary-interval">Summary Interval</label>
+                    <input type="number" id="pf--auto-summary-interval" class="text_pole" min="2" max="200" value="20" />
+                    <div class="pf--setting-help">Messages before Pathfinder should consider writing a memory summary.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Tool Settings (shown when tools enabled) -->
     <div id="pf--tool-settings" class="pf--section pf--section-collapsible" style="display: none;">
         <div class="pf--section-header pf--collapsible-header">
@@ -222,7 +254,6 @@
                     <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Remember" checked /><span>Remember - Create new entries</span></label>
                     <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Update" checked /><span>Update - Edit existing entries</span></label>
                     <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Forget" checked /><span>Forget - Disable/delete entries</span></label>
-                    <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Summarize" checked /><span>Summarize - Create scene summaries</span></label>
                     <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Notebook" checked /><span>Notebook - Private AI scratchpad</span></label>
                 </div>
             </div>

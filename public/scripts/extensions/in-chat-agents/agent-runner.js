@@ -38,6 +38,7 @@ import {
     setSettings as setPathfinderRuntimeSettings,
 } from './pathfinder/tree-store.js';
 import { PATHFINDER_RETRIEVAL_PROMPT_KEYS, runSidecarRetrieval } from './pathfinder/sidecar-retrieval.js';
+import { markAutoSummaryComplete, shouldAutoSummarize } from './pathfinder/auto-summary.js';
 
 const PROMPT_KEY_PREFIX = 'inchat_agent_';
 const MESSAGE_EXTRA_KEY = 'inChatAgents';
@@ -119,11 +120,13 @@ function syncPathfinderRuntimeSettings(agent = getPathfinderRuntimeAgent()) {
 }
 
 function getRegisterableAgentTools(agent) {
-    if (isPathfinderToolAgent(agent) && !agent?.settings?.sidecarEnabled) {
-        return [];
+    const enabledTools = (agent.tools ?? []).filter(tool => tool.enabled !== false);
+
+    if (!isPathfinderToolAgent(agent) || agent?.settings?.sidecarEnabled) {
+        return enabledTools;
     }
 
-    return (agent.tools ?? []).filter(tool => tool.enabled !== false);
+    return enabledTools.filter(tool => tool.name === 'Pathfinder_Summarize');
 }
 
 /**
@@ -1247,6 +1250,19 @@ async function onGenerationAfterCommands(generationType, _options, dryRun) {
     if (pathfinderAgent) {
         syncPathfinderRuntimeSettings(pathfinderAgent);
         await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles);
+
+        if (shouldAutoSummarize()) {
+            const key = PROMPT_KEY_PREFIX + 'pathfinder_auto_summary';
+            setExtensionPrompt(
+                key,
+                'Pathfinder memory summary is due. If the recent conversation contains a meaningful scene, event, state change, or resolved arc, call Pathfinder_Summarize with a concise title, useful content, significance, and arc when applicable. If nothing important happened, do not call it.',
+                extension_prompt_types.IN_PROMPT,
+                4,
+                false,
+                extension_prompt_roles.SYSTEM,
+            );
+            markAutoSummaryComplete();
+        }
     }
 
     const promptAgents = activeAgents.filter(agent => agent.phase === 'pre' || agent.phase === 'both');

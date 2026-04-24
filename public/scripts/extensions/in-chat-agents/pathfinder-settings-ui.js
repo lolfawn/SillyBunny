@@ -308,6 +308,23 @@ async function refreshLorebookList() {
     }
 }
 
+
+function setPathfinderToolEnabled(toolName, enabled) {
+    if (!currentAgent?.tools) {
+        return;
+    }
+
+    const tool = currentAgent.tools.find(t => t.name === toolName);
+    if (tool) {
+        tool.enabled = enabled;
+    }
+}
+
+function isPathfinderToolEnabled(toolName) {
+    const tool = currentAgent?.tools?.find(t => t.name === toolName);
+    return tool?.enabled !== false;
+}
+
 /**
  * Load current settings into UI elements
  */
@@ -326,6 +343,10 @@ function loadSettingsIntoUI() {
     settingsEl.find('#pf--enable-tools').prop('checked', s.sidecarEnabled || false);
     settingsEl.find('#pf--mandatory-tools').prop('checked', s.mandatoryTools || false);
     settingsEl.find('#pf--auto-use-attached').prop('checked', s.autoUseAttachedLorebook || false);
+    settingsEl.find('#pf--auto-summary').prop('checked', s.autoSummary || false);
+    settingsEl.find('#pf--auto-summary-interval').val(s.autoSummaryInterval || 20);
+
+    settingsEl.find('#pf--enable-summarize-tool').prop('checked', isPathfinderToolEnabled('Pathfinder_Summarize'));
 
     // Populate connection profiles
     populateConnectionProfiles();
@@ -459,6 +480,36 @@ function bindEvents() {
         s.connectionProfile = $(this).val();
         setPathfinderSettings(s);
         logPathfinder('Pipeline connection profile changed.', { connectionProfile: s.connectionProfile || 'main-model' });
+        updateAgentSettings();
+    });
+
+    // Memory summary settings
+    settingsEl.find('#pf--enable-summarize-tool').on('change', async function () {
+        const enabled = $(this).prop('checked');
+        setPathfinderToolEnabled('Pathfinder_Summarize', enabled);
+        logPathfinder(`Summary memory tool ${enabled ? 'enabled' : 'disabled'}.`);
+        await updateAgentSettings();
+        syncToolAgentRegistrations();
+    });
+
+    settingsEl.find('#pf--auto-summary').on('change', function () {
+        const s = getPathfinderSettings();
+        s.autoSummary = $(this).prop('checked');
+        if (s.autoSummary) {
+            setPathfinderToolEnabled('Pathfinder_Summarize', true);
+            settingsEl.find('#pf--enable-summarize-tool').prop('checked', true);
+        }
+        setPathfinderSettings(s);
+        logPathfinder(`Auto summary tracking ${s.autoSummary ? 'enabled' : 'disabled'}.`);
+        updateAgentSettings();
+        syncToolAgentRegistrations();
+    });
+
+    settingsEl.find('#pf--auto-summary-interval').on('change', function () {
+        const s = getPathfinderSettings();
+        s.autoSummaryInterval = Math.max(2, Math.min(200, parseInt($(this).val()) || 20));
+        setPathfinderSettings(s);
+        logPathfinder('Auto summary interval changed.', { autoSummaryInterval: s.autoSummaryInterval });
         updateAgentSettings();
     });
 
@@ -937,13 +988,15 @@ async function updateAgentSettings() {
     delete agentSettings.pipelinePrompts;
     delete agentSettings.pipelines;
     currentAgent.settings = { ...agentSettings };
-    currentAgent.enabled = (s.enabledLorebooks || []).length > 0 && (s.sidecarEnabled || s.pipelineEnabled);
+    currentAgent.enabled = (s.enabledLorebooks || []).length > 0 && (s.sidecarEnabled || s.pipelineEnabled || s.autoSummary || isPathfinderToolEnabled('Pathfinder_Summarize'));
     logPathfinder('Agent settings synchronized.', {
         enabled: currentAgent.enabled,
         lorebooks: s.enabledLorebooks || [],
         toolMode: Boolean(s.sidecarEnabled),
         pipelineMode: Boolean(s.pipelineEnabled),
         autoUseAttachedLorebook: Boolean(s.autoUseAttachedLorebook),
+        autoSummary: Boolean(s.autoSummary),
+        summaryTool: isPathfinderToolEnabled('Pathfinder_Summarize'),
     });
 
     await saveAgent(currentAgent);
