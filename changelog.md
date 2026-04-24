@@ -1,28 +1,31 @@
 # Changelog
 
-## v1.4.3
+## v1.4.5
 
 Date: 2026-04-24
 
 ### Group Chats
-- Added Recent Chats tabs for All, Individual, and Group chats, and fixed empty/new group chats so they save, register, branch, and reappear correctly.
-- Added bottom-bar group controls for choosing who speaks next/now, Auto Mode, Auto DM, manual DM mode, and separate per-character DM chat files.
-- Added private DM badges, forced DM mode inside DM chats, a Return to Group button, and participant-only DM visibility so uninvited characters cannot read or reply to private DM context.
-- Added context-aware group replies: direct name calls trigger the addressed character, group-wide phrases trigger all eligible speakers, and autonomous replies stop after a three-message anti-loop cap.
-- Added AI-generated 24-hour schedules with generation toasts, system-time awareness, delayed catch-up behavior after downtime, and optional auto-messaging.
-- Improved group chat defaults and mobile usability by keeping Auto Mode off by default, using a 120-second delay when enabled, starting new group chats empty, and compacting group speaker controls on small screens.
-- Removed redundant group modes and controls, including Narrator Merge, One at a time, and the old Narrate Turn flow.
+- Reworked group chats around controllable speaker selection, Auto Mode, Auto DM, private per-character DM chats, unread DM badges, and a visible `{{char}} is typing...` indicator.
+- Added context-aware group replies for direct name calls and group-wide prompts, with anti-loop limits for autonomous character-to-character replies.
+- Added group schedules with generation toasts, time awareness, downtime catch-up, optional auto-messaging, and separate Auto DM cooldowns.
+- Made group DMs private by default, participant-limited in context, one-tap from unread avatar badges, and easier to return from with `Return to Group`.
+- Improved mobile group controls with compact buttons, stable typing text, evenly spaced avatars, clearer toggle states, and less visual flicker.
+
+### Authors Notes
+- Made Character Author's Note (Private) editable in group chats and separated group-specific notes from individual character-card notes.
+- Fixed private note settings so `Use character author's note` and `Replace/Top/Bottom` persist and inject correctly.
 
 ### Added
 - Added bundled Chat Completions presets for `Geechan - Universal Roleplay (Chat Completions) (v5.0)` and `Geechan's Chatroom Prompt`, with `Geechan's Chatroom Prompt` defaulting to a 256k context window.
-- Added an In-Chat Agents master on/off button and an option to separate Agent chats from normal Individual and Group Recent Chats.
-- Added a separate UI for Pathfinder memory summaries, including editable summary text and injection status.
+- Added In-Chat Agents master enable/disable controls, agent chat separation options, and a Pathfinder memory summary UI with editable text and injection status.
 
 ### Fixed
-- Fixed the built-in updater so `Auto-clear cache after updates` clears frontend cache before the post-update reload.
-- Fixed mobile overflow in the Agents Quick Toggles area.
-- Fixed group chat creation with custom names/member sets so matching groups are reused and new chat branches are easier to return to.
-- Fixed several group DM edge cases, including stale DM targets, Auto DM applying only to one selected character, and characters replying when Auto Mode was off.
+- Fixed group chat saving and Recent Chats registration for new, named, and branched group chats.
+- Fixed Auto Mode persistence per user, Auto Mode draft preservation, Auto DM routing into DM chats, and rapid-fire DM auto-replies.
+- Fixed mobile bottom chat controls, stop/send button sizing, Agents Quick Toggles overflow, and frontend cache clearing after updater reloads.
+- Removed redundant group modes and controls, including Narrator Merge, One at a time, and the old Narrate Turn flow.
+- Updated `Geechan's Chatroom Prompt` emoji guidance to use normal emojis.
+- Bumped app-owned version strings to `1.4.5` without changing dependency versions.
 
 ## v1.4.2
 
