@@ -2898,15 +2898,36 @@ function getSelectedGroupMemberAvatars() {
     return newGroupMembers;
 }
 
-async function createQuickGroupFromSelectedMembers() {
-    if (openGroupId) {
-        toastr.info(t`This group already exists. Use the check button to create a new group from selected members.`);
-        return;
+function getGroupMemberSignature(members) {
+    return [...new Set(Array.isArray(members) ? members : [])].sort().join('|');
+}
+
+function findGroupByMembers(members) {
+    const signature = getGroupMemberSignature(members);
+    if (!signature) {
+        return null;
     }
 
+    return groups.find(group => getGroupMemberSignature(group.members) === signature) || null;
+}
+
+async function createQuickGroupFromSelectedMembers() {
     const members = getSelectedGroupMemberAvatars().filter(onlyUnique);
     if (members.length === 0) {
         toastr.warning(t`Select at least one character first.`);
+        return;
+    }
+
+    const existingGroup = !openGroupId ? findGroupByMembers(members) : null;
+    if (existingGroup) {
+        await createNewGroupChat(existingGroup.id);
+        toastr.info(t`Opened a new chat branch for the existing group.`);
+        return;
+    }
+
+    if (openGroupId) {
+        await createNewGroupChat(openGroupId);
+        toastr.info(t`Opened a new chat branch for this group.`);
         return;
     }
 
@@ -2940,7 +2961,14 @@ async function createGroup() {
     let activationStrategy = Number($('#rm_group_activation_strategy').find(':selected').val()) ?? group_activation_strategy.NATURAL;
     let generationMode = Number($('#rm_group_generation_mode').find(':selected').val()) ?? group_generation_mode.SWAP;
     let autoModeDelay = Number($('#rm_group_automode_delay').val()) ?? DEFAULT_AUTO_MODE_DELAY;
-    const members = newGroupMembers;
+    const members = newGroupMembers.filter(onlyUnique);
+    const existingGroup = findGroupByMembers(members);
+    if (existingGroup) {
+        await createNewGroupChat(existingGroup.id);
+        toastr.info(t`Opened a new chat branch for the existing group.`);
+        return;
+    }
+
     const memberNames = characters.filter(x => members.includes(x.avatar)).map(x => x.name).join(', ');
 
     if (!name) {
