@@ -7118,6 +7118,16 @@ body:not(.movingUI) .drawer-content.maximized {
     background: color-mix(in srgb, var(--SmartThemeQuoteColor) 20%, transparent);
 }
 
+#group_speaker_dm_now.selected {
+    border-color: var(--SmartThemeQuoteColor);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor) 28%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--SmartThemeQuoteColor) 40%, transparent) inset;
+}
+
+#group_speaker_dm_now.selected i {
+    color: var(--SmartThemeQuoteColor);
+}
+
 .group_speaker_avatar img {
     width: 24px;
     height: 24px;

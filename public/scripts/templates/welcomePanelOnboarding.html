@@ -383,6 +383,11 @@
                 </div>
                 <p>Quickly jump back into your most recent conversations.</p>
             </div>
+            <div class="welcomeRecentTabs" role="tablist" aria-label="Recent chat type filter">
+                <button type="button" class="welcomeRecentTab active" data-recent-chat-filter="all" aria-pressed="true" data-i18n="All">All</button>
+                <button type="button" class="welcomeRecentTab" data-recent-chat-filter="individual" aria-pressed="false" data-i18n="Individual">Individual</button>
+                <button type="button" class="welcomeRecentTab" data-recent-chat-filter="group" aria-pressed="false" data-i18n="Groups">Groups</button>
+            </div>
         </div>
         <div class="welcomeRecent">
             <div class="recentChatList">
@@ -397,7 +402,7 @@
             {{/if}}
             {{#each chats}}
                 {{#with this}}
-                <div class="recentChat {{#if hidden}}hidden{{/if}} {{#if is_group}}group{{/if}}" data-file="{{chat_name}}" data-avatar="{{avatar}}" data-group="{{group}}">
+                <div class="recentChat {{#if hidden}}hidden{{/if}} {{#if is_group}}group{{else}}individual{{/if}}" data-file="{{chat_name}}" data-avatar="{{avatar}}" data-group="{{group}}">
                     {{#if pinned}}
                         <div class="recentChatPinned">
                             <i class="fa-solid fa-thumbtack fa-fw fa-xs" title="Pinned chat" data-i18n="[title]Pinned chat"></i>

@@ -6599,7 +6599,8 @@
                                                 <label id="rm_group_automode_label" class="checkbox_label whitespacenowrap">
                                                     <input id="rm_group_automode" type="checkbox" />
                                                     <span data-i18n="Auto Mode">Auto Mode</span>
-                                                    <input id="rm_group_automode_delay" class="text_pole textarea_compact widthUnset" type="number" min="1" max="999" step="1" value="5" title="Auto Mode delay" data-i18n="[title]Auto Mode delay" />
+                                                    <input id="rm_group_automode_delay" class="text_pole textarea_compact widthUnset" type="number" min="1" max="999" step="1" value="30" title="Auto Mode delay in seconds" data-i18n="[title]Auto Mode delay in seconds" />
+                                                    <span class="auto_mode_delay_unit" title="Auto Mode delay unit" data-i18n="seconds">seconds</span>
                                                 </label>
                                                 <label id="rm_group_hidemutedsprites_label" class="checkbox_label whitespacenowrap">
                                                     <input id="rm_group_hidemutedsprites" type="checkbox" />
@@ -8410,25 +8411,17 @@
                     <i class="fa-solid fa-comment-dots"></i>
                     <span data-i18n="Speak Now">Speak Now</span>
                 </button>
-                <button type="button" id="group_speaker_narrate_now" class="menu_button menu_button_icon" title="Consolidate the latest group replies into one narrator response" data-i18n="[title]Consolidate the latest group replies into one narrator response">
-                    <i class="fa-solid fa-feather-pointed"></i>
-                    <span data-i18n="Narrate Turn">Narrate Turn</span>
-                </button>
-                <button type="button" id="group_speaker_dm_now" class="menu_button menu_button_icon" title="Send or receive a private DM with the selected character" data-i18n="[title]Send or receive a private DM with the selected character">
+                <button type="button" id="group_speaker_dm_now" class="menu_button menu_button_icon" title="Toggle private DM mode for the selected character; your next send goes only to them" data-i18n="[title]Toggle private DM mode for the selected character; your next send goes only to them">
                     <i class="fa-solid fa-envelope"></i>
                     <span data-i18n="DM">DM</span>
                 </button>
-                <label class="checkbox_label group_speaker_toggle" title="Let the selected character privately DM you during scheduled auto messages" data-i18n="[title]Let the selected character privately DM you during scheduled auto messages">
+                <button type="button" id="group_speaker_dm_consolidate" class="menu_button menu_button_icon" title="Open a separate private DM chat with the selected character" data-i18n="[title]Open a separate private DM chat with the selected character">
+                    <i class="fa-solid fa-envelope-open-text"></i>
+                    <span data-i18n="DM Chat">DM Chat</span>
+                </button>
+                <label class="checkbox_label group_speaker_toggle" title="Let any character privately DM you during scheduled auto messages" data-i18n="[title]Let any character privately DM you during scheduled auto messages">
                     <input id="group_speaker_auto_dm" type="checkbox" />
                     <span data-i18n="Auto DM">Auto DM</span>
-                </label>
-                <label class="checkbox_label group_speaker_toggle" title="Only let one group member reply unless you explicitly choose narrator merge" data-i18n="[title]Only let one group member reply unless you explicitly choose narrator merge">
-                    <input id="group_speaker_single" type="checkbox" checked />
-                    <span data-i18n="One at a time">One at a time</span>
-                </label>
-                <label class="checkbox_label group_speaker_toggle" title="After a multi-character group turn, ask the model to consolidate the replies into one narrator response" data-i18n="[title]After a multi-character group turn, ask the model to consolidate the replies into one narrator response">
-                    <input id="group_speaker_narrator" type="checkbox" />
-                    <span data-i18n="Narrator merge">Narrator merge</span>
                 </label>
             </div>
             <div id="dialogue_del_mes">

@@ -77,6 +77,9 @@ import {
     animation_duration,
     depth_prompt_role_default,
     shouldAutoContinue,
+    setGenerationChatFilter,
+    setPendingGeneratedMessageExtra,
+    setPendingUserMessageExtra,
     unshallowCharacter,
     chatElement,
     ensureMessageMediaIsArray,
@@ -112,6 +115,7 @@ export {
 
 let is_group_generating = false; // Group generation flag
 let is_group_automode_enabled = false;
+let isGroupScheduleGenerating = false;
 let hideMutedSprites = false;
 /** @type {Group[]} */
 let groups = [];
@@ -123,6 +127,30 @@ let openGroupId = null;
 let newGroupMembers = [];
 
 const GROUP_MEMBER_MODELS_KEY = 'member_models';
+const GROUP_DM_SETTINGS_KEY = 'SillyBunny.groupDmSettings';
+const defaultGroupDmSettings = {
+    autoDmEnabled: false,
+    autoDmMember: '',
+};
+
+function getGlobalGroupDmSettings() {
+    try {
+        const stored = JSON.parse(accountStorage.getItem(GROUP_DM_SETTINGS_KEY) || '{}');
+        return { ...defaultGroupDmSettings, ...(stored && typeof stored === 'object' ? stored : {}) };
+    } catch {
+        return { ...defaultGroupDmSettings };
+    }
+}
+
+function saveGlobalGroupDmSettings(settings) {
+    accountStorage.setItem(GROUP_DM_SETTINGS_KEY, JSON.stringify({ ...getGlobalGroupDmSettings(), ...settings }));
+}
+
+function applyGlobalGroupDmSettings() {
+    const settings = getGlobalGroupDmSettings();
+    selectedGroupDmAvatar = String(settings.autoDmMember || '');
+}
+
 
 function getGroupMemberModels(group) {
     if (!group || typeof group !== 'object') {
@@ -205,12 +233,11 @@ async function runWithGroupMemberModelOverride(group, avatarId, callback) {
 
 
 
-const GROUP_NARRATOR_NAME = 'Group Narrator';
 let selectedGroupSpeakerAvatar = '';
-let groupNarratorConsolidation = false;
-let groupSingleSpeakerMode = true;
 let groupSpeakerControlsInitialized = false;
 let selectedGroupDmAvatar = '';
+let groupDmModeEnabled = false;
+let pendingGroupDmUserTarget = '';
 let groupScheduleCheckInterval = null;
 
 function getCharacterIdByAvatar(avatarId) {
@@ -223,6 +250,33 @@ function getGroupEnabledMembers(group) {
     }
 
     return group.members.filter(member => !group.disabled_members?.includes(member));
+}
+
+function getGroupDmExtra(fromAvatar, toAvatar) {
+    return {
+        is_group_dm: true,
+        dm_from: fromAvatar || 'user',
+        dm_to: toAvatar || 'user',
+    };
+}
+
+function canGroupMemberSeeMessage(message, speakerAvatar) {
+    if (!message?.extra?.is_group_dm) {
+        return true;
+    }
+
+    const dmFrom = String(message.extra.dm_from || (message.is_user ? 'user' : message.original_avatar || ''));
+    const dmTo = String(message.extra.dm_to || message.extra.dm_target || '');
+    return dmFrom === speakerAvatar || dmTo === speakerAvatar;
+}
+
+function withGroupPrivateDmFilter(speakerAvatar, callback) {
+    setGenerationChatFilter(message => canGroupMemberSeeMessage(message, speakerAvatar));
+    try {
+        return callback();
+    } finally {
+        setGenerationChatFilter(null);
+    }
 }
 
 function getSelectedGroupSpeakerChid(group) {
@@ -316,6 +370,26 @@ function findDirectlyAddressedMember(group, text) {
     return -1;
 }
 
+function isAddressedToEntireGroup(text) {
+    return /(^|[^\p{L}\p{N}_])(?:everyone|everybody|you\s+all|y['’]?all|all)([^\p{L}\p{N}_]|$)/iu.test(String(text || ''));
+}
+
+
+function getGroupAutoReplyDepth() {
+    let depth = 0;
+    for (let index = chat.length - 1; index >= 0; index--) {
+        const message = chat[index];
+        if (!message || message.is_user || message.is_system) {
+            break;
+        }
+
+        depth++;
+    }
+
+    return depth;
+}
+
+
 function getMessageSpeakerName(message) {
     if (!message) return '';
     return message.is_user ? 'the user' : (message.name || 'another character');
@@ -344,91 +418,72 @@ function limitGroupSpeakersForControl(activatedMembers, forceSingleSpeaker) {
     return activatedMembers.slice(0, 1);
 }
 
-function getNarratableGroupTurnMessages(startIndex) {
-    return chat.slice(startIndex).filter(message => message && !message.is_user && !message.is_system && message.extra?.type !== 'group_narrator_consolidation' && String(message.mes ?? '').trim());
-}
+function getGroupDmThreadStartIndex(participantAvatar) {
+    for (let index = chat.length - 1; index >= 0; index--) {
+        const message = chat[index];
+        if (!message?.extra?.is_group_dm || message.extra?.type === 'group_dm_consolidation') {
+            return index + 1;
+        }
 
-function getDraftTextFromGenerationResult(result) {
-    if (result === undefined || result === null) {
-        return '';
+        if (!canGroupMemberSeeMessage(message, participantAvatar)) {
+            return index + 1;
+        }
     }
 
-    return String(result).trim();
+    return 0;
 }
 
-function removeNarratedDraftMessages(startIndex) {
+function getGroupDmThreadMessages(participantAvatar, startIndex = getGroupDmThreadStartIndex(participantAvatar)) {
+    return chat.slice(startIndex).filter(message => message?.extra?.is_group_dm && message.extra?.type !== 'group_dm_consolidation' && canGroupMemberSeeMessage(message, participantAvatar) && String(message.mes ?? '').trim());
+}
+
+function removeGroupDmThreadMessages(participantAvatar, startIndex) {
     for (let index = chat.length - 1; index >= startIndex; index--) {
         const message = chat[index];
-        if (message && !message.is_user && !message.is_system && message.extra?.type !== 'group_narrator_consolidation') {
+        if (message?.extra?.is_group_dm && canGroupMemberSeeMessage(message, participantAvatar)) {
             chat.splice(index, 1);
         }
     }
 }
 
-function formatNarratorPromptMessages(messages) {
-    return messages.map(message => `${message.name || 'Character'}: ${message.mes}`).join('\n\n');
+function getGroupDmChatName(group, character) {
+    const safeGroupName = String(group?.name || 'Group').replace(/[\/:*?"<>|]/g, '-');
+    const safeCharacterName = String(character?.name || 'Character').replace(/[\/:*?"<>|]/g, '-');
+    return `DM - ${safeGroupName} - ${safeCharacterName}`;
 }
 
-function getNarratorRecentContext(startIndex) {
-    const contextStart = Math.max(0, startIndex - 8);
-    return chat.slice(contextStart, startIndex)
-        .filter(message => message && message.extra?.type !== 'group_narrator_consolidation' && String(message.mes ?? '').trim())
-        .map(message => ({ name: message.name || (message.is_user ? 'User' : 'Character'), mes: message.mes }));
-}
-
-function buildNarratorConsolidationPrompt(group, startIndex, draftMessages = null) {
-    const messages = Array.isArray(draftMessages) && draftMessages.length ? draftMessages : getNarratableGroupTurnMessages(startIndex);
-    const transcript = formatNarratorPromptMessages(messages);
-    const recentContext = formatNarratorPromptMessages(getNarratorRecentContext(startIndex));
-    const memberNames = getGroupEnabledMembers(group)
-        .map(avatar => characters.find(character => character.avatar === avatar)?.name)
-        .filter(Boolean)
-        .join(', ');
-
-    return `Consolidate the following group-chat character replies into one cohesive narrator-style response. Preserve important actions, dialogue, tone, and continuity. Use the recent conversation for context so the narration flows naturally, but do not restate unrelated old details or add new events beyond light connective narration. Characters in this scene: ${memberNames || group.name}.
-
-Recent conversation before this turn:
-${recentContext || '(No prior context.)'}
-
-Character replies to merge:
-${transcript}`;
-}
-
-async function consolidateGroupTurnAsNarrator(group, startIndex, params = {}, draftMessages = null) {
-    const narratableMessages = Array.isArray(draftMessages) && draftMessages.length ? draftMessages : getNarratableGroupTurnMessages(startIndex);
-    const prompt = buildNarratorConsolidationPrompt(group, startIndex, narratableMessages);
-    if (!narratableMessages.length) {
-        toastr.warning(t`There are no group replies to narrate yet.`);
+async function openSelectedGroupDmChat() {
+    const group = selected_group ? groups.find(x => x.id === selected_group) : null;
+    if (!group || !selectedGroupSpeakerAvatar) {
+        toastr.warning(t`Pick a group member first.`);
         return;
     }
 
-    const previousGroupGenerating = is_group_generating;
-    try {
-        is_group_generating = false;
-        const consolidatedText = String(await Generate('quiet', { quiet_prompt: prompt, quietToLoud: false, skipWIAN: true, automatic_trigger: true, signal: params?.signal }) || '').trim();
-        if (!consolidatedText) {
-            toastr.warning(t`Narrator merge did not return a response.`);
+    const character = characters.find(x => x.avatar === selectedGroupSpeakerAvatar);
+    const dmChatName = getGroupDmChatName(group, character);
+    if (!group.chats.includes(dmChatName)) {
+        const startIndex = getGroupDmThreadStartIndex(selectedGroupSpeakerAvatar);
+        const dmMessages = getGroupDmThreadMessages(selectedGroupSpeakerAvatar, startIndex);
+        const dmChatData = dmMessages.map(message => ({ ...structuredClone(message), extra: { ...(message.extra || {}), is_group_dm: true } }));
+
+        const saved = await saveGroupBookmarkChat(group.id, dmChatName, {
+            type: 'group_dm_chat',
+            dm_member: selectedGroupSpeakerAvatar,
+            main_group_chat_id: group.chat_id,
+            tainted: true,
+        }, undefined, dmChatData, { throwOnError: false });
+        if (!saved) {
             return;
         }
 
-        const narratorMessage = {
-            name: GROUP_NARRATOR_NAME,
-            is_user: false,
-            is_system: false,
-            send_date: getMessageTimeStamp(),
-            mes: consolidatedText,
-            extra: {
-                type: 'group_narrator_consolidation',
-            },
-            force_avatar: system_avatar,
-        };
-        removeNarratedDraftMessages(startIndex);
-        chat.push(narratorMessage);
-        await printMessages();
-        await saveChatConditional();
-    } finally {
-        is_group_generating = previousGroupGenerating;
+        if (dmMessages.length) {
+            removeGroupDmThreadMessages(selectedGroupSpeakerAvatar, startIndex);
+            await printMessages();
+            await saveChatConditional();
+        }
     }
+
+    await openGroupChat(group.id, dmChatName);
 }
 
 function updateGroupSpeakerControls() {
@@ -465,10 +520,8 @@ function updateGroupSpeakerControls() {
         selectedGroupDmAvatar = '';
     }
 
-    container.find('#group_speaker_narrator').prop('checked', groupNarratorConsolidation);
-    container.find('#group_speaker_single').prop('checked', groupSingleSpeakerMode);
-    container.find('#group_speaker_auto_dm').prop('checked', Boolean(group.auto_dm_enabled));
-    container.find('#group_speaker_dm_now').toggleClass('selected', Boolean(selectedGroupDmAvatar));
+    container.find('#group_speaker_auto_dm').prop('checked', Boolean(getGlobalGroupDmSettings().autoDmEnabled));
+    container.find('#group_speaker_dm_now').toggleClass('selected', groupDmModeEnabled);
 }
 
 function initGroupSpeakerControls() {
@@ -477,6 +530,7 @@ function initGroupSpeakerControls() {
     }
 
     groupSpeakerControlsInitialized = true;
+    applyGlobalGroupDmSettings();
     const container = $('#group_speaker_controls');
     container.on('click', '.group_speaker_avatar', function (event) {
         const avatarId = String($(this).data('avatar') || '');
@@ -504,31 +558,23 @@ function initGroupSpeakerControls() {
         }
     });
 
-    container.on('click', '#group_speaker_narrate_now', async function () {
+    container.on('click', '#group_speaker_dm_consolidate', async function () {
+        await openSelectedGroupDmChat();
+    });
+
+    container.on('click', '#group_speaker_dm_now', function () {
         const group = selected_group ? groups.find(x => x.id === selected_group) : null;
         if (!group) {
             return;
         }
 
-        await consolidateGroupTurnAsNarrator(group, getGroupTurnStartIndex());
-    });
-
-    container.on('click', '#group_speaker_dm_now', function () {
-        const group = selected_group ? groups.find(x => x.id === selected_group) : null;
-        if (!group || !selectedGroupSpeakerAvatar) {
+        if (!groupDmModeEnabled && !selectedGroupSpeakerAvatar) {
             toastr.warning(t`Pick a group member first.`);
             return;
         }
 
-        selectedGroupDmAvatar = selectedGroupDmAvatar === selectedGroupSpeakerAvatar ? '' : selectedGroupSpeakerAvatar;
-        const chid = getCharacterIdByAvatar(selectedGroupSpeakerAvatar);
-        if (chid !== -1) {
-            Generate('normal', {
-                force_chid: chid,
-                quiet_prompt: buildContextAwareGroupPrompt(group, characters[chid].name, { isDm: true, targetName: 'the user' }),
-                quietToLoud: true,
-            });
-        }
+        groupDmModeEnabled = !groupDmModeEnabled;
+        selectedGroupDmAvatar = groupDmModeEnabled ? selectedGroupSpeakerAvatar : '';
         updateGroupSpeakerControls();
     });
 
@@ -538,30 +584,11 @@ function initGroupSpeakerControls() {
             return;
         }
 
-        group.auto_dm_enabled = $(this).prop('checked');
-        if (selectedGroupSpeakerAvatar) {
-            selectedGroupDmAvatar = selectedGroupSpeakerAvatar;
-            group.auto_dm_member = selectedGroupDmAvatar;
-        }
-        await saveGroupRuntimeState(group);
+        const enabled = $(this).prop('checked');
+        saveGlobalGroupDmSettings({ autoDmEnabled: enabled, autoDmMember: '' });
         updateGroupSpeakerControls();
     });
 
-    container.on('change', '#group_speaker_single', function () {
-        groupSingleSpeakerMode = $(this).prop('checked');
-        if (groupSingleSpeakerMode) {
-            groupNarratorConsolidation = false;
-        }
-        updateGroupSpeakerControls();
-    });
-
-    container.on('change', '#group_speaker_narrator', function () {
-        groupNarratorConsolidation = $(this).prop('checked');
-        if (groupNarratorConsolidation) {
-            groupSingleSpeakerMode = false;
-        }
-        updateGroupSpeakerControls();
-    });
 }
 
 export const group_activation_strategy = {
@@ -577,7 +604,7 @@ export const group_generation_mode = {
     APPEND_DISABLED: 2,
 };
 
-export const DEFAULT_AUTO_MODE_DELAY = 5;
+export const DEFAULT_AUTO_MODE_DELAY = 30;
 
 export const groupCandidatesFilter = new FilterHelper(debounce(printGroupCandidates, debounce_timeout.quick));
 export const groupMembersFilter = new FilterHelper(debounce(printGroupMembers, debounce_timeout.quick));
@@ -592,6 +619,12 @@ function setAutoModeWorker() {
     const autoModeDelay = groups.find(x => x.id === selected_group)?.auto_mode_delay ?? DEFAULT_AUTO_MODE_DELAY;
     autoModeWorker = setInterval(groupChatAutoModeWorker, autoModeDelay * 1000);
     groupScheduleCheckInterval = setInterval(groupScheduleAutoMessageWorker, 60 * 1000);
+}
+
+function enableGroupAutoMode() {
+    is_group_automode_enabled = true;
+    $('#rm_group_automode').prop('checked', true);
+    setAutoModeWorker();
 }
 
 /**
@@ -1296,8 +1329,6 @@ async function getGroups() {
             group.auto_message_enabled = Boolean(group.auto_message_enabled);
             group.ai_schedule = String(group.ai_schedule || '');
             group.auto_schedule_state = group.auto_schedule_state && typeof group.auto_schedule_state === 'object' ? group.auto_schedule_state : {};
-            group.auto_dm_enabled = Boolean(group.auto_dm_enabled);
-            group.auto_dm_member = String(group.auto_dm_member || '');
             if (group.chat_id == undefined) {
                 group.chat_id = group.id;
                 group.chats = [group.id];
@@ -1507,6 +1538,16 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
         setCharacterName('');
         setCharacterId(undefined);
         const userInput = String($('#send_textarea').val());
+        const manualDmTarget = groupDmModeEnabled ? selectedGroupSpeakerAvatar : '';
+        const isToggledDm = !byAutoMode && [null, undefined, 'normal'].includes(type) && Boolean(manualDmTarget);
+        if (isToggledDm) {
+            type = 'dm';
+            params = { ...(params || {}), force_chid: getCharacterIdByAvatar(manualDmTarget) };
+            pendingGroupDmUserTarget = manualDmTarget;
+            setPendingUserMessageExtra(getGroupDmExtra('user', manualDmTarget));
+        } else {
+            pendingGroupDmUserTarget = '';
+        }
 
         // id of this specific batch for regeneration purposes
         group_generation_id = Date.now();
@@ -1529,8 +1570,18 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
 
         const selectedSpeakerChid = getSelectedGroupSpeakerChid(group);
         const addressedMemberChid = findDirectlyAddressedMember(group, activationText);
-        if (params && typeof params.force_chid == 'number') {
+        const isWholeGroupAddress = isAddressedToEntireGroup(activationText);
+        const autoReplyDepth = byAutoMode && !isUserInput ? getGroupAutoReplyDepth() : 0;
+        if (params && Array.isArray(params.force_chids)) {
+            activatedMembers = params.force_chids;
+        } else if (params && typeof params.force_chid == 'number') {
             activatedMembers = [params.force_chid];
+        } else if (type !== 'quiet' && isWholeGroupAddress && isUserInput) {
+            activatedMembers = getGroupEnabledMembers(group).map(avatar => getCharacterIdByAvatar(avatar)).filter(chid => chid !== -1);
+        } else if (byAutoMode && type !== 'quiet' && addressedMemberChid !== -1 && autoReplyDepth < 3) {
+            activatedMembers = [addressedMemberChid];
+        } else if (byAutoMode && type !== 'quiet' && autoReplyDepth >= 3) {
+            activatedMembers = [];
         } else if (!byAutoMode && type !== 'quiet' && addressedMemberChid !== -1) {
             activatedMembers = [addressedMemberChid];
         } else if (!byAutoMode && type !== 'quiet' && selectedSpeakerChid !== -1) {
@@ -1561,7 +1612,9 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
         }
 
         if (activatedMembers.length === 0) {
-            //toastr.warning('All group members are disabled. Enable at least one to get a reply.');
+            if (byAutoMode || !userInput) {
+                return Promise.resolve();
+            }
 
             // Send user message as is
             const bias = getBiasStrings(userInput, type);
@@ -1570,7 +1623,8 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles: true }));
         }
 
-        const shouldForceSingleSpeaker = groupSingleSpeakerMode && !groupNarratorConsolidation && !byAutoMode && !['quiet', 'swipe', 'continue', 'impersonate'].includes(type);
+        const canUseMultiSpeakerTurn = byAutoMode || (params && Array.isArray(params.force_chids)) || (isWholeGroupAddress && isUserInput);
+        const shouldForceSingleSpeaker = !canUseMultiSpeakerTurn && !['quiet', 'swipe', 'continue', 'impersonate'].includes(type);
         activatedMembers = limitGroupSpeakersForControl(activatedMembers, shouldForceSingleSpeaker);
         groupChatQueueOrder = new Map();
 
@@ -1579,8 +1633,6 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
                 groupChatQueueOrder.set(characters[activatedMembers[i]].avatar, i + 1);
             }
         }
-        const turnStartIndex = chat.length;
-        const narratorDraftMessages = [];
         await eventSource.emit(event_types.GROUP_WRAPPER_STARTED, { selected_group, type });
         // now the real generation begins: cycle through every activated character
         for (const chId of activatedMembers) {
@@ -1602,23 +1654,15 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             const mergedParams = { ...(params || {}) };
             mergedParams.quiet_prompt = [mergedParams.quiet_prompt, contextPrompt].filter(Boolean).join('\n');
             mergedParams.quietToLoud = true;
-            textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...mergedParams }));
+            if (type === 'dm') {
+                setPendingGeneratedMessageExtra(getGroupDmExtra(characters[chId]?.avatar, 'user'));
+            }
+            textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => withGroupPrivateDmFilter(characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...mergedParams })));
             if (type === 'dm') {
                 const dmMessage = chat[chat.length - 1];
                 if (dmMessage && !dmMessage.is_user && !dmMessage.is_system) {
-                    dmMessage.extra = dmMessage.extra || {};
-                    dmMessage.extra.is_group_dm = true;
-                    dmMessage.extra.dm_target = 'user';
+                    dmMessage.extra = { ...(dmMessage.extra || {}), ...getGroupDmExtra(characters[chId]?.avatar, 'user') };
                     dmMessage.title = dmMessage.title || 'Private DM';
-                }
-            }
-            const shouldNarrateMerge = groupNarratorConsolidation && activatedMembers.length > 1 && type !== 'quiet';
-            let currentDraftMessage = null;
-            if (shouldNarrateMerge) {
-                const draftText = getDraftTextFromGenerationResult(textResult);
-                if (draftText) {
-                    currentDraftMessage = { name: characters[chId]?.name || 'Character', mes: draftText };
-                    narratorDraftMessages.push(currentDraftMessage);
                 }
             }
             let messageChunk = textResult?.messageChunk;
@@ -1626,15 +1670,6 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             if (messageChunk) {
                 while (shouldAutoContinue(messageChunk, type === 'impersonate')) {
                     textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => Generate('continue', { automatic_trigger: byAutoMode, ...mergedParams }));
-                    const continuedText = getDraftTextFromGenerationResult(textResult);
-                    if (shouldNarrateMerge && continuedText) {
-                        if (currentDraftMessage) {
-                            currentDraftMessage.mes += continuedText;
-                        } else {
-                            currentDraftMessage = { name: characters[chId]?.name || 'Character', mes: continuedText };
-                            narratorDraftMessages.push(currentDraftMessage);
-                        }
-                    }
                     messageChunk = textResult?.messageChunk;
                 }
             }
@@ -1644,14 +1679,18 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             }
         }
 
-        if (groupNarratorConsolidation && activatedMembers.length > 1 && type !== 'quiet') {
-            await consolidateGroupTurnAsNarrator(group, turnStartIndex, params, narratorDraftMessages);
+        if (type === 'dm' && pendingGroupDmUserTarget) {
+            pendingGroupDmUserTarget = '';
+            updateGroupSpeakerControls();
         }
 
         if (selectedSpeakerChid !== -1 && !(params && typeof params.force_chid == 'number')) {
             clearSelectedGroupSpeaker();
         }
     } finally {
+        setGenerationChatFilter(null);
+        setPendingGeneratedMessageExtra(null);
+        setPendingUserMessageExtra(null);
         is_group_generating = false;
         setSendButtonState(false);
         setCharacterId(undefined);
@@ -1991,6 +2030,64 @@ async function groupChatAutoModeWorker() {
     await generateGroupWrapper(true, 'auto', { signal: groupAutoModeAbortController.signal, quiet_prompt: buildContextAwareGroupPrompt(group, 'the next speaker', { reason: 'automatic group conversation' }), quietToLoud: true });
 }
 
+async function triggerImmediateMentionedGroupReply(messageId) {
+    if (!is_group_automode_enabled || online_status === 'no_connection' || is_send_press || !selected_group) {
+        return;
+    }
+
+    const message = chat[messageId];
+    const group = groups.find((x) => x.id === selected_group);
+    if (!group || !message || message.is_user || message.is_system) {
+        return;
+    }
+
+    const addressedMemberChid = findDirectlyAddressedMember(group, message.mes);
+    if (addressedMemberChid === -1 || characters[addressedMemberChid]?.avatar === message.original_avatar) {
+        return;
+    }
+
+    if (is_group_generating) {
+        await waitUntilCondition(() => !is_group_generating, debounce_timeout.extended, 20);
+    }
+
+    if (!is_group_automode_enabled || online_status === 'no_connection' || is_send_press || is_group_generating || getGroupAutoReplyDepth() >= 3) {
+        return;
+    }
+
+    groupAutoModeAbortController = new AbortController();
+    await generateGroupWrapper(true, 'auto', {
+        signal: groupAutoModeAbortController.signal,
+        force_chid: addressedMemberChid,
+        quiet_prompt: buildContextAwareGroupPrompt(group, characters[addressedMemberChid]?.name || 'the mentioned speaker', { targetName: getMessageSpeakerName(message) }),
+        quietToLoud: true,
+    });
+}
+
+async function triggerImmediateWholeGroupReply(messageId) {
+    if (!is_group_automode_enabled || online_status === 'no_connection' || is_send_press || is_group_generating || !selected_group) {
+        return;
+    }
+
+    const message = chat[messageId];
+    const group = groups.find((x) => x.id === selected_group);
+    if (!group || !message?.is_user || message.is_system || !isAddressedToEntireGroup(message.mes)) {
+        return;
+    }
+
+    const forceChids = getGroupEnabledMembers(group).map(avatar => getCharacterIdByAvatar(avatar)).filter(chid => chid !== -1);
+    if (!forceChids.length) {
+        return;
+    }
+
+    groupAutoModeAbortController = new AbortController();
+    await generateGroupWrapper(true, 'auto', {
+        signal: groupAutoModeAbortController.signal,
+        force_chids: forceChids,
+        quiet_prompt: buildContextAwareGroupPrompt(group, 'everyone in the group', { targetName: 'the user' }),
+        quietToLoud: true,
+    });
+}
+
 async function groupScheduleAutoMessageWorker() {
     if (online_status === 'no_connection' || !selected_group || is_send_press || is_group_generating) {
         return;
@@ -2027,7 +2124,8 @@ async function groupScheduleAutoMessageWorker() {
         state[key] = Date.now();
         groupAutoModeAbortController = new AbortController();
         const character = characters[chid];
-        const isDm = Boolean(group.auto_dm_enabled && (!group.auto_dm_member || group.auto_dm_member === character.avatar));
+        const dmSettings = getGlobalGroupDmSettings();
+        const isDm = Boolean(dmSettings.autoDmEnabled && (!dmSettings.autoDmMember || dmSettings.autoDmMember === character.avatar));
         await saveGroupRuntimeState(group);
         await generateGroupWrapper(true, isDm ? 'dm' : 'auto', {
             signal: groupAutoModeAbortController.signal,
@@ -2176,6 +2274,12 @@ async function onGenerateGroupScheduleClick() {
         return;
     }
 
+    if (isGroupScheduleGenerating) {
+        toastr.info(t`Group schedule is already being generated.`);
+        return;
+    }
+
+    isGroupScheduleGenerating = true;
     const names = getGroupEnabledMembers(group)
         .map(avatar => characters.find(character => character.avatar === avatar)?.name)
         .filter(Boolean)
@@ -2201,6 +2305,7 @@ async function onGenerateGroupScheduleClick() {
         console.error('Group schedule generation failed', error);
         toastr.error(t`Group schedule generation failed.`);
     } finally {
+        isGroupScheduleGenerating = false;
         toastr.clear(toast);
     }
 }
@@ -2739,6 +2844,7 @@ export async function openGroupById(groupId) {
             setEditedMessageId(undefined);
             updateChatMetadata({}, true);
             await getGroupChat(groupId);
+            enableGroupAutoMode();
             return true;
         }
     }
@@ -2864,8 +2970,6 @@ async function createGroup() {
         auto_message_enabled: Boolean($('#rm_group_auto_message').prop('checked')),
         ai_schedule: String($('#rm_group_ai_schedule').val() || ''),
         auto_schedule_state: {},
-        auto_dm_enabled: false,
-        auto_dm_member: '',
     };
 
     const createGroupResponse = await fetch('/api/groups/create', {
@@ -2903,6 +3007,7 @@ export async function createNewGroupChat(groupId) {
 
     await editGroup(group.id, true, false);
     await getGroupChat(group.id);
+    enableGroupAutoMode();
 }
 
 /**
@@ -2958,6 +3063,7 @@ export async function openGroupChat(groupId, chatId) {
 
     await editGroup(groupId, true, false);
     await getGroupChat(groupId);
+    enableGroupAutoMode();
 }
 
 /**
@@ -3156,21 +3262,10 @@ export async function saveGroupBookmarkChat(groupId, name, metadata, mesId, chat
     }
 }
 
-function onSendTextareaInput() {
-    if (is_group_automode_enabled) {
-        // Wait for current automode generation to finish
-        is_group_automode_enabled = false;
-        $('#rm_group_automode').prop('checked', false);
-    }
-}
-
 function stopAutoModeGeneration() {
     if (groupAutoModeAbortController) {
         groupAutoModeAbortController.abort();
     }
-
-    is_group_automode_enabled = false;
-    $('#rm_group_automode').prop('checked', false);
 }
 
 function doCurMemberListPopout() {
@@ -3231,14 +3326,15 @@ jQuery(() => {
     $('#rm_group_automode').on('input', function () {
         const value = $(this).prop('checked');
         is_group_automode_enabled = value;
-        eventSource.once(event_types.GENERATION_STOPPED, stopAutoModeGeneration);
+        if (!value) {
+            stopAutoModeGeneration();
+        }
     });
     $('#rm_group_hidemutedsprites').on('input', function () {
         const value = $(this).prop('checked');
         hideMutedSprites = value;
         onHideMutedSpritesClick(value);
     });
-    $('#send_textarea').on('keyup', onSendTextareaInput);
     $('#groupCurrentMemberPopoutButton').on('click', doCurMemberListPopout);
     $('#rm_group_chat_name').on('input', onGroupNameInput);
     $('#rm_group_delete').off().on('click', onDeleteGroupClick);
@@ -3259,6 +3355,12 @@ jQuery(() => {
     $(document).on('change', '.group_member_model_input', onGroupMemberModelInput);
     eventSource.on(event_types.CHAT_CHANGED, updateGroupSpeakerControls);
     eventSource.on(event_types.GROUP_UPDATED, updateGroupSpeakerControls);
+    eventSource.on(event_types.USER_MESSAGE_RENDERED, (messageId) => {
+        triggerImmediateWholeGroupReply(messageId);
+    });
+    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (messageId) => {
+        triggerImmediateMentionedGroupReply(messageId);
+    });
     eventSource.on(event_types.ONLINE_STATUS_CHANGED, () => {
         groupScheduleAutoMessageWorker();
     });

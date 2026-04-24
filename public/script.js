@@ -4456,6 +4456,40 @@ function removeLastMessage() {
  * @param {boolean} dryRun Whether to actually generate a message or just assemble the prompt
  * @returns {Promise<any>} Returns a promise that resolves when the text is done generating.
  */
+let generationChatFilter = null;
+let pendingGeneratedMessageExtra = null;
+let pendingUserMessageExtra = null;
+
+export function setGenerationChatFilter(filter) {
+    generationChatFilter = typeof filter === 'function' ? filter : null;
+}
+
+export function setPendingGeneratedMessageExtra(extra) {
+    pendingGeneratedMessageExtra = extra && typeof extra === 'object' ? { ...extra } : null;
+}
+
+export function setPendingUserMessageExtra(extra) {
+    pendingUserMessageExtra = extra && typeof extra === 'object' ? { ...extra } : null;
+}
+
+function consumePendingGeneratedMessageExtra(message) {
+    if (!pendingGeneratedMessageExtra || !message) {
+        return;
+    }
+
+    message.extra = { ...(message.extra || {}), ...pendingGeneratedMessageExtra };
+    pendingGeneratedMessageExtra = null;
+}
+
+function consumePendingUserMessageExtra(message) {
+    if (!pendingUserMessageExtra || !message) {
+        return;
+    }
+
+    message.extra = { ...(message.extra || {}), ...pendingUserMessageExtra };
+    pendingUserMessageExtra = null;
+}
+
 export async function Generate(type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, jsonSchema = null, depth = 0 } = {}, dryRun = false) {
     console.log('Generate entered');
     setGenerationProgress(0);
@@ -4663,6 +4697,9 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     const canUseTools = ToolManager.isToolCallingSupported();
     const canPerformToolCalls = !dryRun && ToolManager.canPerformToolCalls(type) && depth < ToolManager.RECURSE_LIMIT;
     let coreChat = chat.filter(x => !x.is_system || (canUseTools && Array.isArray(x.extra?.tool_invocations)));
+    if (generationChatFilter) {
+        coreChat = coreChat.filter((message, index) => generationChatFilter(message, index, coreChat));
+    }
     if (type === 'swipe') {
         coreChat.pop();
     }
@@ -6072,6 +6109,8 @@ export async function sendMessageAsUser(messageText, messageBias, insertAt = nul
         message.force_avatar = getThumbnailUrl('persona', avatar);
     }
 
+    consumePendingUserMessageExtra(message);
+
     if (messageBias) {
         message.extra.bias = messageBias;
         message.mes = removeMacros(message.mes);
@@ -7041,6 +7080,7 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         }
 
         if (selected_group) {
+            consumePendingGeneratedMessageExtra(newMessage);
             console.debug('entering chat update for groups');
             let avatarImg = 'img/ai4.png';
             if (characters[this_chid].avatar != 'none') {

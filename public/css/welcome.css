@@ -752,6 +752,37 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     line-height: 1.45;
 }
 
+.welcomeRecentTabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border: 1px solid color-mix(in srgb, var(--sb-shell-border, var(--SmartThemeBorderColor)) 72%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 38%, transparent);
+}
+
+.welcomeRecentTab {
+    border: 0;
+    border-radius: 999px;
+    padding: 5px 10px;
+    color: var(--SmartThemeBodyColor);
+    background: transparent;
+    cursor: pointer;
+    font-size: calc(var(--mainFontSize) * 0.78);
+    white-space: nowrap;
+}
+
+.welcomeRecentTab.active {
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor) 25%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--SmartThemeQuoteColor) 45%, transparent) inset;
+}
+
+.welcomePanel[data-recent-chat-filter='individual'] .recentChat.group,
+.welcomePanel[data-recent-chat-filter='group'] .recentChat.individual {
+    display: none;
+}
+
 .welcomePanelModeChip {
     min-height: 36px;
     gap: 8px;
@@ -1052,6 +1083,11 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
 
 .welcomeRecent .recentChatList .recentChat.hidden {
     display: none;
+}
+
+.welcomePanel[data-recent-chat-filter='individual'] .recentChat.individual.hidden,
+.welcomePanel[data-recent-chat-filter='group'] .recentChat.group.hidden {
+    display: flex;
 }
 
 .welcomeRecent .recentChatList .showMoreChats {

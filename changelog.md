@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.4.3
+
+Date: 2026-04-24
+
+Changes:
+- Added a bundled Chat Completions preset: `Geechan's Chatroom Prompt`.
+- Added Recent Chats tabs for All, Individual, and Group chats so group conversations are easier to find.
+- Added group bottom-bar controls for selecting the next speaker, persistent manual DM mode, Auto DM, and opening separate per-character DM chat files.
+- Added private DM badges and prompt filtering so DMs stay hidden from unrelated group characters.
+- Added group Auto Mode quality-of-life behavior: enabled automatically for group chats, 30-second default delay with an explicit seconds label, immediate all-member replies for “everyone/all/you all/y’all/everybody,” and direct name-call replies with a three-message anti-loop cap.
+- Fixed stale DM targets, Auto DM being limited to one selected character, Auto Mode turning itself off while switching/typing, and group members replying multiple times when Auto Mode should control autonomous turns.
+- Improved group UI alignment by lining up member rows and model override controls, and removed redundant Narrate Turn, Narrator Merge, and One at a time controls.
+
 ## v1.4.2
 
 Date: 2026-04-24

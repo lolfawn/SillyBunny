@@ -496,6 +496,10 @@
         "type": "openai_preset"
     },
     {
+        "filename": "presets/openai/Geechan's Chatroom Prompt.json",
+        "type": "openai_preset"
+    },
+    {
         "filename": "presets/openai/TLD Card Conversion Preset (Standalone).json",
         "type": "openai_preset"
     },

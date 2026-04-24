@@ -1291,6 +1291,17 @@ async function sendWelcomePanel(chats, expand = false) {
                     setWelcomePanelMode(root, button.getAttribute('data-welcome-panel-mode-target') || WELCOME_PANEL_MODES.full);
                 });
             });
+            root.querySelectorAll('[data-recent-chat-filter]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const filter = button.getAttribute('data-recent-chat-filter') || 'all';
+                    root.dataset.recentChatFilter = filter;
+                    root.querySelectorAll('[data-recent-chat-filter]').forEach((tab) => {
+                        const active = tab === button;
+                        tab.classList.toggle('active', active);
+                        tab.setAttribute('aria-pressed', String(active));
+                    });
+                });
+            });
 
             const tutorialPanel = root.querySelector('.welcomeTourPanel');
             setWelcomePanelMode(root, root.dataset.homePanelMode || getWelcomePanelMode(), { persist: false });
