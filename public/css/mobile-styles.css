@@ -1172,7 +1172,8 @@
         grid-area: avatars !important;
         display: flex !important;
         flex-wrap: nowrap !important;
-        gap: 4px !important;
+        justify-content: space-evenly !important;
+        gap: 0 !important;
         min-width: 0 !important;
         min-height: 32px !important;
         max-height: 32px !important;
@@ -1199,6 +1200,7 @@
         width: 30px !important;
         min-width: 30px !important;
         max-width: 30px !important;
+        margin-inline: 1px !important;
         height: 30px !important;
         min-height: 30px !important;
         max-height: 30px !important;
