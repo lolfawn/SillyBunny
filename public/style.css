@@ -7148,36 +7148,121 @@ body:not(.movingUI) .drawer-content.maximized {
 
 @media screen and (max-width: 600px) {
     .group_speaker_controls {
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) repeat(3, 34px) auto;
+        grid-template-areas: "avatars speak dm chat auto";
         align-items: center;
         gap: 4px;
+        padding: 4px 6px;
         overflow: hidden;
     }
 
     .group_speaker_list {
-        flex: 1 1 100%;
+        grid-area: avatars;
+        flex: none;
         max-width: 100%;
-        min-height: 32px;
-        padding-bottom: 2px;
+        min-width: 0;
+        min-height: 30px;
+        gap: 4px;
+        padding-bottom: 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .group_speaker_list::-webkit-scrollbar {
+        display: none;
     }
 
     .group_speaker_avatar {
-        flex: 0 0 auto;
-        max-width: 44px;
-        min-width: 32px;
-        width: 36px;
-        height: 32px;
-        padding: 2px;
+        flex: 0 0 30px;
+        max-width: 30px;
+        min-width: 30px;
+        width: 30px;
+        height: 30px;
+        padding: 1px;
         justify-content: center;
     }
 
-    .group_speaker_avatar span {
+    .group_speaker_avatar span,
+    #group_speaker_now span,
+    #group_speaker_dm_now span,
+    #group_speaker_dm_consolidate span {
         display: none;
     }
 
     .group_speaker_avatar img {
         width: 24px;
         height: 24px;
+    }
+
+    #group_speaker_now,
+    #group_speaker_dm_now,
+    #group_speaker_dm_consolidate {
+        width: 34px;
+        min-width: 34px;
+        max-width: 34px;
+        height: 30px;
+        min-height: 30px;
+        max-height: 30px;
+        padding: 0;
+        justify-content: center;
+        gap: 0;
+        font-size: calc(var(--mainFontSize) * 0.95);
+    }
+
+    #group_speaker_now {
+        grid-area: speak;
+    }
+
+    #group_speaker_dm_now {
+        grid-area: dm;
+    }
+
+    #group_speaker_dm_consolidate {
+        grid-area: chat;
+    }
+
+    .group_speaker_toggle {
+        grid-area: auto;
+        min-height: 24px;
+        width: fit-content;
+        max-width: 84px;
+        margin-top: 0;
+        font-size: calc(var(--mainFontSize) * 0.76);
+        gap: 4px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .group_speaker_toggle input {
+        width: 16px;
+        height: 16px;
+        min-width: 16px;
+    }
+}
+
+@media screen and (max-width: 420px) {
+    .group_speaker_controls {
+        grid-template-columns: minmax(0, 1fr) repeat(4, 30px);
+    }
+
+    #group_speaker_now,
+    #group_speaker_dm_now,
+    #group_speaker_dm_consolidate {
+        width: 30px;
+        min-width: 30px;
+        max-width: 30px;
+    }
+
+    .group_speaker_toggle {
+        width: 30px;
+        max-width: 30px;
+        justify-content: center;
+        gap: 0;
+    }
+
+    .group_speaker_toggle span {
+        display: none;
     }
 }
 
@@ -7199,4 +7284,64 @@ body:not(.movingUI) .drawer-content.maximized {
 
 .group-dm-badge i {
     font-size: 0.9em;
+}
+
+/* Mobile chat input guardrails: keep send/stop controls square and centered. */
+@media screen and (max-width: 768px) {
+    :root {
+        --bottomFormBlockSize: calc(54px * var(--fontScale) * var(--sb-bottom-bar-scale));
+        --bottomFormIconSize: calc(var(--bottomFormBlockSize) * 0.48);
+    }
+
+    #nonQRFormItems {
+        align-items: center;
+    }
+
+    #leftSendForm,
+    #rightSendForm {
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #rightSendForm > div:not(.stscript_btn),
+    #leftSendForm > div,
+    #send_but,
+    #send_form.sb-generating-controls #mes_stop {
+        width: var(--bottomFormBlockSize) !important;
+        min-width: var(--bottomFormBlockSize) !important;
+        max-width: var(--bottomFormBlockSize) !important;
+        height: var(--bottomFormBlockSize) !important;
+        min-height: var(--bottomFormBlockSize) !important;
+        max-height: var(--bottomFormBlockSize) !important;
+        flex: 0 0 var(--bottomFormBlockSize) !important;
+        aspect-ratio: 1 / 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        line-height: 1;
+        padding: 0 !important;
+    }
+
+    #send_but::before,
+    #mes_stop > i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1em;
+        height: 1em;
+        margin: 0;
+        font-size: var(--bottomFormIconSize);
+        line-height: 1;
+    }
+
+    #send_form.sb-generating-controls #send_but {
+        display: none !important;
+    }
+
+    #send_form.sb-generating-controls #mes_stop {
+        margin: 0 !important;
+        opacity: 1;
+    }
 }

@@ -3064,7 +3064,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     $('#ica--separateRecentChats').on('change', function () {
         setGlobalSettings({ separateRecentChats: $(this).prop('checked') });
         persistExtensionState();
-        toastr.info('Recent Chats separation will apply after refreshing the home screen.');
+        toastr.info('Agent chats will be separated from Individual and Group chats after refreshing the home screen.');
     });
     $('#ica--promptTransformShowNotifications').on('change', function () {
         setGlobalSettings({ promptTransformShowNotifications: $(this).prop('checked') });

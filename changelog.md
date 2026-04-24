@@ -4,14 +4,25 @@
 
 Date: 2026-04-24
 
-Changes:
-- Added a bundled Chat Completions preset: `Geechan's Chatroom Prompt`.
-- Added Recent Chats tabs for All, Individual, and Group chats so group conversations are easier to find.
-- Added group bottom-bar controls for selecting the next speaker, persistent manual DM mode, Auto DM, and opening separate per-character DM chat files.
-- Added private DM badges and prompt filtering so DMs stay hidden from unrelated group characters.
-- Added group Auto Mode quality-of-life behavior: enabled automatically for group chats, 30-second default delay with an explicit seconds label, immediate all-member replies for “everyone/all/you all/y’all/everybody,” and direct name-call replies with a three-message anti-loop cap.
-- Fixed stale DM targets, Auto DM being limited to one selected character, Auto Mode turning itself off while switching/typing, and group members replying multiple times when Auto Mode should control autonomous turns.
-- Improved group UI alignment by lining up member rows and model override controls, and removed redundant Narrate Turn, Narrator Merge, and One at a time controls.
+### Group Chats
+- Added Recent Chats tabs for All, Individual, and Group chats, and fixed empty/new group chats so they save, register, branch, and reappear correctly.
+- Added bottom-bar group controls for choosing who speaks next/now, Auto Mode, Auto DM, manual DM mode, and separate per-character DM chat files.
+- Added private DM badges, forced DM mode inside DM chats, a Return to Group button, and participant-only DM visibility so uninvited characters cannot read or reply to private DM context.
+- Added context-aware group replies: direct name calls trigger the addressed character, group-wide phrases trigger all eligible speakers, and autonomous replies stop after a three-message anti-loop cap.
+- Added AI-generated 24-hour schedules with generation toasts, system-time awareness, delayed catch-up behavior after downtime, and optional auto-messaging.
+- Improved group chat defaults and mobile usability by keeping Auto Mode off by default, using a 120-second delay when enabled, starting new group chats empty, and compacting group speaker controls on small screens.
+- Removed redundant group modes and controls, including Narrator Merge, One at a time, and the old Narrate Turn flow.
+
+### Added
+- Added bundled Chat Completions presets for `Geechan - Universal Roleplay (Chat Completions) (v5.0)` and `Geechan's Chatroom Prompt`, with `Geechan's Chatroom Prompt` defaulting to a 256k context window.
+- Added an In-Chat Agents master on/off button and an option to separate Agent chats from normal Individual and Group Recent Chats.
+- Added a separate UI for Pathfinder memory summaries, including editable summary text and injection status.
+
+### Fixed
+- Fixed the built-in updater so `Auto-clear cache after updates` clears frontend cache before the post-update reload.
+- Fixed mobile overflow in the Agents Quick Toggles area.
+- Fixed group chat creation with custom names/member sets so matching groups are reused and new chat branches are easier to return to.
+- Fixed several group DM edge cases, including stale DM targets, Auto DM applying only to one selected character, and characters replying when Auto Mode was off.
 
 ## v1.4.2
 

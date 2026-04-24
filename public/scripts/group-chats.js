@@ -544,6 +544,29 @@ async function returnToMainGroupChat() {
     await createNewGroupChat(group.id);
 }
 
+async function updateGroupDmReturnTarget(chatId, mainGroupChatId) {
+    if (!chatId || !mainGroupChatId || chatId === mainGroupChatId) {
+        return;
+    }
+
+    const data = await loadGroupChat(chatId);
+    if (!Array.isArray(data) || !data.length || !Object.hasOwn(data[0], 'chat_metadata')) {
+        return;
+    }
+
+    const header = { ...data[0], chat_metadata: { ...(data[0].chat_metadata || {}), main_group_chat_id: mainGroupChatId } };
+    const saveChatRequest = await compressRequest({
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify({ id: chatId, chat: [header, ...data.slice(1)], force: true }),
+    });
+    const response = await fetch('/api/chats/group/save', saveChatRequest);
+
+    if (!response.ok) {
+        console.warn('Could not update DM chat return target', chatId, response);
+    }
+}
+
 async function openSelectedGroupDmChat() {
     const group = selected_group ? groups.find(x => x.id === selected_group) : null;
     if (!group || !selectedGroupSpeakerAvatar) {
@@ -552,6 +575,7 @@ async function openSelectedGroupDmChat() {
     }
 
     const character = characters.find(x => x.avatar === selectedGroupSpeakerAvatar);
+    const previousGroupChatId = isGroupDmChatMetadata() ? String(chat_metadata.main_group_chat_id || '') : group.chat_id;
     const dmChatName = getGroupDmChatName(group, character);
     if (!group.chats.includes(dmChatName)) {
         const startIndex = getGroupDmThreadStartIndex(selectedGroupSpeakerAvatar);
@@ -574,6 +598,10 @@ async function openSelectedGroupDmChat() {
             await printMessages();
             await saveChatConditional();
         }
+    }
+
+    if (group.chats.includes(dmChatName)) {
+        await updateGroupDmReturnTarget(dmChatName, previousGroupChatId);
     }
 
     selectedGroupSpeakerAvatar = selectedGroupSpeakerAvatar || character.avatar;
@@ -737,7 +765,7 @@ export const group_generation_mode = {
     APPEND_DISABLED: 2,
 };
 
-export const DEFAULT_AUTO_MODE_DELAY = 30;
+export const DEFAULT_AUTO_MODE_DELAY = 120;
 
 export const groupCandidatesFilter = new FilterHelper(debounce(printGroupCandidates, debounce_timeout.quick));
 export const groupMembersFilter = new FilterHelper(debounce(printGroupMembers, debounce_timeout.quick));
@@ -754,10 +782,13 @@ function setAutoModeWorker() {
     groupScheduleCheckInterval = setInterval(groupScheduleAutoMessageWorker, 60 * 1000);
 }
 
-function enableGroupAutoMode() {
-    is_group_automode_enabled = true;
-    $('#rm_group_automode').prop('checked', true);
+function syncGroupAutoModeToggle() {
+    $('#rm_group_automode').prop('checked', is_group_automode_enabled);
     setAutoModeWorker();
+}
+
+function hasUserDraftInChatBox() {
+    return String($('#send_textarea').val() || '').trim().length > 0;
 }
 
 /**
@@ -2144,7 +2175,7 @@ async function groupChatAutoModeWorker() {
         return;
     }
 
-    if (!selected_group || is_send_press || is_group_generating) {
+    if (!selected_group || is_send_press || is_group_generating || hasUserDraftInChatBox()) {
         return;
     }
 
@@ -2164,7 +2195,7 @@ async function groupChatAutoModeWorker() {
 }
 
 async function triggerImmediateMentionedGroupReply(messageId) {
-    if (!is_group_automode_enabled || online_status === 'no_connection' || is_send_press || !selected_group) {
+    if (!is_group_automode_enabled || online_status === 'no_connection' || is_send_press || hasUserDraftInChatBox() || !selected_group) {
         return;
     }
 
@@ -2197,7 +2228,7 @@ async function triggerImmediateMentionedGroupReply(messageId) {
 }
 
 async function triggerImmediateWholeGroupReply(messageId) {
-    if (!is_group_automode_enabled || online_status === 'no_connection' || is_send_press || is_group_generating || !selected_group) {
+    if (!is_group_automode_enabled || online_status === 'no_connection' || is_send_press || hasUserDraftInChatBox() || is_group_generating || !selected_group) {
         return;
     }
 
@@ -2222,7 +2253,7 @@ async function triggerImmediateWholeGroupReply(messageId) {
 }
 
 async function groupScheduleAutoMessageWorker() {
-    if (online_status === 'no_connection' || !selected_group || is_send_press || is_group_generating) {
+    if (online_status === 'no_connection' || !selected_group || is_send_press || is_group_generating || hasUserDraftInChatBox()) {
         return;
     }
 
@@ -2977,7 +3008,7 @@ export async function openGroupById(groupId) {
             setEditedMessageId(undefined);
             updateChatMetadata({}, true);
             await getGroupChat(groupId);
-            enableGroupAutoMode();
+            syncGroupAutoModeToggle();
             return true;
         }
     }
@@ -3168,7 +3199,7 @@ export async function createNewGroupChat(groupId) {
 
     await editGroup(group.id, true, false);
     await getGroupChat(group.id);
-    enableGroupAutoMode();
+    syncGroupAutoModeToggle();
 }
 
 /**
@@ -3224,7 +3255,7 @@ export async function openGroupChat(groupId, chatId) {
 
     await editGroup(groupId, true, false);
     await getGroupChat(groupId);
-    enableGroupAutoMode();
+    syncGroupAutoModeToggle();
 }
 
 /**
