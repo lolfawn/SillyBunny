@@ -589,12 +589,163 @@ function renderRetrievalLog() {
         return;
     }
 
-    const text = items.map(formatRetrievalLogItem).filter(Boolean).join('\n\n');
+    const text = formatRetrievalLog(items);
     output.text(text || 'No Pathfinder retrieval activity recorded yet.');
 }
 
+function formatTime(timestamp) {
+    return timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '--:--:--';
+}
+
+function compactText(value, maxLength = 220) {
+    const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+    return text.length > maxLength ? `${text.slice(0, maxLength - 1).trimEnd()}…` : text;
+}
+
+function formatCount(count, noun) {
+    const value = Number(count) || 0;
+    return `${value} ${noun}${value === 1 ? '' : 's'}`;
+}
+
+function formatRetrievalMode(mode) {
+    switch (mode) {
+        case 'pipeline': return 'Pipeline retrieval';
+        case 'tool-retrieval': return 'Tool/legacy retrieval';
+        default: return 'Pathfinder retrieval';
+    }
+}
+
+function formatStageLine(stage) {
+    const stageNumber = Number.isFinite(Number(stage.stageIndex)) ? Number(stage.stageIndex) + 1 : null;
+    const label = stage.promptName || stage.stageName || stage.promptId || (stageNumber ? `Stage ${stageNumber}` : 'Stage');
+    const status = stage.success === false ? 'failed' : (stage.skipped ? 'skipped' : 'completed');
+    const count = stage.entriesFound ?? stage.selectedEntries ?? 0;
+    const extras = [];
+
+    if (stage.reason) extras.push(stage.reason);
+    if (stage.error) extras.push(`Error: ${stage.error}`);
+    if (stage.reasoning) extras.push(`Reasoning: ${compactText(stage.reasoning, 180)}`);
+
+    return `  ${stageNumber ? `${stageNumber}. ` : '- '}${label}: ${status}, ${formatCount(count, 'entry')}${extras.length ? ` — ${extras.join('; ')}` : ''}`;
+}
+
+function formatRetrievalDetail(item) {
+    const selectedEntries = Array.isArray(item.selectedEntries) ? item.selectedEntries : [];
+    const stageResults = Array.isArray(item.stageResults) ? item.stageResults : [];
+    const metadata = item.metadata || {};
+    const injectedPrompt = String(item.injectedPrompt || '');
+    const lines = [
+        `▸ ${formatRetrievalMode(item.mode)} at ${formatTime(item.timestamp)}`,
+        `  Lorebooks: ${(item.books || []).join(', ') || 'none'}`,
+        `  Result: ${formatCount(selectedEntries.length, 'entry')} selected${metadata.candidateCount !== undefined ? ` from ${formatCount(metadata.candidateCount, 'candidate')}` : ''}`,
+    ];
+
+    if (metadata.reason) {
+        lines.push(`  Note: ${metadata.reason.replace(/-/g, ' ')}`);
+    }
+
+    if (stageResults.length > 0) {
+        lines.push('', '  Stages:');
+        lines.push(...stageResults.map(formatStageLine));
+    }
+
+    if (selectedEntries.length > 0) {
+        lines.push('', '  Selected lore:');
+        for (const entry of selectedEntries.slice(0, 12)) {
+            const name = entry.name || 'Untitled entry';
+            const book = entry.bookName ? ` · ${entry.bookName}` : '';
+            const uid = entry.uid !== null && entry.uid !== undefined ? ` · uid ${entry.uid}` : '';
+            lines.push(`  - ${name}${book}${uid}`);
+            if (entry.preview) {
+                lines.push(`    ${compactText(entry.preview, 180)}`);
+            }
+        }
+        if (selectedEntries.length > 12) {
+            lines.push(`  - …and ${selectedEntries.length - 12} more`);
+        }
+    }
+
+    if (injectedPrompt) {
+        lines.push('', `  Injected context: ${formatCount(injectedPrompt.length, 'character')}`);
+        lines.push(`  ${compactText(injectedPrompt, 300)}`);
+    } else {
+        lines.push('', '  Injected context: none');
+    }
+
+    if (metadata.error) {
+        lines.push('', `  Error: ${metadata.error}`);
+    }
+
+    return lines.join('\n');
+}
+
+function formatPipelineSummary(items) {
+    const pipelineEvents = items.filter(item => item.type?.startsWith?.('pipeline_'));
+    if (!pipelineEvents.length) {
+        return '';
+    }
+
+    const latestStart = pipelineEvents.find(item => item.type === 'pipeline_start');
+    const latestComplete = pipelineEvents.find(item => item.type === 'pipeline_complete');
+    const latestError = pipelineEvents.find(item => item.type === 'pipeline_error');
+    const startedStages = pipelineEvents.filter(item => item.type === 'pipeline_stage_start').length;
+    const completedStages = pipelineEvents.filter(item => item.type === 'pipeline_stage_complete').length;
+
+    const lines = ['Recent pipeline activity:'];
+    if (latestStart) lines.push(`  Started “${latestStart.pipelineName}” at ${formatTime(latestStart.timestamp)} (${formatCount(latestStart.stageCount, 'stage')}).`);
+    if (latestComplete) lines.push(`  Finished with ${formatCount(latestComplete.totalEntries, 'entry')} across ${formatCount(latestComplete.stageResults, 'stage result')}.`);
+    if (latestError) lines.push(`  Last error: ${latestError.stageName || latestError.pipelineName}: ${latestError.error}`);
+    if (!latestComplete && !latestError) lines.push(`  Progress: ${completedStages}/${startedStages || '?'} stages completed.`);
+
+    return lines.join('\n');
+}
+
+function formatToolActivity(items) {
+    const toolItems = items.filter(item => item.type?.startsWith?.('tool_call_')).slice(0, 8);
+    if (!toolItems.length) {
+        return '';
+    }
+
+    const lines = ['Recent tool activity:'];
+    for (const item of toolItems) {
+        if (item.type === 'tool_call_started') {
+            lines.push(`  - ${formatTime(item.timestamp)} ${item.toolName}: started`);
+        } else if (item.type === 'tool_call_completed') {
+            const result = typeof item.result === 'string' ? item.result : JSON.stringify(item.result);
+            lines.push(`  - ${formatTime(item.timestamp)} ${item.toolName}: completed — ${compactText(result, 180)}`);
+        } else if (item.type === 'tool_call_error') {
+            lines.push(`  - ${formatTime(item.timestamp)} ${item.toolName}: failed — ${item.error}`);
+        }
+    }
+    return lines.join('\n');
+}
+
+function formatRetrievalLog(items) {
+    const latestDetail = items.find(item => item.type === 'pathfinder_retrieval_detail');
+    const sections = [];
+
+    if (latestDetail) {
+        sections.push(formatRetrievalDetail(latestDetail));
+    } else {
+        sections.push('No completed retrieval summary yet. Refresh after Pathfinder runs, or check pipeline/tool activity below.');
+    }
+
+    const pipelineSummary = formatPipelineSummary(items);
+    if (pipelineSummary) sections.push(pipelineSummary);
+
+    const toolActivity = formatToolActivity(items);
+    if (toolActivity) sections.push(toolActivity);
+
+    const legacyRetrieval = items.find(item => item.type === 'sidecar_retrieval');
+    if (legacyRetrieval && latestDetail?.mode !== 'tool-retrieval') {
+        sections.push(`Legacy retrieval: selected ${formatCount(legacyRetrieval.entryCount, 'entry')} from waypoint IDs ${(legacyRetrieval.nodeIds || []).join(', ') || 'none'}.`);
+    }
+
+    return sections.filter(Boolean).join('\n\n');
+}
+
 function formatRetrievalLogItem(item) {
-    const timestamp = item?.timestamp ? new Date(item.timestamp).toLocaleTimeString() : '--:--:--';
+    const timestamp = formatTime(item?.timestamp);
 
     switch (item.type) {
         case 'pathfinder_retrieval_detail': {
