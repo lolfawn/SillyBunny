@@ -475,6 +475,20 @@ function getCastPrimaryAiActor() {
     };
 }
 
+
+function getCastPrimaryAiActorName() {
+    return getCastPrimaryAiActor()?.name?.trim() || name2;
+}
+
+function getCastPrimaryAiActorAvatar() {
+    return getCastPrimaryAiActor()?.avatar || '';
+}
+
+function getCastPrimaryAiActorChid() {
+    const avatar = getCastPrimaryAiActorAvatar();
+    return avatar ? characters.findIndex(character => character?.avatar === avatar) : -1;
+}
+
 function getCastUserActorName() {
     return getCastUserActor()?.name?.trim() || name1;
 }
@@ -3181,7 +3195,7 @@ export function substituteParamsLegacy(content, _name1, _name2, _original, _grou
 
     // Must be substituted last so that they're replaced inside {{description}}
     environment.user = _name1 ?? getCastUserActorName();
-    environment.char = _name2 ?? name2;
+    environment.char = _name2 ?? getCastPrimaryAiActorName();
     environment.group = environment.charIfNotGroup = getGroupValue(true);
     environment.groupNotMuted = getGroupValue(false);
     environment.notChar = getNotCharValue();
@@ -3230,7 +3244,7 @@ export function substituteParams(content, options = {}) {
     const ctx = /** @type {import('./scripts/macros/engine/MacroEnvBuilder.js').MacroEnvRawContext} */ ({
         content,
         name1Override: options.name1Override ?? getCastUserActorName(),
-        name2Override: options.name2Override,
+        name2Override: options.name2Override ?? getCastPrimaryAiActorName(),
         original: options.original,
         groupOverride: options.groupOverride,
         replaceCharacterCard: options.replaceCharacterCard ?? true,
@@ -3260,8 +3274,8 @@ export function getStoppingStrings(isImpersonate, isContinue, api = main_api) {
     const result = [];
 
     if (power_user.context.names_as_stop_strings) {
-        const charString = `\n${name2}:`;
-        const userString = `\n${name1}:`;
+        const charString = `\n${getCastPrimaryAiActorName()}:`;
+        const userString = `\n${getCastUserActorName()}:`;
         result.push(isImpersonate ? charString : userString);
 
         result.push(userString);
@@ -3631,11 +3645,15 @@ export function createLazyFields(resolvers) {
  * @returns {CharacterCardFields} Character card fields with lazy evaluation
  */
 export function getCharacterCardFieldsLazy({ chid = undefined } = {}) {
-    const currentChid = chid ?? this_chid;
+    const castAiActorChid = chid === undefined ? getCastPrimaryAiActorChid() : -1;
+    const currentChid = chid ?? (castAiActorChid >= 0 ? castAiActorChid : this_chid);
     const character = characters[currentChid];
+    const castAiActorActive = chid === undefined && castAiActorChid >= 0;
+    const userActorName = getCastUserActorName();
+    const aiActorName = castAiActorActive ? getCastPrimaryAiActorName() : name2;
 
-    // For group chats, we need to check if group cards should be used
-    const useGroupCards = selected_group && character;
+    // For group chats, we need to check if group cards should be used. Cast AI assignments intentionally use the card directly.
+    const useGroupCards = selected_group && character && !castAiActorActive;
     const groupCardsLazy = useGroupCards ? getGroupCharacterCardsLazy(selected_group, Number(currentChid)) : null;
 
     /** @type {Record<string, () => string|string[]>} */
@@ -3644,54 +3662,54 @@ export function getCharacterCardFieldsLazy({ chid = undefined } = {}) {
         system: () => {
             if (!character) return '';
             const systemPrompt = chat_metadata.system_prompt || character.data?.system_prompt || '';
-            return power_user.prefer_character_prompt ? baseChatReplace(systemPrompt.trim()) : '';
+            return power_user.prefer_character_prompt ? baseChatReplace(systemPrompt.trim(), userActorName, aiActorName) : '';
         },
         jailbreak: () => {
             if (!character) return '';
-            return power_user.prefer_character_jailbreak ? baseChatReplace(character.data?.post_history_instructions?.trim()) : '';
+            return power_user.prefer_character_jailbreak ? baseChatReplace(character.data?.post_history_instructions?.trim(), userActorName, aiActorName) : '';
         },
         version: () => character?.data?.character_version ?? '',
         charDepthPrompt: () => {
             if (!character) return '';
-            return baseChatReplace(character.data?.extensions?.depth_prompt?.prompt?.trim());
+            return baseChatReplace(character.data?.extensions?.depth_prompt?.prompt?.trim(), userActorName, aiActorName);
         },
         creatorNotes: () => {
             if (!character) return '';
-            return baseChatReplace(character.data?.creator_notes?.trim());
+            return baseChatReplace(character.data?.creator_notes?.trim(), userActorName, aiActorName);
         },
         // These four fields may be overridden by group cards
         description: () => {
             if (groupCardsLazy) return groupCardsLazy.description;
             if (!character) return '';
-            return baseChatReplace(character.description?.trim());
+            return baseChatReplace(character.description?.trim(), userActorName, aiActorName);
         },
         personality: () => {
             if (groupCardsLazy) return groupCardsLazy.personality;
             if (!character) return '';
-            return baseChatReplace(character.personality?.trim());
+            return baseChatReplace(character.personality?.trim(), userActorName, aiActorName);
         },
         scenario: () => {
             if (groupCardsLazy) return groupCardsLazy.scenario;
             if (!character) return '';
             const scenarioText = chat_metadata.scenario || character.scenario || '';
-            return baseChatReplace(scenarioText.trim());
+            return baseChatReplace(scenarioText.trim(), userActorName, aiActorName);
         },
         mesExamples: () => {
             if (groupCardsLazy) return groupCardsLazy.mesExamples;
             if (!character) return '';
             const exampleDialog = chat_metadata.mes_example || character.mes_example || '';
-            return baseChatReplace(exampleDialog.trim());
+            return baseChatReplace(exampleDialog.trim(), userActorName, aiActorName);
         },
         firstMessage: () => {
             if (!character) return '';
             const firstMes = character.first_mes?.trim() || '';
-            return baseChatReplace(firstMes);
+            return baseChatReplace(firstMes, userActorName, aiActorName);
         },
         alternateGreetings: () => {
             if (!character) return [];
             const altGreetings = character.data?.alternate_greetings;
             if (!Array.isArray(altGreetings)) return [];
-            return altGreetings.map(greeting => baseChatReplace(greeting?.trim()));
+            return altGreetings.map(greeting => baseChatReplace(greeting?.trim(), userActorName, aiActorName));
         },
     };
 
@@ -6856,8 +6874,8 @@ export function cleanUpMessage({ getMessage, isImpersonate, isContinue, displayI
         // This only occurs if the corresponding "power_user.allow_nameX_display" is false.
 
         let wrongName = isImpersonate
-            ? (!power_user.allow_name2_display ? name2 : '')  // char
-            : (!power_user.allow_name1_display ? name1 : '');  // user
+            ? (!power_user.allow_name2_display ? getCastPrimaryAiActorName() : '')  // char
+            : (!power_user.allow_name1_display ? getCastUserActorName() : '');  // user
 
         if (wrongName) {
             // If the message starts with the wrong name, delete the entire response
@@ -6911,8 +6929,11 @@ export function cleanUpMessage({ getMessage, isImpersonate, isContinue, displayI
     }
 
     if (!power_user.allow_name2_display) {
-        const name2Escaped = escapeRegex(name2);
-        getMessage = getMessage.replace(new RegExp(`(^|\n)${name2Escaped}:\\s*`, 'g'), '$1');
+        const namesToStrip = [name2, getCastPrimaryAiActorName()].filter(onlyUnique);
+        for (const name of namesToStrip) {
+            const nameEscaped = escapeRegex(name);
+            getMessage = getMessage.replace(new RegExp(`(^|\n)${nameEscaped}:\\s*`, 'g'), '$1');
+        }
     }
 
     if (isImpersonate) {
@@ -6928,8 +6949,8 @@ export function cleanUpMessage({ getMessage, isImpersonate, isContinue, displayI
         // If this isn't an impersonation, trim "{{char}}:" from the beginning.
         // Only applied when the corresponding "power_user.allow_nameX_display" is false.
         const nameToTrim2 = isImpersonate
-            ? (!power_user.allow_name1_display ? name1 : '')  // user
-            : (!power_user.allow_name2_display ? name2 : '');  // char
+            ? (!power_user.allow_name1_display ? getCastUserActorName() : '')  // user
+            : (!power_user.allow_name2_display ? getCastPrimaryAiActorName() : '');  // char
 
         if (nameToTrim2 && getMessage.startsWith(nameToTrim2 + ':')) {
             getMessage = getMessage.replace(nameToTrim2 + ':', '');
@@ -7105,7 +7126,8 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         const newMessage = {};
         chat.push(newMessage);
         newMessage.extra = {};
-        newMessage.name = name2;
+        const castAiActor = getCastPrimaryAiActor();
+        newMessage.name = castAiActor?.name || name2;
         newMessage.is_user = false;
         newMessage.send_date = getMessageTimeStamp();
         newMessage.extra.api = getGeneratingApi();
@@ -7127,7 +7149,10 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
             newMessage.extra.token_count = await getTokenCountAsync(tokenCountText, 0);
         }
 
-        if (selected_group) {
+        if (castAiActor?.avatar) {
+            newMessage.force_avatar = getThumbnailUrl('avatar', castAiActor.avatar);
+            newMessage.original_avatar = castAiActor.avatar;
+        } else if (selected_group) {
             console.debug('entering chat update for groups');
             let avatarImg = 'img/ai4.png';
             if (characters[this_chid].avatar != 'none') {
