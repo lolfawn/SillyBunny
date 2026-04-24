@@ -4211,6 +4211,24 @@ function populateCastSelect(select, characters, selectedAvatar, emptyLabel) {
     }
 }
 
+function populateCastMultiSelect(select, characters, selectedAvatars) {
+    select.replaceChildren();
+    const selected = new Set(selectedAvatars.filter(Boolean));
+
+    for (const character of characters) {
+        const option = createElement('option', {
+            text: character.name,
+            attrs: { value: character.avatar },
+        });
+        option.selected = selected.has(character.avatar);
+        select.appendChild(option);
+    }
+}
+
+function getSelectedCastValues(select) {
+    return Array.from(select.selectedOptions).map(option => option.value).filter(Boolean);
+}
+
 async function refreshCastRolesPanel() {
     const refs = getCastRolesRefs();
 
@@ -4230,11 +4248,15 @@ async function refreshCastRolesPanel() {
         const cast = castRoles.getCastAssignments();
         const characters = getCastCharacterList(context);
         const primaryAiActor = cast.aiActors.find(actor => actor.primary) || cast.aiActors[0] || getActiveAiActorFallback(context);
+        const selectedAiAvatars = cast.aiActors.map(actor => actor.avatar).filter(Boolean);
 
         populateCastSelect(refs.userSelect, characters, cast.userActor?.avatar || '', 'Use current Persona / default user');
-        populateCastSelect(refs.aiSelect, characters, primaryAiActor?.avatar || '', 'Use selected character / group');
+        populateCastMultiSelect(refs.aiSelect, characters, selectedAiAvatars);
         renderCastActorSummary(refs.userSummary, cast.userActor, { fallbackText: 'Current Persona', control: 'user' });
         renderCastActorSummary(refs.aiSummary, primaryAiActor, { fallbackText: 'Selected character or group', control: 'ai' });
+        refs.aiHint.textContent = selectedAiAvatars.length
+            ? `${selectedAiAvatars.length} AI actor${selectedAiAvatars.length === 1 ? '' : 's'} selected. The first selected actor is primary.`
+            : 'No AI cast override selected. The current selected character or group remains the fallback.';
 
         for (const checkbox of refs.optionCheckboxes || []) {
             const optionKey = checkbox.getAttribute('data-cast-option');
@@ -4310,8 +4332,9 @@ async function applyCastSelection(kind, avatar) {
                 castRoles.clearUserActor();
             }
         } else if (kind === 'ai') {
-            if (avatar) {
-                castRoles.setAiActorsFromCharacters([avatar]);
+            const avatars = Array.isArray(avatar) ? avatar : [avatar].filter(Boolean);
+            if (avatars.length) {
+                castRoles.setAiActorsFromCharacters(avatars);
             } else {
                 const cast = castRoles.getCastAssignments();
                 cast.aiActors = [];
@@ -4399,7 +4422,8 @@ function buildCastRolesPanel() {
     const userSummary = createElement('div', { className: 'sb-cast-summary' });
     const aiField = createElement('label', { className: 'sb-cast-field' });
     const aiFieldTitle = createElement('span', { text: 'AI plays as' });
-    const aiSelect = createElement('select', { className: 'text_pole sb-cast-select', attrs: { 'aria-label': 'AI plays as' } });
+    const aiSelect = createElement('select', { className: 'text_pole sb-cast-select sb-cast-multi-select', attrs: { 'aria-label': 'AI plays as', multiple: 'multiple', size: '6' } });
+    const aiHint = createElement('small', { className: 'sb-cast-field-hint', text: 'Select one or more AI-controlled character cards.' });
     const aiSummary = createElement('div', { className: 'sb-cast-summary' });
     const optionsCard = createElement('div', { className: 'sb-cast-options' });
     const optionsTitle = createElement('span', { className: 'sb-cast-options-title', text: 'Behavior options' });
@@ -4432,7 +4456,7 @@ function buildCastRolesPanel() {
     copy.append(title, description);
     header.append(copy, statusPill);
     userField.append(userFieldTitle, userSelect, userSummary);
-    aiField.append(aiFieldTitle, aiSelect, aiSummary);
+    aiField.append(aiFieldTitle, aiSelect, aiHint, aiSummary);
     grid.append(userField, aiField);
     optionsCard.append(optionsTitle, userCardOption.option, lorebookOption.option, controlOption.option, splitOption.option);
     actions.append(refreshButton, resetButton);
@@ -4447,6 +4471,7 @@ function buildCastRolesPanel() {
         aiSelect,
         userSummary,
         aiSummary,
+        aiHint,
         optionCheckboxes,
         refreshButton,
         resetButton,
@@ -4456,7 +4481,7 @@ function buildCastRolesPanel() {
         void applyCastSelection('user', userSelect.value);
     });
     aiSelect.addEventListener('change', () => {
-        void applyCastSelection('ai', aiSelect.value);
+        void applyCastSelection('ai', getSelectedCastValues(aiSelect));
     });
     refreshButton.addEventListener('click', () => scheduleCastRolesRefresh(0));
     resetButton.addEventListener('click', () => {

@@ -4072,3 +4072,13 @@ body.sb-shell-resizing * {
     opacity: 0.68;
     line-height: 1.35;
 }
+
+.sb-cast-multi-select {
+    min-height: 132px;
+    padding-block: 8px;
+}
+
+.sb-cast-field-hint {
+    opacity: 0.68;
+    line-height: 1.35;
+}
