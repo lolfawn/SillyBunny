@@ -1,28 +1,21 @@
 # 🐰 SillyBunny 🐰
+<div>
+<img src="screenshots/banner.jpg" width="100%">
+</div>
 
-An elegant fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), designed with a cleaner, shell-based UI; Bun-based backend; built-in tutorials, presets, extensions, and a quick-start dashboard; and a lightweight agnetic system to faciliate modern agent functionality.
+---
+
+An elegant fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), designed with a cleaner, graphical shell UI; Bun-based backend; built-in tutorials, presets, extensions, and a quick-start dashboard; and a lightweight agnetic system to faciliate modern agent functionality.
 
 > [!WARNING]
 > This is an in-dev fork, and is considered beta quality. [Please direct all issues to this project's issue tracker.](https://github.com/platberlitz/SillyBunny/issues)
 >
 > Disclaimer: LLMs are used to facilitate development of this fork. Overall software design, prompting, testing, and documentation are handled by humans. To keep things simple, we try to maintain close to upstream as possible.
----
-## At a glance
 
-| | |
-|-|-|
-| **UI** | Custom navigation shell with search, themes, and mobile layout |
-| **Runtime** | Bun (auto-installed), Node.js fallback |
-| **Bundled Goodies** | Pre-bundled RP presets, complementary extensions, and additional themes, alongside built-in detailed tutorials |
-| **Agents** | Built-in In-Chat Agents for modular RP prompting |
-| **Data** | Drop-in compatible with SillyTavern settings, characters, chats, presets, and extensions |
-| **Default port** | `4444` |
+<details>
+<summary><h2>Screenshots</h2></summary>
 
----
-
-## User Interface
-
-These screenshots show the refreshed `v1.4.0` shell-based UI across Navigate, Customize, Agents, Characters, Search, and a Bunny Guide in-chat view on desktop and mobile.
+These screenshots show the graphical shell UI across Navigate, Customize, Agents, Characters, Search, and a Bunny Guide in-chat view on desktop and mobile.
 
 #### Desktop
 
@@ -48,9 +41,38 @@ These screenshots show the refreshed `v1.4.0` shell-based UI across Navigate, Cu
 | :---: | :---: | :---: |
 | <img src="screenshots/sillybunny-ui-mobile-characters-v1.4.0.png" alt="Mobile Characters Menu" width="100%"> | <img src="screenshots/sillybunny-ui-mobile-search-v1.4.0.png" alt="Mobile Search" width="100%"> | <img src="screenshots/sillybunny-ui-mobile-in-chat-v1.4.0.png" alt="Mobile Bunny Guide Chat" width="100%"> |
 
+</details>
+
 ---
 
-## Quick Start
+## Table of Contents
+* [At a Glance](#at-a-glance)
+* [Installation](#installation)
+    * [macOS Notes](#macos-notes)
+    * [Termux (Android) Notes](#termux-android-notes)
+    * [Update Instructions](#how-to-update)
+* [Project Goals](#project-goals-aka-why-we-made-this-fork)
+* [Changes Compared to SillyTavern](#changes-vs-sillytavern)
+* [Latest Update](#latest-update)
+    * [v1.4.1 (2026-04-23)](#v141-2026-04-23)
+* [Upstream Information](#upstream-information)
+* [Contributors](#contributors)
+***
+
+## At a glance
+
+| | |
+|-|-|
+| **UI** | Custom navigation shell with search, themes, and mobile layout |
+| **Runtime** | Bun (auto-installed), Node.js fallback |
+| **Bundled Goodies** | Pre-bundled RP presets, complementary extensions, and additional themes, alongside built-in detailed tutorials |
+| **Agents** | Built-in In-Chat Agents for modular RP prompting |
+| **Data** | Drop-in compatible with SillyTavern settings, characters, chats, presets, and extensions |
+| **Default port** | `4444` |
+
+---
+
+## Installation
 
 [Grab the latest release here.](https://github.com/platberlitz/SillyBunny/releases/latest)
 
@@ -100,9 +122,7 @@ bash start.sh
 - The launcher defaults to Node.js + npm on native Termux (more reliable than Bun under grun)
 - To force Bun anyway: `SILLYBUNNY_TERMUX_RUNTIME=bun bash start.sh`
 - For shared storage access: `termux-setup-storage` once before starting
-
----
-
+  
 ### How to Update
 
 | What you want | Command |
@@ -112,6 +132,18 @@ bash start.sh
 | Update only, don't start | `./start.sh --self-update-only` |
 | Skip update check once | `./start.sh --skip-self-update` |
 | Disable auto-update permanently | `SILLYBUNNY_AUTO_UPDATE=0 ./start.sh` |
+
+---
+
+## Project Goals (AKA, why we made this fork)
+
+Our primary goals for SillyBunny are as follows:
+
+1) **Simple by default; powerful when needed.** Directly inspired by KDE Plasma's main driving philosophy, SillyBunny is aimed to be simple to understand and intuitive to use by default, with most of the complex settings hidden away from the default workspace. Sane defaults are implemented while all the extra complexity is hidden behind UI elements: still there, but less obtrusive. Our graphical shell best embodies this philosophy.
+2) **A focus on roleplay and storytelling.** SillyBunny has a more opinionated purpose compared to upstream SillyTavern. Our goals align closely with the creative writing scene for models, and the general direction of the fork is aimed for that use case. We facilitate this with pre-bundled tutorials/add-ons/presets designed to get you started with LLM creative writing in fun ways.
+3) **Modernised features.** We aim to implement new features that can greatly take advantage of modern models and their strong, agnetic capabilities. Currently, this includes full support for In-Chat pre and post gen agents that complement the main generation. Models work best on smaller individual tasks, and this is best shown through in-chat agents and their capabilities. We're also looking into features like an RPG game mode that can take advantage of these agents.
+4) **Better performance.** Base SillyTavern relies on node.js for its runtime environment. While robust, this is not ideal for performance. We've switched to a Bun runtime to increase general performance and startup times, while optimising for lower power devices like smartphones.
+5) **Compatibility**. We remain as closely backwards compatible with upstream SillyTavern as possible. This facilitates easy synchronizing with upstream. We aim to not remove any pre-existing features, unless replacing with a direct alternative. The backend is already very solid, so primary work is done in the frontend space. In addition, we aim to make all our new features compatible with models of all sizes, not just the frontier, SOTA ones. Simplicity is key.
 
 ---
 
@@ -125,19 +157,17 @@ The original SillyTavern layout is replaced with a custom, easy-to-navigate grap
 - **Bottom bar**: New bottom bar designed for quick access to persona switching, quick chat switching, and add/edit/remove existing chat functionality.
 - **Panel-oriented navigation**: Easy access to all settings in nested panels. Collapsible settings sections in both Chat Completions and Text Completions presets.
 - **Global search**: A global search bar that queries across presets, lore, extensions, personas, and settings at once.
-- **Platform-aware**: Designed for both desktop and mobile, with a dedicated phone/tablet navigation layer
-- **Three modern shell themes**: Modern Glass, Clean Minimal, Bold Stylized
+- **Platform-aware**: Designed for both desktop and mobile, with a dedicated phone/tablet navigation layer.
+- **Three modern shell themes**: Modern Glass, Clean Minimal, Bold Stylized.
 - **Palette customization**: Easily change the accent colour of any theme you're currently using.
 
 ### Bun-first runtime
 
-Instead of node.js, this fork uses Bun. This results in consistently faster startups, overall performance, and automatic launcher bootstraping. Node.js is still fully functional as a fallback system.
+We primarily use Bun as a runtime, instead of node.js. This results in consistently faster startups, overall performance, and automatic launcher bootstraping. Node.js is still fully functional as a legacy fallback system.
 
 ### In-Chat Agnetic Support
 
-SillyBunny has support for In-Chat Agents. These are custom prompt fields that can run separately from the main generation, which allows for a lot of extra flexibility. Included are several pre-built prompts designed for trackers, post-gen cleanup, anti-slop, and more. Agents can use the main model or a different connection profile, allowing for a fast, smaller model to run long agnetic tasks with ease while a large, main model writes the actual story content.
-
-This feature is currently in beta. These are designed to fill the gap between full extensions and simple, modular agnetic functionality.
+SillyBunny has support for In-Chat Agents. These are custom prompt fields that can run separately from the main generation, which allows for a lot of extra flexibility. Included are several pre-built prompts designed for trackers, post-gen cleanup, anti-slop, and more. Agents can use the main model or a different connection profile, allowing for a fast, smaller model to run long agnetic tasks with ease while a large, main model writes the actual story content. These are designed to fill the gap between full extensions and simple, modular agnetic functionality.
 
 **Pipeline:**
 
@@ -185,20 +215,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Latest Update
 
-### v1.4.2 (2026-04-24)
-
-**Updated**
-
-- Fixed mobile shell icon sizing, Navigate/Customize switching, high Page Width character-panel sizing, and enlarged chat avatar sharpness.
-- Added Claude-only preset toggles to omit `temperature` and `top_p` from Anthropic Messages requests.
-- Improved Pathfinder retrieval logging for pipeline, legacy retrieval, injected context, stage results, and tool activity.
-- Updated DeepSeek thinking-mode handling, including the new `deepseek-v4` option, safer `reasoning_content` cleanup, and no logprobs on thinking models.
-- Aligned updater messages and admin update pulls with the current tracking branch, such as `origin/staging`.
-- Bumped app-owned version strings to `1.4.2`.
-
 ### v1.4.1 (2026-04-23)
-
-**Updated**
 
 - Restored World Info entry enable/disable behavior and tightened the World Info layout with smaller cards, narrower popup rows, and cleaner mobile/desktop spacing.
 - Added selectable multi-delete pickers for saved presets and connection profiles instead of delete-all-only flows.
@@ -207,37 +224,6 @@ SillyBunny includes some extras by default to help you get started right away:
 - Polished shell/UI consistency by aligning the reasoning token badge, matching bottom-bar sizing to the top bar, and preserving transparency for cropped avatars and alpha-capable thumbnails.
 - Hardened self-update behavior so existing Node/npm installs no longer dirty `package-lock.json` during routine updates.
 - Bumped the app version strings and default-user settings version to `1.4.1`.
-
-### v1.4.0 (2026-04-22)
-
-**Added**
-
-- A universal search flow for the shell, with Search available as a quick shortcut and shared results across Navigate and Customize.
-- A fuller home/launchpad experience, including persistent `Full Home`, `Compact`, and `List only` modes, bundled helpers, and launchpad shortcuts for common actions.
-- New UI customization tools, including a Google Font picker, accent color presets, and a custom RGB accent option.
-- More built-in agnetic and reasoning support, including visible reasoning-tag presets, extra Custom OpenAI-compatible reasoning presets, an agent cancel action, agent diff/history viewing, and Pathfinder auto-use for attached lorebooks.
-- Additional context-size presets and a server-admin branch switcher.
-
-**Removed or Changed**
-
-- Replaced the old per-panel settings search bars with a single universal search surface under the SillyBunny header.
-- Changed the default visual stack to the `Dark V1.0` UI theme with the `Clean Minimal` shell style.
-- Removed the Forest Dusk, Forest Dawn, and Rose Glow theme preset buttons.
-- Reworked the welcome/home surface so it opens correctly on fresh installs, keeps its controls visible across modes, and uses a cleaner launchpad/bundled-extras layout.
-- Refreshed the `v1.4.0` README screenshot gallery and removed the stale screenshot automation/docs flow that no longer matched the live shell.
-
-**Fixed**
-
-- Termux/Android text replacement and autocomplete behavior, so accepted keyboard corrections no longer append broken text in the send box.
-- Mobile layout and parity issues across checkboxes, toggles, prompt/settings rows, menu spacing, and shared control alignment.
-- Theme/font regressions, including self-hosted Figtree fallback behavior, legacy theme font aliases, stale brown shell colors, and Moonlit Echoes CSS/layout persistence issues.
-- Shell/navigation issues affecting launchpad toggling, Home active state/highlighting, Navigate/Customize switching, quick shortcuts, and welcome-panel sizing/reflow.
-- Pathfinder stability issues around saved settings rehydration, connection-profile selection, lorebook tree rebuilding, popup scrolling, and noisy diagnostics.
-- Reasoning/provider compatibility bugs affecting startup, token counters, OpenAI/Gemini response parsing, Gemini thought signatures, and visible reasoning controls.
-- Agent and message-tooling bugs affecting running toasts, post-processing visibility, structured-content handling, and message metadata sync.
-- Bottom-bar and persona behavior, including startup loading, chat switching, and persona selection when duplicate names exist.
-- Extension/runtime issues including duplicate extension cards, stale disabled-extension entries, minimum-version compatibility, reinstall flow, and ARM/Node update churn in `package-lock.json`.
-- Readability and maintenance issues, including flattened AI Studio/terminal debug logging and lint/async helper cleanup needed to keep the codebase green.
 
 [Find other changelogs in our Releases.](https://github.com/platberlitz/SillyBunny/releases)
 
@@ -260,5 +246,6 @@ If something feels off, compare against the upstream `release` branch first.
 
 - [Platberlitz](https://github.com/platberlitz)
 - [Geechan](https://github.com/Geechan)
+- [TheLonelyDevil9](https://github.com/TheLonelyDevil9)
 
 [Licensed as free software under the AGPL-3.0.](https://www.gnu.org/licenses/agpl-3.0.en.html)
