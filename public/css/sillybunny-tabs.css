@@ -2514,6 +2514,10 @@ body.sb-shell-resizing * {
     opacity: 0.72;
 }
 
+.sb-mobile-only-setting {
+    display: none;
+}
+
 .sb-theme-option-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -3118,6 +3122,55 @@ body.sb-shell-resizing * {
         --sb-home-toggle-min-width-base: 34px;
         --sb-proxy-underline-inset-base: 8px;
         --sb-proxy-underline-bottom-base: 4px;
+    }
+
+    .sb-mobile-only-setting {
+        display: flex;
+    }
+
+    #sb-topbar-inner {
+        grid-template-columns: 1fr auto 1fr;
+    }
+
+    #sb-topbar-primary .sb-topbar-group {
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: var(--sb-topbar-group-gap) !important;
+    }
+
+    #sb-topbar-primary .sb-proxy-button,
+    #sb-topbar-primary .sb-chatbar-button {
+        width: var(--sb-mobile-toggle-size) !important;
+        min-width: var(--sb-mobile-toggle-size) !important;
+        max-width: var(--sb-mobile-toggle-size) !important;
+        height: var(--sb-mobile-toggle-size) !important;
+        min-height: var(--sb-mobile-toggle-size) !important;
+        max-height: var(--sb-mobile-toggle-size) !important;
+        flex: 0 0 var(--sb-mobile-toggle-size) !important;
+        padding: 0 !important;
+        border-radius: calc(var(--sb-mobile-toggle-size) * 0.28) !important;
+        box-sizing: border-box !important;
+        line-height: 1 !important;
+        aspect-ratio: 1 / 1;
+    }
+
+    #sb-topbar-primary .sb-proxy-button span,
+    #sb-topbar-primary .sb-chatbar-button span {
+        display: none !important;
+    }
+
+    #sb-topbar-primary .sb-proxy-button i,
+    #sb-topbar-primary .sb-chatbar-button > i {
+        width: 1em !important;
+        height: 1em !important;
+        flex: 0 0 auto !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: calc(var(--sb-mobile-toggle-size) * 0.48) !important;
+        line-height: 1 !important;
+        margin: 0 !important;
+        transform: none !important;
     }
 
     #top-bar,

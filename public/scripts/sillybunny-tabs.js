@@ -710,12 +710,6 @@ function setBottomBarScale(value, { persist = true } = {}) {
     sbState.bottomBarScale = nextScale;
     document.documentElement.style.setProperty('--sb-bottom-bar-scale', scaleFactor);
 
-    // Apply scale to the bottom form via font-size scaling
-    const formSheld = document.getElementById('form_sheld');
-    if (formSheld) {
-        formSheld.style.fontSize = `calc(var(--mainFontSize) * ${scaleFactor})`;
-    }
-
     if (persist) {
         safeSetItem(SB_STORAGE_KEYS.bottomBarScale, String(nextScale));
     }
@@ -5728,8 +5722,8 @@ function injectSillyTavernImportCard() {
     updateSillyTavernImportInteractivity();
 }
 
-function createThemeSliderGroup({ title, valueId, inputId, value, min, max, step, ariaLabel, caption, onInput }) {
-    const sliderGroup = createElement('div', { className: 'sb-theme-slider-group' });
+function createThemeSliderGroup({ title, valueId, inputId, value, min, max, step, ariaLabel, caption, onInput, className = '' }) {
+    const sliderGroup = createElement('div', { className: `sb-theme-slider-group ${className}`.trim() });
     const sliderHeader = createElement('div', { className: 'sb-theme-slider-header' });
     const sliderTitle = createElement('strong', { text: title });
     const sliderValue = createElement('span', { id: valueId, className: 'sb-theme-slider-value' });
@@ -6000,6 +5994,7 @@ function injectThemePicker() {
         ariaLabel: 'Mobile button size',
         caption: 'Increase or decrease the mobile nav and mobile chat tool buttons without changing desktop controls.',
         onInput: nextValue => setMobileButtonScale(nextValue),
+        className: 'sb-mobile-only-setting',
     });
     const topbarLabelSettingsGroup = createTopbarLabelSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();

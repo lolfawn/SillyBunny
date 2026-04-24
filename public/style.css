@@ -124,9 +124,10 @@
     --shadowWidth: 0;
 
     /* Send form variables */
+    --sb-bottom-bar-scale: 1;
     --bottomFormBlockPadding: calc(var(--mainFontSize) / 2.5);
-    --bottomFormIconSize: calc(var(--mainFontSize) * 1.9);
-    --bottomFormBlockSize: var(--topBarBlockSize);
+    --bottomFormIconSize: calc(var(--mainFontSize) * 1.9 * var(--sb-bottom-bar-scale));
+    --bottomFormBlockSize: calc(var(--topBarBlockSize) * var(--sb-bottom-bar-scale));
 
     /*Top Bar Scaling Variables*/
     --topBarIconSize: calc(var(--mainFontSize) * 2);
