@@ -4241,7 +4241,7 @@ async function refreshCastRolesPanel() {
         refs.statusPill.dataset.tone = assignmentCount ? 'good' : '';
         setCastPanelMessage(
             assignmentCount
-                ? 'Cast assignments are saved to this chat only. User and AI actor names, avatars, macros, and card prompts are active for new messages.'
+                ? 'Cast assignments are saved to this chat only. User and AI actor names, avatars, macros, card prompts, and linked lorebooks are active for new messages.'
                 : 'No cast override is active. This chat still uses the normal Persona and selected character flow.',
             assignmentCount ? 'good' : '',
         );
@@ -4342,7 +4342,7 @@ function buildCastRolesPanel() {
     const callout = createElement('div', { className: 'sb-shell-callout' });
     callout.innerHTML = `
         <strong>Cast / Roles</strong>
-        <p>Assign character cards as chat actors. Cast cards can supply chat names, avatars, macros, and prompt context.</p>
+        <p>Assign character cards as chat actors. Cast cards can supply chat names, avatars, macros, prompt context, and linked lorebooks.</p>
     `;
 
     const card = createElement('section', { className: 'sb-admin-card sb-cast-card' });

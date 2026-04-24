@@ -88,6 +88,7 @@ const saveSettingsDebounced = debounce(() => {
 const sortFn = (a, b) => b.order - a.order;
 let updateEditor = (navigation, flashOnNav = true) => { console.debug('Triggered WI navigation', navigation, flashOnNav); };
 const WORLD_INFO_DESKTOP_SPLIT_QUERY = '(min-width: 961px)';
+const CAST_METADATA_KEY = 'cast';
 let desktopSelectedWorldInfoUid = null;
 
 // Do not optimize. updateEditor is a function that is updated by the displayWorldEntries with new data.
@@ -4575,6 +4576,150 @@ export async function createNewWorldInfo(worldName, { interactive = false } = {}
     return true;
 }
 
+
+function getCastActorAssignments() {
+    const cast = chat_metadata?.[CAST_METADATA_KEY];
+
+    if (!cast || cast.options?.includeActorLorebooks === false) {
+        return [];
+    }
+
+    const actors = [];
+
+    if (cast.userActor?.type === 'character') {
+        actors.push({ ...cast.userActor, castControl: 'user' });
+    }
+
+    if (Array.isArray(cast.aiActors)) {
+        for (const actor of cast.aiActors) {
+            if (actor?.type === 'character') {
+                actors.push({ ...actor, castControl: 'ai' });
+            }
+        }
+    }
+
+    return actors;
+}
+
+function getWorldNamesForCharacterIndex(chid) {
+    const character = characters[chid];
+    const worlds = [];
+    const baseWorldName = character?.data?.extensions?.world;
+
+    if (baseWorldName) {
+        worlds.push(baseWorldName);
+    }
+
+    if (chid !== undefined && chid !== null && chid >= 0) {
+        const fileName = getCharaFilename(chid);
+        const extraCharLore = world_info.charLore?.find((e) => e.name === fileName);
+
+        if (extraCharLore && Array.isArray(extraCharLore.extraBooks)) {
+            worlds.push(...extraCharLore.extraBooks);
+        }
+    }
+
+    return worlds.filter(Boolean).filter(onlyUnique);
+}
+
+function isWorldAlreadyActive(worldName) {
+    return selected_world_info.includes(worldName)
+        || chat_metadata[METADATA_KEY] === worldName
+        || power_user.persona_description_lorebook === worldName;
+}
+
+async function getCastActorLore() {
+    const actors = getCastActorAssignments();
+
+    if (!actors.length) {
+        return [];
+    }
+
+    const seenActorKeys = new Set();
+    const worldsToSearch = [];
+
+    for (const actor of actors) {
+        const avatar = String(actor.avatar || '');
+        const chid = characters.findIndex(character => character?.avatar === avatar);
+        const character = chid >= 0 ? characters[chid] : null;
+
+        if (!character) {
+            continue;
+        }
+
+        const actorKey = `${actor.castControl}:${avatar}`;
+        if (seenActorKeys.has(actorKey)) {
+            continue;
+        }
+        seenActorKeys.add(actorKey);
+
+        for (const worldName of getWorldNamesForCharacterIndex(chid)) {
+            if (isWorldAlreadyActive(worldName)) {
+                console.debug(`[WI] Cast ${actor.castControl} actor ${character.name}'s world ${worldName} is already active elsewhere. Skipping...`);
+                continue;
+            }
+
+            worldsToSearch.push({
+                worldName,
+                sourceActor: character.name,
+                sourceActorAvatar: character.avatar,
+                castControl: actor.castControl,
+            });
+        }
+    }
+
+    const seenWorlds = new Set();
+    let entries = [];
+
+    for (const source of worldsToSearch) {
+        const sourceKey = `${source.castControl}:${source.sourceActorAvatar}:${source.worldName}`;
+
+        if (seenWorlds.has(sourceKey)) {
+            continue;
+        }
+        seenWorlds.add(sourceKey);
+
+        const data = await loadWorldInfo(source.worldName);
+        const newEntries = data
+            ? Object.keys(data.entries).map((x) => data.entries[x]).map(({ uid, ...rest }) => ({
+                ...rest,
+                uid,
+                world: source.worldName,
+                sourceActor: source.sourceActor,
+                sourceActorAvatar: source.sourceActorAvatar,
+                castControl: source.castControl,
+                sourceType: 'castActorLore',
+            }))
+            : [];
+        entries = entries.concat(newEntries);
+
+        if (!newEntries.length) {
+            console.debug(`[WI] Cast ${source.castControl} actor ${source.sourceActor}'s world ${source.worldName} could not be found or is empty`);
+        }
+    }
+
+    console.debug(`[WI] Cast actor lore has ${entries.length} entries`, worldsToSearch.map(source => ({
+        world: source.worldName,
+        actor: source.sourceActor,
+        control: source.castControl,
+    })));
+    return entries;
+}
+
+function dedupeWorldInfoEntries(entries) {
+    const seen = new Set();
+    return entries.filter(entry => {
+        const key = `${entry.world}.${entry.uid}`;
+
+        if (seen.has(key)) {
+            return false;
+        }
+
+        seen.add(key);
+        return true;
+    });
+}
+
 async function getCharacterLore() {
     const character = characters[this_chid];
     const name = character?.name;
@@ -4697,35 +4842,37 @@ export async function getSortedEntries() {
             characterLore,
             chatLore,
             personaLore,
+            castActorLore,
         ] = await Promise.all([
             getGlobalLore(),
             getCharacterLore(),
             getChatLore(),
             getPersonaLore(),
+            getCastActorLore(),
         ]);
 
-        await eventSource.emit(event_types.WORLDINFO_ENTRIES_LOADED, { globalLore, characterLore, chatLore, personaLore });
+        await eventSource.emit(event_types.WORLDINFO_ENTRIES_LOADED, { globalLore, characterLore, chatLore, personaLore, castActorLore });
 
         let entries;
 
         switch (Number(world_info_character_strategy)) {
             case world_info_insertion_strategy.evenly:
-                entries = [...globalLore, ...characterLore].sort(sortFn);
+                entries = [...globalLore, ...characterLore, ...castActorLore].sort(sortFn);
                 break;
             case world_info_insertion_strategy.character_first:
-                entries = [...characterLore.sort(sortFn), ...globalLore.sort(sortFn)];
+                entries = [...characterLore.sort(sortFn), ...castActorLore.sort(sortFn), ...globalLore.sort(sortFn)];
                 break;
             case world_info_insertion_strategy.global_first:
-                entries = [...globalLore.sort(sortFn), ...characterLore.sort(sortFn)];
+                entries = [...globalLore.sort(sortFn), ...characterLore.sort(sortFn), ...castActorLore.sort(sortFn)];
                 break;
             default:
                 console.error('[WI] Unknown WI insertion strategy:', world_info_character_strategy, 'defaulting to evenly');
-                entries = [...globalLore, ...characterLore].sort(sortFn);
+                entries = [...globalLore, ...characterLore, ...castActorLore].sort(sortFn);
                 break;
         }
 
         // Chat lore always goes first, then persona lore, then the rest
-        entries = [...chatLore.sort(sortFn), ...personaLore.sort(sortFn), ...entries];
+        entries = dedupeWorldInfoEntries([...chatLore.sort(sortFn), ...personaLore.sort(sortFn), ...entries]);
 
         // Calculate hash and parse decorators. Split maps to preserve old hashes.
         entries = entries.map((entry) => {
