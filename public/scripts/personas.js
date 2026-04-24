@@ -12,7 +12,6 @@ import {
     getCurrentChatId,
     getRequestHeaders,
     getThumbnailUrl,
-    getCharaFilename,
     groupToEntity,
     menu_type,
     name1,
@@ -28,7 +27,7 @@ import {
 } from '../script.js';
 import { persona_description_positions, power_user } from './power-user.js';
 import { getTokenCountAsync } from './tokenizers.js';
-import { PAGINATION_TEMPLATE, clearInfoBlock, debounce, delay, download, ensureImageFormatSupported, flashHighlight, getBase64Async, getCharIndex, isFalseBoolean, isTrueBoolean, onlyUnique, parseJsonFile, setInfoBlock, localizePagination, renderPaginationDropdown, paginationDropdownChangeHandler, addLongPressEvent } from './utils.js';
+import { PAGINATION_TEMPLATE, clearInfoBlock, debounce, delay, download, ensureImageFormatSupported, flashHighlight, getBase64Async, getCharIndex, getCharaFilename, isFalseBoolean, isTrueBoolean, onlyUnique, parseJsonFile, setInfoBlock, localizePagination, renderPaginationDropdown, paginationDropdownChangeHandler, addLongPressEvent } from './utils.js';
 import { debounce_timeout } from './constants.js';
 import { FILTER_TYPES, FilterHelper } from './filters.js';
 import { groups, selected_group } from './group-chats.js';
