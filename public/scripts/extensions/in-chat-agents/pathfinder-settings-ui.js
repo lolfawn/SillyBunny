@@ -42,8 +42,15 @@ function ensureEnabledLorebooks(settings) {
 }
 
 function formatLorebookSourceLabel(sourceTypes) {
-    const orderedTypes = ['character', 'chat', 'global'];
-    const labels = orderedTypes.filter(type => sourceTypes.has(type));
+    const labelMap = {
+        castUser: 'cast user',
+        castAi: 'cast AI',
+        character: 'character',
+        chat: 'chat',
+        global: 'global',
+    };
+    const orderedTypes = ['castUser', 'castAi', 'character', 'chat', 'global'];
+    const labels = orderedTypes.filter(type => sourceTypes.has(type)).map(type => labelMap[type] || type);
     return labels.join(', ') || 'global';
 }
 
@@ -199,6 +206,21 @@ async function getAvailableLorebooks() {
         if (char?.data?.extensions?.world) {
             const charBook = char.data.extensions.world;
             upsertLorebook(lorebooksByName, charBook, { type: 'character' });
+        }
+    }
+
+    const cast = ctx.chat_metadata?.cast;
+    if (cast?.options?.includeActorLorebooks !== false) {
+        const castActors = [
+            cast.userActor ? { ...cast.userActor, sourceType: 'castUser' } : null,
+            ...(Array.isArray(cast.aiActors) ? cast.aiActors.map(actor => ({ ...actor, sourceType: 'castAi' })) : []),
+        ].filter(actor => actor?.type === 'character' && actor.avatar);
+
+        for (const actor of castActors) {
+            const character = ctx.characters?.find(item => item?.avatar === actor.avatar);
+            if (character?.data?.extensions?.world) {
+                upsertLorebook(lorebooksByName, character.data.extensions.world, { type: actor.sourceType });
+            }
         }
     }
 

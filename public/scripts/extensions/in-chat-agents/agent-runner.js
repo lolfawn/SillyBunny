@@ -1575,7 +1575,7 @@ function onWorldInfoEntriesLoaded(data) {
     const managedUids = getPfManagedEntryUids(enabledToolAgents);
     if (managedUids.size === 0) return;
 
-    const loreArrayKeys = ['globalLore', 'characterLore', 'chatLore', 'personaLore'];
+    const loreArrayKeys = ['globalLore', 'characterLore', 'chatLore', 'personaLore', 'castActorLore'];
     for (const key of loreArrayKeys) {
         if (!Array.isArray(data[key])) continue;
         data[key] = data[key].filter(entry => {
