@@ -873,6 +873,23 @@ function hasUserDraftInChatBox() {
     return String($('#send_textarea').val() || '').trim().length > 0;
 }
 
+function shouldGroupDmWaitForUserTurn() {
+    if (!isGroupDmChatMetadata()) {
+        return false;
+    }
+
+    for (let index = chat.length - 1; index >= 0; index--) {
+        const message = chat[index];
+        if (!message || message.is_system) {
+            continue;
+        }
+
+        return !message.is_user;
+    }
+
+    return true;
+}
+
 /**
  * Saves a group to the server.
  * @param {Group} group Group object to save
@@ -2268,7 +2285,7 @@ async function groupChatAutoModeWorker() {
         return;
     }
 
-    if (!selected_group || is_send_press || is_group_generating || hasUserDraftInChatBox()) {
+    if (!selected_group || is_send_press || is_group_generating || hasUserDraftInChatBox() || shouldGroupDmWaitForUserTurn()) {
         return;
     }
 
@@ -2288,7 +2305,7 @@ async function groupChatAutoModeWorker() {
 }
 
 async function triggerImmediateMentionedGroupReply(messageId) {
-    if (!is_group_automode_enabled || online_status === 'no_connection' || is_send_press || hasUserDraftInChatBox() || !selected_group) {
+    if (!is_group_automode_enabled || online_status === 'no_connection' || is_send_press || hasUserDraftInChatBox() || isGroupDmChatMetadata() || !selected_group) {
         return;
     }
 
