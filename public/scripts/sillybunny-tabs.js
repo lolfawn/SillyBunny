@@ -4492,9 +4492,9 @@ async function openCastGroupChat() {
         }
 
         const headers = await getAuthorizedRequestHeadersOrNull(1500, context) || getRequestHeadersFromContext(context);
-        const chatName = context.humanizedDateTime?.() || new Date().toISOString().replace(/[.:]/g, '-');
+        const chatName = `Cast Group - ${new Date().toISOString().replace(/[.:]/g, '-').slice(0, 19)}`;
         const actorNames = characterActors.map(actor => actor.name).filter(Boolean).join(', ');
-        const groupName = `Cast: ${actorNames || 'AI Actors'} (${chatName})`;
+        const groupName = `Cast: ${actorNames || 'AI Actors'}`;
         const requestBody = {
             name: groupName,
             members: avatars,
@@ -4524,7 +4524,7 @@ async function openCastGroupChat() {
         await context.getCharacters?.();
         const opened = await context.openGroupById?.(data.id);
         if (!opened) {
-            await context.openGroupChat?.(data.id, chatName);
+            throw new Error('Group was created, but SillyBunny could not activate it. Please select it from Characters → Groups.');
         }
         context.updateChatMetadata?.({ cast }, true);
         context.saveMetadataDebounced?.();
