@@ -7101,6 +7101,7 @@ body:not(.movingUI) .drawer-content.maximized {
 }
 
 .group_speaker_avatar {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -7266,6 +7267,18 @@ body:not(.movingUI) .drawer-content.maximized {
     }
 }
 
+.group-dm-unread-dot {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #ff3b3b;
+    border: 1px solid var(--SmartThemeBlurTintColor);
+    box-shadow: 0 0 0 1px color-mix(in srgb, #ff3b3b 55%, transparent);
+    pointer-events: none;
+}
 
 .group-dm-badge {
     display: inline-flex;

@@ -128,6 +128,7 @@ let newGroupMembers = [];
 
 const GROUP_MEMBER_MODELS_KEY = 'member_models';
 const GROUP_DM_SETTINGS_KEY = 'SillyBunny.groupDmSettings';
+const GROUP_DM_UNREAD_KEY = 'SillyBunny.groupDmUnread';
 const defaultGroupDmSettings = {
     autoDmEnabled: false,
     autoDmMember: '',
@@ -149,6 +150,43 @@ function saveGlobalGroupDmSettings(settings) {
 function applyGlobalGroupDmSettings() {
     const settings = getGlobalGroupDmSettings();
     selectedGroupDmAvatar = String(settings.autoDmMember || '');
+}
+
+function getGroupDmUnreadState() {
+    try {
+        const stored = JSON.parse(accountStorage.getItem(GROUP_DM_UNREAD_KEY) || '{}');
+        return stored && typeof stored === 'object' ? stored : {};
+    } catch {
+        return {};
+    }
+}
+
+function saveGroupDmUnreadState(state) {
+    accountStorage.setItem(GROUP_DM_UNREAD_KEY, JSON.stringify(state || {}));
+}
+
+function getGroupDmUnreadKey(groupId, avatarId) {
+    return `${groupId || ''}:${avatarId || ''}`;
+}
+
+function hasUnreadGroupDm(groupId, avatarId) {
+    return Boolean(getGroupDmUnreadState()[getGroupDmUnreadKey(groupId, avatarId)]);
+}
+
+function setUnreadGroupDm(groupId, avatarId, unread = true) {
+    const key = getGroupDmUnreadKey(groupId, avatarId);
+    if (!key || key === ':') {
+        return;
+    }
+
+    const state = getGroupDmUnreadState();
+    if (unread) {
+        state[key] = Date.now();
+    } else {
+        delete state[key];
+    }
+    saveGroupDmUnreadState(state);
+    updateGroupSpeakerControls();
 }
 
 
@@ -544,6 +582,15 @@ async function returnToMainGroupChat() {
     await createNewGroupChat(group.id);
 }
 
+async function saveGroupChatData(chatId, data, force = true) {
+    const saveChatRequest = await compressRequest({
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify({ id: chatId, chat: data, force }),
+    });
+    return fetch('/api/chats/group/save', saveChatRequest);
+}
+
 async function updateGroupDmReturnTarget(chatId, mainGroupChatId) {
     if (!chatId || !mainGroupChatId || chatId === mainGroupChatId) {
         return;
@@ -555,16 +602,60 @@ async function updateGroupDmReturnTarget(chatId, mainGroupChatId) {
     }
 
     const header = { ...data[0], chat_metadata: { ...(data[0].chat_metadata || {}), main_group_chat_id: mainGroupChatId } };
-    const saveChatRequest = await compressRequest({
-        method: 'POST',
-        headers: getRequestHeaders(),
-        body: JSON.stringify({ id: chatId, chat: [header, ...data.slice(1)], force: true }),
-    });
-    const response = await fetch('/api/chats/group/save', saveChatRequest);
+    const response = await saveGroupChatData(chatId, [header, ...data.slice(1)], true);
 
     if (!response.ok) {
         console.warn('Could not update DM chat return target', chatId, response);
     }
+}
+
+async function ensureGroupDmChat(group, character, mainGroupChatId, initialMessages = []) {
+    if (!group || !character) {
+        return '';
+    }
+
+    const dmChatName = getGroupDmChatName(group, character);
+    if (!group.chats.includes(dmChatName)) {
+        const dmChatData = initialMessages.map(message => ({
+            ...structuredClone(message),
+            extra: { ...(message.extra || {}), is_group_dm: true },
+        }));
+        const saved = await saveGroupBookmarkChat(group.id, dmChatName, {
+            type: 'group_dm_chat',
+            dm_member: character.avatar,
+            main_group_chat_id: mainGroupChatId || group.chat_id,
+            tainted: true,
+            dm_participants: [character.avatar],
+        }, undefined, dmChatData, { throwOnError: false });
+
+        if (!saved) {
+            return '';
+        }
+    } else {
+        await updateGroupDmReturnTarget(dmChatName, mainGroupChatId || group.chat_id);
+    }
+
+    return dmChatName;
+}
+
+async function appendMessageToGroupDmChat(group, character, message, mainGroupChatId) {
+    const dmChatName = await ensureGroupDmChat(group, character, mainGroupChatId);
+    if (!dmChatName) {
+        return false;
+    }
+
+    const data = await loadGroupChat(dmChatName);
+    if (!Array.isArray(data) || !data.length || !Object.hasOwn(data[0], 'chat_metadata')) {
+        return false;
+    }
+
+    const dmMessage = {
+        ...structuredClone(message),
+        extra: { ...(message.extra || {}), ...getGroupDmExtra(character.avatar, 'user') },
+        title: message.title || 'Private DM',
+    };
+    const response = await saveGroupChatData(dmChatName, [data[0], ...data.slice(1), dmMessage], true);
+    return response.ok;
 }
 
 async function openSelectedGroupDmChat() {
@@ -576,33 +667,20 @@ async function openSelectedGroupDmChat() {
 
     const character = characters.find(x => x.avatar === selectedGroupSpeakerAvatar);
     const previousGroupChatId = isGroupDmChatMetadata() ? String(chat_metadata.main_group_chat_id || '') : group.chat_id;
-    const dmChatName = getGroupDmChatName(group, character);
-    if (!group.chats.includes(dmChatName)) {
-        const startIndex = getGroupDmThreadStartIndex(selectedGroupSpeakerAvatar);
-        const dmMessages = getGroupDmThreadMessages(selectedGroupSpeakerAvatar, startIndex);
-        const dmChatData = dmMessages.map(message => ({ ...structuredClone(message), extra: { ...(message.extra || {}), is_group_dm: true } }));
-
-        const saved = await saveGroupBookmarkChat(group.id, dmChatName, {
-            type: 'group_dm_chat',
-            dm_member: selectedGroupSpeakerAvatar,
-            main_group_chat_id: group.chat_id,
-            tainted: true,
-            dm_participants: [selectedGroupSpeakerAvatar],
-        }, undefined, dmChatData, { throwOnError: false });
-        if (!saved) {
-            return;
-        }
-
-        if (dmMessages.length) {
-            removeGroupDmThreadMessages(selectedGroupSpeakerAvatar, startIndex);
-            await printMessages();
-            await saveChatConditional();
-        }
+    const startIndex = getGroupDmThreadStartIndex(selectedGroupSpeakerAvatar);
+    const dmMessages = group.chats.includes(getGroupDmChatName(group, character)) ? [] : getGroupDmThreadMessages(selectedGroupSpeakerAvatar, startIndex);
+    const dmChatName = await ensureGroupDmChat(group, character, previousGroupChatId, dmMessages);
+    if (!dmChatName) {
+        return;
     }
 
-    if (group.chats.includes(dmChatName)) {
-        await updateGroupDmReturnTarget(dmChatName, previousGroupChatId);
+    if (dmMessages.length) {
+        removeGroupDmThreadMessages(selectedGroupSpeakerAvatar, startIndex);
+        await printMessages();
+        await saveChatConditional();
     }
+
+    setUnreadGroupDm(group.id, character.avatar, false);
 
     selectedGroupSpeakerAvatar = selectedGroupSpeakerAvatar || character.avatar;
     selectedGroupDmAvatar = character.avatar;
@@ -639,6 +717,9 @@ function updateGroupSpeakerControls() {
         item.toggleClass('selected', avatarId === selectedGroupSpeakerAvatar);
         item.append($('<img alt="">').attr('src', getThumbnailUrl('avatar', avatarId)));
         item.append($('<span></span>').text(character.name));
+        if (hasUnreadGroupDm(group.id, avatarId)) {
+            item.append($('<span class="group-dm-unread-dot" aria-label="Unread DM"></span>'));
+        }
         avatarList.append(item);
     }
 
@@ -766,6 +847,7 @@ export const group_generation_mode = {
 };
 
 export const DEFAULT_AUTO_MODE_DELAY = 120;
+export const DEFAULT_AUTO_DM_COOLDOWN = 300;
 
 export const groupCandidatesFilter = new FilterHelper(debounce(printGroupCandidates, debounce_timeout.quick));
 export const groupMembersFilter = new FilterHelper(debounce(printGroupMembers, debounce_timeout.quick));
@@ -1481,6 +1563,7 @@ async function getGroups() {
             }
             group.time_aware = Boolean(group.time_aware);
             group.auto_message_enabled = Boolean(group.auto_message_enabled);
+            group.auto_dm_cooldown = Number(group.auto_dm_cooldown) || DEFAULT_AUTO_DM_COOLDOWN;
             group.ai_schedule = String(group.ai_schedule || '');
             group.auto_schedule_state = group.auto_schedule_state && typeof group.auto_schedule_state === 'object' ? group.auto_schedule_state : {};
             if (group.chat_id == undefined) {
@@ -1817,19 +1900,29 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
                 setPendingGeneratedMessageExtra(getGroupDmExtra(characters[chId]?.avatar, 'user'));
             }
             textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => withGroupPrivateDmFilter(characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...mergedParams })));
-            if (type === 'dm' || isGroupDmChatMetadata()) {
-                const dmMessage = chat[chat.length - 1];
-                if (dmMessage && !dmMessage.is_user && !dmMessage.is_system) {
-                    dmMessage.extra = { ...(dmMessage.extra || {}), ...getGroupDmExtra(characters[chId]?.avatar, 'user') };
-                    dmMessage.title = dmMessage.title || 'Private DM';
-                }
-            }
             let messageChunk = textResult?.messageChunk;
 
             if (messageChunk) {
                 while (shouldAutoContinue(messageChunk, type === 'impersonate')) {
                     textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => Generate('continue', { automatic_trigger: byAutoMode, ...mergedParams }));
                     messageChunk = textResult?.messageChunk;
+                }
+            }
+
+            if (type === 'dm' || isGroupDmChatMetadata()) {
+                const dmMessage = chat[chat.length - 1];
+                if (dmMessage && !dmMessage.is_user && !dmMessage.is_system) {
+                    dmMessage.extra = { ...(dmMessage.extra || {}), ...getGroupDmExtra(characters[chId]?.avatar, 'user') };
+                    dmMessage.title = dmMessage.title || 'Private DM';
+                    if (byAutoMode && type === 'dm' && !isGroupDmChatMetadata()) {
+                        const dmSaved = await appendMessageToGroupDmChat(group, characters[chId], dmMessage, group.chat_id);
+                        if (dmSaved) {
+                            chat.pop();
+                            await printMessages();
+                            await saveChatConditional();
+                            setUnreadGroupDm(group.id, characters[chId]?.avatar, true);
+                        }
+                    }
                 }
             }
             if (power_user.show_group_chat_queue) {
@@ -2285,11 +2378,18 @@ async function groupScheduleAutoMessageWorker() {
             continue;
         }
 
-        state[key] = Date.now();
         groupAutoModeAbortController = new AbortController();
         const character = characters[chid];
         const dmSettings = getGlobalGroupDmSettings();
-        const isDm = Boolean(dmSettings.autoDmEnabled && (!dmSettings.autoDmMember || dmSettings.autoDmMember === character.avatar));
+        const isDmWanted = Boolean(dmSettings.autoDmEnabled && (!dmSettings.autoDmMember || dmSettings.autoDmMember === character.avatar));
+        const cooldownMs = Math.max(1, Number(group.auto_dm_cooldown) || DEFAULT_AUTO_DM_COOLDOWN) * 1000;
+        const lastAutoDmAt = Number(group.auto_schedule_state?.last_auto_dm_at || 0);
+        const isDm = isDmWanted && (!lastAutoDmAt || Date.now() - lastAutoDmAt >= cooldownMs);
+        if (isDmWanted && !isDm) {
+            continue;
+        }
+
+        state[key] = Date.now();
         await saveGroupRuntimeState(group);
         await generateGroupWrapper(true, isDm ? 'dm' : 'auto', {
             signal: groupAutoModeAbortController.signal,
@@ -2297,6 +2397,9 @@ async function groupScheduleAutoMessageWorker() {
             quiet_prompt: buildContextAwareGroupPrompt(group, character.name, { reason: item.reason, isDm, targetName: isDm ? 'the user' : '' }),
             quietToLoud: true,
         });
+        if (isDm) {
+            group.auto_schedule_state.last_auto_dm_at = Date.now();
+        }
         await saveGroupRuntimeState(group);
         break;
     }
@@ -2403,6 +2506,14 @@ async function onGroupAutoModeDelayInput(e) {
         _thisGroup.auto_mode_delay = Number(e.target.value);
         await editGroup(openGroupId, false, false);
         setAutoModeWorker();
+    }
+}
+
+async function onGroupAutoDmCooldownInput(e) {
+    if (openGroupId) {
+        const group = groups.find((x) => x.id == openGroupId);
+        group.auto_dm_cooldown = Number(e.target.value) || DEFAULT_AUTO_DM_COOLDOWN;
+        await editGroup(openGroupId, false, false);
     }
 }
 
@@ -2799,6 +2910,7 @@ function select_group_chats(groupId, skipAnimation) {
     $('#rm_group_allow_self_responses').prop('checked', group && group.allow_self_responses);
     $('#rm_group_hidemutedsprites').prop('checked', group && group.hideMutedSprites);
     $('#rm_group_automode_delay').val(group?.auto_mode_delay ?? DEFAULT_AUTO_MODE_DELAY);
+    $('#rm_group_auto_dm_cooldown').val(group?.auto_dm_cooldown ?? DEFAULT_AUTO_DM_COOLDOWN);
     $('#rm_group_time_aware').prop('checked', Boolean(group?.time_aware));
     $('#rm_group_auto_message').prop('checked', Boolean(group?.auto_message_enabled));
     $('#rm_group_ai_schedule').val(group?.ai_schedule ?? '');
@@ -3158,6 +3270,7 @@ async function createGroup() {
         chat_id: chatName,
         chats: chats,
         auto_mode_delay: autoModeDelay,
+        auto_dm_cooldown: Number($('#rm_group_auto_dm_cooldown').val()) || DEFAULT_AUTO_DM_COOLDOWN,
         time_aware: Boolean($('#rm_group_time_aware').prop('checked')),
         auto_message_enabled: Boolean($('#rm_group_auto_message').prop('checked')),
         ai_schedule: String($('#rm_group_ai_schedule').val() || ''),
@@ -3535,6 +3648,7 @@ jQuery(() => {
     $('#rm_group_activation_strategy').on('change', onGroupActivationStrategyInput);
     $('#rm_group_generation_mode').on('change', onGroupGenerationModeInput);
     $('#rm_group_automode_delay').on('input', onGroupAutoModeDelayInput);
+    $('#rm_group_auto_dm_cooldown').on('input', onGroupAutoDmCooldownInput);
     $('#rm_group_time_aware').on('input', onGroupTimeAwareInput);
     $('#rm_group_auto_message').on('input', onGroupAutoMessageInput);
     $('#rm_group_ai_schedule').on('input', onGroupScheduleInput);
