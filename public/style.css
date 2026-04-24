@@ -7129,6 +7129,11 @@ body:not(.movingUI) .drawer-content.maximized {
     background: color-mix(in srgb, var(--SmartThemeQuoteColor) 20%, transparent);
 }
 
+.group_speaker_avatar.has-unread-dm {
+    border-color: #ff3b3b;
+    box-shadow: 0 0 0 2px color-mix(in srgb, #ff3b3b 28%, transparent), 0 0 10px color-mix(in srgb, #ff3b3b 55%, transparent);
+}
+
 #group_speaker_dm_now.selected,
 #group_speaker_auto_dm.selected {
     border-color: var(--SmartThemeQuoteColor);

@@ -1185,6 +1185,16 @@
         display: none !important;
     }
 
+    .group_speaker_controls.is-typing .group_speaker_list {
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    .group_speaker_controls.is-typing .group_typing_indicator {
+        display: block !important;
+        z-index: 2 !important;
+    }
+
     .group_speaker_avatar {
         width: 30px !important;
         min-width: 30px !important;
@@ -1212,6 +1222,17 @@
         height: 10px !important;
         min-width: 10px !important;
         min-height: 10px !important;
+    }
+
+    .group_speaker_avatar.has-unread-dm {
+        border: 2px solid #ff3b3b !important;
+        box-shadow: 0 0 0 2px color-mix(in srgb, #ff3b3b 45%, transparent), 0 0 12px color-mix(in srgb, #ff3b3b 75%, transparent) !important;
+        animation: groupUnreadDmPulse 1.4s ease-in-out infinite;
+    }
+
+    @keyframes groupUnreadDmPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
     }
 
     .group_speaker_avatar span,

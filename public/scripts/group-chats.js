@@ -705,6 +705,7 @@ function setGroupTypingIndicator(characterName = '') {
 
     indicator.text(activeGroupTypingName ? `${activeGroupTypingName} is typing...` : '');
     indicator.toggleClass('displayNone', !activeGroupTypingName);
+    $('#group_speaker_controls').toggleClass('is-typing', Boolean(activeGroupTypingName));
 }
 
 function updateGroupSpeakerControls() {
@@ -732,10 +733,13 @@ function updateGroupSpeakerControls() {
         const item = $('<button type="button" class="group_speaker_avatar"></button>');
         item.attr('title', `${character.name}: speak next / now`);
         item.attr('data-avatar', avatarId);
+        const hasUnreadDm = hasUnreadGroupDm(group.id, avatarId);
         item.toggleClass('selected', avatarId === selectedGroupSpeakerAvatar);
+        item.toggleClass('has-unread-dm', hasUnreadDm);
         item.append($('<img alt="">').attr('src', getThumbnailUrl('avatar', avatarId)));
         item.append($('<span></span>').text(character.name));
-        if (hasUnreadGroupDm(group.id, avatarId)) {
+        if (hasUnreadDm) {
+            item.attr('title', `${character.name}: unread DM — tap to open`);
             item.append($('<i class="group-dm-unread-dot" aria-label="Unread DM"></i>'));
         }
         avatarList.append(item);
@@ -766,8 +770,16 @@ function initGroupSpeakerControls() {
     groupSpeakerControlsInitialized = true;
     applyGlobalGroupDmSettings();
     const container = $('#group_speaker_controls');
-    container.on('click', '.group_speaker_avatar', function (event) {
+    container.on('click', '.group_speaker_avatar', async function (event) {
         const avatarId = String($(this).data('avatar') || '');
+        if (selected_group && hasUnreadGroupDm(selected_group, avatarId) && !groupDmModeForced && !event.shiftKey) {
+            selectedGroupSpeakerAvatar = avatarId;
+            updateGroupSpeakerControls();
+            eventSource.emit(event_types.GROUP_UPDATED, selected_group);
+            await openSelectedGroupDmChat();
+            return;
+        }
+
         const alreadySelected = selectedGroupSpeakerAvatar === avatarId;
         selectedGroupSpeakerAvatar = groupDmModeForced && alreadySelected ? selectedGroupSpeakerAvatar : (alreadySelected ? '' : avatarId);
         if (groupDmModeForced && avatarId && !isGroupDmParticipant(avatarId)) {
