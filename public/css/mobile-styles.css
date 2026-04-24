@@ -1206,6 +1206,7 @@
     #group_speaker_now span,
     #group_speaker_dm_now span,
     #group_speaker_dm_consolidate span,
+    #group_speaker_auto_dm span,
     .group_speaker_toggle span {
         display: none !important;
     }
@@ -1213,6 +1214,7 @@
     #group_speaker_now,
     #group_speaker_dm_now,
     #group_speaker_dm_consolidate,
+    #group_speaker_auto_dm,
     .group_speaker_toggle {
         width: 32px !important;
         min-width: 32px !important;
@@ -1247,10 +1249,4 @@
         grid-area: auto !important;
     }
 
-    .group_speaker_toggle input[type="checkbox"] {
-        width: 16px !important;
-        min-width: 16px !important;
-        height: 16px !important;
-        margin: 0 !important;
-    }
 }

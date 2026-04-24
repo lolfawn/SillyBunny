@@ -740,7 +740,10 @@ function updateGroupSpeakerControls() {
         selectedGroupDmAvatar = '';
     }
 
-    container.find('#group_speaker_auto_dm').prop('checked', Boolean(getGlobalGroupDmSettings().autoDmEnabled));
+    const autoDmEnabled = Boolean(getGlobalGroupDmSettings().autoDmEnabled);
+    container.find('#group_speaker_auto_dm')
+        .toggleClass('selected', autoDmEnabled)
+        .attr('aria-pressed', String(autoDmEnabled));
     container.find('#group_speaker_dm_now').toggleClass('selected', groupDmModeEnabled);
 
     const dmChatButton = container.find('#group_speaker_dm_consolidate');
@@ -833,13 +836,13 @@ function initGroupSpeakerControls() {
         updateGroupSpeakerControls();
     });
 
-    container.on('change', '#group_speaker_auto_dm', async function () {
+    container.on('click', '#group_speaker_auto_dm', async function () {
         const group = selected_group ? groups.find(x => x.id === selected_group) : null;
         if (!group) {
             return;
         }
 
-        const enabled = $(this).prop('checked');
+        const enabled = !getGlobalGroupDmSettings().autoDmEnabled;
         saveGlobalGroupDmSettings({ autoDmEnabled: enabled, autoDmMember: '' });
         updateGroupSpeakerControls();
     });

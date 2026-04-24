@@ -7129,13 +7129,15 @@ body:not(.movingUI) .drawer-content.maximized {
     background: color-mix(in srgb, var(--SmartThemeQuoteColor) 20%, transparent);
 }
 
-#group_speaker_dm_now.selected {
+#group_speaker_dm_now.selected,
+#group_speaker_auto_dm.selected {
     border-color: var(--SmartThemeQuoteColor);
     background: color-mix(in srgb, var(--SmartThemeQuoteColor) 28%, transparent);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--SmartThemeQuoteColor) 40%, transparent) inset;
 }
 
-#group_speaker_dm_now.selected i {
+#group_speaker_dm_now.selected i,
+#group_speaker_auto_dm.selected i {
     color: var(--SmartThemeQuoteColor);
 }
 
@@ -7206,7 +7208,8 @@ body:not(.movingUI) .drawer-content.maximized {
     .group_speaker_avatar span,
     #group_speaker_now span,
     #group_speaker_dm_now span,
-    #group_speaker_dm_consolidate span {
+    #group_speaker_dm_consolidate span,
+    #group_speaker_auto_dm span {
         display: none;
     }
 
@@ -7217,7 +7220,8 @@ body:not(.movingUI) .drawer-content.maximized {
 
     #group_speaker_now,
     #group_speaker_dm_now,
-    #group_speaker_dm_consolidate {
+    #group_speaker_dm_consolidate,
+    #group_speaker_auto_dm {
         width: 34px;
         min-width: 34px;
         max-width: 34px;
@@ -7244,20 +7248,6 @@ body:not(.movingUI) .drawer-content.maximized {
 
     .group_speaker_toggle {
         grid-area: auto;
-        min-height: 24px;
-        width: fit-content;
-        max-width: 84px;
-        margin-top: 0;
-        font-size: calc(var(--mainFontSize) * 0.76);
-        gap: 4px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .group_speaker_toggle input {
-        width: 16px;
-        height: 16px;
-        min-width: 16px;
     }
 }
 
@@ -7268,7 +7258,8 @@ body:not(.movingUI) .drawer-content.maximized {
 
     #group_speaker_now,
     #group_speaker_dm_now,
-    #group_speaker_dm_consolidate {
+    #group_speaker_dm_consolidate,
+    #group_speaker_auto_dm {
         width: 30px;
         min-width: 30px;
         max-width: 30px;
@@ -7281,7 +7272,8 @@ body:not(.movingUI) .drawer-content.maximized {
         gap: 0;
     }
 
-    .group_speaker_toggle span {
+    .group_speaker_toggle span,
+    #group_speaker_auto_dm span {
         display: none;
     }
 }
