@@ -1,9 +1,9 @@
 import {
     characters,
     chat_metadata,
-    saveMetadataDebounced,
     updateChatMetadata,
 } from '../script.js';
+import { saveMetadataDebounced } from './extensions.js';
 
 export const CAST_METADATA_KEY = 'cast';
 export const CAST_SCHEMA_VERSION = 1;
