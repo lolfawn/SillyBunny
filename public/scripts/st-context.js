@@ -81,7 +81,7 @@ import {
     setExtensionContextGetter,
     writeExtensionField,
 } from './extensions.js';
-import { createNewGroupChat, groups, openGroupChat, selected_group, unshallowGroupMembers } from './group-chats.js';
+import { createNewGroupChat, groups, openGroupById, openGroupChat, selected_group, unshallowGroupMembers } from './group-chats.js';
 import { addLocaleData, getCurrentLocale, t, translate } from './i18n.js';
 import { hideLoader, showLoader } from './loader.js';
 import { loader } from './action-loader.js';
@@ -156,6 +156,7 @@ export function getContext() {
         saveChat: saveChatConditional,
         openCharacterChat,
         openGroupChat,
+        openGroupById,
         createNewGroupChat,
         saveMetadata,
         sendSystemMessage,

@@ -4522,7 +4522,10 @@ async function openCastGroupChat() {
 
         const data = await response.json();
         await context.getCharacters?.();
-        await context.openGroupChat?.(data.id, chatName);
+        const opened = await context.openGroupById?.(data.id);
+        if (!opened) {
+            await context.openGroupChat?.(data.id, chatName);
+        }
         context.updateChatMetadata?.({ cast }, true);
         context.saveMetadataDebounced?.();
         await context.saveChat?.();
