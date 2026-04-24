@@ -7092,6 +7092,16 @@ body:not(.movingUI) .drawer-content.maximized {
     display: none !important;
 }
 
+.group_typing_indicator {
+    flex: 0 0 100%;
+    width: 100%;
+    color: var(--SmartThemeQuoteColor);
+    font-size: calc(var(--mainFontSize) * 0.86);
+    line-height: 1.2;
+    padding: 1px 4px;
+    opacity: 0.9;
+}
+
 .group_speaker_list {
     display: flex;
     gap: 6px;
@@ -7151,11 +7161,20 @@ body:not(.movingUI) .drawer-content.maximized {
     .group_speaker_controls {
         display: grid;
         grid-template-columns: minmax(0, 1fr) repeat(3, 34px) auto;
-        grid-template-areas: "avatars speak dm chat auto";
+        grid-template-areas: "typing typing typing typing typing" "avatars speak dm chat auto";
         align-items: center;
         gap: 4px;
         padding: 4px 6px;
         overflow: hidden;
+    }
+
+    .group_typing_indicator {
+        grid-area: typing;
+        font-size: calc(var(--mainFontSize) * 0.72);
+        padding: 0 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .group_speaker_list {

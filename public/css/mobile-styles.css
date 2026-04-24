@@ -1140,7 +1140,7 @@
     .group_speaker_controls {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) repeat(4, 32px) !important;
-        grid-template-areas: "avatars speak dm chat auto" !important;
+        grid-template-areas: "typing typing typing typing typing" "avatars speak dm chat auto" !important;
         gap: 4px !important;
         align-items: center !important;
         min-height: 40px !important;
@@ -1152,6 +1152,18 @@
 
     .group_speaker_controls.displayNone {
         display: none !important;
+    }
+
+    .group_typing_indicator {
+        grid-area: typing !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        padding: 0 2px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        font-size: 12px !important;
+        line-height: 1.1 !important;
     }
 
     .group_speaker_list {

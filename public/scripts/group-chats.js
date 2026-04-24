@@ -277,6 +277,7 @@ let selectedGroupDmAvatar = '';
 let groupDmModeEnabled = false;
 let groupDmModeForced = false;
 let pendingGroupDmUserTarget = '';
+let activeGroupTypingName = '';
 let groupScheduleCheckInterval = null;
 
 function getCharacterIdByAvatar(avatarId) {
@@ -690,6 +691,17 @@ async function openSelectedGroupDmChat() {
     await openGroupChat(group.id, dmChatName);
 }
 
+function setGroupTypingIndicator(characterName = '') {
+    activeGroupTypingName = String(characterName || '');
+    const indicator = $('#group_typing_indicator');
+    if (!indicator.length) {
+        return;
+    }
+
+    indicator.text(activeGroupTypingName ? `${activeGroupTypingName} is typing...` : '');
+    indicator.toggleClass('displayNone', !activeGroupTypingName);
+}
+
 function updateGroupSpeakerControls() {
     const container = $('#group_speaker_controls');
     if (!container.length) {
@@ -701,6 +713,7 @@ function updateGroupSpeakerControls() {
     container.toggleClass('displayNone', !group || members.length === 0);
     if (!group || members.length === 0) {
         clearSelectedGroupSpeaker();
+        setGroupTypingIndicator('');
         return;
     }
 
@@ -1899,6 +1912,7 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             deactivateSendButtons();
             setCharacterId(chId);
             setCharacterName(characters[chId].name);
+            setGroupTypingIndicator(characters[chId].name);
             if (power_user.show_group_chat_queue) {
                 printGroupMembers();
             }
@@ -1946,6 +1960,7 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
                 groupChatQueueOrder.delete(characters[chId].avatar);
                 groupChatQueueOrder.forEach((value, key, map) => map.set(key, value - 1));
             }
+            setGroupTypingIndicator('');
         }
 
         if (type === 'dm' && pendingGroupDmUserTarget) {
@@ -1960,6 +1975,7 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
         setGenerationChatFilter(null);
         setPendingGeneratedMessageExtra(null);
         setPendingUserMessageExtra(null);
+        setGroupTypingIndicator('');
         is_group_generating = false;
         setSendButtonState(false);
         setCharacterId(undefined);
