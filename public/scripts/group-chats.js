@@ -110,6 +110,7 @@ export {
     resetSelectedGroup,
     select_group_chats,
     getGroupChatNames,
+    getSelectedGroupSpeakerAvatar,
     updateGroupSpeakerControls,
 };
 
@@ -282,6 +283,10 @@ let groupScheduleCheckInterval = null;
 
 function getCharacterIdByAvatar(avatarId) {
     return characters.findIndex(character => character.avatar === avatarId);
+}
+
+function getSelectedGroupSpeakerAvatar() {
+    return selectedGroupSpeakerAvatar;
 }
 
 function getGroupEnabledMembers(group) {
@@ -774,6 +779,7 @@ function initGroupSpeakerControls() {
             });
         }
         updateGroupSpeakerControls();
+        eventSource.emit(event_types.GROUP_UPDATED, selected_group);
 
         if (event.shiftKey && selected_group) {
             const chid = getCharacterIdByAvatar(avatarId);

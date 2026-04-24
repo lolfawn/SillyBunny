@@ -9,7 +9,7 @@ import {
     saveSettingsDebounced,
     this_chid,
 } from '../script.js';
-import { getGroupMembers, selected_group } from './group-chats.js';
+import { getGroupMembers, getSelectedGroupSpeakerAvatar, selected_group } from './group-chats.js';
 import { extension_settings, getContext, saveMetadataDebounced } from './extensions.js';
 import { getCharaFilename, debounce, delay } from './utils.js';
 import { getTokenCountAsync } from './tokenizers.js';
@@ -43,6 +43,29 @@ const chara_note_position = {
 
 function getCharacterNoteByAvatar(avatarId) {
     const avatarName = getCharaFilename(null, { manualAvatarKey: avatarId });
+    if (!avatarName || !extension_settings.note.chara) {
+        return null;
+    }
+
+    return extension_settings.note.chara.find((entry) => entry.name === avatarName) ?? null;
+}
+
+function getEditableCharacterNoteAvatar() {
+    const context = getContext();
+    if (context.groupId) {
+        return getSelectedGroupSpeakerAvatar() || getGroupMembers(context.groupId).find(Boolean)?.avatar || '';
+    }
+
+    return context.characterId !== undefined ? context.characters[context.characterId]?.avatar || '' : '';
+}
+
+function getEditableCharacterNoteName() {
+    const avatarId = getEditableCharacterNoteAvatar();
+    return avatarId ? getCharaFilename(null, { manualAvatarKey: avatarId }) : null;
+}
+
+function getEditableCharacterNote() {
+    const avatarName = getEditableCharacterNoteName();
     if (!avatarName || !extension_settings.note.chara) {
         return null;
     }
@@ -236,7 +259,7 @@ function onExtensionDefaultRoleInput(e) {
 
 async function onExtensionFloatingCharPositionInput(e) {
     const value = e.target.value;
-    const charaNote = extension_settings.note.chara.find((e) => e.name === getCharaFilename());
+    const charaNote = getEditableCharacterNote();
 
     if (charaNote) {
         charaNote.position = Number(value);
@@ -246,7 +269,7 @@ async function onExtensionFloatingCharPositionInput(e) {
 
 function onExtensionFloatingCharaPromptInput() {
     const tempPrompt = $(this).val();
-    const avatarName = getCharaFilename();
+    const avatarName = getEditableCharacterNoteName();
     let tempCharaNote = {
         name: avatarName,
         prompt: tempPrompt,
@@ -290,11 +313,19 @@ function onExtensionFloatingCharaPromptInput() {
 
 function onExtensionFloatingCharaCheckboxChanged() {
     const value = !!$(this).prop('checked');
-    const charaNote = extension_settings.note.chara.find((e) => e.name === getCharaFilename());
+    let charaNote = getEditableCharacterNote();
+    const avatarName = getEditableCharacterNoteName();
+
+    if (!charaNote && avatarName && value) {
+        if (!extension_settings.note.chara) {
+            extension_settings.note.chara = [];
+        }
+        charaNote = { name: avatarName, prompt: '', useChara: false, position: chara_note_position.replace };
+        extension_settings.note.chara.push(charaNote);
+    }
 
     if (charaNote) {
         charaNote.useChara = value;
-
         updateSettings();
     }
 }
@@ -339,8 +370,9 @@ function loadSettings() {
     $('#extension_floating_role').val(chat_metadata[metadata_keys.role]);
     $(`input[name="extension_floating_position"][value="${chat_metadata[metadata_keys.position]}"]`).prop('checked', true);
 
-    if (extension_settings.note.chara && getContext().characterId !== undefined) {
-        const charaNote = extension_settings.note.chara.find((e) => e.name === getCharaFilename());
+    const editableCharaNoteAvatar = getEditableCharacterNoteAvatar();
+    if (editableCharaNoteAvatar) {
+        const charaNote = getEditableCharacterNote();
 
         $('#extension_floating_chara').val(charaNote ? charaNote.prompt : '');
         $('#extension_use_floating_chara').prop('checked', charaNote ? charaNote.useChara : false);
@@ -466,15 +498,18 @@ async function onChatChanged() {
     setFloatingPrompt();
     const context = getContext();
 
-    // In groups, each member's private note is injected only when that member speaks.
-    $('#extension_floating_chara').prop('disabled', !!context.groupId);
+    // In groups, edit the selected member's private note.
+    const canEditCharacterNote = Boolean(getEditableCharacterNoteAvatar());
+    $('#extension_floating_chara').prop('disabled', !canEditCharacterNote);
+    $('#extension_use_floating_chara').prop('disabled', !canEditCharacterNote);
+    $('input[name="extension_floating_char_position"]').prop('disabled', !canEditCharacterNote);
 
     const tokenCounter1 = chat_metadata[metadata_keys.prompt] ? await getTokenCountAsync(chat_metadata[metadata_keys.prompt]) : 0;
     $('#extension_floating_prompt_token_counter').text(tokenCounter1);
 
     let tokenCounter2;
-    if (extension_settings.note.chara && context.characterId !== undefined) {
-        const charaNote = extension_settings.note.chara.find((e) => e.name === getCharaFilename());
+    if (extension_settings.note.chara && (context.characterId !== undefined || context.groupId)) {
+        const charaNote = getEditableCharacterNote();
 
         if (charaNote) {
             tokenCounter2 = await getTokenCountAsync(charaNote.prompt);
@@ -609,6 +644,7 @@ export function initAuthorsNote() {
         `,
     }));
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
+    eventSource.on(event_types.GROUP_UPDATED, onChatChanged);
 
     registerAuthorsNoteMacros();
 }
