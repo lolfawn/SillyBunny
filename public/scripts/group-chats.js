@@ -262,6 +262,15 @@ function getNarratableGroupTurnMessages(startIndex) {
     return chat.slice(startIndex).filter(message => message && !message.is_user && !message.is_system && message.extra?.type !== 'group_narrator_consolidation' && String(message.mes ?? '').trim());
 }
 
+function removeNarratedDraftMessages(startIndex) {
+    for (let index = chat.length - 1; index >= startIndex; index--) {
+        const message = chat[index];
+        if (message && !message.is_user && !message.is_system && message.extra?.type !== 'group_narrator_consolidation') {
+            chat.splice(index, 1);
+        }
+    }
+}
+
 function buildNarratorConsolidationPrompt(group, startIndex) {
     const messages = getNarratableGroupTurnMessages(startIndex);
     const transcript = messages.map(message => `${message.name || 'Character'}: ${message.mes}`).join('\n\n');
@@ -302,8 +311,9 @@ async function consolidateGroupTurnAsNarrator(group, startIndex, params = {}) {
             },
             force_avatar: system_avatar,
         };
+        removeNarratedDraftMessages(startIndex);
         chat.push(narratorMessage);
-        addOneMessage(narratorMessage);
+        await printMessages();
         await saveChatConditional();
     } finally {
         is_group_generating = previousGroupGenerating;
