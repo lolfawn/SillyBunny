@@ -4476,6 +4476,83 @@ function createCastOptionCheckbox({ key, label, description }) {
     return { option, checkbox };
 }
 
+function getSafeCastFileStem(value) {
+    return String(value || '')
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[^a-z0-9_-]+/gi, '_')
+        .replace(/_{2,}/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 72) || 'persona';
+}
+
+async function importCastPersonaProxyCharacter(actor, context, headers) {
+    const personaName = context?.powerUserSettings?.personas?.[actor.avatar] || actor.name || 'Persona';
+    const descriptor = context?.powerUserSettings?.persona_descriptions?.[actor.avatar] || {};
+    const description = String(descriptor.description || '').trim();
+    const safeStem = `cast_persona_${getSafeCastFileStem(actor.avatar || personaName)}`;
+    const characterData = {
+        spec: 'chara_card_v2',
+        spec_version: '2.0',
+        data: {
+            name: personaName,
+            description: description || `${personaName} is a Cast persona actor.`,
+            personality: description,
+            scenario: '',
+            first_mes: '',
+            mes_example: '',
+            creator_notes: `Auto-created Cast proxy for persona ${personaName}.`,
+            system_prompt: '',
+            post_history_instructions: '',
+            alternate_greetings: [],
+            tags: ['Cast Persona Proxy'],
+            extensions: {
+                sillybunny_cast_persona_proxy: true,
+                source_persona_avatar: actor.avatar,
+            },
+        },
+    };
+    const file = new File([JSON.stringify(characterData, null, 2)], `${safeStem}.json`, { type: 'application/json' });
+    const formData = new FormData();
+    formData.append('avatar', file);
+    formData.append('file_type', 'json');
+    formData.append('user_name', context?.name1 || 'User');
+    formData.append('preserved_name', `${safeStem}.png`);
+
+    const response = await fetch('/api/characters/import', {
+        method: 'POST',
+        headers: Object.fromEntries(Object.entries(headers || {}).filter(([key]) => key.toLowerCase() !== 'content-type')),
+        body: formData,
+        cache: 'no-cache',
+    });
+
+    if (!response.ok) {
+        throw new Error(`Persona proxy import failed (${response.status}).`);
+    }
+
+    const data = await response.json();
+    if (data.error) {
+        throw new Error(`Persona proxy import failed: ${data.error}`);
+    }
+
+    return data.file_name ? `${data.file_name}.png` : `${safeStem}.png`;
+}
+
+async function resolveCastGroupMemberAvatars(cast, context, headers) {
+    const members = [];
+
+    for (const actor of cast.aiActors) {
+        if (actor.type === 'character' && actor.avatar) {
+            members.push(actor.avatar);
+        } else if (actor.type === 'persona' && actor.avatar) {
+            const proxyAvatar = await importCastPersonaProxyCharacter(actor, context, headers);
+            members.push(proxyAvatar);
+            actor.proxyAvatar = proxyAvatar;
+        }
+    }
+
+    return members.filter(Boolean);
+}
+
 async function openCastGroupChat() {
     setCastPanelBusy(true);
 
@@ -4483,17 +4560,25 @@ async function openCastGroupChat() {
         const context = getSillyTavernContext();
         const castRoles = await loadCastRolesModule();
         const cast = castRoles.getCastAssignments();
-        const characterActors = cast.aiActors.filter(actor => actor.type === 'character' && actor.avatar);
-        const avatars = characterActors.map(actor => actor.avatar).filter(Boolean);
+        const castActors = cast.aiActors.filter(actor => actor.avatar);
 
-        if (!context || avatars.length < 2) {
-            setCastPanelMessage('Select at least two AI character-card actors to create a group chat. Personas cannot be group members.', 'warn');
+        if (!context || castActors.length < 2) {
+            setCastPanelMessage('Select at least two AI actors to create a group chat.', 'warn');
             return;
         }
 
         const headers = await getAuthorizedRequestHeadersOrNull(1500, context) || getRequestHeadersFromContext(context);
+        const avatars = await resolveCastGroupMemberAvatars(cast, context, headers);
+        castRoles.setCastAssignments(cast);
+
+        if (avatars.length < 2) {
+            setCastPanelMessage('Could not resolve at least two Cast actors into group members.', 'warn');
+            return;
+        }
+
+        await context.getCharacters?.();
         const chatName = `Cast Group - ${new Date().toISOString().replace(/[.:]/g, '-').slice(0, 19)}`;
-        const actorNames = characterActors.map(actor => actor.name).filter(Boolean).join(', ');
+        const actorNames = castActors.map(actor => actor.name).filter(Boolean).join(', ');
         const groupName = `Cast: ${actorNames || 'AI Actors'}`;
         const requestBody = {
             name: groupName,

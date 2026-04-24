@@ -78,6 +78,7 @@ function normalizeActor(actor) {
         name,
         primary: Boolean(actor.primary),
         model: String(actor.model || '').trim(),
+        proxyAvatar: String(actor.proxyAvatar || '').trim(),
     };
 }
 
@@ -199,6 +200,7 @@ export function setAiActors(actors, { save = true } = {}) {
                 name: source.name,
                 primary: index === 0,
                 model: String(actor.model || '').trim(),
+                proxyAvatar: String(actor.proxyAvatar || '').trim(),
             };
         })
         .filter(Boolean);

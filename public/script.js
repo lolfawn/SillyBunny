@@ -464,6 +464,7 @@ function normalizeCastAiActor(actor) {
             name: actor.name || personaName,
             primary: Boolean(actor.primary),
             model: String(actor.model || '').trim(),
+            proxyAvatar: String(actor.proxyAvatar || '').trim(),
             persona: {
                 avatar: actor.avatar,
                 name: personaName,
@@ -7063,6 +7064,15 @@ export function cleanUpMessage({ getMessage, isImpersonate, isContinue, displayI
  *
  * @returns {Promise<void>}
  */
+function getCastActorForOriginalAvatar(avatar) {
+    const avatarKey = String(avatar || '');
+    if (!avatarKey) {
+        return null;
+    }
+
+    return getCastAiActors().find(actor => actor.avatar === avatarKey || actor.proxyAvatar === avatarKey) || null;
+}
+
 function getCastActorByName(name) {
     const normalizedName = String(name || '').trim().toLowerCase();
 
@@ -7303,7 +7313,7 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
                 return message;
             })
             : [createAiReplyMessage({
-                name: getCastPrimaryAiActor()?.name || name2,
+                name: (getCastActorForOriginalAvatar(characters[this_chid]?.avatar) || getCastPrimaryAiActor())?.name || name2,
                 text: getMessage,
                 title,
                 generationFinished,
@@ -7313,7 +7323,7 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
             })];
 
         for (const [index, newMessage] of messagesToInsert.entries()) {
-            const castAiActor = splitSegments.length > 1 ? splitSegments[index].actor : getCastPrimaryAiActor();
+            const castAiActor = splitSegments.length > 1 ? splitSegments[index].actor : (getCastActorForOriginalAvatar(characters[this_chid]?.avatar) || getCastPrimaryAiActor());
 
             if (power_user.message_token_count_enabled) {
                 const tokenCountText = (newMessage.extra.reasoning || '') + newMessage.mes;
