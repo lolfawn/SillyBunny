@@ -2180,11 +2180,11 @@ async function onGenerateGroupScheduleClick() {
         .map(avatar => characters.find(character => character.avatar === avatar)?.name)
         .filter(Boolean)
         .join(', ');
-    const prompt = `Create a simple daily auto-message schedule for this group. Current local time: ${getCurrentLocalTimeContext()}. Group members: ${names}. Return only lines in this exact format: HH:MM Character: short reason. Use 24-hour local time. Include 2 to 5 useful moments.`;
+    const prompt = `Create an immersive full-day routine and auto-message schedule for this fictional group. Current local time: ${getCurrentLocalTimeContext()}. Group members: ${names}. Cover the whole day from 00:00 through 23:00. Include mundane realistic activities such as sleeping, meals, chores, travel, study/work, rest, hobbies, checking on others, and winding down. Use 24-hour local time. Return only schedule lines in this exact format: HH:MM Character: short in-character reason. Include at least one entry for every hour 00 through 23, with natural variation and no markdown.`;
     const schedule = String(await generateRaw({
         prompt,
-        systemPrompt: 'You create concise daily schedules for fictional group chat auto-messages. Return only schedule lines in the requested format.',
-        responseLength: 300,
+        systemPrompt: 'You create immersive 24-hour daily routines for fictional group chat auto-messages. Return only schedule lines in the requested HH:MM Character: reason format.',
+        responseLength: 1200,
     }) || '').trim();
     if (!schedule) {
         toastr.warning(t`Schedule generation did not return anything.`);

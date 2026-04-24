@@ -6541,6 +6541,27 @@
                                                     <option value="2" data-i18n="Join character cards (include muted)">Join character cards (include muted)</option>
                                                 </select>
                                             </div>
+                                            <div class="wide100p flex-container flexFlowColumn flexGap5 group_schedule_controls">
+                                                <div class="flex-container flexGap5 flexWrap alignitemscenter">
+                                                    <label class="checkbox_label whitespacenowrap" title="Adds your local date and time to group auto-message prompts" data-i18n="[title]Adds your local date and time to group auto-message prompts">
+                                                        <input id="rm_group_time_aware" type="checkbox" />
+                                                        <span data-i18n="Time-aware">Time-aware</span>
+                                                    </label>
+                                                    <label class="checkbox_label whitespacenowrap" title="Let scheduled characters message when their schedule is due" data-i18n="[title]Let scheduled characters message when their schedule is due">
+                                                        <input id="rm_group_auto_message" type="checkbox" />
+                                                        <span data-i18n="Scheduled messages">Scheduled messages</span>
+                                                    </label>
+                                                    <button type="button" id="rm_group_generate_schedule" class="menu_button menu_button_icon" title="Ask the AI to make a full 24-hour daily message schedule for this group" data-i18n="[title]Ask the AI to make a full 24-hour daily message schedule for this group">
+                                                        <i class="fa-solid fa-calendar-days"></i>
+                                                        <span data-i18n="Generate Schedule">Generate Schedule</span>
+                                                    </button>
+                                                </div>
+                                                <textarea id="rm_group_ai_schedule" class="text_pole textarea_compact autoSetHeight wide100p" rows="8" placeholder="00:00 Seraphina: sleeps while keeping a faint watch over the glade
+08:00 Bunny Guide: checks in after breakfast
+23:00 Assistant Nahida: winds down and reflects" title="Daily auto-message schedule. Format: HH:MM Character: reason" data-i18n="[placeholder]00:00 Seraphina: sleeps while keeping a faint watch over the glade
+08:00 Bunny Guide: checks in after breakfast
+23:00 Assistant Nahida: winds down and reflects;[title]Daily auto-message schedule. Format: HH:MM Character: reason"></textarea>
+                                            </div>
                                             <div class="flex1 flexGap5" title="Inserted before each part of the joined fields." data-i18n="[title]Inserted before each part of the joined fields.">
                                                 <label for="rm_group_generation_mode_join_prefix" class="flexnowrap width100p whitespacenowrap">
                                                     <span data-i18n="Join Prefix">Join Prefix</span>
@@ -6580,23 +6601,6 @@
                                                     <span data-i18n="Auto Mode">Auto Mode</span>
                                                     <input id="rm_group_automode_delay" class="text_pole textarea_compact widthUnset" type="number" min="1" max="999" step="1" value="5" title="Auto Mode delay" data-i18n="[title]Auto Mode delay" />
                                                 </label>
-                                                <label class="checkbox_label whitespacenowrap" title="Adds your local date and time to group auto-message prompts" data-i18n="[title]Adds your local date and time to group auto-message prompts">
-                                                    <input id="rm_group_time_aware" type="checkbox" />
-                                                    <span data-i18n="Time-aware">Time-aware</span>
-                                                </label>
-                                                <label class="checkbox_label whitespacenowrap" title="Let scheduled characters message when their schedule is due" data-i18n="[title]Let scheduled characters message when their schedule is due">
-                                                    <input id="rm_group_auto_message" type="checkbox" />
-                                                    <span data-i18n="Scheduled messages">Scheduled messages</span>
-                                                </label>
-                                                <div class="flex-container flexGap5 alignitemscenter wide100p">
-                                                    <button type="button" id="rm_group_generate_schedule" class="menu_button menu_button_icon" title="Ask the AI to make a daily message schedule for this group" data-i18n="[title]Ask the AI to make a daily message schedule for this group">
-                                                        <i class="fa-solid fa-calendar-days"></i>
-                                                        <span data-i18n="Generate Schedule">Generate Schedule</span>
-                                                    </button>
-                                                </div>
-                                                <textarea id="rm_group_ai_schedule" class="text_pole textarea_compact autoSetHeight wide100p" rows="3" placeholder="09:00 Nahida: morning check-in
-15:00 Seraphina: asks about the glade" title="Daily auto-message schedule. Format: HH:MM Character: reason" data-i18n="[placeholder]09:00 Nahida: morning check-in
-15:00 Seraphina: asks about the glade;[title]Daily auto-message schedule. Format: HH:MM Character: reason"></textarea>
                                                 <label id="rm_group_hidemutedsprites_label" class="checkbox_label whitespacenowrap">
                                                     <input id="rm_group_hidemutedsprites" type="checkbox" />
                                                     <span data-i18n="Hide Muted Member Sprites">Hide Muted Member Sprites</span>
