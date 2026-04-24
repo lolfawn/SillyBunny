@@ -3868,6 +3868,49 @@ body.sb-shell-resizing * {
     .sb-shell-nav-scroll {
         display: inline-flex;
     }
+
+    #sb-topbar-primary .sb-chatbar-button,
+    #sb-mobile-chat-tools-panel .sb-chatbar-button,
+    #sb-mobile-chat-tools-panel .sb-mobile-chat-close,
+    #send_form #leftSendForm > .interactable,
+    #send_form #rightSendForm > .interactable,
+    #send_form #send_but,
+    #send_form .mes_stop {
+        inline-size: var(--sb-mobile-toggle-size) !important;
+        min-inline-size: var(--sb-mobile-toggle-size) !important;
+        max-inline-size: var(--sb-mobile-toggle-size) !important;
+        block-size: var(--sb-mobile-toggle-size) !important;
+        min-block-size: var(--sb-mobile-toggle-size) !important;
+        max-block-size: var(--sb-mobile-toggle-size) !important;
+        flex: 0 0 var(--sb-mobile-toggle-size) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        border-radius: calc(var(--sb-mobile-toggle-size) * 0.28) !important;
+        box-sizing: border-box !important;
+        line-height: 1 !important;
+        aspect-ratio: 1 / 1;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    #sb-topbar-primary .sb-chatbar-button > i,
+    #sb-mobile-chat-tools-panel .sb-chatbar-button > i,
+    #sb-mobile-chat-tools-panel .sb-mobile-chat-close > i,
+    #send_form #leftSendForm > .interactable > i,
+    #send_form #rightSendForm > .interactable > i,
+    #send_form #send_but > i,
+    #send_form .mes_stop > i {
+        inline-size: 1em !important;
+        block-size: 1em !important;
+        flex: 0 0 auto !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: calc(var(--sb-mobile-toggle-size) * 0.48) !important;
+        line-height: 1 !important;
+        transform: none !important;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
