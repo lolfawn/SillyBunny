@@ -1,10 +1,10 @@
 import {
     characters,
     chat_metadata,
-    power_user,
     updateChatMetadata,
 } from '../script.js';
 import { saveMetadataDebounced } from './extensions.js';
+import { power_user } from './power-user.js';
 
 export const CAST_METADATA_KEY = 'cast';
 export const CAST_SCHEMA_VERSION = 1;
