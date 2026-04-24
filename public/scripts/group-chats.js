@@ -292,6 +292,7 @@ let groupDmModeEnabled = false;
 let groupDmModeForced = false;
 let pendingGroupDmUserTarget = '';
 let activeGroupTypingName = '';
+let groupSpeakerAvatarRenderKey = '';
 let groupScheduleCheckInterval = null;
 
 function getCharacterIdByAvatar(avatarId) {
@@ -710,7 +711,12 @@ async function openSelectedGroupDmChat() {
 }
 
 function setGroupTypingIndicator(characterName = '') {
-    activeGroupTypingName = String(characterName || '');
+    const nextTypingName = String(characterName || '');
+    if (activeGroupTypingName === nextTypingName) {
+        return;
+    }
+
+    activeGroupTypingName = nextTypingName;
     const indicator = $('#group_typing_indicator');
     if (!indicator.length) {
         return;
@@ -733,29 +739,40 @@ function updateGroupSpeakerControls() {
     if (!group || members.length === 0) {
         clearSelectedGroupSpeaker();
         setGroupTypingIndicator('');
+        groupSpeakerAvatarRenderKey = '';
         return;
     }
 
-    const avatarList = container.find('.group_speaker_list').empty();
-    for (const avatarId of members) {
-        const character = characters.find(x => x.avatar === avatarId);
-        if (!character) {
-            continue;
-        }
+    const unreadState = getGroupDmUnreadState();
+    const avatarRenderKey = JSON.stringify({
+        groupId: group.id,
+        members,
+        selected: selectedGroupSpeakerAvatar,
+        unread: members.map(avatarId => Boolean(unreadState[getGroupDmUnreadKey(group.id, avatarId)])),
+    });
+    if (avatarRenderKey !== groupSpeakerAvatarRenderKey) {
+        groupSpeakerAvatarRenderKey = avatarRenderKey;
+        const avatarList = container.find('.group_speaker_list').empty();
+        for (const avatarId of members) {
+            const character = characters.find(x => x.avatar === avatarId);
+            if (!character) {
+                continue;
+            }
 
-        const item = $('<button type="button" class="group_speaker_avatar"></button>');
-        item.attr('title', `${character.name}: speak next / now`);
-        item.attr('data-avatar', avatarId);
-        const hasUnreadDm = hasUnreadGroupDm(group.id, avatarId);
-        item.toggleClass('selected', avatarId === selectedGroupSpeakerAvatar);
-        item.toggleClass('has-unread-dm', hasUnreadDm);
-        item.append($('<img alt="">').attr('src', getThumbnailUrl('avatar', avatarId)));
-        item.append($('<span></span>').text(character.name));
-        if (hasUnreadDm) {
-            item.attr('title', `${character.name}: unread DM — tap to open`);
-            item.append($('<i class="group-dm-unread-dot" aria-label="Unread DM"></i>'));
+            const item = $('<button type="button" class="group_speaker_avatar"></button>');
+            item.attr('title', `${character.name}: speak next / now`);
+            item.attr('data-avatar', avatarId);
+            const hasUnreadDm = Boolean(unreadState[getGroupDmUnreadKey(group.id, avatarId)]);
+            item.toggleClass('selected', avatarId === selectedGroupSpeakerAvatar);
+            item.toggleClass('has-unread-dm', hasUnreadDm);
+            item.append($('<img alt="">').attr('src', getThumbnailUrl('avatar', avatarId)));
+            item.append($('<span></span>').text(character.name));
+            if (hasUnreadDm) {
+                item.attr('title', `${character.name}: unread DM — tap to open`);
+                item.append($('<i class="group-dm-unread-dot" aria-label="Unread DM"></i>'));
+            }
+            avatarList.append(item);
         }
-        avatarList.append(item);
     }
 
     if (selectedGroupDmAvatar && !members.includes(selectedGroupDmAvatar)) {
