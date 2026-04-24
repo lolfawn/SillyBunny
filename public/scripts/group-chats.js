@@ -736,7 +736,7 @@ function updateGroupSpeakerControls() {
         item.append($('<img alt="">').attr('src', getThumbnailUrl('avatar', avatarId)));
         item.append($('<span></span>').text(character.name));
         if (hasUnreadGroupDm(group.id, avatarId)) {
-            item.append($('<span class="group-dm-unread-dot" aria-label="Unread DM"></span>'));
+            item.append($('<i class="group-dm-unread-dot" aria-label="Unread DM"></i>'));
         }
         avatarList.append(item);
     }

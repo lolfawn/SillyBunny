@@ -7280,14 +7280,19 @@ body:not(.movingUI) .drawer-content.maximized {
 
 .group-dm-unread-dot {
     position: absolute;
-    top: 0;
-    right: 0;
-    width: 9px;
-    height: 9px;
+    top: -1px;
+    right: -1px;
+    z-index: 2;
+    display: block !important;
+    width: 10px;
+    height: 10px;
+    min-width: 10px;
+    min-height: 10px;
+    padding: 0;
     border-radius: 50%;
     background: #ff3b3b;
-    border: 1px solid var(--SmartThemeBlurTintColor);
-    box-shadow: 0 0 0 1px color-mix(in srgb, #ff3b3b 55%, transparent);
+    border: 2px solid var(--SmartThemeBlurTintColor);
+    box-shadow: 0 0 0 1px color-mix(in srgb, #ff3b3b 65%, transparent), 0 0 7px color-mix(in srgb, #ff3b3b 75%, transparent);
     pointer-events: none;
 }
 

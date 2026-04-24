@@ -1202,6 +1202,16 @@
         height: 26px !important;
     }
 
+    .group-dm-unread-dot {
+        top: -2px !important;
+        right: -2px !important;
+        display: block !important;
+        width: 10px !important;
+        height: 10px !important;
+        min-width: 10px !important;
+        min-height: 10px !important;
+    }
+
     .group_speaker_avatar span,
     #group_speaker_now span,
     #group_speaker_dm_now span,
