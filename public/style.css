@@ -6707,6 +6707,26 @@ body:not(.movingUI) .drawer-content.maximized {
     width: 40%;
 }
 
+.reasoning-tag-style-row {
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+}
+
+.reasoning-tag-style-row label {
+    margin: 0;
+    flex: 0 1 auto;
+    min-width: max-content;
+}
+
+.reasoning-tag-style-row select {
+    flex: 1 1 220px;
+    width: auto;
+    max-width: 260px;
+    min-width: 180px;
+}
+
 .sb-setting-inline-help {
     align-items: flex-start;
     justify-content: space-between;
