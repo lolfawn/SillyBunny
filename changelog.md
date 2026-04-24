@@ -5,25 +5,25 @@
 Date: 2026-04-24
 
 ### Group Chats
-- Reworked group chats around controllable speaker selection, Auto Mode, Auto DM, private per-character DM chats, unread DM badges, and a visible `{{char}} is typing...` indicator.
-- Added context-aware group replies for direct name calls and group-wide prompts, with anti-loop limits for autonomous character-to-character replies.
-- Added group schedules with generation toasts, time awareness, downtime catch-up, optional auto-messaging, and separate Auto DM cooldowns.
-- Made group DMs private by default, participant-limited in context, one-tap from unread avatar badges, and easier to return from with `Return to Group`.
-- Improved mobile group controls with compact buttons, stable typing text, evenly spaced avatars, clearer toggle states, and less visual flicker.
-
-### Authors Notes
-- Made Character Author's Note (Private) editable in group chats and separated group-specific notes from individual character-card notes.
-- Fixed private note settings so `Use character author's note` and `Replace/Top/Bottom` persist and inject correctly.
-
-### Added
-- Added bundled Chat Completions presets for `Geechan - Universal Roleplay (Chat Completions) (v5.0)` and `Geechan's Chatroom Prompt`, with `Geechan's Chatroom Prompt` defaulting to a 256k context window.
-- Added In-Chat Agents master enable/disable controls, agent chat separation options, and a Pathfinder memory summary UI with editable text and injection status.
-
-### Fixed
-- Fixed group chat saving and Recent Chats registration for new, named, and branched group chats.
-- Fixed Auto Mode persistence per user, Auto Mode draft preservation, Auto DM routing into DM chats, and rapid-fire DM auto-replies.
-- Fixed mobile bottom chat controls, stop/send button sizing, Agents Quick Toggles overflow, and frontend cache clearing after updater reloads.
+- Added a full group-chat control bar with speaker selection, Speak Now, manual DM mode, Auto Mode, Auto DM, unread DM badges, and compact mobile controls.
+- Added private per-character DM chats with participant-limited context, one-tap unread DM opening, forced DM mode inside DM chats, and Return to Group navigation.
+- Added context-aware replies for direct name calls and group-wide prompts, plus anti-loop limits for autonomous character replies.
+- Added AI-generated 24-hour schedules with time awareness, generation toasts, downtime catch-up, optional auto-messaging, and separate Auto DM cooldowns.
+- Fixed group chat saving, branching, Recent Chats registration, empty new chats, custom-name reuse, Auto Mode persistence, draft preservation, and rapid-fire DM auto-replies.
 - Removed redundant group modes and controls, including Narrator Merge, One at a time, and the old Narrate Turn flow.
+
+### Character Notes
+- Made Character Author's Note (Private) editable in group chats and separated group-specific notes from individual chat notes.
+- Fixed private note persistence and injection for `Use character author's note` plus `Replace`, `Top`, and `Bottom` placement.
+
+### UI And Mobile
+- Fixed mobile bottom chat controls, send/stop sizing, group avatar spacing, typing indicator alignment, toggle visibility, unread DM badge visibility, and avatar refresh flicker.
+- Fixed Agents Quick Toggles overflow and added clearer agent enable/disable and chat-separation controls.
+
+### Presets And Maintenance
+- Added bundled Chat Completions presets for `Geechan - Universal Roleplay (Chat Completions) (v5.0)` and `Geechan's Chatroom Prompt`, with `Geechan's Chatroom Prompt` defaulting to a 256k context window.
+- Added a separate Pathfinder memory summary UI with editable summary text and injection status.
+- Fixed frontend cache clearing after updater reloads.
 - Updated `Geechan's Chatroom Prompt` emoji guidance to use normal emojis.
 - Bumped app-owned version strings to `1.4.5` without changing dependency versions.
 
