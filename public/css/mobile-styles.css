@@ -1233,8 +1233,12 @@
     }
 
     @keyframes groupUnreadDmPulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.08); }
+        0%, 100% {
+            box-shadow: 0 0 0 2px color-mix(in srgb, #ff3b3b 45%, transparent), 0 0 10px color-mix(in srgb, #ff3b3b 62%, transparent);
+        }
+        50% {
+            box-shadow: 0 0 0 3px color-mix(in srgb, #ff3b3b 58%, transparent), 0 0 16px color-mix(in srgb, #ff3b3b 82%, transparent);
+        }
     }
 
     .group_speaker_avatar span,

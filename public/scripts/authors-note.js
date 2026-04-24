@@ -41,13 +41,40 @@ const chara_note_position = {
     after: 2,
 };
 
-function getCharacterNoteByAvatar(avatarId) {
+function ensureCharacterNoteStore() {
+    if (!extension_settings.note.chara) {
+        extension_settings.note.chara = [];
+    }
+
+    return extension_settings.note.chara;
+}
+
+function getCharacterNoteKey(avatarId, groupId = '') {
     const avatarName = getCharaFilename(null, { manualAvatarKey: avatarId });
-    if (!avatarName || !extension_settings.note.chara) {
+    if (!avatarName) {
         return null;
     }
 
-    return extension_settings.note.chara.find((entry) => entry.name === avatarName) ?? null;
+    return groupId ? `group:${groupId}:${avatarName}` : `individual:${avatarName}`;
+}
+
+function getCharacterNoteByKey(noteKey) {
+    if (!noteKey || !extension_settings.note.chara) {
+        return null;
+    }
+
+    return extension_settings.note.chara.find((entry) => entry.name === noteKey) ?? null;
+}
+
+function getCharacterNoteByAvatar(avatarId, groupId = '') {
+    const noteKey = getCharacterNoteKey(avatarId, groupId);
+    const scopedNote = getCharacterNoteByKey(noteKey);
+    if (scopedNote || groupId) {
+        return scopedNote;
+    }
+
+    const legacyName = getCharaFilename(null, { manualAvatarKey: avatarId });
+    return getCharacterNoteByKey(legacyName);
 }
 
 function getEditableCharacterNoteAvatar() {
@@ -60,17 +87,20 @@ function getEditableCharacterNoteAvatar() {
 }
 
 function getEditableCharacterNoteName() {
+    const context = getContext();
     const avatarId = getEditableCharacterNoteAvatar();
-    return avatarId ? getCharaFilename(null, { manualAvatarKey: avatarId }) : null;
+    return avatarId ? getCharacterNoteKey(avatarId, context.groupId || '') : null;
 }
 
 function getEditableCharacterNote() {
-    const avatarName = getEditableCharacterNoteName();
-    if (!avatarName || !extension_settings.note.chara) {
-        return null;
+    const context = getContext();
+    const note = getCharacterNoteByKey(getEditableCharacterNoteName());
+    if (note || context.groupId) {
+        return note;
     }
 
-    return extension_settings.note.chara.find((entry) => entry.name === avatarName) ?? null;
+    const avatarId = getEditableCharacterNoteAvatar();
+    return avatarId ? getCharacterNoteByAvatar(avatarId) : null;
 }
 
 function applyCharacterNote(prompt, charaNote) {
@@ -98,7 +128,7 @@ function getActiveGroupCharacterNote(context) {
         return null;
     }
 
-    return getCharacterNoteByAvatar(avatarId);
+    return getCharacterNoteByAvatar(avatarId, context.groupId);
 }
 
 function setNoteTextCommand(_, text) {
@@ -296,10 +326,7 @@ function onExtensionFloatingCharaPromptInput() {
     } else if (extension_settings.note.chara && existingCharaNote) {
         Object.assign(existingCharaNote, tempCharaNote);
     } else if (avatarName && tempPrompt.length > 0) {
-        if (!extension_settings.note.chara) {
-            extension_settings.note.chara = [];
-        }
-        extension_settings.note.chara.push(tempCharaNote);
+        ensureCharacterNoteStore().push(tempCharaNote);
     } else {
         console.log('Character author\'s note error: No avatar name key could be found.');
         toastr.error(t`Something went wrong. Could not save character's author's note.`);
@@ -317,11 +344,8 @@ function onExtensionFloatingCharaCheckboxChanged() {
     const avatarName = getEditableCharacterNoteName();
 
     if (!charaNote && avatarName && value) {
-        if (!extension_settings.note.chara) {
-            extension_settings.note.chara = [];
-        }
         charaNote = { name: avatarName, prompt: '', useChara: false, position: chara_note_position.replace };
-        extension_settings.note.chara.push(charaNote);
+        ensureCharacterNoteStore().push(charaNote);
     }
 
     if (charaNote) {
@@ -432,7 +456,7 @@ export function setFloatingPrompt() {
 
     let prompt = shouldAddPrompt ? $('#extension_floating_prompt').val() : '';
     if (shouldAddPrompt && extension_settings.note.chara) {
-        const charaNote = context.groupId ? getActiveGroupCharacterNote(context) : (context.characterId !== undefined ? extension_settings.note.chara.find((e) => e.name === getCharaFilename()) : null);
+        const charaNote = context.groupId ? getActiveGroupCharacterNote(context) : getEditableCharacterNote();
         prompt = applyCharacterNote(prompt, charaNote);
     }
     context.setExtensionPrompt(
@@ -516,7 +540,7 @@ async function onChatChanged() {
         }
     } else if (extension_settings.note.chara && context.groupId) {
         const groupNotes = getGroupMembers(context.groupId)
-            .map(character => getCharacterNoteByAvatar(character?.avatar))
+            .map(character => getCharacterNoteByAvatar(character?.avatar, context.groupId))
             .filter(note => note?.prompt);
         const combinedPrompt = groupNotes.map(note => note.prompt).join('\n');
         tokenCounter2 = combinedPrompt ? await getTokenCountAsync(combinedPrompt) : 0;
