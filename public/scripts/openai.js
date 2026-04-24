@@ -111,7 +111,8 @@ const default_continue_nudge_prompt = '[Continue your last message without repea
 const default_bias = 'Default (none)';
 const default_personality_format = '{{personality}}';
 const default_scenario_format = '{{scenario}}';
-const default_group_nudge_prompt = '[Write the next reply only as {{char}}.]';
+const legacy_group_nudge_prompt = '[Write the next reply only as {{char}}.]';
+const default_group_nudge_prompt = '[Group chat turn: write the next reply only as {{char}}. The full conversation matters: {{char}} may address, react to, interrupt, answer, agree with, disagree with, or ask questions of any participant, not only {{user}}. Other participants currently present: {{notChar}}. Do not write dialogue or actions for anyone except {{char}}.]';
 const default_bias_presets = {
     [default_bias]: [],
     'Anti-bond': [
@@ -5315,6 +5316,7 @@ export class ChatCompletion {
  */
 function migrateChatCompletionSettings(settings) {
     const migrateMap = [
+        { oldKey: 'group_nudge_prompt', oldValue: legacy_group_nudge_prompt, newKey: 'group_nudge_prompt', newValue: default_group_nudge_prompt },
         { oldKey: 'names_in_completion', oldValue: true, newKey: 'names_behavior', newValue: character_names_behavior.COMPLETION },
         { oldKey: 'chat_completion_source', oldValue: 'palm', newKey: 'chat_completion_source', newValue: chat_completion_sources.MAKERSUITE },
         { oldKey: 'custom_prompt_post_processing', oldValue: custom_prompt_post_processing_types.CLAUDE, newKey: 'custom_prompt_post_processing', newValue: custom_prompt_post_processing_types.MERGE },
