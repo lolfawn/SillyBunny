@@ -51,7 +51,6 @@ import {
     chat_metadata,
     updateChatMetadata,
     getThumbnailUrl,
-    getRequestHeaders,
     setMenuType,
     menu_type,
     select_selected_character,
@@ -67,6 +66,7 @@ import {
     getCurrentChatId,
     setCharacterSettingsOverrides,
     system_avatar,
+    getRequestHeaders,
     isChatSaving,
     setExternalAbortController,
     baseChatReplace,
@@ -106,6 +106,7 @@ export {
     resetSelectedGroup,
     select_group_chats,
     getGroupChatNames,
+    updateGroupSpeakerControls,
 };
 
 let is_group_generating = false; // Group generation flag
@@ -201,6 +202,198 @@ async function runWithGroupMemberModelOverride(group, avatarId, callback) {
     }
 }
 
+
+
+const GROUP_NARRATOR_NAME = 'Group Narrator';
+let selectedGroupSpeakerAvatar = '';
+let groupNarratorConsolidation = false;
+let groupSingleSpeakerMode = true;
+let groupSpeakerControlsInitialized = false;
+
+function getCharacterIdByAvatar(avatarId) {
+    return characters.findIndex(character => character.avatar === avatarId);
+}
+
+function getGroupEnabledMembers(group) {
+    if (!group || !Array.isArray(group.members)) {
+        return [];
+    }
+
+    return group.members.filter(member => !group.disabled_members?.includes(member));
+}
+
+function getSelectedGroupSpeakerChid(group) {
+    if (!selectedGroupSpeakerAvatar) {
+        return -1;
+    }
+
+    if (!getGroupEnabledMembers(group).includes(selectedGroupSpeakerAvatar)) {
+        selectedGroupSpeakerAvatar = '';
+        return -1;
+    }
+
+    return getCharacterIdByAvatar(selectedGroupSpeakerAvatar);
+}
+
+function clearSelectedGroupSpeaker() {
+    selectedGroupSpeakerAvatar = '';
+    $('#group_speaker_controls .group_speaker_avatar').removeClass('selected');
+}
+
+function getGroupTurnStartIndex() {
+    for (let index = chat.length - 1; index >= 0; index--) {
+        if (chat[index]?.is_user || chat[index]?.is_system || chat[index]?.extra?.type === system_message_types.NARRATOR) {
+            return index + 1;
+        }
+    }
+
+    return Math.max(0, chat.length - 1);
+}
+
+function limitGroupSpeakersForControl(activatedMembers, forceSingleSpeaker) {
+    if (!forceSingleSpeaker || activatedMembers.length <= 1) {
+        return activatedMembers;
+    }
+
+    return activatedMembers.slice(0, 1);
+}
+
+function getNarratableGroupTurnMessages(startIndex) {
+    return chat.slice(startIndex).filter(message => message && !message.is_user && !message.is_system && message.extra?.type !== 'group_narrator_consolidation' && String(message.mes ?? '').trim());
+}
+
+function buildNarratorConsolidationPrompt(group, startIndex) {
+    const messages = getNarratableGroupTurnMessages(startIndex);
+    const transcript = messages.map(message => `${message.name || 'Character'}: ${message.mes}`).join('\n\n');
+    const memberNames = getGroupEnabledMembers(group)
+        .map(avatar => characters.find(character => character.avatar === avatar)?.name)
+        .filter(Boolean)
+        .join(', ');
+
+    return `Consolidate the following group-chat character replies into one cohesive narrator-style response. Preserve important actions, dialogue, tone, and continuity. Do not add new events beyond a light connective narration. Characters in this scene: ${memberNames || group.name}.
+
+${transcript}`;
+}
+
+async function consolidateGroupTurnAsNarrator(group, startIndex, params = {}) {
+    const prompt = buildNarratorConsolidationPrompt(group, startIndex);
+    if (!getNarratableGroupTurnMessages(startIndex).length) {
+        toastr.warning(t`There are no group replies to narrate yet.`);
+        return;
+    }
+
+    const previousGroupGenerating = is_group_generating;
+    try {
+        is_group_generating = false;
+        const consolidatedText = String(await Generate('quiet', { quiet_prompt: prompt, quietToLoud: false, skipWIAN: true, automatic_trigger: true, signal: params?.signal }) || '').trim();
+        if (!consolidatedText) {
+            toastr.warning(t`Narrator merge did not return a response.`);
+            return;
+        }
+
+        const narratorMessage = {
+            name: GROUP_NARRATOR_NAME,
+            is_user: false,
+            is_system: false,
+            send_date: getMessageTimeStamp(),
+            mes: consolidatedText,
+            extra: {
+                type: 'group_narrator_consolidation',
+            },
+            force_avatar: system_avatar,
+        };
+        chat.push(narratorMessage);
+        addOneMessage(narratorMessage);
+        await saveChatConditional();
+    } finally {
+        is_group_generating = previousGroupGenerating;
+    }
+}
+
+function updateGroupSpeakerControls() {
+    const container = $('#group_speaker_controls');
+    if (!container.length) {
+        return;
+    }
+
+    const group = selected_group ? groups.find(x => x.id === selected_group) : null;
+    const members = getGroupEnabledMembers(group);
+    container.toggleClass('displayNone', !group || members.length === 0);
+    if (!group || members.length === 0) {
+        clearSelectedGroupSpeaker();
+        return;
+    }
+
+    const avatarList = container.find('.group_speaker_list').empty();
+    for (const avatarId of members) {
+        const character = characters.find(x => x.avatar === avatarId);
+        if (!character) {
+            continue;
+        }
+
+        const item = $('<button type="button" class="group_speaker_avatar"></button>');
+        item.attr('title', `${character.name}: speak next / now`);
+        item.attr('data-avatar', avatarId);
+        item.toggleClass('selected', avatarId === selectedGroupSpeakerAvatar);
+        item.append($('<img alt="">').attr('src', getThumbnailUrl('avatar', avatarId)));
+        item.append($('<span></span>').text(character.name));
+        avatarList.append(item);
+    }
+
+    container.find('#group_speaker_narrator').prop('checked', groupNarratorConsolidation);
+    container.find('#group_speaker_single').prop('checked', groupSingleSpeakerMode);
+}
+
+function initGroupSpeakerControls() {
+    if (groupSpeakerControlsInitialized) {
+        return;
+    }
+
+    groupSpeakerControlsInitialized = true;
+    const container = $('#group_speaker_controls');
+    container.on('click', '.group_speaker_avatar', function (event) {
+        const avatarId = String($(this).data('avatar') || '');
+        const alreadySelected = selectedGroupSpeakerAvatar === avatarId;
+        selectedGroupSpeakerAvatar = alreadySelected ? '' : avatarId;
+        updateGroupSpeakerControls();
+
+        if (event.shiftKey && selected_group) {
+            const chid = getCharacterIdByAvatar(avatarId);
+            if (chid !== -1) {
+                Generate('normal', { force_chid: chid });
+            }
+        }
+    });
+
+    container.on('click', '#group_speaker_now', function () {
+        if (!selected_group || !selectedGroupSpeakerAvatar) {
+            toastr.warning(t`Pick a group member first.`);
+            return;
+        }
+
+        const chid = getCharacterIdByAvatar(selectedGroupSpeakerAvatar);
+        if (chid !== -1) {
+            Generate('normal', { force_chid: chid });
+        }
+    });
+
+    container.on('click', '#group_speaker_narrate_now', async function () {
+        const group = selected_group ? groups.find(x => x.id === selected_group) : null;
+        if (!group) {
+            return;
+        }
+
+        await consolidateGroupTurnAsNarrator(group, getGroupTurnStartIndex());
+    });
+
+    container.on('change', '#group_speaker_single', function () {
+        groupSingleSpeakerMode = $(this).prop('checked');
+    });
+
+    container.on('change', '#group_speaker_narrator', function () {
+        groupNarratorConsolidation = $(this).prop('checked');
+    });
+}
 
 export const group_activation_strategy = {
     NATURAL: 0,
@@ -1157,8 +1350,11 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
         const enabledMembers = group.members.filter(x => !group.disabled_members.includes(x));
         let activatedMembers = [];
 
+        const selectedSpeakerChid = getSelectedGroupSpeakerChid(group);
         if (params && typeof params.force_chid == 'number') {
             activatedMembers = [params.force_chid];
+        } else if (!byAutoMode && type !== 'quiet' && selectedSpeakerChid !== -1) {
+            activatedMembers = [selectedSpeakerChid];
         } else if (type === 'quiet') {
             activatedMembers = activateSwipe(group.members, { allowSystem: true }).slice(0, 1);
 
@@ -1193,6 +1389,9 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             await saveChatConditional();
             $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles: true }));
         }
+
+        const shouldForceSingleSpeaker = groupSingleSpeakerMode && !groupNarratorConsolidation && !byAutoMode && !['quiet', 'swipe', 'continue', 'impersonate'].includes(type);
+        activatedMembers = limitGroupSpeakersForControl(activatedMembers, shouldForceSingleSpeaker);
         groupChatQueueOrder = new Map();
 
         if (power_user.show_group_chat_queue) {
@@ -1200,6 +1399,7 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
                 groupChatQueueOrder.set(characters[activatedMembers[i]].avatar, i + 1);
             }
         }
+        const turnStartIndex = chat.length;
         await eventSource.emit(event_types.GROUP_WRAPPER_STARTED, { selected_group, type });
         // now the real generation begins: cycle through every activated character
         for (const chId of activatedMembers) {
@@ -1227,6 +1427,14 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
                 groupChatQueueOrder.delete(characters[chId].avatar);
                 groupChatQueueOrder.forEach((value, key, map) => map.set(key, value - 1));
             }
+        }
+
+        if (groupNarratorConsolidation && activatedMembers.length > 1 && type !== 'quiet') {
+            await consolidateGroupTurnAsNarrator(group, turnStartIndex, params);
+        }
+
+        if (selectedSpeakerChid !== -1 && !(params && typeof params.force_chid == 'number')) {
+            clearSelectedGroupSpeaker();
         }
     } finally {
         is_group_generating = false;
@@ -2044,6 +2252,7 @@ function select_group_chats(groupId, skipAnimation) {
     hideMutedSprites = group?.hideMutedSprites ?? false;
     $('#rm_group_hidemutedsprites').prop('checked', hideMutedSprites);
 
+    updateGroupSpeakerControls();
     eventSource.emit('groupSelected', { detail: { id: openGroupId, group: group } });
 }
 
@@ -2669,6 +2878,7 @@ function doCurMemberListPopout() {
 }
 
 jQuery(() => {
+    initGroupSpeakerControls();
     if (!CSS.supports('field-sizing', 'content')) {
         $(document).on('input', '#rm_group_chats_block .autoSetHeight', function () {
             resetScrollHeight($(this));
@@ -2709,4 +2919,6 @@ jQuery(() => {
     $('#rm_group_restore_avatar').on('click', restoreGroupAvatar);
     $(document).on('click', '.group_member .right_menu_button', onGroupActionClick);
     $(document).on('change', '.group_member_model_input', onGroupMemberModelInput);
+    eventSource.on(event_types.CHAT_CHANGED, updateGroupSpeakerControls);
+    eventSource.on(event_types.GROUP_UPDATED, updateGroupSpeakerControls);
 });

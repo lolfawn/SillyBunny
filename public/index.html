@@ -8383,6 +8383,25 @@
         </div>
         <div id="form_sheld">
             <div id="sb-bottom-chat-bar"></div>
+            <div id="group_speaker_controls" class="group_speaker_controls displayNone">
+                <div class="group_speaker_list"></div>
+                <button type="button" id="group_speaker_now" class="menu_button menu_button_icon" title="Make selected character speak now" data-i18n="[title]Make selected character speak now">
+                    <i class="fa-solid fa-comment-dots"></i>
+                    <span data-i18n="Speak Now">Speak Now</span>
+                </button>
+                <button type="button" id="group_speaker_narrate_now" class="menu_button menu_button_icon" title="Consolidate the latest group replies into one narrator response" data-i18n="[title]Consolidate the latest group replies into one narrator response">
+                    <i class="fa-solid fa-feather-pointed"></i>
+                    <span data-i18n="Narrate Turn">Narrate Turn</span>
+                </button>
+                <label class="checkbox_label group_speaker_toggle" title="Only let one group member reply unless you explicitly choose narrator merge" data-i18n="[title]Only let one group member reply unless you explicitly choose narrator merge">
+                    <input id="group_speaker_single" type="checkbox" checked />
+                    <span data-i18n="One at a time">One at a time</span>
+                </label>
+                <label class="checkbox_label group_speaker_toggle" title="After a multi-character group turn, ask the model to consolidate the replies into one narrator response" data-i18n="[title]After a multi-character group turn, ask the model to consolidate the replies into one narrator response">
+                    <input id="group_speaker_narrator" type="checkbox" />
+                    <span data-i18n="Narrator merge">Narrator merge</span>
+                </label>
+            </div>
             <div id="dialogue_del_mes">
                 <div id="dialogue_del_mes_ok" data-i18n="Delete" class="menu_button">Delete</div>
                 <div id="dialogue_del_mes_cancel" data-i18n="Cancel" class="menu_button">Cancel</div>

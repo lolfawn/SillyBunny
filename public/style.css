@@ -7075,3 +7075,63 @@ body:not(.movingUI) .drawer-content.maximized {
     margin-top: 10px;
     flex-wrap: wrap;
 }
+
+
+.group_speaker_controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: var(--SmartThemeBlurTintColor);
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 10px;
+    margin-bottom: 4px;
+}
+
+.group_speaker_controls.displayNone {
+    display: none !important;
+}
+
+.group_speaker_list {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    flex: 1;
+    min-width: 0;
+}
+
+.group_speaker_avatar {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--SmartThemeBodyColor);
+    padding: 2px 7px 2px 2px;
+    max-width: 150px;
+    cursor: pointer;
+}
+
+.group_speaker_avatar.selected {
+    border-color: var(--SmartThemeQuoteColor);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor) 20%, transparent);
+}
+
+.group_speaker_avatar img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: 0 0 auto;
+}
+
+.group_speaker_avatar span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.group_speaker_toggle {
+    white-space: nowrap;
+}
