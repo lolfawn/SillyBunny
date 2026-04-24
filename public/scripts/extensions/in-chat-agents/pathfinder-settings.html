@@ -237,6 +237,22 @@
                     <div class="pf--setting-help">Messages before Pathfinder should consider writing a memory summary.</div>
                 </div>
             </div>
+            <div class="pf--setting-group pf--summary-editor">
+                <div class="pf--summary-editor-header">
+                    <label class="pf--setting-label" for="pf--summary-content">Latest memory summary</label>
+                    <span id="pf--summary-injection-indicator" class="pf--summary-indicator pf--summary-indicator-missing">No summary</span>
+                </div>
+                <textarea id="pf--summary-content" class="text_pole" rows="7" placeholder="When Pathfinder creates a memory summary, it will appear here for review and editing."></textarea>
+                <div class="pf--summary-meta" id="pf--summary-meta">No Pathfinder summary has been created yet.</div>
+                <div class="pf--summary-actions">
+                    <button type="button" id="pf--summary-save" class="menu_button menu_button_icon">
+                        <i class="fa-solid fa-save"></i>
+                        <span>Save Summary</span>
+                    </button>
+                    <span id="pf--summary-save-status" class="pf--prompt-status"></span>
+                </div>
+                <div class="pf--setting-help">Saving updates the actual lorebook summary entry. The indicator shows whether that latest summary was selected and injected by Pathfinder retrieval.</div>
+            </div>
         </div>
     </div>
 
@@ -745,6 +761,52 @@
 
 .pf--setting-row .pf--setting-group {
     flex: 1;
+}
+
+
+.pf--summary-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.pf--summary-indicator {
+    border-radius: 999px;
+    font-size: 11px;
+    padding: 3px 8px;
+    white-space: nowrap;
+}
+
+.pf--summary-indicator-injected {
+    background: rgba(34, 197, 94, 0.18);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: #86efac;
+}
+
+.pf--summary-indicator-not-injected {
+    background: rgba(245, 158, 11, 0.16);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fcd34d;
+}
+
+.pf--summary-indicator-missing {
+    background: rgba(148, 163, 184, 0.15);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    color: #cbd5e1;
+}
+
+.pf--summary-meta {
+    font-size: 11px;
+    opacity: 0.75;
+    margin-top: 5px;
+}
+
+.pf--summary-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
 }
 
 /* Tool List */

@@ -4,6 +4,7 @@ import { sidecarGenerate } from './llm-sidecar.js';
 import { logPathfinderRetrievalDetail, logSidecarRetrieval, logPipelineStart, logPipelineComplete, setSidecarActive } from './activity-feed.js';
 import { buildTreeFromMetadata } from './tree-builder.js';
 import { runPipeline } from './prompts/pipeline-runner.js';
+import { isSummaryMemoryEntry, markSummaryMemoryInjected } from './summary-memory-store.js';
 
 const RETRIEVAL_PROMPT_KEY = 'pathfinder_sidecar_retrieval';
 const PIPELINE_RETRIEVAL_KEY = 'pathfinder_pipeline_retrieval';
@@ -205,6 +206,10 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
             .join('\n\n');
 
         const content = `<pathfinder_context>\n${formattedContent}\n</pathfinder_context>`;
+        if (entryContents.some(entry => isSummaryMemoryEntry(entry))) {
+            markSummaryMemoryInjected({ mode: 'pipeline' });
+        }
+
         logPathfinderRetrievalDetail({
             mode: 'pipeline',
             books,
@@ -309,6 +314,10 @@ async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptType
                 selectedEntryCount: allEntries.length,
             },
         });
+
+        if (allEntries.some(entry => isSummaryMemoryEntry(entry))) {
+            markSummaryMemoryInjected({ mode: 'tool-retrieval' });
+        }
 
         if (allEntries.length > 0) {
             const content = `**Pathfinder Auto-Retrieval** (${allEntries.length} entries relevant)`;

@@ -20,6 +20,7 @@ import { syncToolAgentRegistrations } from './agent-runner.js';
 import { getPrompt, savePrompt } from './pathfinder/prompts/prompt-store.js';
 import { getDefaultPrompts } from './pathfinder/prompts/default-prompts.js';
 import { clearFeed, getFeedItems } from './pathfinder/activity-feed.js';
+import { getSummaryMemoryState, onSummaryMemoryChanged, saveSummaryMemoryContent } from './pathfinder/summary-memory-store.js';
 
 const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
@@ -28,6 +29,7 @@ const PATHFINDER_LOG_MODE_KEY = 'pathfinder-retrieval-log-mode';
 let settingsEl = null;
 let currentAgent = null;
 let retrievalLogMode = localStorage.getItem(PATHFINDER_LOG_MODE_KEY) === 'detailed' ? 'detailed' : 'summary';
+let summaryMemoryUnsubscribe = null;
 
 function logPathfinder(message, ...details) {
     console.log(`${PATHFINDER_LOG_PREFIX} ${message}`, ...details);
@@ -146,6 +148,10 @@ export async function openPathfinderSettings(agent) {
     }
 
     settingsEl = $(html);
+    if (summaryMemoryUnsubscribe) {
+        summaryMemoryUnsubscribe();
+    }
+    summaryMemoryUnsubscribe = onSummaryMemoryChanged(renderSummaryMemoryEditor);
 
     // Initialize UI
     await refreshLorebookList();
@@ -155,6 +161,7 @@ export async function openPathfinderSettings(agent) {
     updateStatusBanner();
     updateModeCardStates();
     renderRetrievalLog();
+    renderSummaryMemoryEditor();
 
     return settingsEl;
 }
@@ -384,6 +391,54 @@ function populateConnectionProfiles() {
     });
 }
 
+
+function formatSummaryTimestamp(timestamp) {
+    if (!timestamp) {
+        return '';
+    }
+
+    return new Date(timestamp).toLocaleString();
+}
+
+function renderSummaryMemoryEditor() {
+    if (!settingsEl) {
+        return;
+    }
+
+    const summary = getSummaryMemoryState();
+    const textarea = settingsEl.find('#pf--summary-content');
+    const indicator = settingsEl.find('#pf--summary-injection-indicator');
+    const meta = settingsEl.find('#pf--summary-meta');
+    const hasSummary = Boolean(summary.content || summary.uid);
+
+    if (document.activeElement !== textarea[0]) {
+        textarea.val(summary.content || '');
+    }
+
+    textarea.prop('disabled', !hasSummary);
+    settingsEl.find('#pf--summary-save').prop('disabled', !hasSummary);
+
+    indicator.removeClass('pf--summary-indicator-missing pf--summary-indicator-not-injected pf--summary-indicator-injected');
+    if (!hasSummary) {
+        indicator.addClass('pf--summary-indicator-missing').text('No summary');
+        meta.text('No Pathfinder summary has been created yet.');
+        return;
+    }
+
+    const isInjected = summary.injectedAt && summary.injectedAt >= summary.updatedAt;
+    if (isInjected) {
+        indicator.addClass('pf--summary-indicator-injected').text('Injected');
+    } else {
+        indicator.addClass('pf--summary-indicator-not-injected').text('Not injected');
+    }
+
+    const title = summary.title || 'Untitled summary';
+    const location = summary.bookName && summary.uid !== null ? `${summary.bookName} / UID ${summary.uid}` : 'not linked to a lorebook entry';
+    const updated = summary.updatedAt ? `Updated ${formatSummaryTimestamp(summary.updatedAt)}` : 'Not saved yet';
+    const injected = summary.injectedAt ? `Last injected ${formatSummaryTimestamp(summary.injectedAt)}${summary.injectedMode ? ` via ${summary.injectedMode}` : ''}` : 'Not injected by retrieval yet';
+    meta.text(`${title} — ${location}. ${updated}. ${injected}.`);
+}
+
 /**
  * Bind all event handlers
  */
@@ -511,6 +566,17 @@ function bindEvents() {
         setPathfinderSettings(s);
         logPathfinder('Auto summary interval changed.', { autoSummaryInterval: s.autoSummaryInterval });
         updateAgentSettings();
+    });
+
+    settingsEl.find('#pf--summary-save').on('click', async () => {
+        const status = settingsEl.find('#pf--summary-save-status');
+        try {
+            await saveSummaryMemoryContent(settingsEl.find('#pf--summary-content').val());
+            status.text('Saved!').removeClass('error').addClass('success');
+            setTimeout(() => status.text(''), 3000);
+        } catch (err) {
+            status.text(`Save failed: ${err.message}`).removeClass('success').addClass('error');
+        }
     });
 
     // Tool settings
