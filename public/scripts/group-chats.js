@@ -128,12 +128,25 @@ let openGroupId = null;
 let newGroupMembers = [];
 
 const GROUP_MEMBER_MODELS_KEY = 'member_models';
+const GROUP_AUTO_MODE_KEY = 'SillyBunny.groupAutoModeEnabled';
 const GROUP_DM_SETTINGS_KEY = 'SillyBunny.groupDmSettings';
 const GROUP_DM_UNREAD_KEY = 'SillyBunny.groupDmUnread';
 const defaultGroupDmSettings = {
     autoDmEnabled: false,
     autoDmMember: '',
 };
+
+function getGlobalGroupAutoModeEnabled() {
+    return accountStorage.getItem(GROUP_AUTO_MODE_KEY) === 'true';
+}
+
+function saveGlobalGroupAutoModeEnabled(enabled) {
+    accountStorage.setItem(GROUP_AUTO_MODE_KEY, String(Boolean(enabled)));
+}
+
+function applyGlobalGroupAutoModeSettings() {
+    is_group_automode_enabled = getGlobalGroupAutoModeEnabled();
+}
 
 function getGlobalGroupDmSettings() {
     try {
@@ -2995,7 +3008,7 @@ function select_group_chats(groupId, skipAnimation) {
     }
 
     updateFavButtonState(group?.fav ?? false);
-    setAutoModeWorker();
+    syncGroupAutoModeToggle();
 
     // top bar
     if (group) {
@@ -3666,6 +3679,7 @@ function doCurMemberListPopout() {
 }
 
 jQuery(() => {
+    applyGlobalGroupAutoModeSettings();
     initGroupSpeakerControls();
     if (!CSS.supports('field-sizing', 'content')) {
         $(document).on('input', '#rm_group_chats_block .autoSetHeight', function () {
@@ -3685,6 +3699,8 @@ jQuery(() => {
     $('#rm_group_automode').on('input', function () {
         const value = $(this).prop('checked');
         is_group_automode_enabled = value;
+        saveGlobalGroupAutoModeEnabled(value);
+        syncGroupAutoModeToggle();
         if (!value) {
             stopAutoModeGeneration();
         }
