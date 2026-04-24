@@ -1603,6 +1603,15 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             mergedParams.quiet_prompt = [mergedParams.quiet_prompt, contextPrompt].filter(Boolean).join('\n');
             mergedParams.quietToLoud = true;
             textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...mergedParams }));
+            if (type === 'dm') {
+                const dmMessage = chat[chat.length - 1];
+                if (dmMessage && !dmMessage.is_user && !dmMessage.is_system) {
+                    dmMessage.extra = dmMessage.extra || {};
+                    dmMessage.extra.is_group_dm = true;
+                    dmMessage.extra.dm_target = 'user';
+                    dmMessage.title = dmMessage.title || 'Private DM';
+                }
+            }
             const shouldNarrateMerge = groupNarratorConsolidation && activatedMembers.length > 1 && type !== 'quiet';
             let currentDraftMessage = null;
             if (shouldNarrateMerge) {

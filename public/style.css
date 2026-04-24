@@ -7135,3 +7135,23 @@ body:not(.movingUI) .drawer-content.maximized {
 .group_speaker_toggle {
     white-space: nowrap;
 }
+
+
+.group-dm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 4px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor) 22%, transparent);
+    border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor) 45%, transparent);
+    color: var(--SmartThemeBodyColor);
+    font-size: 0.75em;
+    line-height: 1.3;
+    vertical-align: middle;
+}
+
+.group-dm-badge i {
+    font-size: 0.9em;
+}
