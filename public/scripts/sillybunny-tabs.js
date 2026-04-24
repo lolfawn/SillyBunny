@@ -4241,7 +4241,7 @@ async function refreshCastRolesPanel() {
         refs.statusPill.dataset.tone = assignmentCount ? 'good' : '';
         setCastPanelMessage(
             assignmentCount
-                ? 'Cast assignments are saved to this chat only. Prompt and message behavior will be wired in the next phase.'
+                ? 'Cast assignments are saved to this chat only. User actor name, avatar, macros, and persona context are active for new messages.'
                 : 'No cast override is active. This chat still uses the normal Persona and selected character flow.',
             assignmentCount ? 'good' : '',
         );
@@ -4342,7 +4342,7 @@ function buildCastRolesPanel() {
     const callout = createElement('div', { className: 'sb-shell-callout' });
     callout.innerHTML = `
         <strong>Cast / Roles</strong>
-        <p>Assign character cards as chat actors. For now this safely stores per-chat role metadata without changing normal chats.</p>
+        <p>Assign character cards as chat actors. User-controlled cards can supply your chat name, avatar, macros, and persona context.</p>
     `;
 
     const card = createElement('section', { className: 'sb-admin-card sb-cast-card' });

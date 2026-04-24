@@ -424,6 +424,113 @@ const MESSAGE_SCREENSHOT_INPUT_IDS = Object.freeze({
 /** @type {ChatMessage[]} */
 export let chat = [];
 
+
+const CAST_METADATA_KEY = 'cast';
+
+function getCastUserActor() {
+    const actor = chat_metadata?.[CAST_METADATA_KEY]?.userActor;
+
+    if (!actor || actor.type !== 'character' || !actor.avatar) {
+        return null;
+    }
+
+    const character = characters.find(item => item?.avatar === actor.avatar);
+
+    if (!character) {
+        return null;
+    }
+
+    return {
+        type: 'character',
+        avatar: character.avatar,
+        name: actor.name || character.name,
+        character,
+    };
+}
+
+function getCastPrimaryAiActor() {
+    const actors = chat_metadata?.[CAST_METADATA_KEY]?.aiActors;
+
+    if (!Array.isArray(actors) || !actors.length) {
+        return null;
+    }
+
+    const actor = actors.find(item => item?.primary) || actors[0];
+
+    if (!actor || actor.type !== 'character' || !actor.avatar) {
+        return null;
+    }
+
+    const character = characters.find(item => item?.avatar === actor.avatar);
+
+    if (!character) {
+        return null;
+    }
+
+    return {
+        type: 'character',
+        avatar: character.avatar,
+        name: actor.name || character.name,
+        character,
+    };
+}
+
+function getCastUserActorName() {
+    return getCastUserActor()?.name?.trim() || name1;
+}
+
+function getCastUserActorAvatar() {
+    return getCastUserActor()?.avatar || user_avatar;
+}
+
+function getCastOptions() {
+    return chat_metadata?.[CAST_METADATA_KEY]?.options || {};
+}
+
+function getCastUserActorPrompt() {
+    const actor = getCastUserActor();
+
+    if (!actor || getCastOptions().injectUserActorCard === false) {
+        return '';
+    }
+
+    const character = actor.character;
+    const primaryAiActor = getCastPrimaryAiActor();
+    const userName = actor.name || name1;
+    const aiName = primaryAiActor?.name || name2;
+    const sections = [];
+    const addSection = (label, value) => {
+        const text = baseChatReplace(String(value || '').trim(), userName, aiName);
+
+        if (text) {
+            sections.push(`${label}:\n${text}`);
+        }
+    };
+
+    addSection('Description', character.description);
+    addSection('Personality', character.personality);
+    addSection('Scenario', character.scenario);
+    addSection('Creator Notes', character.data?.creator_notes);
+
+    if (!sections.length) {
+        return '';
+    }
+
+    const header = primaryAiActor
+        ? `The human user is roleplaying as ${userName}. The assistant is roleplaying as ${aiName}.`
+        : `The human user is roleplaying as ${userName}.`;
+    const guardrail = getCastOptions().preventAiUserControl === false
+        ? ''
+        : `\nDo not write ${userName}'s actions or dialogue unless explicitly requested.`;
+
+    return `${header}\n${userName}'s character card:\n${sections.join('\n\n')}${guardrail}`;
+}
+
+function getEffectiveUserPersonaPrompt() {
+    const castPrompt = getCastUserActorPrompt();
+    return castPrompt || power_user.persona_description?.trim() || '';
+}
+
 /**
  * @type {import('./scripts/constants.js').SWIPE_STATE}
  */
@@ -3073,7 +3180,7 @@ export function substituteParamsLegacy(content, _name1, _name2, _original, _grou
     }
 
     // Must be substituted last so that they're replaced inside {{description}}
-    environment.user = _name1 ?? name1;
+    environment.user = _name1 ?? getCastUserActorName();
     environment.char = _name2 ?? name2;
     environment.group = environment.charIfNotGroup = getGroupValue(true);
     environment.groupNotMuted = getGroupValue(false);
@@ -3122,7 +3229,7 @@ export function substituteParams(content, options = {}) {
 
     const ctx = /** @type {import('./scripts/macros/engine/MacroEnvBuilder.js').MacroEnvRawContext} */ ({
         content,
-        name1Override: options.name1Override,
+        name1Override: options.name1Override ?? getCastUserActorName(),
         name2Override: options.name2Override,
         original: options.original,
         groupOverride: options.groupOverride,
@@ -3326,7 +3433,9 @@ function addPersonaDescriptionExtensionPrompt() {
     const INJECT_TAG = 'PERSONA_DESCRIPTION';
     setExtensionPrompt(INJECT_TAG, '', extension_prompt_types.IN_PROMPT, 0);
 
-    if (!power_user.persona_description || power_user.persona_description_position === persona_description_positions.NONE) {
+    const personaPrompt = getEffectiveUserPersonaPrompt();
+
+    if (!personaPrompt || power_user.persona_description_position === persona_description_positions.NONE) {
         return;
     }
 
@@ -3335,14 +3444,14 @@ function addPersonaDescriptionExtensionPrompt() {
     if (promptPositions.includes(power_user.persona_description_position) && shouldWIAddPrompt) {
         const originalAN = extension_prompts[NOTE_MODULE_NAME].value;
         const ANWithDesc = power_user.persona_description_position === persona_description_positions.TOP_AN
-            ? `${power_user.persona_description}\n${originalAN}`
-            : `${originalAN}\n${power_user.persona_description}`;
+            ? `${personaPrompt}\n${originalAN}`
+            : `${originalAN}\n${personaPrompt}`;
 
         setExtensionPrompt(NOTE_MODULE_NAME, ANWithDesc, chat_metadata[metadata_keys.position], chat_metadata[metadata_keys.depth], extension_settings.note.allowWIScan, chat_metadata[metadata_keys.role]);
     }
 
     if (power_user.persona_description_position === persona_description_positions.AT_DEPTH) {
-        setExtensionPrompt(INJECT_TAG, power_user.persona_description, extension_prompt_types.IN_CHAT, power_user.persona_description_depth, true, power_user.persona_description_role);
+        setExtensionPrompt(INJECT_TAG, personaPrompt, extension_prompt_types.IN_CHAT, power_user.persona_description_depth, true, power_user.persona_description_role);
     }
 }
 
@@ -3531,7 +3640,7 @@ export function getCharacterCardFieldsLazy({ chid = undefined } = {}) {
 
     /** @type {Record<string, () => string|string[]>} */
     const resolvers = {
-        persona: () => baseChatReplace(power_user.persona_description?.trim()),
+        persona: () => baseChatReplace(getEffectiveUserPersonaPrompt()),
         system: () => {
             if (!character) return '';
             const systemPrompt = chat_metadata.system_prompt || character.data?.system_prompt || '';
@@ -6024,7 +6133,7 @@ export function removeMacros(str) {
  * @param {string} [avatar] Avatar of the user sending the message. Defaults to user_avatar.
  * @returns {Promise<any>} A promise that resolves to the message when it is inserted.
  */
-export async function sendMessageAsUser(messageText, messageBias, insertAt = null, compact = false, name = name1, avatar = user_avatar) {
+export async function sendMessageAsUser(messageText, messageBias, insertAt = null, compact = false, name = getCastUserActorName(), avatar = getCastUserActorAvatar()) {
     messageText = getRegexedString(messageText, regex_placement.USER_INPUT);
 
     const message = {
@@ -6042,9 +6151,12 @@ export async function sendMessageAsUser(messageText, messageBias, insertAt = nul
         message.extra.token_count = await getTokenCountAsync(message.mes, 0);
     }
 
-    // Lock user avatar to a persona.
+    // Lock user avatar to a persona or a user-controlled character card.
     if (avatar in power_user.personas) {
         message.force_avatar = getThumbnailUrl('persona', avatar);
+    } else if (getCastUserActor()?.avatar === avatar) {
+        message.force_avatar = getThumbnailUrl('avatar', avatar);
+        message.original_avatar = avatar;
     }
 
     if (messageBias) {
