@@ -975,6 +975,7 @@ body .panelControlBar {
     order: 1;
 }
 
+#send_form.sb-generating-controls #send_but,
 #send_form.sb-generating-controls #mes_continue,
 #send_form.sb-generating-controls #mes_impersonate {
     display: none !important;
@@ -982,7 +983,20 @@ body .panelControlBar {
 
 #send_form.sb-generating-controls #mes_stop {
     display: flex !important;
-    order: 1;
+    order: 2;
+    width: var(--bottomFormBlockSize);
+    min-width: var(--bottomFormBlockSize);
+    max-width: var(--bottomFormBlockSize);
+    height: var(--bottomFormBlockSize);
+    min-height: var(--bottomFormBlockSize);
+    max-height: var(--bottomFormBlockSize);
+    flex: 0 0 var(--bottomFormBlockSize);
+    place-self: center;
+    background-color: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) !important;
+    color: var(--color-background, var(--SmartThemeBlurTintColor)) !important;
+    border-color: transparent !important;
+    border-radius: var(--avatar-roundness, 8px);
+    opacity: 1;
 }
 
 #send_form .mes_stop {

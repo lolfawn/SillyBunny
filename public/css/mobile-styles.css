@@ -169,6 +169,13 @@
 
     #send_form.sb-generating-controls #mes_stop {
         display: flex !important;
+        width: var(--bottomFormBlockSize) !important;
+        min-width: var(--bottomFormBlockSize) !important;
+        max-width: var(--bottomFormBlockSize) !important;
+        height: var(--bottomFormBlockSize) !important;
+        min-height: var(--bottomFormBlockSize) !important;
+        max-height: var(--bottomFormBlockSize) !important;
+        flex: 0 0 var(--bottomFormBlockSize) !important;
     }
 
     /* Hide stop button when not generating */
