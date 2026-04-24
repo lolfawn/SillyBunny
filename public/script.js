@@ -7039,6 +7039,84 @@ export function cleanUpMessage({ getMessage, isImpersonate, isContinue, displayI
  *
  * @returns {Promise<void>}
  */
+function getCastActorByName(name) {
+    const normalizedName = String(name || '').trim().toLowerCase();
+
+    if (!normalizedName) {
+        return null;
+    }
+
+    return getCastAiActors().find(actor => actor.name?.trim().toLowerCase() === normalizedName) || null;
+}
+
+function parseCastMultiSpeakerReply(messageText) {
+    if (!getCastOptions().splitMultiSpeakerReplies || getCastAiActors().length < 2) {
+        return [];
+    }
+
+    const lines = String(messageText || '').split('\n');
+    const segments = [];
+    let current = null;
+
+    for (const line of lines) {
+        const match = line.match(/^\s*([^:\n]{1,80}):\s*(.*)$/);
+        const actor = match ? getCastActorByName(match[1]) : null;
+
+        if (actor) {
+            if (current?.content.length) {
+                segments.push(current);
+            }
+            current = { actor, content: [match[2] || ''] };
+            continue;
+        }
+
+        if (current) {
+            current.content.push(line);
+        }
+    }
+
+    if (current?.content.length) {
+        segments.push(current);
+    }
+
+    return segments
+        .map(segment => ({
+            actor: segment.actor,
+            text: segment.content.join('\n').trim(),
+        }))
+        .filter(segment => segment.text);
+}
+
+function applyCastActorIdentityToMessage(message, actor) {
+    if (!actor?.avatar) {
+        return;
+    }
+
+    message.name = actor.name || message.name;
+    message.force_avatar = getThumbnailUrl('avatar', actor.avatar);
+    message.original_avatar = actor.avatar;
+}
+
+function createAiReplyMessage({ name, text, title, generationFinished, reasoning = '', reasoningSignature = null, reasoningTokens = 0 }) {
+    return {
+        name,
+        is_user: false,
+        send_date: getMessageTimeStamp(),
+        mes: text,
+        title,
+        gen_started: generation_started,
+        gen_finished: generationFinished,
+        extra: {
+            api: getGeneratingApi(),
+            model: getGeneratingModel(),
+            reasoning,
+            reasoning_duration: null,
+            reasoning_signature: reasoningSignature,
+            reasoning_tokens: reasoningTokens,
+        },
+    };
+}
+
 async function processImageAttachment(message, { imageUrls }) {
     if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
         return;
@@ -7181,52 +7259,64 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         !fromStreaming && await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, chat_id, type);
     } else {
         console.debug('entering chat update routine for non-swipe post');
-        const newMessage = {};
-        chat.push(newMessage);
-        newMessage.extra = {};
-        const castAiActor = getCastPrimaryAiActor();
-        newMessage.name = castAiActor?.name || name2;
-        newMessage.is_user = false;
-        newMessage.send_date = getMessageTimeStamp();
-        newMessage.extra.api = getGeneratingApi();
-        newMessage.extra.model = getGeneratingModel();
-        newMessage.extra.reasoning = reasoning;
-        newMessage.extra.reasoning_duration = null;
-        newMessage.extra.reasoning_signature = reasoningSignature;
-        newMessage.extra.reasoning_tokens = reasoningTokens;
         if (power_user.trim_spaces) {
             getMessage = getMessage.trim();
         }
-        newMessage.mes = getMessage;
-        newMessage.title = title;
-        newMessage.gen_started = generation_started;
-        newMessage.gen_finished = generationFinished;
 
-        if (power_user.message_token_count_enabled) {
-            const tokenCountText = (reasoning || '') + newMessage.mes;
-            newMessage.extra.token_count = await getTokenCountAsync(tokenCountText, 0);
-        }
+        const splitSegments = parseCastMultiSpeakerReply(getMessage);
+        const messagesToInsert = splitSegments.length > 1
+            ? splitSegments.map((segment, index) => {
+                const message = createAiReplyMessage({
+                    name: segment.actor.name,
+                    text: segment.text,
+                    title: index === 0 ? title : '',
+                    generationFinished,
+                    reasoning: index === 0 ? reasoning : '',
+                    reasoningSignature: index === 0 ? reasoningSignature : null,
+                    reasoningTokens: index === 0 ? reasoningTokens : 0,
+                });
+                applyCastActorIdentityToMessage(message, segment.actor);
+                return message;
+            })
+            : [createAiReplyMessage({
+                name: getCastPrimaryAiActor()?.name || name2,
+                text: getMessage,
+                title,
+                generationFinished,
+                reasoning,
+                reasoningSignature,
+                reasoningTokens,
+            })];
 
-        if (castAiActor?.avatar) {
-            newMessage.force_avatar = getThumbnailUrl('avatar', castAiActor.avatar);
-            newMessage.original_avatar = castAiActor.avatar;
-        } else if (selected_group) {
-            console.debug('entering chat update for groups');
-            let avatarImg = 'img/ai4.png';
-            if (characters[this_chid].avatar != 'none') {
-                avatarImg = getThumbnailUrl('avatar', characters[this_chid].avatar);
+        for (const [index, newMessage] of messagesToInsert.entries()) {
+            const castAiActor = splitSegments.length > 1 ? splitSegments[index].actor : getCastPrimaryAiActor();
+
+            if (power_user.message_token_count_enabled) {
+                const tokenCountText = (newMessage.extra.reasoning || '') + newMessage.mes;
+                newMessage.extra.token_count = await getTokenCountAsync(tokenCountText, 0);
             }
-            newMessage.force_avatar = avatarImg;
-            newMessage.original_avatar = characters[this_chid].avatar;
-            newMessage.extra.gen_id = group_generation_id;
+
+            if (castAiActor?.avatar) {
+                applyCastActorIdentityToMessage(newMessage, castAiActor);
+            } else if (selected_group) {
+                console.debug('entering chat update for groups');
+                let avatarImg = 'img/ai4.png';
+                if (characters[this_chid].avatar != 'none') {
+                    avatarImg = getThumbnailUrl('avatar', characters[this_chid].avatar);
+                }
+                newMessage.force_avatar = avatarImg;
+                newMessage.original_avatar = characters[this_chid].avatar;
+                newMessage.extra.gen_id = group_generation_id;
+            }
+
+            await processImageAttachment(newMessage, { imageUrls: index === 0 ? imageUrls : [] });
+            chat.push(newMessage);
+            const chat_id = (chat.length - 1);
+
+            !fromStreaming && await eventSource.emit(event_types.MESSAGE_RECEIVED, chat_id, type);
+            addOneMessage(chat[chat_id]);
+            !fromStreaming && await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, chat_id, type);
         }
-
-        await processImageAttachment(newMessage, { imageUrls });
-        const chat_id = (chat.length - 1);
-
-        !fromStreaming && await eventSource.emit(event_types.MESSAGE_RECEIVED, chat_id, type);
-        addOneMessage(chat[chat_id]);
-        !fromStreaming && await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, chat_id, type);
     }
 
     const item = chat[chat.length - 1];
