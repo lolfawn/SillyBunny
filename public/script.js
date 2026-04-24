@@ -449,7 +449,29 @@ function getCastUserActor() {
 }
 
 function normalizeCastAiActor(actor) {
-    if (!actor || actor.type !== 'character' || !actor.avatar) {
+    if (!actor || !actor.avatar) {
+        return null;
+    }
+
+    if (actor.type === 'persona') {
+        const personaName = power_user.personas?.[actor.avatar];
+        if (!personaName) {
+            return null;
+        }
+        return {
+            type: 'persona',
+            avatar: actor.avatar,
+            name: actor.name || personaName,
+            primary: Boolean(actor.primary),
+            persona: {
+                avatar: actor.avatar,
+                name: personaName,
+                description: power_user.persona_descriptions?.[actor.avatar]?.description || '',
+            },
+        };
+    }
+
+    if (actor.type !== 'character') {
         return null;
     }
 
@@ -500,8 +522,8 @@ function getCastPrimaryAiActorAvatar() {
 }
 
 function getCastPrimaryAiActorChid() {
-    const avatar = getCastPrimaryAiActorAvatar();
-    return avatar ? characters.findIndex(character => character?.avatar === avatar) : -1;
+    const actor = getCastPrimaryAiActor();
+    return actor?.type === 'character' && actor.avatar ? characters.findIndex(character => character?.avatar === actor.avatar) : -1;
 }
 
 function getCastUserActorName() {
@@ -7093,7 +7115,7 @@ function applyCastActorIdentityToMessage(message, actor) {
     }
 
     message.name = actor.name || message.name;
-    message.force_avatar = getThumbnailUrl('avatar', actor.avatar);
+    message.force_avatar = getThumbnailUrl(actor.type === 'persona' ? 'persona' : 'avatar', actor.avatar);
     message.original_avatar = actor.avatar;
 }
 

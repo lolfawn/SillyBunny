@@ -4116,6 +4116,30 @@ function getCastCharacterList(context = getSillyTavernContext()) {
         .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }));
 }
 
+function getCastPersonaList(context = getSillyTavernContext()) {
+    const personas = context?.powerUserSettings?.personas ?? {};
+    const descriptions = context?.powerUserSettings?.persona_descriptions ?? {};
+
+    return Object.entries(personas)
+        .filter(([, name]) => name && name !== '[Unnamed Persona]')
+        .map(([avatar, name]) => ({
+            type: 'persona',
+            avatar: String(avatar),
+            name: String(name),
+            description: String(descriptions?.[avatar]?.description || descriptions?.[avatar]?.title || '').trim(),
+        }))
+        .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }));
+}
+
+function encodeCastOptionValue(type, avatar) {
+    return `${type}:${avatar}`;
+}
+
+function decodeCastOptionValue(value) {
+    const [type, ...avatarParts] = String(value || '').split(':');
+    return { type: type === 'persona' ? 'persona' : 'character', avatar: avatarParts.join(':') };
+}
+
 function getCastCharacterAvatarUrl(character, context = getSillyTavernContext()) {
     if (!character?.avatar) {
         return '';
@@ -4211,22 +4235,35 @@ function populateCastSelect(select, characters, selectedAvatar, emptyLabel) {
     }
 }
 
-function populateCastMultiSelect(select, characters, selectedAvatars) {
+function populateCastMultiSelect(select, characters, personas, selectedActors) {
     select.replaceChildren();
-    const selected = new Set(selectedAvatars.filter(Boolean));
+    const selected = new Set(selectedActors.map(actor => encodeCastOptionValue(actor.type || 'character', actor.avatar)).filter(Boolean));
+    const groups = [
+        { label: 'Character Cards', type: 'character', items: characters },
+        { label: 'Personas', type: 'persona', items: personas },
+    ];
 
-    for (const character of characters) {
-        const option = createElement('option', {
-            text: character.name,
-            attrs: { value: character.avatar },
-        });
-        option.selected = selected.has(character.avatar);
-        select.appendChild(option);
+    for (const group of groups) {
+        if (!group.items.length) {
+            continue;
+        }
+
+        const optgroup = createElement('optgroup', { attrs: { label: group.label } });
+        for (const item of group.items) {
+            const value = encodeCastOptionValue(group.type, item.avatar);
+            const option = createElement('option', {
+                text: item.name,
+                attrs: { value },
+            });
+            option.selected = selected.has(value);
+            optgroup.appendChild(option);
+        }
+        select.appendChild(optgroup);
     }
 }
 
 function getSelectedCastValues(select) {
-    return Array.from(select.selectedOptions).map(option => option.value).filter(Boolean);
+    return Array.from(select.selectedOptions).map(option => decodeCastOptionValue(option.value)).filter(actor => actor.avatar);
 }
 
 async function refreshCastRolesPanel() {
@@ -4247,11 +4284,13 @@ async function refreshCastRolesPanel() {
         const castRoles = await loadCastRolesModule();
         const cast = castRoles.getCastAssignments();
         const characters = getCastCharacterList(context);
+        const personas = getCastPersonaList(context);
         const primaryAiActor = cast.aiActors.find(actor => actor.primary) || cast.aiActors[0] || getActiveAiActorFallback(context);
-        const selectedAiAvatars = cast.aiActors.map(actor => actor.avatar).filter(Boolean);
+        const selectedAiActors = cast.aiActors.filter(actor => actor.avatar);
+        const selectedAiAvatars = selectedAiActors.map(actor => actor.avatar).filter(Boolean);
 
         populateCastSelect(refs.userSelect, characters, cast.userActor?.avatar || '', 'Use current Persona / default user');
-        populateCastMultiSelect(refs.aiSelect, characters, selectedAiAvatars);
+        populateCastMultiSelect(refs.aiSelect, characters, personas, selectedAiActors);
         renderCastActorSummary(refs.userSummary, cast.userActor, { fallbackText: 'Current Persona', control: 'user' });
         renderCastActorSummary(refs.aiSummary, primaryAiActor, { fallbackText: 'Selected character or group', control: 'ai' });
         refs.aiHint.textContent = selectedAiAvatars.length
@@ -4332,9 +4371,9 @@ async function applyCastSelection(kind, avatar) {
                 castRoles.clearUserActor();
             }
         } else if (kind === 'ai') {
-            const avatars = Array.isArray(avatar) ? avatar : [avatar].filter(Boolean);
-            if (avatars.length) {
-                castRoles.setAiActorsFromCharacters(avatars);
+            const actors = Array.isArray(avatar) ? avatar : [avatar].filter(Boolean);
+            if (actors.length) {
+                castRoles.setAiActors(actors);
             } else {
                 const cast = castRoles.getCastAssignments();
                 cast.aiActors = [];
@@ -4400,10 +4439,10 @@ async function openCastGroupChat() {
         const context = getSillyTavernContext();
         const castRoles = await loadCastRolesModule();
         const cast = castRoles.getCastAssignments();
-        const avatars = cast.aiActors.map(actor => actor.avatar).filter(Boolean);
+        const avatars = cast.aiActors.filter(actor => actor.type === 'character').map(actor => actor.avatar).filter(Boolean);
 
         if (!context || avatars.length < 2) {
-            setCastPanelMessage('Select at least two AI actors to open a matching group chat.', 'warn');
+            setCastPanelMessage('Select at least two AI character-card actors to open a matching group chat. Personas cannot be group members.', 'warn');
             return;
         }
 
@@ -4463,7 +4502,7 @@ function buildCastRolesPanel() {
     const aiField = createElement('label', { className: 'sb-cast-field' });
     const aiFieldTitle = createElement('span', { text: 'AI plays as' });
     const aiSelect = createElement('select', { className: 'text_pole sb-cast-select sb-cast-multi-select', attrs: { 'aria-label': 'AI plays as', multiple: 'multiple', size: '6' } });
-    const aiHint = createElement('small', { className: 'sb-cast-field-hint', text: 'Select one or more AI-controlled character cards.' });
+    const aiHint = createElement('small', { className: 'sb-cast-field-hint', text: 'Select one or more AI-controlled character cards or personas.' });
     const aiSummary = createElement('div', { className: 'sb-cast-summary' });
     const optionsCard = createElement('div', { className: 'sb-cast-options' });
     const optionsTitle = createElement('span', { className: 'sb-cast-options-title', text: 'Behavior options' });
@@ -4485,7 +4524,7 @@ function buildCastRolesPanel() {
     const splitOption = createCastOptionCheckbox({
         key: 'splitMultiSpeakerReplies',
         label: 'Split multi-speaker replies',
-        description: 'Later phases can split named cast replies into separate messages.',
+        description: 'If the AI writes “Name: text” for multiple cast actors, save each speaker as its own message with the matching avatar.',
     });
     const optionCheckboxes = [userCardOption.checkbox, lorebookOption.checkbox, controlOption.checkbox, splitOption.checkbox];
     const actions = createElement('div', { className: 'sb-server-actions sb-cast-actions' });

@@ -1,6 +1,7 @@
 import {
     characters,
     chat_metadata,
+    power_user,
     updateChatMetadata,
 } from '../script.js';
 import { saveMetadataDebounced } from './extensions.js';
@@ -33,6 +34,20 @@ function isObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function findPersonaByAvatar(avatar) {
+    const avatarKey = String(avatar || '');
+    const name = power_user?.personas?.[avatarKey];
+    if (!avatarKey || !name) {
+        return null;
+    }
+
+    return {
+        avatar: avatarKey,
+        name,
+        description: power_user?.persona_descriptions?.[avatarKey]?.description || '',
+    };
+}
+
 function findCharacterByAvatar(avatar) {
     const avatarKey = String(avatar || '');
     if (!avatarKey) {
@@ -50,7 +65,8 @@ function normalizeActor(actor) {
     const type = Object.values(CAST_ACTOR_TYPES).includes(actor.type) ? actor.type : CAST_ACTOR_TYPES.CHARACTER;
     const avatar = String(actor.avatar || '').trim();
     const character = type === CAST_ACTOR_TYPES.CHARACTER ? findCharacterByAvatar(avatar) : null;
-    const name = String(actor.name || character?.name || '').trim();
+    const persona = type === CAST_ACTOR_TYPES.PERSONA ? findPersonaByAvatar(avatar) : null;
+    const name = String(actor.name || character?.name || persona?.name || '').trim();
 
     if (!avatar && !name) {
         return null;
@@ -102,6 +118,11 @@ export function getUserActorCharacter() {
 export function getPrimaryAiActorCharacter() {
     const actor = getCastAssignments().aiActors.find(candidate => candidate.primary) || getCastAssignments().aiActors[0];
     return actor?.type === CAST_ACTOR_TYPES.CHARACTER ? findCharacterByAvatar(actor.avatar) : null;
+}
+
+export function getPrimaryAiActorPersona() {
+    const actor = getCastAssignments().aiActors.find(candidate => candidate.primary) || getCastAssignments().aiActors[0];
+    return actor?.type === CAST_ACTOR_TYPES.PERSONA ? findPersonaByAvatar(actor.avatar) : null;
 }
 
 export function setCastAssignments(cast, { save = true } = {}) {
@@ -156,6 +177,29 @@ export function setAiActorsFromCharacters(avatars, { save = true } = {}) {
             name: character.name,
             primary: index === 0,
         }));
+
+    const cast = getCastAssignments();
+    cast.aiActors = aiActors;
+    return setCastAssignments(cast, { save });
+}
+
+export function setAiActors(actors, { save = true } = {}) {
+    const actorList = Array.isArray(actors) ? actors : [actors];
+    const aiActors = actorList
+        .map((actor, index) => {
+            const type = Object.values(CAST_ACTOR_TYPES).includes(actor?.type) ? actor.type : CAST_ACTOR_TYPES.CHARACTER;
+            const source = type === CAST_ACTOR_TYPES.PERSONA ? findPersonaByAvatar(actor?.avatar) : findCharacterByAvatar(actor?.avatar);
+            if (!source) {
+                return null;
+            }
+            return {
+                type,
+                avatar: source.avatar,
+                name: source.name,
+                primary: index === 0,
+            };
+        })
+        .filter(Boolean);
 
     const cast = getCastAssignments();
     cast.aiActors = aiActors;
