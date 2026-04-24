@@ -3648,10 +3648,12 @@ export function isStreamingEnabled() {
 }
 
 function showStopButton() {
+    $('#send_form').addClass('sb-generating-controls');
     $('#mes_stop').css({ 'display': 'flex' });
 }
 
 function hideStopButton() {
+    $('#send_form').removeClass('sb-generating-controls');
     // prevent NOOP, because hideStopButton() gets called multiple times
     if ($('#mes_stop').css('display') !== 'none') {
         $('#mes_stop').css({ 'display': 'none' });

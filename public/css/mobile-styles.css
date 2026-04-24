@@ -167,6 +167,10 @@
         justify-content: center;
     }
 
+    #send_form.sb-generating-controls #mes_stop {
+        display: flex !important;
+    }
+
     /* Hide stop button when not generating */
     #send_form .mes_stop:not(.active):not([style*="display: flex"]):not([style*="display: inline-flex"]) {
         display: none !important;
