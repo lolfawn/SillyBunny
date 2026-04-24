@@ -15,6 +15,10 @@
 
         <div class="ica--toolbar">
             <div class="ica--toolbar-actions">
+                <button type="button" id="ica--globalEnabled" class="menu_button menu_button_icon" title="Enable or disable all In-Chat Agents without changing individual agent toggles" aria-pressed="true">
+                    <i class="fa-solid fa-power-off"></i>
+                    <span>Agents On</span>
+                </button>
                 <div id="ica--addAgent" class="menu_button menu_button_icon" title="Create a new agent from scratch">
                     <i class="fa-solid fa-plus"></i>
                     <span>New Agent</span>
@@ -100,6 +104,10 @@
                     <option value="parallel">Parallel (faster)</option>
                     <option value="sequential">Sequential (rate-limit friendly)</option>
                 </select>
+            </label>
+            <label class="checkbox_label" title="Show Agent chats in their own Recent Chats tab instead of mixing them into Individual and Group tabs.">
+                <input type="checkbox" id="ica--separateRecentChats" />
+                <span>Separate Agent chats in Recent Chats</span>
             </label>
             <label class="checkbox_label" title="Master switch for prompt pass toasts. Per-agent notification checkboxes still decide which agents can show them.">
                 <input type="checkbox" id="ica--promptTransformShowNotifications" />

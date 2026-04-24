@@ -7146,6 +7146,41 @@ body:not(.movingUI) .drawer-content.maximized {
     white-space: nowrap;
 }
 
+@media screen and (max-width: 600px) {
+    .group_speaker_controls {
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        overflow: hidden;
+    }
+
+    .group_speaker_list {
+        flex: 1 1 100%;
+        max-width: 100%;
+        min-height: 32px;
+        padding-bottom: 2px;
+    }
+
+    .group_speaker_avatar {
+        flex: 0 0 auto;
+        max-width: 44px;
+        min-width: 32px;
+        width: 36px;
+        height: 32px;
+        padding: 2px;
+        justify-content: center;
+    }
+
+    .group_speaker_avatar span {
+        display: none;
+    }
+
+    .group_speaker_avatar img {
+        width: 24px;
+        height: 24px;
+    }
+}
+
 
 .group-dm-badge {
     display: inline-flex;

@@ -93,6 +93,8 @@ let customGroups = [];
 
 /** Global settings for the In-Chat Agents extension. */
 let globalSettings = {
+    enabled: true,
+    separateRecentChats: false,
     connectionProfile: '',
     promptTransformShowNotifications: true,
     appendAgentsExecutionMode: 'parallel',
@@ -100,7 +102,7 @@ let globalSettings = {
 
 /**
  * Returns the global settings.
- * @returns {{ connectionProfile: string, promptTransformShowNotifications: boolean, appendAgentsExecutionMode: 'parallel'|'sequential' }}
+ * @returns {{ enabled: boolean, separateRecentChats: boolean, connectionProfile: string, promptTransformShowNotifications: boolean, appendAgentsExecutionMode: 'parallel'|'sequential' }}
  */
 export function getGlobalSettings() {
     return globalSettings;
@@ -423,6 +425,10 @@ export function getAgents() {
  * @returns {InChatAgent[]}
  */
 export function getEnabledAgents() {
+    if (globalSettings.enabled === false) {
+        return [];
+    }
+
     return agents
         .filter(agent => agent.enabled)
         .sort((a, b) => a.injection.order - b.injection.order);
@@ -450,6 +456,10 @@ export function getToolAgents() {
  * @returns {InChatAgent[]}
  */
 export function getEnabledToolAgents() {
+    if (globalSettings.enabled === false) {
+        return [];
+    }
+
     return agents.filter(agent => agent.enabled && agent.category === 'tool');
 }
 

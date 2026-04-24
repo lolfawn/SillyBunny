@@ -762,6 +762,7 @@ async function validateGroup(group) {
         for (let i = 0; i < results.length; i++) {
             const chatId = group.chats[i];
             const availability = results[i].status === 'fulfilled' ? results[i].value : 'unknown';
+            const isActiveChat = chatId === String(group.chat_id ?? '');
 
             if (availability === 'present') {
                 presentChats.push(chatId);
@@ -769,7 +770,7 @@ async function validateGroup(group) {
                 continue;
             }
 
-            if (availability !== 'missing') {
+            if (availability !== 'missing' || isActiveChat) {
                 retainedChats.push(chatId);
             }
         }
@@ -834,24 +835,8 @@ export async function getGroupChat(groupId, reload = false) {
     if (group && Array.isArray(group.members) && freshChat) {
         chat.splice(0, chat.length);
         chatElement.find('.mes').remove();
-        for (let member of group.members) {
-            const character = characters.find(x => x.avatar === member || x.name === member);
-            if (!character) {
-                continue;
-            }
-
-            const mes = await getFirstCharacterMessage(character);
-
-            // No first message
-            if (!(mes?.mes)) {
-                continue;
-            }
-
-            chat.push(mes);
-            await eventSource.emit(event_types.MESSAGE_RECEIVED, (chat.length - 1), 'first_message');
-            addOneMessage(mes);
-            await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, (chat.length - 1), 'first_message');
-        }
+        metadata.tainted = true;
+        updateChatMetadata(metadata, true);
         await saveGroupChat(groupId, false);
     } else if (Array.isArray(data) && data.length) {
         chat.splice(0, chat.length, ...data);
@@ -1178,6 +1163,10 @@ async function saveGroupChat(groupId, shouldSaveGroup, force = false) {
         return;
     }
     const chatId = group.chat_id;
+    if (chatId && Array.isArray(group.chats) && !group.chats.includes(chatId)) {
+        group.chats.push(chatId);
+        shouldSaveGroup = true;
+    }
     group.date_last_chat = Date.now();
     /** @type {ChatHeader} */
     const chatHeader = {

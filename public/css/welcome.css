@@ -779,7 +779,11 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 }
 
 .welcomePanel[data-recent-chat-filter='individual'] .recentChat.group,
-.welcomePanel[data-recent-chat-filter='group'] .recentChat.individual {
+.welcomePanel[data-recent-chat-filter='individual'] .recentChat.agent,
+.welcomePanel[data-recent-chat-filter='group'] .recentChat.individual,
+.welcomePanel[data-recent-chat-filter='group'] .recentChat.agent,
+.welcomePanel[data-recent-chat-filter='agent'] .recentChat.individual,
+.welcomePanel[data-recent-chat-filter='agent'] .recentChat.group {
     display: none;
 }
 
@@ -1086,7 +1090,8 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
 }
 
 .welcomePanel[data-recent-chat-filter='individual'] .recentChat.individual.hidden,
-.welcomePanel[data-recent-chat-filter='group'] .recentChat.group.hidden {
+.welcomePanel[data-recent-chat-filter='group'] .recentChat.group.hidden,
+.welcomePanel[data-recent-chat-filter='agent'] .recentChat.agent.hidden {
     display: flex;
 }
 

@@ -11,7 +11,7 @@
     "repetition_penalty": 1,
     "max_context_unlocked": true,
     "tool_reasoning_mode": "disabled",
-    "openai_max_context": 4095,
+    "openai_max_context": 256000,
     "openai_max_tokens": 300,
     "names_behavior": 0,
     "send_if_empty": "",

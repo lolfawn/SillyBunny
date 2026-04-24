@@ -356,7 +356,7 @@ async function checkChatIntegrity(filePath, integritySlug) {
  *
  * @typedef {(textArray: string[]) => boolean} ChatMatchFunction
  */
-export async function getChatInfo(pathToFile, additionalData = {}, withMetadata = false, matcher = null) {
+export async function getChatInfo(pathToFile, additionalData = {}, withMetadata = false, matcher = null, previewMessageLimit = 0) {
     try {
         const parsedPath = path.parse(pathToFile);
         const stats = await fs.promises.stat(pathToFile);
@@ -388,6 +388,8 @@ export async function getChatInfo(pathToFile, additionalData = {}, withMetadata 
             let itemCounter = 0;
             let hasAnyMatch = false;
             let matchBuffer = [];
+            const previewMessages = [];
+            const previewLimit = Math.max(0, Number(previewMessageLimit) || 0);
 
             fileStream.once('error', rej);
             rl.once('error', rej);
@@ -400,13 +402,22 @@ export async function getChatInfo(pathToFile, additionalData = {}, withMetadata 
                     }
                 }
                 // Skip matching if any match was already found
-                if (hasMatcher && !hasAnyMatch && itemCounter > 0) {
+                if ((hasMatcher && !hasAnyMatch && itemCounter > 0) || (previewLimit > 0 && itemCounter > 0)) {
                     const jsonData = tryParse(line);
                     if (jsonData) {
-                        matchBuffer.push(jsonData.mes || '');
-                        if (matcher(matchBuffer)) {
-                            hasAnyMatch = true;
-                            matchBuffer = [];
+                        if (hasMatcher && !hasAnyMatch) {
+                            matchBuffer.push(jsonData.mes || '');
+                            if (matcher(matchBuffer)) {
+                                hasAnyMatch = true;
+                                matchBuffer = [];
+                            }
+                        }
+
+                        if (previewLimit > 0) {
+                            previewMessages.push(jsonData);
+                            if (previewMessages.length > previewLimit) {
+                                previewMessages.shift();
+                            }
                         }
                     }
                 }
@@ -427,6 +438,9 @@ export async function getChatInfo(pathToFile, additionalData = {}, withMetadata 
                     chatData.mes = jsonData.mes || '[The message is empty]';
                     chatData.last_mes = jsonData.send_date || new Date(Math.round(stats.mtimeMs)).toISOString();
                     chatData.match = hasMatcher ? hasAnyMatch : true;
+                    if (previewLimit > 0) {
+                        chatData.preview_messages = previewMessages;
+                    }
 
                     res(chatData);
                 } else {
@@ -1076,9 +1090,10 @@ router.post('/recent', async function (request, response) {
         }).slice(0, max);
         const jsonFilesPromise = recentChats.map((file) => {
             const withMetadata = !!request.body.metadata;
+            const previewMessageLimit = Math.max(0, Math.min(20, Number(request.body.previewMessages) || 0));
             return file.groupId
-                ? getChatInfo(file.filePath, { group: file.groupId }, withMetadata)
-                : getChatInfo(file.filePath, { avatar: file.pngFile }, withMetadata);
+                ? getChatInfo(file.filePath, { group: file.groupId }, withMetadata, null, previewMessageLimit)
+                : getChatInfo(file.filePath, { avatar: file.pngFile }, withMetadata, null, previewMessageLimit);
         });
 
         const chatData = (await Promise.allSettled(jsonFilesPromise)).filter(x => x.status === 'fulfilled').map(x => x.value);

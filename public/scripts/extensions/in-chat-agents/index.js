@@ -137,6 +137,25 @@ function updateCancelGenerationButton() {
     $('#ica--cancelGeneration').toggle(isAgentGenerationActive());
 }
 
+function areAgentsGloballyEnabled() {
+    return getGlobalSettings().enabled !== false;
+}
+
+function updateGlobalAgentToggle() {
+    const enabled = areAgentsGloballyEnabled();
+    const button = $('#ica--globalEnabled');
+    button.toggleClass('active', enabled);
+    button.attr('aria-pressed', String(enabled));
+    button.attr('title', enabled
+        ? 'Agents are enabled. Click to disable all In-Chat Agents.'
+        : 'Agents are disabled. Click to re-enable In-Chat Agents.');
+    button.find('span').text(enabled ? 'Agents On' : 'Agents Off');
+}
+
+function populateSeparateRecentChatsToggle() {
+    $('#ica--separateRecentChats').prop('checked', Boolean(getGlobalSettings().separateRecentChats));
+}
+
 function sortAgentsByOrder(agentList = []) {
     return [...agentList].sort((a, b) => Number(a?.injection?.order ?? 0) - Number(b?.injection?.order ?? 0));
 }
@@ -2529,6 +2548,8 @@ function refreshConnectionProfileUi() {
 }
 
 function populateGlobalNotificationToggle() {
+    updateGlobalAgentToggle();
+    populateSeparateRecentChatsToggle();
     $('#ica--promptTransformShowNotifications').prop(
         'checked',
         Boolean(getGlobalSettings().promptTransformShowNotifications),
@@ -2925,6 +2946,14 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     renderAgentList();
 
     // Wire up toolbar
+    $('#ica--globalEnabled').on('click', () => {
+        const enabled = !areAgentsGloballyEnabled();
+        setGlobalSettings({ enabled });
+        persistExtensionState();
+        updateGlobalAgentToggle();
+        syncToolAgentRegistrations();
+        toastr.info(enabled ? 'In-Chat Agents enabled.' : 'In-Chat Agents disabled.');
+    });
     $('#ica--addAgent').on('click', () => openEditor());
     $('#ica--importAgent').on('click', () => $('#ica--importFile').trigger('click'));
     $('#ica--importFile').on('change', handleImport);
@@ -3031,6 +3060,11 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         setGlobalSettings({ connectionProfile: this.value });
         persistExtensionState();
         renderAgentList();
+    });
+    $('#ica--separateRecentChats').on('change', function () {
+        setGlobalSettings({ separateRecentChats: $(this).prop('checked') });
+        persistExtensionState();
+        toastr.info('Recent Chats separation will apply after refreshing the home screen.');
     });
     $('#ica--promptTransformShowNotifications').on('change', function () {
         setGlobalSettings({ promptTransformShowNotifications: $(this).prop('checked') });

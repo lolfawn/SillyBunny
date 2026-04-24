@@ -119,6 +119,10 @@ function syncPathfinderRuntimeSettings(agent = getPathfinderRuntimeAgent()) {
     setPathfinderRuntimeSettings(nextRuntimeSettings);
 }
 
+function areAgentsGloballyEnabled() {
+    return getGlobalSettings()?.enabled !== false;
+}
+
 function getRegisterableAgentTools(agent) {
     const enabledTools = (agent.tools ?? []).filter(tool => tool.enabled !== false);
 
@@ -139,7 +143,7 @@ export function syncToolAgentRegistrations() {
     }
 
     const desiredTools = new Set();
-    const enabledToolAgents = getEnabledToolAgents();
+    const enabledToolAgents = areAgentsGloballyEnabled() ? getEnabledToolAgents() : [];
     syncPathfinderRuntimeSettings(getPathfinderRuntimeAgent(enabledToolAgents));
 
     for (const agent of enabledToolAgents) {
@@ -323,6 +327,13 @@ function shouldActivate(agent, generationType) {
 
 function buildActivationSnapshot(generationType) {
     const normalizedGenerationType = normalizeGenerationType(generationType);
+    if (!areAgentsGloballyEnabled()) {
+        return {
+            generationType: normalizedGenerationType,
+            activeAgentIds: [],
+        };
+    }
+
     const activeAgents = getEnabledAgents().filter(agent => shouldActivate(agent, normalizedGenerationType));
 
     return {
@@ -1239,7 +1250,7 @@ function onGenerationStopped() {
  * @param {boolean} dryRun
  */
 async function onGenerationAfterCommands(generationType, _options, dryRun) {
-    if (dryRun || internalPromptTransformDepth > 0) {
+    if (dryRun || internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
         return;
     }
 
@@ -1446,7 +1457,7 @@ async function processReceivedMessage(messageIndex, generationType) {
 }
 
 async function onMessageReceived(messageIndex, generationType) {
-    if (internalPromptTransformDepth > 0) {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
         return;
     }
 
@@ -1476,6 +1487,10 @@ async function onMessageReceived(messageIndex, generationType) {
 }
 
 function onMessageEdited(messageIndex) {
+    if (!areAgentsGloballyEnabled()) {
+        return;
+    }
+
     const message = chat[messageIndex];
     if (!message || !message.extra?.[MESSAGE_EXTRA_KEY]) {
         return;
@@ -1486,7 +1501,7 @@ function onMessageEdited(messageIndex) {
 }
 
 async function onImpersonateReady() {
-    if (internalPromptTransformDepth > 0) {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
         return;
     }
 
@@ -1540,7 +1555,7 @@ async function onMessageSwiped(data) {
  * @param {object} data Generation data being prepared for the API call
  */
 function onChatCompletionSettingsReady(data) {
-    if (agentRegisteredToolNames.size === 0) {
+    if (!areAgentsGloballyEnabled() || agentRegisteredToolNames.size === 0) {
         return;
     }
 
@@ -1585,6 +1600,10 @@ function onChatCompletionSettingsReady(data) {
  * @param {object} data World info data with globalLore, characterLore, etc.
  */
 function onWorldInfoEntriesLoaded(data) {
+    if (!areAgentsGloballyEnabled()) {
+        return;
+    }
+
     const enabledToolAgents = getEnabledToolAgents();
     if (enabledToolAgents.length === 0) return;
 
@@ -1618,6 +1637,11 @@ function getPfManagedEntryUids(toolAgents) {
 let _onChatChangedToolSync = false;
 
 function onChatChangedToolSync() {
+    if (!areAgentsGloballyEnabled()) {
+        syncToolAgentRegistrations();
+        return;
+    }
+
     if (_onChatChangedToolSync) {
         return;
     }
@@ -1631,6 +1655,11 @@ function onChatChangedToolSync() {
 }
 
 function onWorldInfoUpdatedToolSync() {
+    if (!areAgentsGloballyEnabled()) {
+        syncToolAgentRegistrations();
+        return;
+    }
+
     if (toolSyncDuringGeneration || isGenerationInProgress) {
         return;
     }
@@ -1724,6 +1753,11 @@ export function initAgentRunner() {
  * @returns {Promise<import('./agent-store.js').InChatAgent | null>}
  */
 export async function runAgentOnMessage(agentId, messageIndex) {
+    if (!areAgentsGloballyEnabled()) {
+        toastr.warning('In-Chat Agents are disabled.');
+        return null;
+    }
+
     if (internalPromptTransformDepth > 0) {
         toastr.warning('Cannot run an agent while another is in progress.');
         return null;

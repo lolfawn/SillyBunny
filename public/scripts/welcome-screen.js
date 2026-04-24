@@ -26,7 +26,7 @@ import {
     updateRemoteChatName,
 } from '../script.js';
 import { deleteGroupChatByName, getGroupAvatar, groups, is_group_generating, openGroupById, openGroupChat } from './group-chats.js';
-import { enableExtension, findExtension, installExtension } from './extensions.js';
+import { enableExtension, extension_settings, findExtension, installExtension } from './extensions.js';
 import { t } from './i18n.js';
 import { getPresetManager } from './preset-manager.js';
 import { callGenericPopup, POPUP_TYPE } from './popup.js';
@@ -47,6 +47,9 @@ const DEFAULT_NEUTRAL_ASSISTANT_NAME = 'Assistant';
 
 const DEFAULT_DISPLAYED = 3;
 const MAX_DISPLAYED = 15;
+const MAX_RECENT_FETCH = 60;
+const AGENT_MESSAGE_EXTRA_KEY = 'inChatAgents';
+const AGENT_PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
 const STARTER_PACK_PRESET_NAME_SILLYBUNNY = 'Pura\'s Director Preset (SillyBunny)';
 const STARTER_PACK_PRESET_TITLE = 'Pura\'s Director Preset';
 const STARTER_PACK_CREATOR_NAME = 'purachina';
@@ -899,6 +902,7 @@ function buildWelcomeTemplateData(chats) {
         welcomePanelFull: welcomePanelMode === WELCOME_PANEL_MODES.full,
         welcomePanelCompact: welcomePanelMode === WELCOME_PANEL_MODES.compact,
         welcomePanelListOnly: welcomePanelMode === WELCOME_PANEL_MODES.list,
+        separateAgentRecentChats: shouldSeparateAgentRecentChats(),
         deckTabs: buildDeckTabs(activeDeckView),
         deckTourActive: activeDeckView === 'tour',
         deckBasicsActive: activeDeckView === 'basics',
@@ -1714,12 +1718,30 @@ async function refreshWelcomeScreen({ flashChat = null } = {}) {
  * @property {boolean} is_group Indicates if the chat is a group chat
  * @property {boolean} hidden Chat will be hidden by default
  * @property {boolean} pinned Indicates if the chat is pinned
+ * @property {boolean} is_agent Indicates if the chat contains Agent-authored edits or transform history
  */
+function shouldSeparateAgentRecentChats() {
+    return Boolean(extension_settings?.inChatAgents?.globalSettings?.separateRecentChats);
+}
+
+function isAgentRecentChat(chatData) {
+    const metadata = chatData?.chat_metadata;
+    if (metadata?.inChatAgents || metadata?.agentChat || metadata?.isAgentChat) {
+        return true;
+    }
+
+    const messages = Array.isArray(chatData?.preview_messages) ? chatData.preview_messages : [];
+    return messages.some(message => Boolean(
+        message?.extra?.[AGENT_MESSAGE_EXTRA_KEY] ||
+        message?.extra?.[AGENT_PROMPT_TRANSFORM_HISTORY_KEY],
+    ));
+}
+
 async function getRecentChats() {
     const response = await fetch('/api/chats/recent', {
         method: 'POST',
         headers: getRequestHeaders(),
-        body: JSON.stringify({ max: MAX_DISPLAYED, pinned: PinnedChatsManager.getAll() }),
+        body: JSON.stringify({ max: MAX_RECENT_FETCH, pinned: PinnedChatsManager.getAll(), metadata: shouldSeparateAgentRecentChats(), previewMessages: shouldSeparateAgentRecentChats() ? 8 : 0 }),
         cache: 'no-cache',
     });
 
@@ -1765,6 +1787,7 @@ async function getRecentChats() {
         chat.avatar = chat.avatar || '';
         chat.group = chat.group || '';
         chat.pinned = PinnedChatsManager.isPinned(chat);
+        chat.is_agent = shouldSeparateAgentRecentChats() && isAgentRecentChat(chat);
     });
 
     return dataWithEntities.map(t => t.chat);

@@ -618,19 +618,35 @@
 
 @media (max-width: 768px) {
     .ica--quick-section {
-        padding: 12px;
+        max-width: 100%;
+        min-width: 0;
+        padding: 10px;
+        overflow: hidden;
     }
 
     .ica--quick-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
+        min-width: 0;
     }
 
     .ica--quick-chip {
+        min-width: 0;
         padding: 4px;
     }
 
     .ica--quick-chip-main {
-        padding: 8px 9px;
+        min-width: 0;
+        padding: 8px 7px;
+    }
+
+    .ica--quick-chip-actions {
+        gap: 2px;
+    }
+
+    .ica--quick-chip-pin,
+    .ica--quick-chip-apply {
+        width: 30px;
+        min-width: 30px;
     }
 
     .ica--card-toggle {
