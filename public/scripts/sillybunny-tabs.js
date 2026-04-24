@@ -942,7 +942,11 @@ function canResizeDesktopShells() {
 }
 
 function isDesktopResizableShell(shellKey) {
-    return shellKey === 'left' || shellKey === 'right';
+    return shellKey === 'left' || shellKey === 'right' || shellKey === 'characters';
+}
+
+function getShellSizingKey(shellKey) {
+    return ['left', 'right', 'characters'].includes(shellKey) ? 'right' : shellKey;
 }
 
 function getShellAccountStorage() {
@@ -1020,21 +1024,22 @@ function getPersistedShellSize(shellKey) {
 }
 
 function hydratePersistedShellSizes() {
-    for (const shellKey of ['left', 'right']) {
-        const persistedSize = getPersistedShellSize(shellKey);
+    const persistedSize = getPersistedShellSize('right') ?? getPersistedShellSize('left');
 
-        if (persistedSize) {
-            sbState.shellSizing.overrides[shellKey] = persistedSize;
-        }
+    if (persistedSize) {
+        sbState.shellSizing.overrides.left = persistedSize;
+        sbState.shellSizing.overrides.right = persistedSize;
     }
 }
 
 function getShellSizeStorageKey(shellKey) {
-    if (shellKey === 'left') {
+    const sizingKey = getShellSizingKey(shellKey);
+
+    if (sizingKey === 'left') {
         return SB_STORAGE_KEYS.leftShellSize;
     }
 
-    if (shellKey === 'right') {
+    if (sizingKey === 'right') {
         return SB_STORAGE_KEYS.rightShellSize;
     }
 
@@ -1119,7 +1124,7 @@ function areShellSizesEqual(left, right) {
 }
 
 function getShellSizeOverride(shellKey) {
-    return isDesktopResizableShell(shellKey) ? sbState.shellSizing.overrides[shellKey] ?? null : null;
+    return isDesktopResizableShell(shellKey) ? sbState.shellSizing.overrides.right ?? sbState.shellSizing.overrides.left ?? null : null;
 }
 
 function setShellSizeOverride(shellKey, size, { persist = true } = {}) {
@@ -1127,24 +1132,29 @@ function setShellSizeOverride(shellKey, size, { persist = true } = {}) {
         return null;
     }
 
-    const storageKey = getShellSizeStorageKey(shellKey);
     const nextSize = clampShellSize(size);
 
-    sbState.shellSizing.overrides[shellKey] = nextSize;
+    sbState.shellSizing.overrides.left = nextSize;
+    sbState.shellSizing.overrides.right = nextSize;
 
-    if (!persist || !storageKey) {
+    if (!persist) {
         return nextSize;
     }
 
     const accountStorage = getShellAccountStorage();
+    const storageKeys = [SB_STORAGE_KEYS.leftShellSize, SB_STORAGE_KEYS.rightShellSize];
 
     if (nextSize) {
         const serializedSize = JSON.stringify(nextSize);
-        safeSetItem(storageKey, serializedSize);
-        accountStorage?.setItem(storageKey, serializedSize);
+        for (const storageKey of storageKeys) {
+            safeSetItem(storageKey, serializedSize);
+            accountStorage?.setItem(storageKey, serializedSize);
+        }
     } else {
-        safeRemoveItem(storageKey);
-        accountStorage?.removeItem(storageKey);
+        for (const storageKey of storageKeys) {
+            safeRemoveItem(storageKey);
+            accountStorage?.removeItem(storageKey);
+        }
     }
 
     return nextSize;
@@ -1162,8 +1172,10 @@ function syncDesktopShellSizing() {
 
     const resizingEnabled = canResizeDesktopShells();
 
-    for (const shellKey of ['left', 'right']) {
-        const root = document.getElementById(getShellConfig(shellKey).rootPanelId);
+    for (const shellKey of ['left', 'right', 'characters']) {
+        const root = shellKey === 'characters'
+            ? document.getElementById('right-nav-panel')
+            : document.getElementById(getShellConfig(shellKey).rootPanelId);
         if (!(root instanceof HTMLElement)) {
             continue;
         }
@@ -1194,7 +1206,7 @@ function syncDesktopShellSizing() {
                 if (!areShellSizesEqual(storedOverride, clampedOverride)) {
                     setShellSizeOverride(shellKey, clampedOverride);
                 } else {
-                    sbState.shellSizing.overrides[shellKey] = clampedOverride;
+                    sbState.shellSizing.overrides[getShellSizingKey(shellKey)] = clampedOverride;
                 }
             }
         }
@@ -1204,12 +1216,20 @@ function syncDesktopShellSizing() {
     }
 }
 
+function getResizableShellRoot(shellKey) {
+    if (shellKey === 'characters') {
+        return document.getElementById('right-nav-panel');
+    }
+
+    return document.getElementById(getShellConfig(shellKey).rootPanelId);
+}
+
 function beginShellResize(shellKey, event) {
     if (!canResizeDesktopShells() || !isDesktopResizableShell(shellKey) || event.button !== 0) {
         return;
     }
 
-    const root = document.getElementById(getShellConfig(shellKey).rootPanelId);
+    const root = getResizableShellRoot(shellKey);
     if (!(root instanceof HTMLElement) || !root.classList.contains('openDrawer')) {
         return;
     }
@@ -1219,7 +1239,7 @@ function beginShellResize(shellKey, event) {
     }
 
     const handle = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
-    const bounds = getDesktopShellResizeBounds();
+    const bounds = getDesktopShellResizeBounds(shellKey);
     const startRect = root.getBoundingClientRect();
     const startSize = clampShellSize({
         width: startRect.width || bounds.defaultWidth,
@@ -1265,13 +1285,13 @@ function beginShellResize(shellKey, event) {
         const nextSize = clampShellSize({
             width: startSize.width + (moveEvent.clientX - event.clientX),
             height: startSize.height + (moveEvent.clientY - event.clientY),
-        });
+        }, bounds);
 
         if (!nextSize) {
             return;
         }
 
-        sbState.shellSizing.overrides[shellKey] = nextSize;
+        sbState.shellSizing.overrides[getShellSizingKey(shellKey)] = nextSize;
         applyDesktopShellSize(root, nextSize);
     };
 
@@ -3499,8 +3519,36 @@ function closeCharacterPanel() {
     syncChatbarVisibilityState();
 }
 
+function ensureCharacterResizeHandle() {
+    const panel = document.getElementById('right-nav-panel');
+    if (!(panel instanceof HTMLElement)) {
+        return null;
+    }
+
+    let handle = panel.querySelector(':scope > .sb-shell-resize-handle');
+    if (handle instanceof HTMLElement) {
+        return handle;
+    }
+
+    handle = createElement('div', {
+        className: 'sb-shell-resize-handle',
+        attrs: {
+            role: 'separator',
+            'aria-orientation': 'both',
+            'aria-label': 'Resize Characters panel',
+            title: 'Resize Characters panel',
+        },
+    });
+
+    stopProxyPointerPropagation(handle);
+    handle.addEventListener('pointerdown', event => beginShellResize('characters', event));
+    panel.appendChild(handle);
+    return handle;
+}
+
 function toggleCharacterPanel() {
     injectCharacterCloseButton();
+    ensureCharacterResizeHandle();
     const shouldOpenActiveCharacterEditor = hasActiveCharacterChat();
 
     if (isCharacterPanelOpen()) {
@@ -3537,6 +3585,7 @@ function toggleCharacterPanel() {
         }
 
         syncChatbarVisibilityState();
+        syncDesktopShellSizing();
     });
 }
 

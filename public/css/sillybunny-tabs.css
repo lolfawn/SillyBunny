@@ -1297,11 +1297,13 @@ body:not(.movingUI) .drawer-content.maximized {
     border-radius: inherit;
 }
 
-.sb-shell-root.sb-shell-can-resize.openDrawer .sb-shell-resize-handle {
+.sb-shell-root.sb-shell-can-resize.openDrawer .sb-shell-resize-handle,
+#right-nav-panel.sb-shell-can-resize.openDrawer > .sb-shell-resize-handle {
     display: block;
 }
 
 .sb-shell-root.sb-shell-resize-active .sb-shell-resize-handle,
+#right-nav-panel.sb-shell-resize-active > .sb-shell-resize-handle,
 .sb-shell-resize-handle:hover {
     opacity: 1;
 }
