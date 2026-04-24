@@ -9,7 +9,7 @@ import {
     saveSettingsDebounced,
     this_chid,
 } from '../script.js';
-import { selected_group } from './group-chats.js';
+import { getGroupMembers, selected_group } from './group-chats.js';
 import { extension_settings, getContext, saveMetadataDebounced } from './extensions.js';
 import { getCharaFilename, debounce, delay } from './utils.js';
 import { getTokenCountAsync } from './tokenizers.js';
@@ -40,6 +40,43 @@ const chara_note_position = {
     before: 1,
     after: 2,
 };
+
+function getCharacterNoteByAvatar(avatarId) {
+    const avatarName = getCharaFilename(null, { manualAvatarKey: avatarId });
+    if (!avatarName || !extension_settings.note.chara) {
+        return null;
+    }
+
+    return extension_settings.note.chara.find((entry) => entry.name === avatarName) ?? null;
+}
+
+function applyCharacterNote(prompt, charaNote) {
+    if (!charaNote?.useChara) {
+        return prompt;
+    }
+
+    switch (charaNote.position) {
+        case chara_note_position.before:
+            return [charaNote.prompt, prompt].filter(Boolean).join('\n');
+        case chara_note_position.after:
+            return [prompt, charaNote.prompt].filter(Boolean).join('\n');
+        default:
+            return charaNote.prompt;
+    }
+}
+
+function getActiveGroupCharacterNote(context) {
+    if (!context.groupId || context.characterId === undefined) {
+        return null;
+    }
+
+    const avatarId = context.characters[context.characterId]?.avatar;
+    if (!avatarId) {
+        return null;
+    }
+
+    return getCharacterNoteByAvatar(avatarId);
+}
 
 function setNoteTextCommand(_, text) {
     if (text) {
@@ -362,23 +399,9 @@ export function setFloatingPrompt() {
     shouldWIAddPrompt = shouldAddPrompt;
 
     let prompt = shouldAddPrompt ? $('#extension_floating_prompt').val() : '';
-    if (shouldAddPrompt && extension_settings.note.chara && getContext().characterId !== undefined) {
-        const charaNote = extension_settings.note.chara.find((e) => e.name === getCharaFilename());
-
-        // Only replace with the chara note if the user checked the box
-        if (charaNote && charaNote.useChara) {
-            switch (charaNote.position) {
-                case chara_note_position.before:
-                    prompt = charaNote.prompt + '\n' + prompt;
-                    break;
-                case chara_note_position.after:
-                    prompt = prompt + '\n' + charaNote.prompt;
-                    break;
-                default:
-                    prompt = charaNote.prompt;
-                    break;
-            }
-        }
+    if (shouldAddPrompt && extension_settings.note.chara) {
+        const charaNote = context.groupId ? getActiveGroupCharacterNote(context) : (context.characterId !== undefined ? extension_settings.note.chara.find((e) => e.name === getCharaFilename()) : null);
+        prompt = applyCharacterNote(prompt, charaNote);
     }
     context.setExtensionPrompt(
         MODULE_NAME,
@@ -443,7 +466,7 @@ async function onChatChanged() {
     setFloatingPrompt();
     const context = getContext();
 
-    // Disable the chara note if in a group
+    // In groups, each member's private note is injected only when that member speaks.
     $('#extension_floating_chara').prop('disabled', !!context.groupId);
 
     const tokenCounter1 = chat_metadata[metadata_keys.prompt] ? await getTokenCountAsync(chat_metadata[metadata_keys.prompt]) : 0;
@@ -456,6 +479,12 @@ async function onChatChanged() {
         if (charaNote) {
             tokenCounter2 = await getTokenCountAsync(charaNote.prompt);
         }
+    } else if (extension_settings.note.chara && context.groupId) {
+        const groupNotes = getGroupMembers(context.groupId)
+            .map(character => getCharacterNoteByAvatar(character?.avatar))
+            .filter(note => note?.prompt);
+        const combinedPrompt = groupNotes.map(note => note.prompt).join('\n');
+        tokenCounter2 = combinedPrompt ? await getTokenCountAsync(combinedPrompt) : 0;
     }
 
     $('#extension_floating_chara_token_counter').text(tokenCounter2 || 0);
