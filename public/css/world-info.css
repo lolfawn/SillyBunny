@@ -269,7 +269,7 @@
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 8px;
-    align-items: start;
+    align-items: center;
     padding: 0;
     background: transparent;
     border: 0;
@@ -358,18 +358,21 @@
 }
 
 .world_entry .killSwitch {
-    min-height: 34px;
+    min-height: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    padding: 0 10px;
+    padding: 0 9px;
     border-radius: 999px;
     cursor: pointer;
     white-space: nowrap;
 }
 
 .world_entry .killSwitch i {
-    font-size: calc(var(--mainFontSize) * 1.15);
+    font-size: calc(var(--mainFontSize) * 0.95);
+    line-height: 1;
 }
 
 .world_entry .killSwitch.is-disabled {
@@ -389,6 +392,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    line-height: 1;
 }
 
 .wi-card-entry {
@@ -983,9 +987,14 @@ select.keyselect+span.select2-container .select2-selection--multiple {
         grid-column: 1 / -1;
         grid-row: 1;
         grid-template-columns: auto auto minmax(0, 1fr);
-        align-items: start;
+        align-items: center;
         width: 100%;
         gap: 8px;
+    }
+
+    #world_popup_entries_list .WIEntryHeaderMain > .inline-drawer-icon,
+    #world_popup_entries_list .WIEntryHeaderMain > .killSwitch {
+        align-self: center;
     }
 
     #world_popup_entries_list .world_entry .inline-drawer-header:has(> .drag-handle) .WIEntryHeaderMain {
