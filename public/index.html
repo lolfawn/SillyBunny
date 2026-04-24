@@ -6580,6 +6580,23 @@
                                                     <span data-i18n="Auto Mode">Auto Mode</span>
                                                     <input id="rm_group_automode_delay" class="text_pole textarea_compact widthUnset" type="number" min="1" max="999" step="1" value="5" title="Auto Mode delay" data-i18n="[title]Auto Mode delay" />
                                                 </label>
+                                                <label class="checkbox_label whitespacenowrap" title="Adds your local date and time to group auto-message prompts" data-i18n="[title]Adds your local date and time to group auto-message prompts">
+                                                    <input id="rm_group_time_aware" type="checkbox" />
+                                                    <span data-i18n="Time-aware">Time-aware</span>
+                                                </label>
+                                                <label class="checkbox_label whitespacenowrap" title="Let scheduled characters message when their schedule is due" data-i18n="[title]Let scheduled characters message when their schedule is due">
+                                                    <input id="rm_group_auto_message" type="checkbox" />
+                                                    <span data-i18n="Scheduled messages">Scheduled messages</span>
+                                                </label>
+                                                <div class="flex-container flexGap5 alignitemscenter wide100p">
+                                                    <button type="button" id="rm_group_generate_schedule" class="menu_button menu_button_icon" title="Ask the AI to make a daily message schedule for this group" data-i18n="[title]Ask the AI to make a daily message schedule for this group">
+                                                        <i class="fa-solid fa-calendar-days"></i>
+                                                        <span data-i18n="Generate Schedule">Generate Schedule</span>
+                                                    </button>
+                                                </div>
+                                                <textarea id="rm_group_ai_schedule" class="text_pole textarea_compact autoSetHeight wide100p" rows="3" placeholder="09:00 Nahida: morning check-in
+15:00 Seraphina: asks about the glade" title="Daily auto-message schedule. Format: HH:MM Character: reason" data-i18n="[placeholder]09:00 Nahida: morning check-in
+15:00 Seraphina: asks about the glade;[title]Daily auto-message schedule. Format: HH:MM Character: reason"></textarea>
                                                 <label id="rm_group_hidemutedsprites_label" class="checkbox_label whitespacenowrap">
                                                     <input id="rm_group_hidemutedsprites" type="checkbox" />
                                                     <span data-i18n="Hide Muted Member Sprites">Hide Muted Member Sprites</span>
@@ -8393,6 +8410,14 @@
                     <i class="fa-solid fa-feather-pointed"></i>
                     <span data-i18n="Narrate Turn">Narrate Turn</span>
                 </button>
+                <button type="button" id="group_speaker_dm_now" class="menu_button menu_button_icon" title="Send or receive a private DM with the selected character" data-i18n="[title]Send or receive a private DM with the selected character">
+                    <i class="fa-solid fa-envelope"></i>
+                    <span data-i18n="DM">DM</span>
+                </button>
+                <label class="checkbox_label group_speaker_toggle" title="Let the selected character privately DM you during scheduled auto messages" data-i18n="[title]Let the selected character privately DM you during scheduled auto messages">
+                    <input id="group_speaker_auto_dm" type="checkbox" />
+                    <span data-i18n="Auto DM">Auto DM</span>
+                </label>
                 <label class="checkbox_label group_speaker_toggle" title="Only let one group member reply unless you explicitly choose narrator merge" data-i18n="[title]Only let one group member reply unless you explicitly choose narrator merge">
                     <input id="group_speaker_single" type="checkbox" checked />
                     <span data-i18n="One at a time">One at a time</span>
