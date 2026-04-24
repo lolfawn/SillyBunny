@@ -256,6 +256,15 @@
         </div>
         <div class="pf--section-body" style="display: none;">
             <div class="pf--section-desc">Shows what Pathfinder actually selected or injected, including selected lore entries, stage results, and the prompt payload Pathfinder added before generation.</div>
+            <div class="pf--log-mode-row">
+                <label class="checkbox_label" for="pf--log-mode">
+                    <span>Log detail</span>
+                    <select id="pf--log-mode" class="text_pole">
+                        <option value="summary">Summarized</option>
+                        <option value="detailed">Detailed</option>
+                    </select>
+                </label>
+            </div>
             <div class="pf--log-actions">
                 <button type="button" id="pf--refresh-log" class="menu_button menu_button_icon">
                     <i class="fa-solid fa-rotate"></i>
@@ -463,6 +472,20 @@
     flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 10px;
+}
+
+.pf--log-mode-row {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 10px;
+}
+
+.pf--log-mode-row .checkbox_label {
+    gap: 8px;
+}
+
+#pf--log-mode {
+    min-width: 140px;
 }
 
 .pf--retrieval-log-output,

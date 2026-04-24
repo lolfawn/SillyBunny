@@ -23,9 +23,11 @@ import { clearFeed, getFeedItems } from './pathfinder/activity-feed.js';
 
 const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
+const PATHFINDER_LOG_MODE_KEY = 'pathfinder-retrieval-log-mode';
 
 let settingsEl = null;
 let currentAgent = null;
+let retrievalLogMode = localStorage.getItem(PATHFINDER_LOG_MODE_KEY) === 'detailed' ? 'detailed' : 'summary';
 
 function logPathfinder(message, ...details) {
     console.log(`${PATHFINDER_LOG_PREFIX} ${message}`, ...details);
@@ -149,6 +151,7 @@ export async function openPathfinderSettings(agent) {
     await refreshLorebookList();
     loadSettingsIntoUI();
     bindEvents();
+    settingsEl.find('#pf--log-mode').val(retrievalLogMode);
     updateStatusBanner();
     updateModeCardStates();
     renderRetrievalLog();
@@ -531,6 +534,12 @@ function bindEvents() {
         logPathfinder('Pathfinder retrieval log refreshed.');
     });
 
+    settingsEl.find('#pf--log-mode').on('change', function () {
+        retrievalLogMode = String($(this).val()) === 'detailed' ? 'detailed' : 'summary';
+        localStorage.setItem(PATHFINDER_LOG_MODE_KEY, retrievalLogMode);
+        renderRetrievalLog();
+    });
+
     settingsEl.find('#pf--clear-log').on('click', () => {
         clearFeed();
         renderRetrievalLog();
@@ -604,7 +613,24 @@ function compactText(value, maxLength = 220) {
 
 function formatCount(count, noun) {
     const value = Number(count) || 0;
-    return `${value} ${noun}${value === 1 ? '' : 's'}`;
+    const plural = noun === 'entry' ? 'entries' : `${noun}s`;
+    return `${value} ${value === 1 ? noun : plural}`;
+}
+
+function prettyJson(value, fallback = '') {
+    if (value === undefined || value === null || value === '') {
+        return fallback;
+    }
+
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return String(value);
+    }
 }
 
 function formatRetrievalMode(mode) {
@@ -629,7 +655,7 @@ function formatStageLine(stage) {
     return `  ${stageNumber ? `${stageNumber}. ` : '- '}${label}: ${status}, ${formatCount(count, 'entry')}${extras.length ? ` — ${extras.join('; ')}` : ''}`;
 }
 
-function formatRetrievalDetail(item) {
+function formatRetrievalDetail(item, { detailed = false } = {}) {
     const selectedEntries = Array.isArray(item.selectedEntries) ? item.selectedEntries : [];
     const stageResults = Array.isArray(item.stageResults) ? item.stageResults : [];
     const metadata = item.metadata || {};
@@ -645,31 +671,36 @@ function formatRetrievalDetail(item) {
     }
 
     if (stageResults.length > 0) {
-        lines.push('', '  Stages:');
+        lines.push('', detailed ? '  Retrieval stages:' : '  Stages:');
         lines.push(...stageResults.map(formatStageLine));
     }
 
     if (selectedEntries.length > 0) {
-        lines.push('', '  Selected lore:');
-        for (const entry of selectedEntries.slice(0, 12)) {
+        lines.push('', detailed ? '  Lorebook entries selected for injection:' : '  Selected lore:');
+        for (const entry of selectedEntries.slice(0, detailed ? 50 : 12)) {
             const name = entry.name || 'Untitled entry';
             const book = entry.bookName ? ` · ${entry.bookName}` : '';
             const uid = entry.uid !== null && entry.uid !== undefined ? ` · uid ${entry.uid}` : '';
             lines.push(`  - ${name}${book}${uid}`);
             if (entry.preview) {
-                lines.push(`    ${compactText(entry.preview, 180)}`);
+                lines.push(`    ${detailed ? String(entry.preview).trim() : compactText(entry.preview, 180)}`);
             }
         }
-        if (selectedEntries.length > 12) {
+        if (!detailed && selectedEntries.length > 12) {
             lines.push(`  - …and ${selectedEntries.length - 12} more`);
         }
     }
 
     if (injectedPrompt) {
         lines.push('', `  Injected context: ${formatCount(injectedPrompt.length, 'character')}`);
-        lines.push(`  ${compactText(injectedPrompt, 300)}`);
+        lines.push(detailed ? injectedPrompt : `  ${compactText(injectedPrompt, 300)}`);
     } else {
         lines.push('', '  Injected context: none');
+    }
+
+    if (detailed && Object.keys(metadata).length > 0) {
+        lines.push('', '  Retrieval metadata:');
+        lines.push(prettyJson(metadata));
     }
 
     if (metadata.error) {
@@ -720,12 +751,50 @@ function formatToolActivity(items) {
     return lines.join('\n');
 }
 
+function formatDetailedToolActivity(items) {
+    const toolItems = items.filter(item => item.type?.startsWith?.('tool_call_')).slice(0, 30).reverse();
+    if (!toolItems.length) {
+        return '';
+    }
+
+    const lines = ['Tool calls and lorebook actions:'];
+    for (const item of toolItems) {
+        const toolName = item.toolName || 'Tool';
+        if (item.type === 'tool_call_started') {
+            lines.push(`\n- ${formatTime(item.timestamp)} ${toolName}: started${item.isSidecar ? ' (sidecar)' : ''}`);
+            if (item.args !== undefined) {
+                lines.push('  Arguments:');
+                lines.push(prettyJson(item.args).split('\n').map(line => `  ${line}`).join('\n'));
+            }
+        } else if (item.type === 'tool_call_completed') {
+            lines.push(`\n- ${formatTime(item.timestamp)} ${toolName}: completed${item.isSidecar ? ' (sidecar)' : ''}`);
+            if (item.result !== undefined) {
+                lines.push('  Result:');
+                lines.push(prettyJson(item.result).split('\n').map(line => `  ${line}`).join('\n'));
+            }
+        } else if (item.type === 'tool_call_error') {
+            lines.push(`\n- ${formatTime(item.timestamp)} ${toolName}: failed`);
+            lines.push(`  Error: ${item.error}`);
+        }
+    }
+    return lines.join('\n');
+}
+
+function formatRawEventTimeline(items) {
+    const lines = ['Event timeline:'];
+    for (const item of items.slice(0, 30).reverse()) {
+        lines.push(`  - ${formatTime(item.timestamp)} ${formatRetrievalLogItem(item).replace(/^\[[^\]]+\]\s*/, '').replace(/\n/g, '\n    ')}`);
+    }
+    return lines.join('\n');
+}
+
 function formatRetrievalLog(items) {
     const latestDetail = items.find(item => item.type === 'pathfinder_retrieval_detail');
     const sections = [];
+    const detailed = retrievalLogMode === 'detailed';
 
     if (latestDetail) {
-        sections.push(formatRetrievalDetail(latestDetail));
+        sections.push(formatRetrievalDetail(latestDetail, { detailed }));
     } else {
         sections.push('No completed retrieval summary yet. Refresh after Pathfinder runs, or check pipeline/tool activity below.');
     }
@@ -733,8 +802,12 @@ function formatRetrievalLog(items) {
     const pipelineSummary = formatPipelineSummary(items);
     if (pipelineSummary) sections.push(pipelineSummary);
 
-    const toolActivity = formatToolActivity(items);
+    const toolActivity = detailed ? formatDetailedToolActivity(items) : formatToolActivity(items);
     if (toolActivity) sections.push(toolActivity);
+
+    if (detailed) {
+        sections.push(formatRawEventTimeline(items));
+    }
 
     const legacyRetrieval = items.find(item => item.type === 'sidecar_retrieval');
     if (legacyRetrieval && latestDetail?.mode !== 'tool-retrieval') {
