@@ -237,6 +237,7 @@ let selectedGroupSpeakerAvatar = '';
 let groupSpeakerControlsInitialized = false;
 let selectedGroupDmAvatar = '';
 let groupDmModeEnabled = false;
+let groupDmModeForced = false;
 let pendingGroupDmUserTarget = '';
 let groupScheduleCheckInterval = null;
 
@@ -252,6 +253,71 @@ function getGroupEnabledMembers(group) {
     return group.members.filter(member => !group.disabled_members?.includes(member));
 }
 
+function isGroupDmChatMetadata(metadata = chat_metadata) {
+    return metadata?.type === 'group_dm_chat' && Boolean(metadata?.dm_member);
+}
+
+function getGroupDmParticipants(metadata = chat_metadata) {
+    if (!isGroupDmChatMetadata(metadata)) {
+        return [];
+    }
+
+    return [metadata.dm_member, ...(Array.isArray(metadata.dm_participants) ? metadata.dm_participants : [])]
+        .map(avatar => String(avatar || ''))
+        .filter(Boolean)
+        .filter(onlyUnique);
+}
+
+function isGroupDmParticipant(avatarId, metadata = chat_metadata) {
+    return getGroupDmParticipants(metadata).includes(String(avatarId || ''));
+}
+
+function getGroupDmAllowedMembers(group, metadata = chat_metadata) {
+    const enabledMembers = getGroupEnabledMembers(group);
+    if (!isGroupDmChatMetadata(metadata)) {
+        return enabledMembers;
+    }
+
+    const participants = getGroupDmParticipants(metadata);
+    return enabledMembers.filter(avatar => participants.includes(avatar));
+}
+
+async function inviteGroupDmParticipant(avatarId) {
+    if (!isGroupDmChatMetadata(chat_metadata)) {
+        return false;
+    }
+
+    const avatar = String(avatarId || '');
+    if (!avatar || isGroupDmParticipant(avatar)) {
+        return false;
+    }
+
+    const participants = getGroupDmParticipants(chat_metadata);
+    const nextParticipants = [...participants, avatar].filter(onlyUnique);
+    updateChatMetadata({ ...chat_metadata, dm_participants: nextParticipants }, true);
+    await saveChatConditional();
+    return true;
+}
+
+function applyGroupDmChatMode(metadata = chat_metadata) {
+    if (isGroupDmChatMetadata(metadata)) {
+        const dmMember = String(metadata.dm_member || '');
+        selectedGroupSpeakerAvatar = dmMember;
+        selectedGroupDmAvatar = dmMember;
+        groupDmModeEnabled = true;
+        groupDmModeForced = true;
+        updateGroupSpeakerControls();
+        return;
+    }
+
+    if (groupDmModeForced) {
+        selectedGroupDmAvatar = '';
+        groupDmModeEnabled = false;
+        groupDmModeForced = false;
+        updateGroupSpeakerControls();
+    }
+}
+
 function getGroupDmExtra(fromAvatar, toAvatar) {
     return {
         is_group_dm: true,
@@ -263,6 +329,10 @@ function getGroupDmExtra(fromAvatar, toAvatar) {
 function canGroupMemberSeeMessage(message, speakerAvatar) {
     if (!message?.extra?.is_group_dm) {
         return true;
+    }
+
+    if (isGroupDmChatMetadata()) {
+        return isGroupDmParticipant(speakerAvatar);
     }
 
     const dmFrom = String(message.extra.dm_from || (message.is_user ? 'user' : message.original_avatar || ''));
@@ -338,7 +408,7 @@ function getCurrentMinutes(date = new Date()) {
 
 function findScheduledCharacterId(group, scheduleItem) {
     const wanted = scheduleItem.name.toLowerCase();
-    const avatar = getGroupEnabledMembers(group).find(member => {
+    const avatar = getGroupDmAllowedMembers(group).find(member => {
         const character = characters.find(x => x.avatar === member);
         return character?.name?.toLowerCase() === wanted;
     });
@@ -357,7 +427,7 @@ function findDirectlyAddressedMember(group, text) {
         return -1;
     }
 
-    for (const avatar of getGroupEnabledMembers(group)) {
+    for (const avatar of getGroupDmAllowedMembers(group)) {
         const character = characters.find(x => x.avatar === avatar);
         if (!character?.name) continue;
         const escapedName = character.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -452,6 +522,28 @@ function getGroupDmChatName(group, character) {
     return `DM - ${safeGroupName} - ${safeCharacterName}`;
 }
 
+async function returnToMainGroupChat() {
+    const group = selected_group ? groups.find(x => x.id === selected_group) : null;
+    const mainGroupChatId = String(chat_metadata.main_group_chat_id || '');
+
+    if (!group) {
+        return;
+    }
+
+    if (mainGroupChatId && group.chats.includes(mainGroupChatId)) {
+        await openGroupChat(group.id, mainGroupChatId);
+        return;
+    }
+
+    const fallbackChatId = group.chats.find(chatId => chatId !== group.chat_id && !String(chatId).startsWith('DM - '));
+    if (fallbackChatId) {
+        await openGroupChat(group.id, fallbackChatId);
+        return;
+    }
+
+    await createNewGroupChat(group.id);
+}
+
 async function openSelectedGroupDmChat() {
     const group = selected_group ? groups.find(x => x.id === selected_group) : null;
     if (!group || !selectedGroupSpeakerAvatar) {
@@ -471,6 +563,7 @@ async function openSelectedGroupDmChat() {
             dm_member: selectedGroupSpeakerAvatar,
             main_group_chat_id: group.chat_id,
             tainted: true,
+            dm_participants: [selectedGroupSpeakerAvatar],
         }, undefined, dmChatData, { throwOnError: false });
         if (!saved) {
             return;
@@ -483,6 +576,11 @@ async function openSelectedGroupDmChat() {
         }
     }
 
+    selectedGroupSpeakerAvatar = selectedGroupSpeakerAvatar || character.avatar;
+    selectedGroupDmAvatar = character.avatar;
+    groupDmModeEnabled = true;
+    groupDmModeForced = true;
+    updateGroupSpeakerControls();
     await openGroupChat(group.id, dmChatName);
 }
 
@@ -522,6 +620,12 @@ function updateGroupSpeakerControls() {
 
     container.find('#group_speaker_auto_dm').prop('checked', Boolean(getGlobalGroupDmSettings().autoDmEnabled));
     container.find('#group_speaker_dm_now').toggleClass('selected', groupDmModeEnabled);
+
+    const dmChatButton = container.find('#group_speaker_dm_consolidate');
+    const inDmChat = isGroupDmChatMetadata();
+    dmChatButton.attr('title', inDmChat ? t`Return to the main group chat` : t`Open a separate private DM chat with the selected character`);
+    dmChatButton.find('i').attr('class', inDmChat ? 'fa-solid fa-arrow-left' : 'fa-solid fa-envelope-open-text');
+    dmChatButton.find('span').text(inDmChat ? t`Return to Group` : t`DM Chat`);
 }
 
 function initGroupSpeakerControls() {
@@ -535,21 +639,37 @@ function initGroupSpeakerControls() {
     container.on('click', '.group_speaker_avatar', function (event) {
         const avatarId = String($(this).data('avatar') || '');
         const alreadySelected = selectedGroupSpeakerAvatar === avatarId;
-        selectedGroupSpeakerAvatar = alreadySelected ? '' : avatarId;
+        selectedGroupSpeakerAvatar = groupDmModeForced && alreadySelected ? selectedGroupSpeakerAvatar : (alreadySelected ? '' : avatarId);
+        if (groupDmModeForced && avatarId && !isGroupDmParticipant(avatarId)) {
+            void inviteGroupDmParticipant(avatarId).then(invited => {
+                if (invited) {
+                    toastr.success(t`Added participant to this DM chat.`);
+                }
+                updateGroupSpeakerControls();
+            });
+        }
         updateGroupSpeakerControls();
 
         if (event.shiftKey && selected_group) {
             const chid = getCharacterIdByAvatar(avatarId);
             if (chid !== -1) {
-                Generate('normal', { force_chid: chid });
+                if (groupDmModeForced && !isGroupDmParticipant(avatarId)) {
+                    void inviteGroupDmParticipant(avatarId).then(() => Generate('normal', { force_chid: chid }));
+                } else {
+                    Generate('normal', { force_chid: chid });
+                }
             }
         }
     });
 
-    container.on('click', '#group_speaker_now', function () {
+    container.on('click', '#group_speaker_now', async function () {
         if (!selected_group || !selectedGroupSpeakerAvatar) {
             toastr.warning(t`Pick a group member first.`);
             return;
+        }
+
+        if (groupDmModeForced && selectedGroupSpeakerAvatar && !isGroupDmParticipant(selectedGroupSpeakerAvatar)) {
+            await inviteGroupDmParticipant(selectedGroupSpeakerAvatar);
         }
 
         const chid = getCharacterIdByAvatar(selectedGroupSpeakerAvatar);
@@ -559,12 +679,25 @@ function initGroupSpeakerControls() {
     });
 
     container.on('click', '#group_speaker_dm_consolidate', async function () {
+        if (isGroupDmChatMetadata()) {
+            await returnToMainGroupChat();
+            return;
+        }
+
         await openSelectedGroupDmChat();
     });
 
     container.on('click', '#group_speaker_dm_now', function () {
         const group = selected_group ? groups.find(x => x.id === selected_group) : null;
         if (!group) {
+            return;
+        }
+
+        if (groupDmModeForced) {
+            groupDmModeEnabled = true;
+            selectedGroupDmAvatar = selectedGroupSpeakerAvatar || selectedGroupDmAvatar;
+            updateGroupSpeakerControls();
+            toastr.info(t`DM is locked on for this DM chat.`);
             return;
         }
 
@@ -846,6 +979,7 @@ export async function getGroupChat(groupId, reload = false) {
     }
 
     updateChatMetadata(metadata, true);
+    applyGroupDmChatMode(metadata);
 
     if (reload) {
         select_group_chats(groupId, true);
@@ -1554,7 +1688,7 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
         }
 
         const activationStrategy = Number(group.activation_strategy ?? group_activation_strategy.NATURAL);
-        const enabledMembers = group.members.filter(x => !group.disabled_members.includes(x));
+        const enabledMembers = getGroupDmAllowedMembers(group);
         let activatedMembers = [];
 
         const selectedSpeakerChid = getSelectedGroupSpeakerChid(group);
@@ -1566,7 +1700,7 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
         } else if (params && typeof params.force_chid == 'number') {
             activatedMembers = [params.force_chid];
         } else if (type !== 'quiet' && isWholeGroupAddress && isUserInput) {
-            activatedMembers = getGroupEnabledMembers(group).map(avatar => getCharacterIdByAvatar(avatar)).filter(chid => chid !== -1);
+            activatedMembers = enabledMembers.map(avatar => getCharacterIdByAvatar(avatar)).filter(chid => chid !== -1);
         } else if (byAutoMode && type !== 'quiet' && addressedMemberChid !== -1 && autoReplyDepth < 3) {
             activatedMembers = [addressedMemberChid];
         } else if (byAutoMode && type !== 'quiet' && autoReplyDepth >= 3) {
@@ -1576,20 +1710,20 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
         } else if (!byAutoMode && type !== 'quiet' && selectedSpeakerChid !== -1) {
             activatedMembers = [selectedSpeakerChid];
         } else if (type === 'quiet') {
-            activatedMembers = activateSwipe(group.members, { allowSystem: true }).slice(0, 1);
+            activatedMembers = activateSwipe(enabledMembers, { allowSystem: true }).slice(0, 1);
 
             if (activatedMembers.length === 0) {
-                activatedMembers = activateListOrder(group.members.slice(0, 1));
+                activatedMembers = activateListOrder(enabledMembers.slice(0, 1));
             }
         } else if (type === 'swipe' || type === 'continue') {
-            activatedMembers = activateSwipe(group.members, { allowSystem: false });
+            activatedMembers = activateSwipe(enabledMembers, { allowSystem: false });
 
             if (activatedMembers.length === 0) {
                 toastr.warning(t`Deleted group member swiped. To get a reply, add them back to the group.`);
                 throw new Error('Deleted group member swiped');
             }
         } else if (type === 'impersonate') {
-            activatedMembers = activateImpersonate(group.members);
+            activatedMembers = activateImpersonate(enabledMembers);
         } else if (activationStrategy === group_activation_strategy.NATURAL) {
             activatedMembers = activateNaturalOrder(enabledMembers, activationText, lastMessage, group.allow_self_responses, isUserInput);
         } else if (activationStrategy === group_activation_strategy.LIST) {
@@ -1598,6 +1732,11 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             activatedMembers = activatePooledOrder(enabledMembers, lastMessage, isUserInput);
         } else if (activationStrategy === group_activation_strategy.MANUAL && !isUserInput) {
             activatedMembers = shuffle(enabledMembers).slice(0, 1).map(x => characters.findIndex(y => y.avatar === x)).filter(x => x !== -1);
+        }
+
+        if (isGroupDmChatMetadata()) {
+            const allowedMemberSet = new Set(enabledMembers);
+            activatedMembers = activatedMembers.filter(chid => allowedMemberSet.has(characters[chid]?.avatar));
         }
 
         if (activatedMembers.length === 0) {
@@ -1638,16 +1777,16 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             const generateType = ['swipe', 'impersonate', 'quiet', 'continue'].includes(type) ? type : 'normal';
             const contextPrompt = buildContextAwareGroupPrompt(group, characters[chId]?.name || 'the selected speaker', {
                 targetName: addressedMemberChid === chId ? getMessageSpeakerName(lastMessage) : '',
-                isDm: type === 'dm',
+                isDm: type === 'dm' || isGroupDmChatMetadata(),
             });
             const mergedParams = { ...(params || {}) };
             mergedParams.quiet_prompt = [mergedParams.quiet_prompt, contextPrompt].filter(Boolean).join('\n');
             mergedParams.quietToLoud = true;
-            if (type === 'dm') {
+            if (type === 'dm' || isGroupDmChatMetadata()) {
                 setPendingGeneratedMessageExtra(getGroupDmExtra(characters[chId]?.avatar, 'user'));
             }
             textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => withGroupPrivateDmFilter(characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...mergedParams })));
-            if (type === 'dm') {
+            if (type === 'dm' || isGroupDmChatMetadata()) {
                 const dmMessage = chat[chat.length - 1];
                 if (dmMessage && !dmMessage.is_user && !dmMessage.is_system) {
                     dmMessage.extra = { ...(dmMessage.extra || {}), ...getGroupDmExtra(characters[chId]?.avatar, 'user') };
@@ -2015,8 +2154,13 @@ async function groupChatAutoModeWorker() {
         return;
     }
 
+    const allowedMembers = getGroupDmAllowedMembers(group);
+    if (!allowedMembers.length) {
+        return;
+    }
+
     groupAutoModeAbortController = new AbortController();
-    await generateGroupWrapper(true, 'auto', { signal: groupAutoModeAbortController.signal, quiet_prompt: buildContextAwareGroupPrompt(group, 'the next speaker', { reason: 'automatic group conversation' }), quietToLoud: true });
+    await generateGroupWrapper(true, 'auto', { signal: groupAutoModeAbortController.signal, quiet_prompt: buildContextAwareGroupPrompt(group, 'the next speaker', { reason: 'automatic group conversation', isDm: isGroupDmChatMetadata() }), quietToLoud: true });
 }
 
 async function triggerImmediateMentionedGroupReply(messageId) {
@@ -2047,7 +2191,7 @@ async function triggerImmediateMentionedGroupReply(messageId) {
     await generateGroupWrapper(true, 'auto', {
         signal: groupAutoModeAbortController.signal,
         force_chid: addressedMemberChid,
-        quiet_prompt: buildContextAwareGroupPrompt(group, characters[addressedMemberChid]?.name || 'the mentioned speaker', { targetName: getMessageSpeakerName(message) }),
+        quiet_prompt: buildContextAwareGroupPrompt(group, characters[addressedMemberChid]?.name || 'the mentioned speaker', { targetName: getMessageSpeakerName(message), isDm: isGroupDmChatMetadata() }),
         quietToLoud: true,
     });
 }
@@ -2063,7 +2207,7 @@ async function triggerImmediateWholeGroupReply(messageId) {
         return;
     }
 
-    const forceChids = getGroupEnabledMembers(group).map(avatar => getCharacterIdByAvatar(avatar)).filter(chid => chid !== -1);
+    const forceChids = getGroupDmAllowedMembers(group).map(avatar => getCharacterIdByAvatar(avatar)).filter(chid => chid !== -1);
     if (!forceChids.length) {
         return;
     }
@@ -2072,7 +2216,7 @@ async function triggerImmediateWholeGroupReply(messageId) {
     await generateGroupWrapper(true, 'auto', {
         signal: groupAutoModeAbortController.signal,
         force_chids: forceChids,
-        quiet_prompt: buildContextAwareGroupPrompt(group, 'everyone in the group', { targetName: 'the user' }),
+        quiet_prompt: buildContextAwareGroupPrompt(group, 'everyone in the DM', { targetName: 'the user', isDm: isGroupDmChatMetadata() }),
         quietToLoud: true,
     });
 }
@@ -2083,7 +2227,7 @@ async function groupScheduleAutoMessageWorker() {
     }
 
     const group = groups.find((x) => x.id === selected_group);
-    if (!group?.auto_message_enabled) {
+    if (!group?.auto_message_enabled || isGroupDmChatMetadata()) {
         return;
     }
 

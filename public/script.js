@@ -8444,7 +8444,7 @@ export async function saveSettings(loopCounter = 0) {
     }
 }
 
-async function clearFrontendCache({ skipConfirmation = false, saveBeforeClear = true } = {}) {
+export async function clearFrontendCache({ skipConfirmation = false, saveBeforeClear = true } = {}) {
     if (!skipConfirmation) {
         const confirmation = await Popup.show.confirm(
             t`Clear all cache?`,
@@ -8510,6 +8510,11 @@ async function clearFrontendCache({ skipConfirmation = false, saveBeforeClear = 
     }
 
     return true;
+}
+
+
+if (typeof window !== 'undefined') {
+    window.SillyBunnyClearFrontendCache = clearFrontendCache;
 }
 
 async function clearAllCacheAndReload() {

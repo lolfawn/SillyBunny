@@ -4553,8 +4553,15 @@ function renderServerAdminConfig(data, { overwrite = true } = {}) {
     }
 }
 
-async function waitForServerReturn(expectedRevision = '') {
+async function waitForServerReturn(expectedRevision = '', { clearCacheBeforeReload = false } = {}) {
     let sawOffline = false;
+
+    async function reloadAfterOptionalCacheClear() {
+        if (clearCacheBeforeReload && typeof window.SillyBunnyClearFrontendCache === 'function') {
+            await window.SillyBunnyClearFrontendCache({ skipConfirmation: true, saveBeforeClear: false });
+        }
+        location.reload();
+    }
     const timeoutAt = Date.now() + 180000;
 
     while (Date.now() < timeoutAt) {
@@ -4569,12 +4576,12 @@ async function waitForServerReturn(expectedRevision = '') {
             const revision = String(version?.gitRevision ?? '').trim();
 
             if (expectedRevision && revision === expectedRevision) {
-                location.reload();
+                await reloadAfterOptionalCacheClear();
                 return true;
             }
 
             if (sawOffline) {
-                location.reload();
+                await reloadAfterOptionalCacheClear();
                 return true;
             }
         } catch {
@@ -4802,7 +4809,8 @@ async function handleServerAdminUpdate() {
         toastr.info(result?.message || 'Update applied. Restarting SillyBunny…', 'Server update');
 
         const expectedRevision = String(result?.version?.gitRevision ?? result?.repository?.currentCommit ?? '').trim();
-        const restarted = await waitForServerReturn(expectedRevision);
+        const autoClearCacheEnabled = Boolean(document.getElementById('auto_clear_cache_on_update')?.checked);
+        const restarted = await waitForServerReturn(expectedRevision, { clearCacheBeforeReload: autoClearCacheEnabled });
 
         if (!restarted) {
             state.restarting = false;
