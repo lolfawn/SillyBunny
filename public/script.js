@@ -463,6 +463,7 @@ function normalizeCastAiActor(actor) {
             avatar: actor.avatar,
             name: actor.name || personaName,
             primary: Boolean(actor.primary),
+            model: String(actor.model || '').trim(),
             persona: {
                 avatar: actor.avatar,
                 name: personaName,
@@ -486,6 +487,7 @@ function normalizeCastAiActor(actor) {
         avatar: character.avatar,
         name: actor.name || character.name,
         primary: Boolean(actor.primary),
+        model: String(actor.model || '').trim(),
         character,
     };
 }

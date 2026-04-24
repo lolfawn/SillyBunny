@@ -4082,3 +4082,28 @@ body.sb-shell-resizing * {
     opacity: 0.68;
     line-height: 1.35;
 }
+
+.sb-cast-model-list {
+    display: grid;
+    gap: 8px;
+}
+
+.sb-cast-model-row {
+    display: grid;
+    grid-template-columns: minmax(90px, 0.8fr) minmax(160px, 1.2fr);
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+
+.sb-cast-model-row > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0.82;
+}
+
+.sb-cast-model-input {
+    width: 100%;
+    min-width: 0;
+}

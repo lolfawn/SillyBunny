@@ -4183,7 +4183,7 @@ function setCastPanelMessage(message, tone = '') {
 function setCastPanelBusy(isBusy) {
     const refs = getCastRolesRefs();
 
-    for (const element of [refs?.userSelect, refs?.aiSelect, refs?.resetButton, refs?.refreshButton, refs?.groupButton, ...(refs?.optionCheckboxes || [])]) {
+    for (const element of [refs?.userSelect, refs?.aiSelect, refs?.resetButton, refs?.refreshButton, refs?.groupButton, ...(refs?.optionCheckboxes || []), ...(refs?.modelInputs || [])]) {
         if (element instanceof HTMLButtonElement || element instanceof HTMLSelectElement) {
             element.disabled = Boolean(isBusy);
         }
@@ -4266,6 +4266,55 @@ function getSelectedCastValues(select) {
     return Array.from(select.selectedOptions).map(option => decodeCastOptionValue(option.value)).filter(actor => actor.avatar);
 }
 
+function renderCastModelOverrides(container, cast) {
+    container.replaceChildren();
+    const actors = cast.aiActors.filter(actor => actor.avatar);
+
+    if (!actors.length) {
+        container.appendChild(createElement('small', { className: 'sb-cast-field-hint', text: 'Select AI actors to set optional per-actor model IDs.' }));
+        return;
+    }
+
+    for (const actor of actors) {
+        const row = createElement('label', { className: 'sb-cast-model-row' });
+        const label = createElement('span', { text: actor.name || actor.avatar });
+        const input = createElement('input', {
+            className: 'text_pole sb-cast-model-input',
+            attrs: {
+                type: 'text',
+                placeholder: 'Use current model',
+                value: actor.model || '',
+                'data-cast-actor-type': actor.type || 'character',
+                'data-cast-actor-avatar': actor.avatar,
+            },
+        });
+        input.addEventListener('change', () => {
+            void applyCastActorModel(actor.type || 'character', actor.avatar, input.value);
+        });
+        row.append(label, input);
+        container.appendChild(row);
+    }
+}
+
+async function applyCastActorModel(type, avatar, model) {
+    setCastPanelBusy(true);
+
+    try {
+        const castRoles = await loadCastRolesModule();
+        const cast = castRoles.getCastAssignments();
+        const actor = cast.aiActors.find(item => (item.type || 'character') === type && item.avatar === avatar);
+        if (actor) {
+            actor.model = String(model || '').trim();
+            castRoles.setCastAssignments(cast);
+        }
+        scheduleCastRolesRefresh(0);
+    } catch (error) {
+        setCastPanelMessage(error.message || 'Failed to save Cast actor model.', 'danger');
+    } finally {
+        setCastPanelBusy(false);
+    }
+}
+
 async function refreshCastRolesPanel() {
     const refs = getCastRolesRefs();
 
@@ -4301,6 +4350,8 @@ async function refreshCastRolesPanel() {
             const optionKey = checkbox.getAttribute('data-cast-option');
             checkbox.checked = Boolean(cast.options?.[optionKey]);
         }
+        renderCastModelOverrides(refs.modelOverrides, cast);
+        refs.modelInputs = Array.from(refs.modelOverrides.querySelectorAll('.sb-cast-model-input'));
 
         const assignmentCount = Number(Boolean(cast.userActor)) + cast.aiActors.length;
         refs.statusPill.textContent = assignmentCount ? `${assignmentCount} active` : 'Default';
@@ -4545,6 +4596,10 @@ function buildCastRolesPanel() {
         description: 'If the AI writes “Name: text” for multiple cast actors, save each speaker as its own message with the matching avatar.',
     });
     const optionCheckboxes = [userCardOption.checkbox, lorebookOption.checkbox, controlOption.checkbox, splitOption.checkbox];
+    const modelCard = createElement('div', { className: 'sb-cast-options' });
+    const modelTitle = createElement('span', { className: 'sb-cast-options-title', text: 'Per-actor models' });
+    const modelDescription = createElement('small', { className: 'sb-cast-field-hint', text: 'Optional model IDs for each AI actor. Blank uses the current model. Applies during Cast-created group generation for the active Chat Completion provider.' });
+    const modelOverrides = createElement('div', { className: 'sb-cast-model-list' });
     const actions = createElement('div', { className: 'sb-server-actions sb-cast-actions' });
     const refreshButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Refresh cast', attrs: { type: 'button' } });
     const groupButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Create group chat', attrs: { type: 'button' } });
@@ -4557,8 +4612,9 @@ function buildCastRolesPanel() {
     aiField.append(aiFieldTitle, aiSelect, aiHint, aiSummary);
     grid.append(userField, aiField);
     optionsCard.append(optionsTitle, userCardOption.option, lorebookOption.option, controlOption.option, splitOption.option);
+    modelCard.append(modelTitle, modelDescription, modelOverrides);
     actions.append(refreshButton, groupButton, resetButton);
-    card.append(header, grid, optionsCard, actions, statusNote);
+    card.append(header, grid, optionsCard, modelCard, actions, statusNote);
     column.append(callout, card);
     scroller.appendChild(column);
 
@@ -4571,6 +4627,8 @@ function buildCastRolesPanel() {
         aiSummary,
         aiHint,
         optionCheckboxes,
+        modelOverrides,
+        modelInputs: [],
         refreshButton,
         groupButton,
         resetButton,
