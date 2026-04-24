@@ -4450,8 +4450,8 @@ async function openCastGroupChat() {
             avatar_url: 'img/ai4.png',
             allow_self_responses: false,
             hideMutedSprites: false,
-            activation_strategy: 0,
-            generation_mode: 0,
+            activation_strategy: 1,
+            generation_mode: 1,
             disabled_members: [],
             fav: false,
             chat_id: chatName,
@@ -4472,7 +4472,10 @@ async function openCastGroupChat() {
         const data = await response.json();
         await context.getCharacters?.();
         await context.openGroupChat?.(data.id, chatName);
-        setCastPanelMessage(`Created and opened new group "${groupName}".`, 'good');
+        context.updateChatMetadata?.({ cast }, true);
+        context.saveMetadataDebounced?.();
+        await context.saveChat?.();
+        setCastPanelMessage(`Created and opened new group "${groupName}" with the current Cast assignments.`, 'good');
     } catch (error) {
         setCastPanelMessage(error.message || 'Failed to create Cast group chat.', 'danger');
     } finally {
