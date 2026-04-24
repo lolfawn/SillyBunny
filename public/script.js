@@ -448,15 +448,7 @@ function getCastUserActor() {
     };
 }
 
-function getCastPrimaryAiActor() {
-    const actors = chat_metadata?.[CAST_METADATA_KEY]?.aiActors;
-
-    if (!Array.isArray(actors) || !actors.length) {
-        return null;
-    }
-
-    const actor = actors.find(item => item?.primary) || actors[0];
-
+function normalizeCastAiActor(actor) {
     if (!actor || actor.type !== 'character' || !actor.avatar) {
         return null;
     }
@@ -471,8 +463,31 @@ function getCastPrimaryAiActor() {
         type: 'character',
         avatar: character.avatar,
         name: actor.name || character.name,
+        primary: Boolean(actor.primary),
         character,
     };
+}
+
+function getCastAiActors() {
+    const actors = chat_metadata?.[CAST_METADATA_KEY]?.aiActors;
+
+    if (!Array.isArray(actors) || !actors.length) {
+        return [];
+    }
+
+    const normalized = actors.map(normalizeCastAiActor).filter(Boolean);
+    const primaryIndex = normalized.findIndex(actor => actor.primary);
+
+    if (primaryIndex > 0) {
+        const [primary] = normalized.splice(primaryIndex, 1);
+        normalized.unshift(primary);
+    }
+
+    return normalized;
+}
+
+function getCastPrimaryAiActor() {
+    return getCastAiActors()[0] || null;
 }
 
 
@@ -501,6 +516,49 @@ function getCastOptions() {
     return chat_metadata?.[CAST_METADATA_KEY]?.options || {};
 }
 
+function getCastRoleInstruction(userName, aiActors) {
+    if (!aiActors.length) {
+        return `The human user is roleplaying as ${userName}.`;
+    }
+
+    if (aiActors.length === 1) {
+        return `The human user is roleplaying as ${userName}. The assistant is roleplaying as ${aiActors[0].name}.`;
+    }
+
+    const aiNames = aiActors.map(actor => actor.name).filter(Boolean);
+    const list = aiNames.length > 1
+        ? `${aiNames.slice(0, -1).join(', ')} and ${aiNames.at(-1)}`
+        : aiNames[0];
+    const splitHint = getCastOptions().splitMultiSpeakerReplies
+        ? ' When writing dialogue for AI-controlled actors, prefix each spoken turn with the speaker name.'
+        : '';
+
+    return `The human user controls ${userName}. The assistant controls ${list}.${splitHint}`;
+}
+
+function getCastAiActorSummaryPrompt(aiActors) {
+    if (aiActors.length <= 1) {
+        return '';
+    }
+
+    const summaries = aiActors.map((actor) => {
+        const character = actor.character;
+        const sections = [];
+        const addSection = (label, value) => {
+            const text = baseChatReplace(String(value || '').trim(), getCastUserActorName(), actor.name);
+            if (text) {
+                sections.push(`${label}: ${text}`);
+            }
+        };
+
+        addSection('Description', character.description);
+        addSection('Personality', character.personality);
+        return sections.length ? `${actor.name}:\n${sections.join('\n')}` : actor.name;
+    });
+
+    return `\n\nAI-controlled cast cards:\n${summaries.join('\n\n')}`;
+}
+
 function getCastUserActorPrompt() {
     const actor = getCastUserActor();
 
@@ -509,7 +567,8 @@ function getCastUserActorPrompt() {
     }
 
     const character = actor.character;
-    const primaryAiActor = getCastPrimaryAiActor();
+    const aiActors = getCastAiActors();
+    const primaryAiActor = aiActors[0] || null;
     const userName = actor.name || name1;
     const aiName = primaryAiActor?.name || name2;
     const sections = [];
@@ -530,9 +589,8 @@ function getCastUserActorPrompt() {
         return '';
     }
 
-    const header = primaryAiActor
-        ? `The human user is roleplaying as ${userName}. The assistant is roleplaying as ${aiName}.`
-        : `The human user is roleplaying as ${userName}.`;
+    const header = getCastRoleInstruction(userName, aiActors);
+    const aiActorSummary = getCastAiActorSummaryPrompt(aiActors);
     const guardrail = getCastOptions().preventAiUserControl === false
         ? ''
         : `\nDo not write ${userName}'s actions or dialogue unless explicitly requested.`;
