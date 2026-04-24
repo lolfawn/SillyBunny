@@ -163,11 +163,9 @@ export function setAiActorsFromCharacters(avatars, { save = true } = {}) {
 }
 
 export function clearCastAssignments({ save = true } = {}) {
-    updateChatMetadata({
-        ...chat_metadata,
-        [CAST_METADATA_KEY]: undefined,
-    }, true);
-    delete chat_metadata[CAST_METADATA_KEY];
+    const nextMetadata = { ...chat_metadata };
+    delete nextMetadata[CAST_METADATA_KEY];
+    updateChatMetadata(nextMetadata, true);
 
     if (save) {
         saveMetadataDebounced();

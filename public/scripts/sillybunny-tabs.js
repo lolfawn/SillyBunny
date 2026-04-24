@@ -288,6 +288,14 @@ const SB_SHELLS = Object.freeze({
         ],
         customTabs: [
             {
+                id: 'cast',
+                label: 'Cast',
+                icon: 'fa-masks-theater',
+                searchPlaceholder: 'Search cast roles, user actor, AI actor, or character cards',
+                searchExamples: ['you play as', 'AI plays as', 'character card', 'roles'],
+                description: 'Assign who you play and who the AI plays for this chat.',
+            },
+            {
                 id: 'server',
                 label: 'Server',
                 icon: 'fa-server',
@@ -445,6 +453,14 @@ const sbState = {
         paused: false,
         lastUpdatedAt: 0,
         lastError: '',
+    },
+    castRoles: {
+        refs: null,
+        modulePromise: null,
+        module: null,
+        refreshTimer: 0,
+        bindingRetryTimer: 0,
+        boundEventSource: null,
     },
     importer: {
         refs: null,
@@ -4055,6 +4071,344 @@ function buildInChatAgentsPanel() {
     };
 }
 
+
+function getCastRolesState() {
+    return sbState.castRoles;
+}
+
+function getCastRolesRefs() {
+    return getCastRolesState().refs;
+}
+
+function loadCastRolesModule() {
+    const state = getCastRolesState();
+
+    if (state.module) {
+        return Promise.resolve(state.module);
+    }
+
+    if (!state.modulePromise) {
+        state.modulePromise = import('/scripts/cast-roles.js')
+            .then(module => {
+                state.module = module;
+                return module;
+            })
+            .catch(error => {
+                state.modulePromise = null;
+                console.error('[SillyBunny] Failed to load Cast/Roles helpers.', error);
+                throw error;
+            });
+    }
+
+    return state.modulePromise;
+}
+
+function getCastCharacterList(context = getSillyTavernContext()) {
+    const characters = Array.isArray(context?.characters) ? context.characters : [];
+
+    return characters
+        .filter(character => character && character.avatar && character.name)
+        .map(character => ({
+            avatar: String(character.avatar),
+            name: String(character.name),
+            description: String(character.description || character.personality || character.scenario || '').trim(),
+        }))
+        .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }));
+}
+
+function getCastCharacterAvatarUrl(character, context = getSillyTavernContext()) {
+    if (!character?.avatar) {
+        return '';
+    }
+
+    return context?.getThumbnailUrl?.('avatar', character.avatar)
+        || `/thumbnail?type=avatar&file=${encodeURIComponent(character.avatar)}`;
+}
+
+function getActiveAiActorFallback(context = getSillyTavernContext()) {
+    if (!context) {
+        return null;
+    }
+
+    if (context.characterId !== undefined && context.characterId !== null) {
+        return context.characters?.[context.characterId] ?? null;
+    }
+
+    if (context.groupId) {
+        const group = context.groups?.find(item => String(item?.id) === String(context.groupId));
+        const memberAvatar = Array.isArray(group?.members) ? group.members[0] : null;
+        return Array.isArray(context.characters)
+            ? context.characters.find(character => character?.avatar === memberAvatar) ?? null
+            : null;
+    }
+
+    return null;
+}
+
+function setCastPanelMessage(message, tone = '') {
+    const refs = getCastRolesRefs();
+
+    if (!refs?.statusNote) {
+        return;
+    }
+
+    refs.statusNote.textContent = message;
+    refs.statusNote.dataset.tone = tone;
+}
+
+function setCastPanelBusy(isBusy) {
+    const refs = getCastRolesRefs();
+
+    for (const element of [refs?.userSelect, refs?.aiSelect, refs?.resetButton, refs?.refreshButton]) {
+        if (element instanceof HTMLButtonElement || element instanceof HTMLSelectElement) {
+            element.disabled = Boolean(isBusy);
+        }
+    }
+}
+
+function renderCastActorSummary(container, actor, { fallbackText = 'Default behavior', control = 'user' } = {}) {
+    container.replaceChildren();
+
+    const row = createElement('div', { className: 'sb-cast-actor-row' });
+    const avatar = createElement('div', { className: 'sb-cast-actor-avatar' });
+    const copy = createElement('div', { className: 'sb-cast-actor-copy' });
+    const title = createElement('strong', { text: actor?.name || fallbackText });
+    const meta = createElement('small', {
+        text: actor?.avatar
+            ? `${control === 'user' ? 'User-controlled' : 'AI-controlled'} character card`
+            : 'No cast override is active for this chat.',
+    });
+
+    if (actor?.avatar) {
+        avatar.style.backgroundImage = `url("${getCastCharacterAvatarUrl(actor)}")`;
+    } else {
+        avatar.innerHTML = '<i class="fa-solid fa-user" aria-hidden="true"></i>';
+    }
+
+    copy.append(title, meta);
+    row.append(avatar, copy);
+    container.appendChild(row);
+}
+
+function populateCastSelect(select, characters, selectedAvatar, emptyLabel) {
+    select.replaceChildren();
+    select.appendChild(createElement('option', {
+        text: emptyLabel,
+        attrs: { value: '' },
+    }));
+
+    for (const character of characters) {
+        const option = createElement('option', {
+            text: character.name,
+            attrs: { value: character.avatar },
+        });
+
+        if (character.avatar === selectedAvatar) {
+            option.selected = true;
+        }
+
+        select.appendChild(option);
+    }
+}
+
+async function refreshCastRolesPanel() {
+    const refs = getCastRolesRefs();
+
+    if (!refs) {
+        return;
+    }
+
+    const context = getSillyTavernContext();
+
+    if (!context) {
+        setCastPanelMessage('Cast roles are waiting for SillyTavern to finish loading.', 'warn');
+        return;
+    }
+
+    try {
+        const castRoles = await loadCastRolesModule();
+        const cast = castRoles.getCastAssignments();
+        const characters = getCastCharacterList(context);
+        const primaryAiActor = cast.aiActors.find(actor => actor.primary) || cast.aiActors[0] || getActiveAiActorFallback(context);
+
+        populateCastSelect(refs.userSelect, characters, cast.userActor?.avatar || '', 'Use current Persona / default user');
+        populateCastSelect(refs.aiSelect, characters, primaryAiActor?.avatar || '', 'Use selected character / group');
+        renderCastActorSummary(refs.userSummary, cast.userActor, { fallbackText: 'Current Persona', control: 'user' });
+        renderCastActorSummary(refs.aiSummary, primaryAiActor, { fallbackText: 'Selected character or group', control: 'ai' });
+
+        const assignmentCount = Number(Boolean(cast.userActor)) + cast.aiActors.length;
+        refs.statusPill.textContent = assignmentCount ? `${assignmentCount} active` : 'Default';
+        refs.statusPill.dataset.tone = assignmentCount ? 'good' : '';
+        setCastPanelMessage(
+            assignmentCount
+                ? 'Cast assignments are saved to this chat only. Prompt and message behavior will be wired in the next phase.'
+                : 'No cast override is active. This chat still uses the normal Persona and selected character flow.',
+            assignmentCount ? 'good' : '',
+        );
+    } catch (error) {
+        setCastPanelMessage(error.message || 'Failed to refresh Cast/Roles.', 'danger');
+    }
+}
+
+function scheduleCastRolesRefresh(delay = 80) {
+    const state = getCastRolesState();
+    window.clearTimeout(state.refreshTimer);
+    state.refreshTimer = window.setTimeout(() => {
+        void refreshCastRolesPanel();
+    }, delay);
+}
+
+function bindCastRolesEvents() {
+    const state = getCastRolesState();
+    const context = getSillyTavernContext();
+    const eventSource = context?.eventSource;
+    const eventTypes = context?.eventTypes ?? context?.event_types;
+
+    if (!eventSource || !eventTypes) {
+        window.clearTimeout(state.bindingRetryTimer);
+        state.bindingRetryTimer = window.setTimeout(bindCastRolesEvents, 500);
+        return;
+    }
+
+    if (state.boundEventSource === eventSource) {
+        return;
+    }
+
+    const refresh = () => scheduleCastRolesRefresh(0);
+    const events = [
+        eventTypes.APP_READY,
+        eventTypes.CHAT_CHANGED,
+        eventTypes.CHAT_LOADED,
+        eventTypes.CHAT_CREATED,
+        eventTypes.GROUP_CHAT_CREATED,
+        eventTypes.CHARACTER_SELECTED,
+        eventTypes.SETTINGS_UPDATED,
+    ].filter(Boolean);
+
+    for (const eventName of new Set(events)) {
+        eventSource.on(eventName, refresh);
+    }
+
+    state.boundEventSource = eventSource;
+}
+
+async function applyCastSelection(kind, avatar) {
+    setCastPanelBusy(true);
+
+    try {
+        const castRoles = await loadCastRolesModule();
+
+        if (kind === 'user') {
+            if (avatar) {
+                castRoles.setUserActorFromCharacter(avatar);
+            } else {
+                castRoles.clearUserActor();
+            }
+        } else if (kind === 'ai') {
+            if (avatar) {
+                castRoles.setAiActorsFromCharacters([avatar]);
+            } else {
+                const cast = castRoles.getCastAssignments();
+                cast.aiActors = [];
+                castRoles.setCastAssignments(cast);
+            }
+        }
+
+        scheduleCastRolesRefresh(0);
+    } catch (error) {
+        setCastPanelMessage(error.message || 'Failed to save Cast/Roles.', 'danger');
+    } finally {
+        setCastPanelBusy(false);
+    }
+}
+
+async function resetCastAssignments() {
+    setCastPanelBusy(true);
+
+    try {
+        const castRoles = await loadCastRolesModule();
+        castRoles.clearCastAssignments();
+        scheduleCastRolesRefresh(0);
+    } catch (error) {
+        setCastPanelMessage(error.message || 'Failed to reset Cast/Roles.', 'danger');
+    } finally {
+        setCastPanelBusy(false);
+    }
+}
+
+function buildCastRolesPanel() {
+    const { panel, scroller } = createShellPanel({ id: 'cast' });
+    const column = createElement('div', { className: 'sb-shell-column sb-cast-column' });
+    const callout = createElement('div', { className: 'sb-shell-callout' });
+    callout.innerHTML = `
+        <strong>Cast / Roles</strong>
+        <p>Assign character cards as chat actors. For now this safely stores per-chat role metadata without changing normal chats.</p>
+    `;
+
+    const card = createElement('section', { className: 'sb-admin-card sb-cast-card' });
+    const header = createElement('div', { className: 'sb-admin-card-header' });
+    const copy = createElement('div', { className: 'sb-admin-card-copy' });
+    const title = createElement('strong', { text: 'Current Chat Cast' });
+    const description = createElement('p', { text: 'Choose who you play as and who the AI is assigned to play in this chat.' });
+    const statusPill = createElement('span', { className: 'sb-server-pill', text: 'Loading…' });
+    const grid = createElement('div', { className: 'sb-cast-grid' });
+    const userField = createElement('label', { className: 'sb-cast-field' });
+    const userFieldTitle = createElement('span', { text: 'You play as' });
+    const userSelect = createElement('select', { className: 'text_pole sb-cast-select', attrs: { 'aria-label': 'You play as' } });
+    const userSummary = createElement('div', { className: 'sb-cast-summary' });
+    const aiField = createElement('label', { className: 'sb-cast-field' });
+    const aiFieldTitle = createElement('span', { text: 'AI plays as' });
+    const aiSelect = createElement('select', { className: 'text_pole sb-cast-select', attrs: { 'aria-label': 'AI plays as' } });
+    const aiSummary = createElement('div', { className: 'sb-cast-summary' });
+    const actions = createElement('div', { className: 'sb-server-actions sb-cast-actions' });
+    const refreshButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Refresh cast', attrs: { type: 'button' } });
+    const resetButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Reset chat cast', attrs: { type: 'button' } });
+    const statusNote = createElement('div', { className: 'sb-server-note', text: 'Loading Cast/Roles…' });
+
+    copy.append(title, description);
+    header.append(copy, statusPill);
+    userField.append(userFieldTitle, userSelect, userSummary);
+    aiField.append(aiFieldTitle, aiSelect, aiSummary);
+    grid.append(userField, aiField);
+    actions.append(refreshButton, resetButton);
+    card.append(header, grid, actions, statusNote);
+    column.append(callout, card);
+    scroller.appendChild(column);
+
+    getCastRolesState().refs = {
+        statusPill,
+        statusNote,
+        userSelect,
+        aiSelect,
+        userSummary,
+        aiSummary,
+        refreshButton,
+        resetButton,
+    };
+
+    userSelect.addEventListener('change', () => {
+        void applyCastSelection('user', userSelect.value);
+    });
+    aiSelect.addEventListener('change', () => {
+        void applyCastSelection('ai', aiSelect.value);
+    });
+    refreshButton.addEventListener('click', () => scheduleCastRolesRefresh(0));
+    resetButton.addEventListener('click', () => {
+        void resetCastAssignments();
+    });
+
+    return {
+        id: 'cast',
+        panel,
+        button: null,
+        searchRoot: column,
+        onActivate: () => {
+            bindCastRolesEvents();
+            scheduleCastRolesRefresh(0);
+        },
+    };
+}
+
 function getServerAdminState() {
     return sbState.serverAdmin;
 }
@@ -6684,6 +7038,12 @@ function buildShell(shellKey) {
         if (customTab.id === 'agents') {
             const agentPanel = buildInChatAgentsPanel();
             registerShellTab(shellKey, customTab, agentPanel, agentPanel.searchRoot);
+            continue;
+        }
+
+        if (customTab.id === 'cast') {
+            const castPanel = buildCastRolesPanel();
+            registerShellTab(shellKey, customTab, castPanel, castPanel.searchRoot);
             continue;
         }
 
