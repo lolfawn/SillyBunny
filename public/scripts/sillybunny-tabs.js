@@ -4425,13 +4425,6 @@ function createCastOptionCheckbox({ key, label, description }) {
     return { option, checkbox };
 }
 
-function findCastGroupForAvatars(context, avatars) {
-    const desired = [...avatars].sort().join('|');
-    return context?.groups?.find(group => Array.isArray(group.members)
-        && group.members.length === avatars.length
-        && [...group.members].sort().join('|') === desired) || null;
-}
-
 async function openCastGroupChat() {
     setCastPanelBusy(true);
 
@@ -4439,27 +4432,49 @@ async function openCastGroupChat() {
         const context = getSillyTavernContext();
         const castRoles = await loadCastRolesModule();
         const cast = castRoles.getCastAssignments();
-        const avatars = cast.aiActors.filter(actor => actor.type === 'character').map(actor => actor.avatar).filter(Boolean);
+        const characterActors = cast.aiActors.filter(actor => actor.type === 'character' && actor.avatar);
+        const avatars = characterActors.map(actor => actor.avatar).filter(Boolean);
 
         if (!context || avatars.length < 2) {
-            setCastPanelMessage('Select at least two AI character-card actors to open a matching group chat. Personas cannot be group members.', 'warn');
+            setCastPanelMessage('Select at least two AI character-card actors to create a group chat. Personas cannot be group members.', 'warn');
             return;
         }
 
-        const existingGroup = findCastGroupForAvatars(context, avatars);
+        const headers = await getAuthorizedRequestHeadersOrNull(1500, context) || getRequestHeadersFromContext(context);
+        const chatName = context.humanizedDateTime?.() || new Date().toISOString().replace(/[.:]/g, '-');
+        const actorNames = characterActors.map(actor => actor.name).filter(Boolean).join(', ');
+        const groupName = `Cast: ${actorNames || 'AI Actors'} (${chatName})`;
+        const requestBody = {
+            name: groupName,
+            members: avatars,
+            avatar_url: 'img/ai4.png',
+            allow_self_responses: false,
+            hideMutedSprites: false,
+            activation_strategy: 0,
+            generation_mode: 0,
+            disabled_members: [],
+            fav: false,
+            chat_id: chatName,
+            chats: [chatName],
+            auto_mode_delay: 5,
+        };
 
-        if (existingGroup) {
-            const chatId = existingGroup.chat_id || existingGroup.chats?.[0];
-            if (chatId) {
-                await context.openGroupChat?.(existingGroup.id, chatId);
-                setCastPanelMessage(`Opened group chat "${existingGroup.name}" for the selected AI cast.`, 'good');
-                return;
-            }
+        const response = await fetch('/api/groups/create', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Group creation failed (${response.status}).`);
         }
 
-        setCastPanelMessage('No existing group with exactly those AI actors was found. Open Characters → Groups to create one, then return here.', 'warn');
+        const data = await response.json();
+        await context.getCharacters?.();
+        await context.openGroupChat?.(data.id, chatName);
+        setCastPanelMessage(`Created and opened new group "${groupName}".`, 'good');
     } catch (error) {
-        setCastPanelMessage(error.message || 'Failed to open Cast group chat.', 'danger');
+        setCastPanelMessage(error.message || 'Failed to create Cast group chat.', 'danger');
     } finally {
         setCastPanelBusy(false);
     }
@@ -4529,7 +4544,7 @@ function buildCastRolesPanel() {
     const optionCheckboxes = [userCardOption.checkbox, lorebookOption.checkbox, controlOption.checkbox, splitOption.checkbox];
     const actions = createElement('div', { className: 'sb-server-actions sb-cast-actions' });
     const refreshButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Refresh cast', attrs: { type: 'button' } });
-    const groupButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Open matching group chat', attrs: { type: 'button' } });
+    const groupButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Create group chat', attrs: { type: 'button' } });
     const resetButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Reset chat cast', attrs: { type: 'button' } });
     const statusNote = createElement('div', { className: 'sb-server-note', text: 'Loading Cast/Roles…' });
 
