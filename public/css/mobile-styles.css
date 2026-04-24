@@ -1048,3 +1048,197 @@
         min-height: 28px;
     }
 }
+
+/* Final mobile chat-bar guardrails: keep controls compact and square. */
+@media screen and (max-width: 768px) {
+    :root {
+        --bottomFormBlockSize: 42px;
+        --bottomFormIconSize: 20px;
+    }
+
+    #send_form {
+        border-radius: 0;
+    }
+
+    #nonQRFormItems {
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 6px !important;
+        min-height: 42px !important;
+        padding: 4px 6px !important;
+    }
+
+    #leftSendForm,
+    #rightSendForm {
+        flex: 0 0 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+        min-height: 42px !important;
+        height: 42px !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    #leftSendForm > div,
+    #rightSendForm > div:not(.stscript_btn),
+    #send_but,
+    #send_form .mes_stop,
+    #send_form.sb-generating-controls #mes_stop {
+        width: 42px !important;
+        min-width: 42px !important;
+        max-width: 42px !important;
+        height: 42px !important;
+        min-height: 42px !important;
+        max-height: 42px !important;
+        flex: 0 0 42px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+        border-radius: 12px !important;
+        line-height: 1 !important;
+        font-size: 20px !important;
+    }
+
+    #send_textarea {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        min-height: 42px !important;
+        height: 42px !important;
+        padding: 8px !important;
+        font-size: 16px !important;
+    }
+
+    #send_but::before,
+    #mes_stop > i {
+        width: 1em !important;
+        height: 1em !important;
+        margin: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 20px !important;
+        line-height: 1 !important;
+    }
+
+    #send_form:not(.sb-generating-controls) #mes_stop {
+        display: none !important;
+    }
+
+    #send_form.sb-generating-controls #send_but,
+    #send_form.sb-generating-controls #mes_continue,
+    #send_form.sb-generating-controls #mes_impersonate {
+        display: none !important;
+    }
+
+    #send_form.sb-generating-controls #mes_stop {
+        display: flex !important;
+        opacity: 1 !important;
+    }
+
+    .group_speaker_controls {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) repeat(4, 32px) !important;
+        grid-template-areas: "avatars speak dm chat auto" !important;
+        gap: 4px !important;
+        align-items: center !important;
+        min-height: 40px !important;
+        padding: 4px 6px !important;
+        margin-bottom: 2px !important;
+        border-radius: 9px !important;
+        overflow: hidden !important;
+    }
+
+    .group_speaker_controls.displayNone {
+        display: none !important;
+    }
+
+    .group_speaker_list {
+        grid-area: avatars !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 4px !important;
+        min-width: 0 !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scrollbar-width: none !important;
+    }
+
+    .group_speaker_list::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .group_speaker_avatar {
+        width: 30px !important;
+        min-width: 30px !important;
+        max-width: 30px !important;
+        height: 30px !important;
+        min-height: 30px !important;
+        max-height: 30px !important;
+        flex: 0 0 30px !important;
+        padding: 1px !important;
+        gap: 0 !important;
+        justify-content: center !important;
+        border-radius: 999px !important;
+    }
+
+    .group_speaker_avatar img {
+        width: 26px !important;
+        height: 26px !important;
+    }
+
+    .group_speaker_avatar span,
+    #group_speaker_now span,
+    #group_speaker_dm_now span,
+    #group_speaker_dm_consolidate span,
+    .group_speaker_toggle span {
+        display: none !important;
+    }
+
+    #group_speaker_now,
+    #group_speaker_dm_now,
+    #group_speaker_dm_consolidate,
+    .group_speaker_toggle {
+        width: 32px !important;
+        min-width: 32px !important;
+        max-width: 32px !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0 !important;
+        border-radius: 9px !important;
+        box-sizing: border-box !important;
+        font-size: 16px !important;
+    }
+
+    #group_speaker_now {
+        grid-area: speak !important;
+    }
+
+    #group_speaker_dm_now {
+        grid-area: dm !important;
+    }
+
+    #group_speaker_dm_consolidate {
+        grid-area: chat !important;
+    }
+
+    .group_speaker_toggle {
+        grid-area: auto !important;
+    }
+
+    .group_speaker_toggle input[type="checkbox"] {
+        width: 16px !important;
+        min-width: 16px !important;
+        height: 16px !important;
+        margin: 0 !important;
+    }
+}
