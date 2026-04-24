@@ -2180,20 +2180,29 @@ async function onGenerateGroupScheduleClick() {
         .map(avatar => characters.find(character => character.avatar === avatar)?.name)
         .filter(Boolean)
         .join(', ');
-    const prompt = `Create an immersive full-day routine and auto-message schedule for this fictional group. Current local time: ${getCurrentLocalTimeContext()}. Group members: ${names}. Cover the whole day from 00:00 through 23:00. Include mundane realistic activities such as sleeping, meals, chores, travel, study/work, rest, hobbies, checking on others, and winding down. Use 24-hour local time. Return only schedule lines in this exact format: HH:MM Character: short in-character reason. Include at least one entry for every hour 00 through 23, with natural variation and no markdown.`;
-    const schedule = String(await generateRaw({
-        prompt,
-        systemPrompt: 'You create immersive 24-hour daily routines for fictional group chat auto-messages. Return only schedule lines in the requested HH:MM Character: reason format.',
-        responseLength: 1200,
-    }) || '').trim();
-    if (!schedule) {
-        toastr.warning(t`Schedule generation did not return anything.`);
-        return;
-    }
+    const toast = toastr.info(t`Generating group schedule...`, '', { timeOut: 0, extendedTimeOut: 0, tapToDismiss: false });
+    try {
+        const prompt = `Create an immersive full-day routine and auto-message schedule for this fictional group. Current local time: ${getCurrentLocalTimeContext()}. Group members: ${names}. Cover the whole day from 00:00 through 23:00. Include mundane realistic activities such as sleeping, meals, chores, travel, study/work, rest, hobbies, checking on others, and winding down. Use 24-hour local time. Return only schedule lines in this exact format: HH:MM Character: short in-character reason. Include at least one entry for every hour 00 through 23, with natural variation and no markdown.`;
+        const schedule = String(await generateRaw({
+            prompt,
+            systemPrompt: 'You create immersive 24-hour daily routines for fictional group chat auto-messages. Return only schedule lines in the requested HH:MM Character: reason format.',
+            responseLength: 1200,
+        }) || '').trim();
+        if (!schedule) {
+            toastr.warning(t`Schedule generation did not return anything.`);
+            return;
+        }
 
-    group.ai_schedule = schedule;
-    $('#rm_group_ai_schedule').val(schedule).trigger('input');
-    await editGroup(group.id, false, false);
+        group.ai_schedule = schedule;
+        $('#rm_group_ai_schedule').val(schedule).trigger('input');
+        await editGroup(group.id, false, false);
+        toastr.success(t`Group schedule generated.`);
+    } catch (error) {
+        console.error('Group schedule generation failed', error);
+        toastr.error(t`Group schedule generation failed.`);
+    } finally {
+        toastr.clear(toast);
+    }
 }
 
 async function onGroupGenerationModeTemplateInput(e) {
