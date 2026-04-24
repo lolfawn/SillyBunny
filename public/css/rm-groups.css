@@ -243,3 +243,14 @@
     flex-shrink: 0;
     flex-basis: auto;
 }
+
+.group_member_model {
+    width: min(180px, 28%);
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+.group_member_model_input {
+    width: 100%;
+    min-width: 0;
+}

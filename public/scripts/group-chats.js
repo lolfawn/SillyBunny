@@ -87,6 +87,7 @@ import { POPUP_TYPE, Popup, callGenericPopup } from './popup.js';
 import { t } from './i18n.js';
 import { accountStorage } from './util/AccountStorage.js';
 import { compressRequest } from './request-compression.js';
+import { chat_completion_sources, oai_settings } from './openai.js';
 
 export {
     selected_group,
@@ -118,6 +119,88 @@ let group_generation_id = null;
 let fav_grp_checked = false;
 let openGroupId = null;
 let newGroupMembers = [];
+
+const GROUP_MEMBER_MODELS_KEY = 'member_models';
+
+function getGroupMemberModels(group) {
+    if (!group || typeof group !== 'object') {
+        return {};
+    }
+
+    if (!group[GROUP_MEMBER_MODELS_KEY] || typeof group[GROUP_MEMBER_MODELS_KEY] !== 'object') {
+        group[GROUP_MEMBER_MODELS_KEY] = {};
+    }
+
+    return group[GROUP_MEMBER_MODELS_KEY];
+}
+
+function getGroupMemberModel(group, avatarId) {
+    return String(getGroupMemberModels(group)[avatarId] ?? '').trim();
+}
+
+function setGroupMemberModel(group, avatarId, model) {
+    if (!group || !avatarId) {
+        return;
+    }
+
+    const models = getGroupMemberModels(group);
+    const value = String(model ?? '').trim();
+    if (value) {
+        models[avatarId] = value;
+    } else {
+        delete models[avatarId];
+    }
+}
+
+function getCurrentChatCompletionModelSettingKey() {
+    switch (oai_settings.chat_completion_source) {
+        case chat_completion_sources.CLAUDE: return 'claude_model';
+        case chat_completion_sources.OPENAI:
+        case chat_completion_sources.OPENAI_RESPONSES: return 'openai_model';
+        case chat_completion_sources.MAKERSUITE: return 'google_model';
+        case chat_completion_sources.VERTEXAI: return 'vertexai_model';
+        case chat_completion_sources.OPENROUTER: return 'openrouter_model';
+        case chat_completion_sources.AI21: return 'ai21_model';
+        case chat_completion_sources.MISTRALAI: return 'mistralai_model';
+        case chat_completion_sources.CUSTOM: return 'custom_model';
+        case chat_completion_sources.COHERE: return 'cohere_model';
+        case chat_completion_sources.PERPLEXITY: return 'perplexity_model';
+        case chat_completion_sources.GROQ: return 'groq_model';
+        case chat_completion_sources.SILICONFLOW: return 'siliconflow_model';
+        case chat_completion_sources.ELECTRONHUB: return 'electronhub_model';
+        case chat_completion_sources.CHUTES: return 'chutes_model';
+        case chat_completion_sources.NANOGPT: return 'nanogpt_model';
+        case chat_completion_sources.DEEPSEEK: return 'deepseek_model';
+        case chat_completion_sources.AIMLAPI: return 'aimlapi_model';
+        case chat_completion_sources.XAI: return 'xai_model';
+        case chat_completion_sources.POLLINATIONS: return 'pollinations_model';
+        case chat_completion_sources.COMETAPI: return 'cometapi_model';
+        case chat_completion_sources.MOONSHOT: return 'moonshot_model';
+        case chat_completion_sources.FIREWORKS: return 'fireworks_model';
+        case chat_completion_sources.AZURE_OPENAI: return 'azure_openai_model';
+        case chat_completion_sources.ZAI: return 'zai_model';
+        default: return '';
+    }
+}
+
+async function runWithGroupMemberModelOverride(group, avatarId, callback) {
+    const model = getGroupMemberModel(group, avatarId);
+    const settingKey = model ? getCurrentChatCompletionModelSettingKey() : '';
+
+    if (!model || !settingKey) {
+        return callback();
+    }
+
+    const previousModel = oai_settings[settingKey];
+    oai_settings[settingKey] = model;
+    try {
+        console.debug(`[Group] Using model override for ${avatarId}: ${model}`);
+        return await callback();
+    } finally {
+        oai_settings[settingKey] = previousModel;
+    }
+}
+
 
 export const group_activation_strategy = {
     NATURAL: 0,
@@ -1131,12 +1214,12 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
 
             // Wait for generation to finish
             const generateType = ['swipe', 'impersonate', 'quiet', 'continue'].includes(type) ? type : 'normal';
-            textResult = await Generate(generateType, { automatic_trigger: byAutoMode, ...(params || {}) });
+            textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...(params || {}) }));
             let messageChunk = textResult?.messageChunk;
 
             if (messageChunk) {
                 while (shouldAutoContinue(messageChunk, type === 'impersonate')) {
-                    textResult = await Generate('continue', { automatic_trigger: byAutoMode, ...(params || {}) });
+                    textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => Generate('continue', { automatic_trigger: byAutoMode, ...(params || {}) }));
                     messageChunk = textResult?.messageChunk;
                 }
             }
@@ -1500,6 +1583,9 @@ async function modifyGroupMember(groupId, groupMember, isDelete) {
         const index = membersArray.findIndex((x) => x === id);
         if (index !== -1) {
             membersArray.splice(membersArray.indexOf(id), 1);
+            if (thisGroup) {
+                setGroupMemberModel(thisGroup, id, '');
+            }
         }
     } else {
         membersArray.unshift(id);
@@ -1781,6 +1867,11 @@ function getGroupCharacterBlock(character) {
 
     template.toggleClass('disabled', isGroupMemberDisabled(character.avatar));
 
+    const thisGroup = openGroupId && groups.find((x) => x.id == openGroupId);
+    const modelInput = template.find('.group_member_model_input');
+    modelInput.val(getGroupMemberModel(thisGroup, character.avatar));
+    modelInput.toggle(!!thisGroup && isGroupMember(thisGroup, character.avatar));
+
     // Display inline tags
     const tagsElement = template.find('.tags');
     printTagList(tagsElement, { forEntityOrKey: characters.indexOf(character), tagOptions: { isCharacterList: true } });
@@ -1789,6 +1880,7 @@ function getGroupCharacterBlock(character) {
         template.find('[data-action="speak"]').hide();
         template.find('[data-action="enable"]').hide();
         template.find('[data-action="disable"]').hide();
+        modelInput.hide();
     }
 
     return template;
@@ -2154,6 +2246,51 @@ function filterGroupMemberList() {
     groupMembersFilter.setFilterData(FILTER_TYPES.SEARCH, searchValue);
 }
 
+
+function getSelectedGroupMemberAvatars() {
+    if (openGroupId) {
+        return groups.find(x => x.id === openGroupId)?.members ?? [];
+    }
+
+    return newGroupMembers;
+}
+
+async function createQuickGroupFromSelectedMembers() {
+    if (openGroupId) {
+        toastr.info(t`This group already exists. Use the check button to create a new group from selected members.`);
+        return;
+    }
+
+    const members = getSelectedGroupMemberAvatars().filter(onlyUnique);
+    if (members.length === 0) {
+        toastr.warning(t`Select at least one character first.`);
+        return;
+    }
+
+    const names = members
+        .map(avatar => characters.find(character => character.avatar === avatar)?.name)
+        .filter(Boolean);
+    const defaultName = names.length ? t`Group: ${names.join(', ')}` : t`New Group`;
+    const groupName = await Popup.show.input(t`Create Group Chat`, t`Name this group chat:`, defaultName);
+    if (groupName === null) {
+        return;
+    }
+
+    $('#rm_group_chat_name').val(String(groupName || defaultName));
+    await createGroup();
+}
+
+async function onGroupMemberModelInput() {
+    if (!openGroupId) {
+        return;
+    }
+
+    const group = groups.find(x => x.id === openGroupId);
+    const member = $(this).closest('.group_member');
+    setGroupMemberModel(group, member.data('id'), $(this).val());
+    await editGroup(openGroupId, false, false);
+}
+
 async function createGroup() {
     let name = $('#rm_group_chat_name').val().toString();
     let allowSelfResponses = !!$('#rm_group_allow_self_responses').prop('checked');
@@ -2181,6 +2318,7 @@ async function createGroup() {
         activation_strategy: activationStrategy,
         generation_mode: generationMode,
         disabled_members: [],
+        [GROUP_MEMBER_MODELS_KEY]: {},
         fav: fav_grp_checked,
         chat_id: chatName,
         chats: chats,
@@ -2544,6 +2682,7 @@ jQuery(() => {
     $('#rm_group_filter').on('input', filterGroupMembers);
     $('#rm_group_members_filter').on('input', filterGroupMemberList);
     $('#rm_group_submit').on('click', createGroup);
+    $('#rm_group_quick_create').on('click', createQuickGroupFromSelectedMembers);
     $('#rm_group_scenario').on('click', setCharacterSettingsOverrides);
     $('#rm_group_automode').on('input', function () {
         const value = $(this).prop('checked');
@@ -2569,4 +2708,5 @@ jQuery(() => {
     $('#group_avatar_button').on('input', uploadGroupAvatar);
     $('#rm_group_restore_avatar').on('click', restoreGroupAvatar);
     $(document).on('click', '.group_member .right_menu_button', onGroupActionClick);
+    $(document).on('change', '.group_member_model_input', onGroupMemberModelInput);
 });
