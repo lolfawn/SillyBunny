@@ -4159,7 +4159,7 @@ function setCastPanelMessage(message, tone = '') {
 function setCastPanelBusy(isBusy) {
     const refs = getCastRolesRefs();
 
-    for (const element of [refs?.userSelect, refs?.aiSelect, refs?.resetButton, refs?.refreshButton]) {
+    for (const element of [refs?.userSelect, refs?.aiSelect, refs?.resetButton, refs?.refreshButton, ...(refs?.optionCheckboxes || [])]) {
         if (element instanceof HTMLButtonElement || element instanceof HTMLSelectElement) {
             element.disabled = Boolean(isBusy);
         }
@@ -4235,6 +4235,11 @@ async function refreshCastRolesPanel() {
         populateCastSelect(refs.aiSelect, characters, primaryAiActor?.avatar || '', 'Use selected character / group');
         renderCastActorSummary(refs.userSummary, cast.userActor, { fallbackText: 'Current Persona', control: 'user' });
         renderCastActorSummary(refs.aiSummary, primaryAiActor, { fallbackText: 'Selected character or group', control: 'ai' });
+
+        for (const checkbox of refs.optionCheckboxes || []) {
+            const optionKey = checkbox.getAttribute('data-cast-option');
+            checkbox.checked = Boolean(cast.options?.[optionKey]);
+        }
 
         const assignmentCount = Number(Boolean(cast.userActor)) + cast.aiActors.length;
         refs.statusPill.textContent = assignmentCount ? `${assignmentCount} active` : 'Default';
@@ -4322,6 +4327,42 @@ async function applyCastSelection(kind, avatar) {
     }
 }
 
+
+async function applyCastOption(optionKey, enabled) {
+    setCastPanelBusy(true);
+
+    try {
+        const castRoles = await loadCastRolesModule();
+        const cast = castRoles.getCastAssignments();
+        cast.options = {
+            ...cast.options,
+            [optionKey]: Boolean(enabled),
+        };
+        castRoles.setCastAssignments(cast);
+        scheduleCastRolesRefresh(0);
+    } catch (error) {
+        setCastPanelMessage(error.message || 'Failed to save Cast/Roles option.', 'danger');
+    } finally {
+        setCastPanelBusy(false);
+    }
+}
+
+function createCastOptionCheckbox({ key, label, description }) {
+    const option = createElement('label', { className: 'checkbox_label sb-cast-option' });
+    const checkbox = createElement('input', { attrs: { type: 'checkbox', 'data-cast-option': key } });
+    const copy = createElement('span', { className: 'sb-cast-option-copy' });
+    const title = createElement('strong', { text: label });
+    const detail = createElement('small', { text: description });
+
+    copy.append(title, detail);
+    option.append(checkbox, copy);
+    checkbox.addEventListener('change', () => {
+        void applyCastOption(key, checkbox.checked);
+    });
+
+    return { option, checkbox };
+}
+
 async function resetCastAssignments() {
     setCastPanelBusy(true);
 
@@ -4360,6 +4401,29 @@ function buildCastRolesPanel() {
     const aiFieldTitle = createElement('span', { text: 'AI plays as' });
     const aiSelect = createElement('select', { className: 'text_pole sb-cast-select', attrs: { 'aria-label': 'AI plays as' } });
     const aiSummary = createElement('div', { className: 'sb-cast-summary' });
+    const optionsCard = createElement('div', { className: 'sb-cast-options' });
+    const optionsTitle = createElement('span', { className: 'sb-cast-options-title', text: 'Behavior options' });
+    const userCardOption = createCastOptionCheckbox({
+        key: 'injectUserActorCard',
+        label: 'Inject user actor card',
+        description: 'Use the selected user card as persona context.',
+    });
+    const lorebookOption = createCastOptionCheckbox({
+        key: 'includeActorLorebooks',
+        label: 'Include actor lorebooks',
+        description: 'Scan primary and additional lorebooks linked to cast cards.',
+    });
+    const controlOption = createCastOptionCheckbox({
+        key: 'preventAiUserControl',
+        label: 'Prevent AI user control',
+        description: 'Tell the assistant not to write the user actor unless asked.',
+    });
+    const splitOption = createCastOptionCheckbox({
+        key: 'splitMultiSpeakerReplies',
+        label: 'Split multi-speaker replies',
+        description: 'Later phases can split named cast replies into separate messages.',
+    });
+    const optionCheckboxes = [userCardOption.checkbox, lorebookOption.checkbox, controlOption.checkbox, splitOption.checkbox];
     const actions = createElement('div', { className: 'sb-server-actions sb-cast-actions' });
     const refreshButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Refresh cast', attrs: { type: 'button' } });
     const resetButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Reset chat cast', attrs: { type: 'button' } });
@@ -4370,8 +4434,9 @@ function buildCastRolesPanel() {
     userField.append(userFieldTitle, userSelect, userSummary);
     aiField.append(aiFieldTitle, aiSelect, aiSummary);
     grid.append(userField, aiField);
+    optionsCard.append(optionsTitle, userCardOption.option, lorebookOption.option, controlOption.option, splitOption.option);
     actions.append(refreshButton, resetButton);
-    card.append(header, grid, actions, statusNote);
+    card.append(header, grid, optionsCard, actions, statusNote);
     column.append(callout, card);
     scroller.appendChild(column);
 
@@ -4382,6 +4447,7 @@ function buildCastRolesPanel() {
         aiSelect,
         userSummary,
         aiSummary,
+        optionCheckboxes,
         refreshButton,
         resetButton,
     };

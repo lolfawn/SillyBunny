@@ -4033,3 +4033,42 @@ body.sb-shell-resizing * {
 .sb-cast-actions {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
+
+.sb-cast-options {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: var(--sb-radius-md, 16px);
+    border: 1px solid color-mix(in srgb, var(--sb-shell-border) 72%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
+}
+
+.sb-cast-options-title {
+    font-size: calc(var(--mainFontSize) * 0.72);
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    opacity: 0.72;
+}
+
+.sb-cast-option {
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+}
+
+.sb-cast-option-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.sb-cast-option-copy strong {
+    font-size: calc(var(--mainFontSize) * 0.82);
+}
+
+.sb-cast-option-copy small {
+    opacity: 0.68;
+    line-height: 1.35;
+}
