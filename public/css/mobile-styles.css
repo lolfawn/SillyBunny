@@ -1140,7 +1140,7 @@
     .group_speaker_controls {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) repeat(4, 32px) !important;
-        grid-template-areas: "typing typing typing typing typing" "avatars speak dm chat auto" !important;
+        grid-template-areas: "avatars speak dm chat auto" !important;
         gap: 4px !important;
         align-items: center !important;
         min-height: 40px !important;
@@ -1155,7 +1155,8 @@
     }
 
     .group_typing_indicator {
-        grid-area: typing !important;
+        grid-area: avatars !important;
+        align-self: end !important;
         min-width: 0 !important;
         width: 100% !important;
         padding: 0 2px !important;
@@ -1164,6 +1165,7 @@
         white-space: nowrap !important;
         font-size: 12px !important;
         line-height: 1.1 !important;
+        pointer-events: none !important;
     }
 
     .group_speaker_list {
@@ -1257,6 +1259,26 @@
 
     .group_speaker_toggle {
         grid-area: auto !important;
+    }
+
+    #group_speaker_dm_now.selected,
+    #group_speaker_auto_dm.selected {
+        color: var(--SmartThemeBlurTintColor) !important;
+        background: var(--SmartThemeQuoteColor) !important;
+        border-color: var(--SmartThemeQuoteColor) !important;
+        opacity: 1 !important;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--SmartThemeQuoteColor) 45%, transparent), 0 0 10px color-mix(in srgb, var(--SmartThemeQuoteColor) 55%, transparent) !important;
+    }
+
+    #group_speaker_dm_now.selected i,
+    #group_speaker_auto_dm.selected i {
+        color: var(--SmartThemeBlurTintColor) !important;
+    }
+
+    #group_speaker_dm_now:not(.selected),
+    #group_speaker_auto_dm:not(.selected) {
+        opacity: 0.58 !important;
+        background: color-mix(in srgb, var(--SmartThemeBodyColor) 8%, transparent) !important;
     }
 
 }
