@@ -747,7 +747,6 @@ function updateGroupSpeakerControls() {
     const avatarRenderKey = JSON.stringify({
         groupId: group.id,
         members,
-        selected: selectedGroupSpeakerAvatar,
         unread: members.map(avatarId => Boolean(unreadState[getGroupDmUnreadKey(group.id, avatarId)])),
     });
     if (avatarRenderKey !== groupSpeakerAvatarRenderKey) {
@@ -774,6 +773,11 @@ function updateGroupSpeakerControls() {
             avatarList.append(item);
         }
     }
+
+    container.find('.group_speaker_avatar').each(function () {
+        const avatarId = String($(this).data('avatar') || '');
+        $(this).toggleClass('selected', avatarId === selectedGroupSpeakerAvatar);
+    });
 
     if (selectedGroupDmAvatar && !members.includes(selectedGroupDmAvatar)) {
         selectedGroupDmAvatar = '';
@@ -805,7 +809,6 @@ function initGroupSpeakerControls() {
         if (selected_group && hasUnreadGroupDm(selected_group, avatarId) && !groupDmModeForced && !event.shiftKey) {
             selectedGroupSpeakerAvatar = avatarId;
             updateGroupSpeakerControls();
-            eventSource.emit(event_types.GROUP_UPDATED, selected_group);
             await openSelectedGroupDmChat();
             return;
         }
@@ -821,7 +824,6 @@ function initGroupSpeakerControls() {
             });
         }
         updateGroupSpeakerControls();
-        eventSource.emit(event_types.GROUP_UPDATED, selected_group);
 
         if (event.shiftKey && selected_group) {
             const chid = getCharacterIdByAvatar(avatarId);
