@@ -1,3 +1,4 @@
+import { generateRaw } from '../../../../script.js';
 import { getSettings } from './tree-store.js';
 
 /**
@@ -42,19 +43,17 @@ export async function sidecarGenerateWithProfile(prompt, systemPrompt = '', prof
         }
     }
 
-    // Fallback to main model
-    const cm = ctx?.ConnectionManagerRequestService;
-    if (cm) {
-        try {
-            const result = await cm.sendRequest('', messages, maxTokens, {
-                extractData: true,
-                includePreset: true,
-                stream: false,
-            });
-            return typeof result === 'string' ? result : result?.content || '';
-        } catch (err) {
-            console.warn('[Pathfinder] Sidecar via main model failed:', err);
-        }
+    // Fallback to the currently selected main model. Connection Manager
+    // requires a concrete profile id, so an empty id is not a valid
+    // representation of "main model" here.
+    try {
+        return await generateRaw({
+            prompt: messages,
+            responseLength: maxTokens,
+            trimNames: false,
+        });
+    } catch (err) {
+        console.warn('[Pathfinder] Sidecar via main model failed:', err);
     }
 
     return '';
