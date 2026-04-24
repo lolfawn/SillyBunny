@@ -45,7 +45,7 @@ export async function sidecarGenerateWithProfile(prompt, systemPrompt = '', prof
         }
     }
 
-    try {
+try {
         return await generateRaw({
             prompt: messages,
             responseLength: maxTokens,
@@ -54,6 +54,7 @@ export async function sidecarGenerateWithProfile(prompt, systemPrompt = '', prof
         });
     } catch (err) {
         console.warn('[Pathfinder] Sidecar via main model failed:', err);
+    }
     }
 
     return '';

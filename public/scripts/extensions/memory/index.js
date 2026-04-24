@@ -576,11 +576,9 @@ async function getSummaryPromptForNow(context, force) {
     }
 
     try {
-        // Group queues can draft several members in sequence. Do not block the
-        // wrapper or spam timeout logs while that queue is still active.
-        if (selected_group && is_group_generating) {
-            console.debug('Skipping summary while group generation queue is active');
-            return '';
+        // Wait for group to finish generating
+        if (selected_group) {
+            await waitUntilCondition(() => is_group_generating === false, 1000, 10);
         }
         // Wait for the send button to be released
         await waitUntilCondition(() => is_send_press === false, 30000, 100);

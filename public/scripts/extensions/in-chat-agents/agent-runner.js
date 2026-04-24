@@ -16,7 +16,6 @@ import {
 } from '../../../script.js';
 import { getContext } from '../../extensions.js';
 import { eventSource, event_types } from '../../events.js';
-import { is_group_generating, selected_group } from '../../group-chats.js';
 import { ToolManager } from '../../tool-calling.js';
 import {
     DEFAULT_AGENT_MAX_TOKENS,
@@ -1238,11 +1237,6 @@ function onGenerationStopped() {
  */
 async function onGenerationAfterCommands(generationType, _options, dryRun) {
     if (dryRun || internalPromptTransformDepth > 0) {
-        return;
-    }
-
-    if (selected_group && !is_group_generating) {
-        console.debug('[Pathfinder] Skipping pre-wrapper group generation pass.');
         return;
     }
 
