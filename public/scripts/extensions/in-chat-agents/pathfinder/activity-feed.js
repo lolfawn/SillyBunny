@@ -31,7 +31,7 @@ export function logToolCallCompleted(toolName, result, isSidecar = false) {
     addFeedItem({
         type: 'tool_call_completed',
         toolName,
-        result: typeof result === 'string' ? result.slice(0, 200) : String(result).slice(0, 200),
+        result,
         isSidecar,
     });
 }

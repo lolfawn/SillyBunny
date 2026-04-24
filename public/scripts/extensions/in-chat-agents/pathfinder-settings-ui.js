@@ -655,7 +655,7 @@ function formatRetrievalLogItem(item) {
         case 'tool_call_started':
             return `[${timestamp}] Tool started: ${item.toolName}`;
         case 'tool_call_completed':
-            return `[${timestamp}] Tool completed: ${item.toolName} - ${item.result}`;
+            return `[${timestamp}] Tool completed: ${item.toolName} - ${typeof item.result === 'string' ? item.result : JSON.stringify(item.result, null, 2)}`;
         case 'tool_call_error':
             return `[${timestamp}] Tool error: ${item.toolName} - ${item.error}`;
         default:

@@ -434,7 +434,7 @@ export let isChatSaving = false;
 export let firstRun = false;
 export let settingsReady = false;
 let currentVersion = '0.0.0';
-const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.4.1';
+const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.4.2';
 
 export let displayVersion = SILLYBUNNY_UI_VERSION;
 
@@ -451,7 +451,7 @@ export const default_avatar = 'img/ai4.png';
 export const system_avatar = 'img/sillybunny-pixel-logo.png';
 export const comment_avatar = 'img/quill.png';
 export const default_user_avatar = 'img/user-default.png';
-export let CLIENT_VERSION = 'SillyBunny:v1.4.1:platberlitz'; // For Horde header
+export let CLIENT_VERSION = 'SillyBunny:v1.4.2:platberlitz'; // For Horde header
 let optionsPopper = Popper.createPopper(document.getElementById('options_button'), document.getElementById('options'), {
     placement: 'top-start',
 });
@@ -2681,17 +2681,22 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
  */
 export function updateMessageElement(mes, { messageId = chat.length - 1, messageElement = messageTemplate.clone(), adjustMediaScroll = SCROLL_BEHAVIOR.NONE } = {}) {
     let avatarImg = getThumbnailUrl('persona', user_avatar);
+    let originalAvatarImg = getFullAvatarUrl('persona', user_avatar);
 
     //for non-user messages
     if (!mes.is_user) {
         if (mes.force_avatar) {
             avatarImg = mes.force_avatar;
+            originalAvatarImg = mes.force_avatar;
         } else if (this_chid === undefined) {
             avatarImg = system_avatar;
+            originalAvatarImg = system_avatar;
         } else if (characters[this_chid] && characters[this_chid].avatar !== 'none') {
             avatarImg = getThumbnailUrl('avatar', characters[this_chid].avatar);
+            originalAvatarImg = getFullAvatarUrl('avatar', characters[this_chid].avatar);
         } else {
             avatarImg = default_avatar;
+            originalAvatarImg = default_avatar;
         }
         //old processing:
         //if message is from system, use the name provided in the message JSONL to proceed,
@@ -2700,6 +2705,7 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
     } else if (mes.is_user && mes.force_avatar) {
         // Special case for persona images.
         avatarImg = mes.force_avatar;
+        originalAvatarImg = mes.force_avatar;
     }
     const momentDate = timestampToMoment(mes.send_date);
     const timestamp = momentDate.isValid() ? momentDate.format('LL LT') : '';
@@ -2723,12 +2729,13 @@ export function updateMessageElement(mes, { messageId = chat.length - 1, message
 
     if (messageElement[0] instanceof HTMLElement) {
         const avatarCssUrl = `url("${String(avatarImg).replace(/(["\\])/g, '\\$1')}")`;
+        const originalAvatarCssUrl = `url("${String(originalAvatarImg).replace(/(["\\])/g, '\\$1')}")`;
         messageElement[0].style.setProperty('--sb-message-avatar', avatarCssUrl);
         messageElement[0].style.setProperty('--mes-avatar-url', avatarCssUrl);
-        messageElement[0].style.setProperty('--mes-avatar-original-url', avatarCssUrl);
+        messageElement[0].style.setProperty('--mes-avatar-original-url', originalAvatarCssUrl);
     }
 
-    messageElement.find('.avatar img').attr('src', avatarImg);
+    messageElement.find('.avatar img').attr('src', originalAvatarImg).attr('data-thumbnail-src', avatarImg);
     messageElement.find('.ch_name .name_text').text(mes.name);
     messageElement.find('.timestamp').text(timestamp).attr('title', `${mes.extra?.api ? mes.extra.api + ' - ' : ''}${mes.extra?.model ?? ''}`);
     messageElement.find('.mesIDDisplay').text(`#${messageId}`);
@@ -7795,6 +7802,15 @@ async function read_avatar_load(input) {
  */
 export function getThumbnailUrl(type, file, t = false) {
     return `/thumbnail?type=${type}&file=${encodeURIComponent(file)}${t ? `&t=${Date.now()}` : ''}`;
+}
+
+function getFullAvatarUrl(type, file, t = false) {
+    if (!file || file === 'none') {
+        return default_avatar;
+    }
+
+    const basePath = type === 'persona' ? '/User%20Avatars/' : '/characters/';
+    return `${basePath}${encodeURIComponent(file)}${t ? `?t=${Date.now()}` : ''}`;
 }
 
 export function buildAvatarList(block, entities, { templateId = 'inline_avatar_template', empty = true, interactable = false, highlightFavs = true } = {}) {

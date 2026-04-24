@@ -185,6 +185,17 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Latest Update
 
+### v1.4.2 (2026-04-24)
+
+**Updated**
+
+- Fixed mobile shell icon sizing, Navigate/Customize switching, high Page Width character-panel sizing, and enlarged chat avatar sharpness.
+- Added Claude-only preset toggles to omit `temperature` and `top_p` from Anthropic Messages requests.
+- Improved Pathfinder retrieval logging for pipeline, legacy retrieval, injected context, stage results, and tool activity.
+- Updated DeepSeek thinking-mode handling, including the new `deepseek-v4` option, safer `reasoning_content` cleanup, and no logprobs on thinking models.
+- Aligned updater messages and admin update pulls with the current tracking branch, such as `origin/staging`.
+- Bumped app-owned version strings to `1.4.2`.
+
 ### v1.4.1 (2026-04-23)
 
 **Updated**

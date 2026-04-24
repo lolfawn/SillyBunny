@@ -1519,9 +1519,14 @@ function summarizeScalarObjectForLog(value) {
  * Creates a compact, redacted summary of LLM payloads for debug logging.
  * Keeps counts and scalar generation settings, but avoids dumping full prompt text.
  * @param {any} payload Raw request or response payload
+ * @param {{includeText?: boolean}} [options] Logging options
  * @returns {any} Safe summary for console output
  */
-export function summarizeLlmPayloadForLog(payload) {
+export function summarizeLlmPayloadForLog(payload, options = {}) {
+    if (options?.includeText) {
+        return payload;
+    }
+
     if (payload === null || payload === undefined) {
         return payload;
     }

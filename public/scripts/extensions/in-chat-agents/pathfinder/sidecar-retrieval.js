@@ -83,11 +83,27 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
 
     if (books.length === 0) {
         console.log('[Pathfinder] No readable lorebooks with built trees for pipeline retrieval');
+        logPathfinderRetrievalDetail({
+            mode: 'pipeline',
+            books,
+            selectedEntries: [],
+            stageResults: [],
+            injectedPrompt: '',
+            metadata: { pipelineId, reason: 'no-readable-lorebooks' },
+        });
         return;
     }
 
     if (chatMessages.length === 0) {
         console.log('[Pathfinder] No chat messages for pipeline retrieval');
+        logPathfinderRetrievalDetail({
+            mode: 'pipeline',
+            books,
+            selectedEntries: [],
+            stageResults: [],
+            injectedPrompt: '',
+            metadata: { pipelineId, reason: 'no-chat-messages' },
+        });
         return;
     }
 
@@ -99,11 +115,27 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
 
     if (!result.success) {
         console.warn('[Pathfinder] Pipeline retrieval failed:', result.error);
+        logPathfinderRetrievalDetail({
+            mode: 'pipeline',
+            books,
+            selectedEntries: [],
+            stageResults: result.stageResults,
+            injectedPrompt: '',
+            metadata: { pipelineId, error: result.error },
+        });
         return;
     }
 
     if (result.selectedEntries.length === 0) {
         console.log('[Pathfinder] Pipeline returned no entries');
+        logPathfinderRetrievalDetail({
+            mode: 'pipeline',
+            books,
+            selectedEntries: [],
+            stageResults: result.stageResults,
+            injectedPrompt: '',
+            metadata: { pipelineId, selectedEntryCount: 0 },
+        });
         return;
     }
 

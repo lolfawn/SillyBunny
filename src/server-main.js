@@ -333,7 +333,7 @@ async function preSetupTasks() {
         console.log(`Running '${version.gitBranch}' (${version.gitRevision}) - ${localDate}`);
         if (!version.isLatest && ['staging', 'release'].includes(version.gitBranch)) {
             console.log('INFO: Currently not on the latest commit.');
-            console.log('      Run \'git pull\' to update. If you have any merge conflicts, run \'git reset --hard\' and \'git pull\' to reset your branch.');
+            console.log(`      Run 'git pull --ff-only' to update from the tracked upstream for '${version.gitBranch}'. If you have merge conflicts, resolve them before updating.`);
         }
     }
     console.log();

@@ -532,13 +532,13 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
             return response.json({
                 updated: false,
                 restarting: false,
-                message: 'Already up to date.',
+                message: `Already up to date on ${repository.branch || 'current branch'} tracking ${repository.trackingBranch}.`,
                 repository,
             });
         }
 
         await git.fetch();
-        await git.raw(['pull', '--ff-only']);
+        await git.raw(['merge', '--ff-only', repository.trackingBranch]);
 
         if (stashed) {
             try {
@@ -576,7 +576,7 @@ router.post('/update', requireAdminMiddleware, async (_request, response) => {
             restarting: true,
             stashed,
             stashPopWarning,
-            message: stashPopWarning || 'Update applied. Restarting SillyBunny now.',
+            message: stashPopWarning || `Update applied from ${repository.trackingBranch}. Restarting SillyBunny now.`,
             version: nextVersion,
             repository: nextRepository,
             install: installResult ? {

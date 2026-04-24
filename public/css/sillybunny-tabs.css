@@ -484,8 +484,11 @@ body.sb-topbar-compact #sb-chatbar-layer {
     align-items: center;
     justify-content: center;
     width: var(--sb-chatbar-button-size);
+    max-width: var(--sb-chatbar-button-size);
     min-width: var(--sb-chatbar-button-size);
     height: var(--sb-chatbar-button-size);
+    max-height: var(--sb-chatbar-button-size);
+    flex: 0 0 var(--sb-chatbar-button-size);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 90%, transparent);
     border-radius: var(--sb-chatbar-button-radius);
     background: transparent;
@@ -493,6 +496,8 @@ body.sb-topbar-compact #sb-chatbar-layer {
     cursor: pointer;
     padding: 0 !important;
     min-height: 0 !important;
+    line-height: 1;
+    box-sizing: border-box;
     transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
 }
 
@@ -517,6 +522,12 @@ body.sb-topbar-compact #sb-chatbar-layer {
 #sb-topbar-primary .sb-chatbar-button > i {
     font-size: var(--sb-topbar-compact-icon-size);
     line-height: 1;
+    width: 1em;
+    height: 1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
 }
 
 .sb-chatbar-button:hover {
@@ -892,9 +903,12 @@ body:not(.movingUI) .drawer-content.maximized {
 .sb-chatbar-button.is-mobile-compact,
 .sb-mobile-chat-close {
     width: var(--sb-mobile-tools-button-size);
+    max-width: var(--sb-mobile-tools-button-size);
     min-width: var(--sb-mobile-tools-button-size);
     height: var(--sb-mobile-tools-button-size);
+    max-height: var(--sb-mobile-tools-button-size);
     min-height: var(--sb-mobile-tools-button-size);
+    flex-basis: var(--sb-mobile-tools-button-size);
     border-radius: var(--sb-mobile-tools-button-radius);
 }
 
@@ -969,7 +983,9 @@ body:not(.movingUI) .drawer-content.maximized {
     padding: 0 var(--sb-proxy-button-padding-x);
     min-height: var(--sb-proxy-button-height);
     height: var(--sb-proxy-button-height);
+    max-height: var(--sb-proxy-button-height);
     min-width: var(--sb-proxy-button-min-width);
+    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;

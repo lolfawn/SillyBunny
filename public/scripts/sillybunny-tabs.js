@@ -1041,9 +1041,10 @@ function getShellSizeStorageKey(shellKey) {
     return '';
 }
 
-function getDesktopShellDimensions() {
+function getDesktopShellDimensions(shellKey = '') {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const maxShellWidth = shellKey === 'right' ? Math.min(SB_DESKTOP_SHELL_LAYOUT.maxWidth, 760) : SB_DESKTOP_SHELL_LAYOUT.maxWidth;
 
     if (isMobileViewport() || viewportHeight <= SB_DESKTOP_SHELL_LAYOUT.fullWidthMaxHeight) {
         return {
@@ -1063,7 +1064,7 @@ function getDesktopShellDimensions() {
     const desiredWidth = clampNumber(
         viewportWidth * SB_DESKTOP_SHELL_LAYOUT.ratio,
         SB_DESKTOP_SHELL_LAYOUT.minWidth,
-        SB_DESKTOP_SHELL_LAYOUT.maxWidth,
+        maxShellWidth,
     );
     const gutter = clampNumber(
         viewportWidth * SB_DESKTOP_SHELL_LAYOUT.gutterRatio,
@@ -1079,13 +1080,13 @@ function getDesktopShellDimensions() {
     };
 }
 
-function getDesktopShellResizeBounds() {
+function getDesktopShellResizeBounds(shellKey = '') {
     const viewportWidth = Math.max(0, Math.round(window.innerWidth));
     const topbarOffset = Number.parseFloat(
         window.getComputedStyle(document.documentElement).getPropertyValue('--sb-topbar-layout-offset'),
     );
     const resolvedTopbarOffset = Number.isFinite(topbarOffset) ? topbarOffset : 0;
-    const defaultDimensions = getDesktopShellDimensions();
+    const defaultDimensions = getDesktopShellDimensions(shellKey);
     const maxHeight = Math.max(0, Math.round(window.innerHeight - resolvedTopbarOffset - SB_DESKTOP_SHELL_RESIZE.bottomGap));
 
     return {
@@ -1159,8 +1160,6 @@ function applyDesktopShellSize(root, size) {
 function syncDesktopShellSizing() {
     hydratePersistedShellSizes();
 
-    const { width, maxWidth } = getDesktopShellDimensions();
-    const bounds = getDesktopShellResizeBounds();
     const resizingEnabled = canResizeDesktopShells();
 
     for (const shellKey of ['left', 'right']) {
@@ -1168,6 +1167,9 @@ function syncDesktopShellSizing() {
         if (!(root instanceof HTMLElement)) {
             continue;
         }
+
+        const { width, maxWidth } = getDesktopShellDimensions(shellKey);
+        const bounds = getDesktopShellResizeBounds(shellKey);
 
         if (isMobileViewport()) {
             root.style.setProperty('width', `${width}px`, 'important');
@@ -3566,7 +3568,7 @@ function toggleShellPanel(shellKey, tabId = null) {
     }
 
     closeAllDropdowns({ except: shellKey });
-    openShell(shellKey, tabId);
+    window.requestAnimationFrame(() => openShell(shellKey, tabId));
 }
 
 function isLandingPageVisible() {

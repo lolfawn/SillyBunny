@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.4.2
+
+Date: 2026-04-24
+
+Changes:
+- Fixed mobile shell icon regressions so top-bar buttons, bottom chat controls, mobile utility buttons, Navigate, Customize, Characters, and send controls keep square dimensions and centered icons on iOS Safari.
+- Fixed Navigate to Customize shell switching so Customize remains open after cross-menu transitions instead of flashing and closing during the drawer animation handoff.
+- Fixed high Page Width layouts by sizing the right-side Characters panel independently from chat width, preserving usable panel width and MovingUI compatibility.
+- Improved enlarged chat/Ripple avatar quality by preferring the full avatar source for rendered message avatars instead of stretching small thumbnails.
+- Added Claude-only Chat Completion preset toggles for disabling `temperature` and `top_p`; enabled toggles omit those fields from Anthropic Messages requests instead of sending numeric values.
+- Improved Pathfinder Retrieval Log coverage for pipeline retrieval, legacy/tool retrieval, selected lorebooks, selected entries, stage results, injected prompt context, and tool activity.
+- Restored untruncated DeepSeek request prompt debug logging where needed for final generation payload inspection while keeping normal payload summaries available elsewhere.
+- Updated DeepSeek thinking-mode handling, including the new `deepseek-v4` option, safer `reasoning_content` cleanup for normal turns, continuation-only tool-call compatibility, and no `logprobs`/`top_logprobs` on thinking models.
+- Aligned updater status and admin update pulls with the current tracking branch, such as `origin/staging`, instead of implying a hardcoded main-branch update path.
+- Bumped app-owned version strings to `1.4.2` without changing dependency versions.
+
+Commits:
+- `fix(release): ship v1.4.2 provider and shell polish`
+
 ## v1.4.1
 
 Date: 2026-04-23

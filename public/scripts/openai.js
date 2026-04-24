@@ -336,6 +336,8 @@ export const settingsToUpdate = {
     frequency_penalty: ['#freq_pen_openai', 'freq_pen_openai', false, false],
     presence_penalty: ['#pres_pen_openai', 'pres_pen_openai', false, false],
     top_p: ['#top_p_openai', 'top_p_openai', false, false],
+    claude_disable_temperature: ['#claude_disable_temperature', 'claude_disable_temperature', true, false],
+    claude_disable_top_p: ['#claude_disable_top_p', 'claude_disable_top_p', true, false],
     top_k: ['#top_k_openai', 'top_k_openai', false, false],
     top_a: ['#top_a_openai', 'top_a_openai', false, false],
     min_p: ['#min_p_openai', 'min_p_openai', false, false],
@@ -463,6 +465,8 @@ const default_settings = {
     personality_format: default_personality_format,
     openai_model: 'gpt-4-turbo',
     claude_model: 'claude-sonnet-4-5',
+    claude_disable_temperature: false,
+    claude_disable_top_p: false,
     google_model: 'gemini-2.5-pro',
     vertexai_model: 'gemini-2.5-pro',
     ai21_model: 'jamba-large',
@@ -2298,10 +2302,12 @@ function groupOpenAISettingsIntoDrawers() {
             description: 'Temperature, penalties, and probability controls',
             selectors: [
                 '#range_block_openai > .range-block:has(#temp_openai)',
+                '#range_block_openai > .range-block:has(#claude_disable_temperature)',
                 '#range_block_openai > .range-block:has(#freq_pen_openai)',
                 '#range_block_openai > .range-block:has(#pres_pen_openai)',
                 '#range_block_openai > .range-block:has(#top_k_openai)',
                 '#range_block_openai > .range-block:has(#top_p_openai)',
+                '#range_block_openai > .range-block:has(#claude_disable_top_p)',
                 '#range_block_openai > .range-block:has(#repetition_penalty_openai)',
                 '#range_block_openai > .range-block:has(#min_p_openai)',
                 '#range_block_openai > .range-block:has(#top_a_openai)',
@@ -4024,6 +4030,11 @@ export async function createGenerationParameters(settings, model, type, messages
     // https://api-docs.deepseek.com/api/create-chat-completion
     if (settings.chat_completion_source === chat_completion_sources.DEEPSEEK) {
         generate_data.top_p = generate_data.top_p || Number.EPSILON;
+    }
+
+    if (settings.chat_completion_source === chat_completion_sources.CLAUDE) {
+        generate_data.claude_disable_temperature = Boolean(settings.claude_disable_temperature);
+        generate_data.claude_disable_top_p = Boolean(settings.claude_disable_top_p);
     }
 
     if (settings.chat_completion_source === chat_completion_sources.XAI) {
@@ -6903,7 +6914,7 @@ async function onModelChange() {
     if (oai_settings.chat_completion_source === chat_completion_sources.DEEPSEEK) {
         if (oai_settings.max_context_unlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
-        } else if (['deepseek-reasoner', 'deepseek-chat'].includes(oai_settings.deepseek_model)) {
+        } else if (['deepseek-reasoner', 'deepseek-chat', 'deepseek-v4'].includes(oai_settings.deepseek_model)) {
             $('#openai_max_context').attr('max', max_128k);
         } else if (oai_settings.deepseek_model == 'deepseek-coder') {
             $('#openai_max_context').attr('max', max_16k);

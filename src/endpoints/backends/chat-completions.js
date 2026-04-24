@@ -370,6 +370,14 @@ async function sendClaudeRequest(request, response) {
             }
         }
 
+        if (request.body.claude_disable_temperature) {
+            delete requestBody.temperature;
+        }
+
+        if (request.body.claude_disable_top_p) {
+            delete requestBody.top_p;
+        }
+
         const reasoningEffort = request.body.reasoning_effort;
         const budgetTokens = calculateClaudeBudgetTokens(requestBody.max_tokens, reasoningEffort, requestBody.stream, isAdaptiveModel);
 
@@ -1092,8 +1100,9 @@ async function sendDeepSeekRequest(request, response) {
 
     try {
         let bodyParams = {};
+        const isThinkingModel = /(?:^|-)reasoner$|deepseek-v4/i.test(String(request.body.model || ''));
 
-        if (request.body.logprobs > 0) {
+        if (request.body.logprobs > 0 && !isThinkingModel) {
             bodyParams['top_logprobs'] = request.body.logprobs;
             bodyParams['logprobs'] = true;
         }
@@ -1125,8 +1134,14 @@ async function sendDeepSeekRequest(request, response) {
 
         const processedMessages = addAssistantPrefix(postProcessPrompt(request.body.messages, PROMPT_PROCESSING_TYPE.SEMI_TOOLS, getPromptNames(request)), bodyParams.tools, 'prefix');
 
-        if (/-reasoner/.test(request.body.model)) {
+        if (isThinkingModel && bodyParams.tools) {
             addReasoningContentToToolCalls(processedMessages);
+        } else if (isThinkingModel) {
+            for (const message of processedMessages) {
+                if (message && typeof message === 'object' && 'reasoning_content' in message) {
+                    delete message.reasoning_content;
+                }
+            }
         }
 
         const requestBody = {
@@ -1153,7 +1168,7 @@ async function sendDeepSeekRequest(request, response) {
             signal: controller.signal,
         };
 
-        console.debug('DeepSeek request:', summarizeLlmPayloadForLog(requestBody));
+        console.debug('DeepSeek request:', summarizeLlmPayloadForLog(requestBody, { includeText: true }));
 
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
