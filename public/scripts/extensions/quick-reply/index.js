@@ -173,7 +173,17 @@ const init = async () => {
     log('settings: ', settings);
 
     manager = new SettingsUi(settings);
-    document.querySelector('#qr_container').append(await manager.render());
+    const qrContainer = document.querySelector('#qr_container');
+    const settingsDrawer = await manager.render();
+    if (qrContainer && settingsDrawer) {
+        // SillyBunny: clear stale settings roots before reattaching Quick Reply.
+        qrContainer.querySelectorAll('#qr--settings').forEach(node => {
+            if (node !== settingsDrawer) {
+                node.remove();
+            }
+        });
+        qrContainer.append(settingsDrawer);
+    }
 
     buttons = new ButtonUi(settings);
     buttons.show();

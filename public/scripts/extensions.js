@@ -52,10 +52,53 @@ export let modules = [];
 const activeExtensions = new Set();
 
 /**
+ * A set of normalized active extension identifiers.
+ * @type {Set<string>}
+ */
+const activeExtensionDedupKeys = new Set();
+
+/**
+ * A set of normalized extension identifiers that are currently activating.
+ * @type {Set<string>}
+ */
+const activatingExtensionDedupKeys = new Set();
+
+/**
  * Errors that occurred while loading extensions.
  * @type {Set<string>}
  */
 const extensionLoadErrors = new Set();
+
+// SillyBunny: extensions append settings UI into shared columns; keep that surface resilient.
+const extensionSettingsHostIds = ['extensions_settings', 'extensions_settings2'];
+const ignoredExtensionSettingsSelectors = [
+    '#nemo-tab-extension-overlay',
+    '.nemo-extensions-search',
+    '.nemo-extensions-layout',
+    '.nemo-folder-controls',
+];
+const ignoredExtensionSettingsSelector = ignoredExtensionSettingsSelectors.join(', ');
+const genericExtensionSettingsClasses = new Set([
+    'alignitemscenter',
+    'alignitemsbaseline',
+    'closeddrawer',
+    'drawer-content',
+    'extension_container',
+    'flex-container',
+    'flex1',
+    'flexflowcolumn',
+    'flexgrow',
+    'flexnowrap',
+    'hidden',
+    'inline-drawer',
+    'margin0',
+    'marginbot10',
+    'wide100p',
+    'wide50p',
+]);
+
+let extensionSettingsDedupeObserver = null;
+let extensionSettingsDedupeScheduled = false;
 
 const getApiUrl = () => extension_settings.apiUrl;
 const sortManifestsByOrder = (a, b) => parseInt(a.loading_order) - parseInt(b.loading_order) || String(a.display_name).localeCompare(String(b.display_name));
@@ -539,6 +582,146 @@ export function findExtension(name) {
     return { name: internalExtensionName, enabled: isEnabled };
 }
 
+function getNormalizedSettingsText(value) {
+    return String(value || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+}
+
+function getExtensionSettingsTitle(element) {
+    const titleElement = element.querySelector(':scope > .inline-drawer > .inline-drawer-header b, :scope > .inline-drawer > .inline-drawer-header strong, :scope > .inline-drawer > .inline-drawer-header [data-i18n], :scope > .inline-drawer-header b, :scope > .inline-drawer-header strong, :scope > h3, :scope > h4, :scope > [data-extension-name], :scope > .extension-name');
+    const title = titleElement?.dataset?.extensionName || titleElement?.textContent || '';
+
+    return getNormalizedSettingsText(title);
+}
+
+function getExtensionSettingsStructureKey(element) {
+    const identifiers = [...element.querySelectorAll('[id]')]
+        .slice(0, 12)
+        .map(node => node.id)
+        .filter(Boolean)
+        .join('|');
+
+    return identifiers ? `structure:${identifiers}` : '';
+}
+
+function getExtensionSettingsClassKey(element) {
+    const classes = [...element.classList]
+        .map(className => className.toLowerCase())
+        .filter(className => !genericExtensionSettingsClasses.has(className))
+        .sort();
+
+    return classes.length ? `class:${classes.join('.')}` : '';
+}
+
+function getExtensionSettingsDedupeKey(element) {
+    const datasetName = element.dataset?.extensionName || element.dataset?.extensionId || '';
+    if (datasetName) {
+        return `data:${getNormalizedSettingsText(datasetName)}`;
+    }
+
+    if (element.id && !element.classList.contains('extension_container')) {
+        return `id:${element.id.toLowerCase()}`;
+    }
+
+    const title = getExtensionSettingsTitle(element);
+    if (title) {
+        return `title:${title}`;
+    }
+
+    const classKey = getExtensionSettingsClassKey(element);
+    if (classKey) {
+        return classKey;
+    }
+
+    const structureKey = getExtensionSettingsStructureKey(element);
+    if (structureKey) {
+        return structureKey;
+    }
+
+    return '';
+}
+
+function getExtensionSettingsUnits(host) {
+    const units = [];
+
+    for (const child of host.children) {
+        if (!(child instanceof HTMLElement) || child.matches(ignoredExtensionSettingsSelector)) {
+            continue;
+        }
+
+        if (child.classList.contains('extension_container')) {
+            units.push(...[...child.children].filter(node => node instanceof HTMLElement));
+        } else {
+            units.push(child);
+        }
+    }
+
+    return units;
+}
+
+function dedupeExtensionSettingsDrawers() {
+    const seen = new Map();
+
+    for (const hostId of extensionSettingsHostIds) {
+        const host = document.getElementById(hostId);
+        if (!host) {
+            continue;
+        }
+
+        for (const unit of getExtensionSettingsUnits(host)) {
+            if (!(unit instanceof HTMLElement) || unit.matches(ignoredExtensionSettingsSelector)) {
+                continue;
+            }
+
+            const key = getExtensionSettingsDedupeKey(unit);
+            if (!key) {
+                continue;
+            }
+
+            const existing = seen.get(key);
+            if (existing && existing.isConnected) {
+                console.warn('[Extensions] Removing duplicate settings drawer', { key, removed: unit.id || unit.className || unit.tagName });
+                unit.remove();
+                continue;
+            }
+
+            seen.set(key, unit);
+        }
+    }
+}
+
+function scheduleExtensionSettingsDedupe() {
+    if (extensionSettingsDedupeScheduled) {
+        return;
+    }
+
+    extensionSettingsDedupeScheduled = true;
+    requestAnimationFrame(() => {
+        extensionSettingsDedupeScheduled = false;
+        dedupeExtensionSettingsDrawers();
+    });
+}
+
+function observeExtensionSettingsDrawers() {
+    if (extensionSettingsDedupeObserver) {
+        extensionSettingsDedupeObserver.disconnect();
+    }
+
+    const hosts = extensionSettingsHostIds
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
+
+    if (!hosts.length) {
+        return;
+    }
+
+    extensionSettingsDedupeObserver = new MutationObserver(scheduleExtensionSettingsDedupe);
+    hosts.forEach(host => extensionSettingsDedupeObserver.observe(host, { childList: true, subtree: true }));
+    scheduleExtensionSettingsDedupe();
+}
+
 /**
  * Loads manifest.json files for extensions.
  * @param {string[]} names Array of extension names
@@ -598,12 +781,13 @@ async function activateExtensions() {
     for (let entry of extensions) {
         const name = entry[0];
         const manifest = entry[1];
+        const extensionKey = getExtensionDedupKey(name);
         const extrasRequirements = manifest.requires;
         const extensionDependencies = manifest.dependencies;
         const minClientVersion = manifest.minimum_client_version;
         const displayName = manifest.display_name || name;
 
-        if (activeExtensions.has(name)) {
+        if (activeExtensions.has(name) || activeExtensionDedupKeys.has(extensionKey) || activatingExtensionDedupKeys.has(extensionKey)) {
             continue;
         }
         // Client version requirement: pass if 'minimum_client_version' is undefined or null.
@@ -651,17 +835,22 @@ async function activateExtensions() {
         if (meetsModuleRequirements && meetsExtensionDeps && meetsClientMinimumVersion && !isDisabled) {
             try {
                 console.debug('Activating extension', name);
+                activatingExtensionDedupKeys.add(extensionKey);
                 const promise = addExtensionLocale(name, manifest).finally(() =>
                     Promise.all([addExtensionScript(name, manifest), addExtensionStyle(name, manifest)]),
                 );
                 await promise
                     .then(() => {
                         activeExtensions.add(name);
+                        activeExtensionDedupKeys.add(extensionKey);
                         return callExtensionHook(name, 'activate');
                     })
                     .catch(err => {
                         console.log('Could not activate extension', name, err);
                         extensionLoadErrors.add(t`Extension "${displayName}" failed to load: ${err}`);
+                    })
+                    .finally(() => {
+                        activatingExtensionDedupKeys.delete(extensionKey);
                     });
                 promises.push(promise);
             } catch (error) {
@@ -1724,6 +1913,9 @@ export async function loadExtensionSettings(settings, versionChanged, enableAuto
         await autoUpdateExtensions(false);
     }
 
+    // SillyBunny: extension settings are injected by many independent modules,
+    // so guard the shared settings columns against duplicate top-level drawers.
+    observeExtensionSettingsDrawers();
     await activateExtensions();
     if (extension_settings.autoConnect && extension_settings.apiUrl) {
         connectToApi(extension_settings.apiUrl);

@@ -28,6 +28,9 @@ Date: 2026-04-25
 ### Server Tools
 - Added thumbnail quality controls to Customize > Server for toggling thumbnail generation, choosing JPG or PNG, setting quality and dimensions, applying SillyBunny's recommended sharp-avatar preset, and clearing the current user's thumbnail cache for rebuilds without manually editing `config.yaml`.
 
+### Extensions
+- Hardened the shared extension settings columns so duplicate top-level drawers for the same extension are removed automatically, including stale Quick Reply drawers after repeated activation.
+
 Commits:
 - `fix(ui): make Moonlit Echoes optional`
 - `fix(tooling): keep eslint stable after launcher installs`
@@ -37,6 +40,7 @@ Commits:
 - `fix(ui): restore individual recent chats`
 - `fix(extension): contain moonlit chat avatars`
 - `feat(server): add thumbnail quality controls`
+- `fix(extension): prevent duplicate settings drawers`
 
 ## v1.4.5
 
