@@ -8,7 +8,7 @@
 An elegant fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), designed with a cleaner, graphical shell UI; Bun-based backend; built-in tutorials, presets, extensions, and a quick-start dashboard; and a lightweight agnetic system to faciliate modern agent functionality.
 
 > [!WARNING]
-> This is an in-dev fork, and is considered beta quality. [Please direct all issues to this project's issue tracker.](https://github.com/platberlitz/SillyBunny/issues)
+> This is an in-dev fork, and is considered beta quality. [Please direct SillyBunny-specific issues to this project's issue tracker.](https://github.com/platberlitz/SillyBunny/issues) If an issue is reproducible in upstream SillyTavern, please report it upstream instead.
 >
 > Disclaimer: LLMs are used to facilitate development of this fork. Overall software design, prompting, testing, and documentation are handled by humans. To keep things simple, we try to maintain close to upstream as possible.
 
@@ -127,6 +127,7 @@ bash start.sh
 
 | What you want | Command |
 |---------------|---------|
+| Update from the running app | Open Customize > Server and use the built-in updater |
 | Normal launch (auto-checks for updates) | `./start.sh` |
 | Force update then launch | `./start.sh --self-update` |
 | Update only, don't start | `./start.sh --self-update-only` |
@@ -223,7 +224,7 @@ SillyBunny includes some extras by default to help you get started right away:
 - Kept List Only mode focused on recent chats by removing its extra shortcut row, while also cleaning up home-screen preset copy so only the bundled SillyBunny-tuned Director preset is promoted.
 - Polished shell/UI consistency by aligning the reasoning token badge, matching bottom-bar sizing to the top bar, and preserving transparency for cropped avatars and alpha-capable thumbnails.
 - Hardened self-update behavior so existing Node/npm installs no longer dirty `package-lock.json` during routine updates.
-- Bumped the app version strings and default-user settings version to `1.4.1`.
+- Bumped the user-facing app version strings, package version references, Horde fallback client string, and default-user settings version to `1.4.1`.
 
 [Find other changelogs in our Releases.](https://github.com/platberlitz/SillyBunny/releases)
 
@@ -231,7 +232,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Upstream Information
 
-SillyBunny is a fork of SillyTavern. Most SillyTavern behavior, data formats, and ecosystem knowledge still apply. If running into an issue reproducable in upstream, please direct issues there.
+SillyBunny is a fork of SillyTavern. Most SillyTavern behavior, data formats, and ecosystem knowledge still apply. Please report SillyBunny-specific issues here, while reporting SillyTavern adjacent issues upstream.
 
 | Resource | Link |
 |----------|------|

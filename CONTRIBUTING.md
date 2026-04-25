@@ -88,9 +88,11 @@ When a new, stable upstream SillyTavern version releases:
 
 ## Setting up the dev environment
 
-1. Required software: git and bun.
+1. Required software: git and Bun for normal local development. Node.js and npm are also required when testing Node.js compatibility or matching CI behavior.
 2. An IDE or editor of your choice. Visual Studio Code is a safe default.
 3. You can also use GitHub Codespaces which sets up everything for you.
+
+Native Termux contributors should use the launcher default of Node.js + npm unless specifically testing Bun behavior; Bun can still be forced with `SILLYBUNNY_TERMUX_RUNTIME=bun bash start.sh`.
 
 ## Getting the code ready
 
