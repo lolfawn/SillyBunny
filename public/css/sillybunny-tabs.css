@@ -2670,7 +2670,7 @@ body.sb-shell-resizing * {
     gap: 8px;
     padding: 6px 12px;
     border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 50%, transparent);
-    background: transparent;
+    background: var(--sb-composer-surface-bg, color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeChatTintColor) 8%));
     min-height: 34px;
 }
 
@@ -2689,7 +2689,7 @@ body.sb-shell-resizing * {
     font-size: calc(var(--mainFontSize) * 0.85);
     line-height: 1.1;
     color: var(--SmartThemeBodyColor);
-    background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 60%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base, var(--SmartThemeBlurTintColor)));
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 40%, transparent);
     border-radius: 14px;
     appearance: none;
@@ -2740,7 +2740,7 @@ body.sb-shell-resizing * {
     border: 2px solid color-mix(in srgb, var(--SmartThemeBorderColor) 50%, transparent);
     background-size: cover;
     background-position: center;
-    background-color: color-mix(in srgb, var(--SmartThemeBlurTintColor) 60%, transparent);
+    background-color: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base, var(--SmartThemeBlurTintColor)));
     cursor: pointer;
     flex-shrink: 0;
     transition: border-color 180ms ease, transform 180ms ease;

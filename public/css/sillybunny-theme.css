@@ -42,6 +42,11 @@
     --sb-shell-tab-active-bg: linear-gradient(135deg, color-mix(in srgb, var(--SmartThemeQuoteColor) 18%, transparent), color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent));
     --sb-shell-border: color-mix(in srgb, var(--SmartThemeBorderColor) 96%, transparent);
     --sb-shell-shadow: 0 32px 90px color-mix(in srgb, var(--SmartThemeShadowColor) 34%, transparent);
+    --sb-chat-surface-source: color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeChatTintColor) 8%);
+    --sb-chat-surface-base: var(--sb-chat-surface-source);
+    --sb-composer-surface-base: var(--sb-chat-surface-source);
+    --sb-chat-surface-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-chat-surface-base)), var(--sb-chat-surface-base));
+    --sb-composer-surface-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base)), var(--sb-composer-surface-base));
     --sb-card-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 6%, var(--SmartThemeBlurTintColor)), color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, transparent));
     --sb-button-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 84%, transparent);
     --sb-button-hover: color-mix(in srgb, var(--SmartThemeQuoteColor) 14%, transparent);
@@ -67,6 +72,13 @@
     --sb-page-control-opacity: 1;
     --sb-page-overlay-opacity: 1;
     --sb-message-radius: 22px;
+}
+
+@supports (color: rgb(from black r g b / 1)) {
+    :root {
+        --sb-chat-surface-base: rgb(from var(--sb-chat-surface-source) r g b / calc(var(--sb-page-overlay-opacity) * 0.96));
+        --sb-composer-surface-base: rgb(from var(--sb-chat-surface-source) r g b / calc(var(--sb-page-card-opacity) * 0.96));
+    }
 }
 
 :root[data-sb-theme='modern-glass'] {
@@ -198,17 +210,7 @@ body::before {
 #chat {
     position: relative;
     isolation: isolate;
-    background-color: transparent;
-}
-
-#chat::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background: color-mix(in srgb, var(--SmartThemeChatTintColor) 82%, var(--SmartThemeBlurTintColor) 18%);
-    opacity: var(--sb-page-overlay-opacity);
+    background: var(--sb-chat-surface-bg);
 }
 
 #top-bar {
@@ -503,8 +505,8 @@ select.text_pole {
     pointer-events: none;
     background:
         linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent), transparent 90%),
-        color-mix(in srgb, var(--SmartThemeBlurTintColor) 94%, var(--SmartThemeChatTintColor) 6%);
-    opacity: var(--sb-page-card-opacity);
+        var(--sb-composer-surface-bg);
+    opacity: 1;
 }
 
 #nonQRFormItems {
