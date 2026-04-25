@@ -38,6 +38,7 @@ import {
     cancelAgentGeneration,
     initAgentRunner,
     isAgentGenerationActive,
+    onAgentGenerationStateChanged,
     runAgentOnMessage,
     syncToolAgentRegistrations,
     undoPromptTransform,
@@ -3173,6 +3174,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     }
 
     const refreshGenerationUi = () => updateCancelGenerationButton();
+    onAgentGenerationStateChanged(refreshGenerationUi);
     for (const eventName of [
         event_types.GENERATION_STARTED,
         event_types.GENERATION_ENDED,

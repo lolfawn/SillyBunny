@@ -63,6 +63,12 @@ let generationStopRequested = false;
 const deferredPostProcessingQueue = new Map();
 let deferredPostProcessingTimeout = null;
 const activePromptTransformToasts = new Set();
+const agentGenerationStateListeners = new Set();
+const manualAgentRunQueue = [];
+let manualAgentRunQueueProcessing = false;
+let manualAgentRunCancelRequested = false;
+let activeManualAgentRun = null;
+const promptTransformIdleResolvers = new Set();
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -74,23 +80,150 @@ let toolSyncDuringGeneration = false;
 let toolRecursionDepth = 0;
 
 export function isAgentGenerationActive() {
-    return internalPromptTransformDepth > 0 || isGenerationInProgress;
+    return internalPromptTransformDepth > 0 || manualAgentRunQueueProcessing || manualAgentRunQueue.length > 0;
+}
+
+export function onAgentGenerationStateChanged(listener) {
+    if (typeof listener !== 'function') {
+        return () => {};
+    }
+
+    agentGenerationStateListeners.add(listener);
+    return () => agentGenerationStateListeners.delete(listener);
+}
+
+function notifyAgentGenerationStateChanged() {
+    const active = isAgentGenerationActive();
+
+    for (const listener of agentGenerationStateListeners) {
+        try {
+            listener(active);
+        } catch (error) {
+            console.warn('[InChatAgents] Agent generation state listener failed:', error);
+        }
+    }
+}
+
+function notifyPromptTransformIdle() {
+    if (internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    const resolvers = [...promptTransformIdleResolvers];
+    promptTransformIdleResolvers.clear();
+
+    for (const resolve of resolvers) {
+        resolve();
+    }
+}
+
+function waitForPromptTransformIdle() {
+    if (internalPromptTransformDepth === 0) {
+        return Promise.resolve();
+    }
+
+    return new Promise(resolve => promptTransformIdleResolvers.add(resolve));
+}
+
+function clearManualAgentRunQueue() {
+    const queuedRuns = manualAgentRunQueue.splice(0);
+
+    for (const queuedRun of queuedRuns) {
+        queuedRun.resolve(null);
+    }
+
+    return queuedRuns.length;
 }
 
 export function cancelAgentGeneration() {
-    const wasActive = isAgentGenerationActive() || Boolean(streamingProcessor);
-    generationStopRequested = true;
+    const wasActive = isAgentGenerationActive();
+    const queuedCount = clearManualAgentRunQueue();
+    manualAgentRunCancelRequested = wasActive;
+
+    if (internalPromptTransformDepth > 0) {
+        generationStopRequested = true;
+    }
+
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
 
-    const stopped = stopGeneration();
-    if (stopped || wasActive) {
-        toastr.info('Stopping agent generation...');
+    const stopped = internalPromptTransformDepth > 0 || activeManualAgentRun ? stopGeneration() : false;
+    notifyAgentGenerationStateChanged();
+
+    if (stopped || wasActive || queuedCount > 0) {
+        toastr.info(queuedCount > 0 ? `Stopping agent generation and clearing ${queuedCount} queued run${queuedCount === 1 ? '' : 's'}...` : 'Stopping agent generation...');
         return true;
     }
 
     toastr.info('No agent generation is currently running.');
     return false;
+}
+
+async function processManualAgentRunQueue() {
+    if (manualAgentRunQueueProcessing) {
+        return;
+    }
+
+    manualAgentRunQueueProcessing = true;
+    notifyAgentGenerationStateChanged();
+
+    try {
+        while (manualAgentRunQueue.length > 0) {
+            if (manualAgentRunCancelRequested) {
+                break;
+            }
+
+            await waitForPromptTransformIdle();
+
+            if (manualAgentRunCancelRequested) {
+                break;
+            }
+
+            const queuedRun = manualAgentRunQueue.shift();
+            if (!queuedRun) {
+                continue;
+            }
+
+            activeManualAgentRun = queuedRun;
+            notifyAgentGenerationStateChanged();
+
+            try {
+                const result = await executeManualAgentRun(queuedRun.agentId, queuedRun.messageIndex);
+                queuedRun.resolve(result);
+            } catch (error) {
+                queuedRun.reject(error);
+            } finally {
+                activeManualAgentRun = null;
+                notifyAgentGenerationStateChanged();
+            }
+        }
+    } finally {
+        clearManualAgentRunQueue();
+        manualAgentRunCancelRequested = false;
+        manualAgentRunQueueProcessing = false;
+        activeManualAgentRun = null;
+        notifyAgentGenerationStateChanged();
+    }
+}
+
+function enqueueManualAgentRun(agentId, messageIndex) {
+    const wasAlreadyActive = isAgentGenerationActive();
+
+    return new Promise((resolve, reject) => {
+        manualAgentRunQueue.push({
+            agentId,
+            messageIndex,
+            resolve,
+            reject,
+        });
+
+        if (wasAlreadyActive) {
+            toastr.info('Queued agent run.');
+        }
+
+        notifyAgentGenerationStateChanged();
+        void processManualAgentRunQueue();
+    });
 }
 
 function isPathfinderToolAgent(agent) {
@@ -961,10 +1094,13 @@ async function requestPromptTransform(agent, promptMessages, maxTokens) {
     const CMRS = context?.ConnectionManagerRequestService;
     const runAsInternalPromptTransform = async (requestFn) => {
         internalPromptTransformDepth++;
+        notifyAgentGenerationStateChanged();
         try {
             return await requestFn();
         } finally {
             internalPromptTransformDepth = Math.max(0, internalPromptTransformDepth - 1);
+            notifyPromptTransformIdle();
+            notifyAgentGenerationStateChanged();
         }
     };
 
@@ -1838,23 +1974,7 @@ export function initAgentRunner() {
     }
 }
 
-/**
- * Manually runs a single agent on a specific message (on-demand, not triggered by generation).
- * @param {string} agentId
- * @param {number} messageIndex
- * @returns {Promise<import('./agent-store.js').InChatAgent | null>}
- */
-export async function runAgentOnMessage(agentId, messageIndex) {
-    if (!areAgentsGloballyEnabled()) {
-        toastr.warning('In-Chat Agents are disabled.');
-        return null;
-    }
-
-    if (internalPromptTransformDepth > 0) {
-        toastr.warning('Cannot run an agent while another is in progress.');
-        return null;
-    }
-
+async function executeManualAgentRun(agentId, messageIndex) {
     await commitOpenEditorForMessage(messageIndex);
 
     const agent = getAgentById(agentId);
@@ -1882,4 +2002,20 @@ export async function runAgentOnMessage(agentId, messageIndex) {
     }
 
     return result;
+}
+
+/**
+ * Manually runs a single agent on a specific message (on-demand, not triggered by generation).
+ * Requests are queued so repeated manual runs apply one at a time.
+ * @param {string} agentId
+ * @param {number} messageIndex
+ * @returns {Promise<import('./agent-store.js').InChatAgent | null>}
+ */
+export async function runAgentOnMessage(agentId, messageIndex) {
+    if (!areAgentsGloballyEnabled()) {
+        toastr.warning('In-Chat Agents are disabled.');
+        return null;
+    }
+
+    return await enqueueManualAgentRun(agentId, messageIndex);
 }

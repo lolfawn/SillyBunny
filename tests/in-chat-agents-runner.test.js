@@ -32,6 +32,7 @@ describe('in-chat agent post-processing runner', () => {
     let eventTypes;
     let saveChatDebounced;
     let saveChat;
+    let generateQuietPrompt;
 
     beforeEach(async () => {
         jest.resetModules();
@@ -59,6 +60,7 @@ describe('in-chat agent post-processing runner', () => {
         };
         saveChatDebounced = jest.fn();
         saveChat = jest.fn();
+        generateQuietPrompt = jest.fn(async () => 'quiet result');
 
         globalThis.document = {
             body: { dataset: {} },
@@ -100,7 +102,7 @@ describe('in-chat agent post-processing runner', () => {
                 extensionPrompts[key] = { value };
             }),
             substituteParams: jest.fn(value => String(value ?? '')),
-            generateQuietPrompt: jest.fn(async () => 'quiet result'),
+            generateQuietPrompt,
             normalizeContentText: jest.fn(value => String(value ?? '')),
             saveChatDebounced,
             stopGeneration: jest.fn(() => false),
@@ -193,6 +195,117 @@ describe('in-chat agent post-processing runner', () => {
             },
         }];
     }
+
+    function useManualTransformAgents() {
+        enabledAgents = [
+            {
+                id: 'agent-manual-a',
+                name: 'Manual A',
+                phase: 'post',
+                prompt: 'Rewrite as A',
+                injection: { order: 100 },
+                postProcess: {
+                    enabled: false,
+                    promptTransformEnabled: true,
+                    promptTransformMode: 'rewrite',
+                    promptTransformMaxTokens: 8192,
+                },
+                conditions: {
+                    triggerKeywords: [],
+                    triggerProbability: 100,
+                    generationTypes: ['normal'],
+                },
+            },
+            {
+                id: 'agent-manual-b',
+                name: 'Manual B',
+                phase: 'post',
+                prompt: 'Rewrite as B',
+                injection: { order: 110 },
+                postProcess: {
+                    enabled: false,
+                    promptTransformEnabled: true,
+                    promptTransformMode: 'rewrite',
+                    promptTransformMaxTokens: 8192,
+                },
+                conditions: {
+                    triggerKeywords: [],
+                    triggerProbability: 100,
+                    generationTypes: ['normal'],
+                },
+            },
+        ];
+    }
+
+    async function waitFor(condition) {
+        for (let i = 0; i < 20; i++) {
+            if (condition()) {
+                return;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    }
+
+    test('does not mark normal chat generation as active agent generation', async () => {
+        const { initAgentRunner, isAgentGenerationActive } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        expect(isAgentGenerationActive()).toBe(false);
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+
+        expect(isAgentGenerationActive()).toBe(false);
+
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+
+        expect(isAgentGenerationActive()).toBe(false);
+    });
+
+    test('queues manual agent runs while another manual agent is active', async () => {
+        useManualTransformAgents();
+        const quietResolvers = [];
+        generateQuietPrompt.mockImplementation(async () => await new Promise(resolve => quietResolvers.push(resolve)));
+        chat.push({
+            name: 'Assistant',
+            mes: 'Original reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        const { isAgentGenerationActive, runAgentOnMessage } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+
+        const firstRun = runAgentOnMessage('agent-manual-a', 0);
+        await waitFor(() => generateQuietPrompt.mock.calls.length === 1);
+
+        expect(isAgentGenerationActive()).toBe(true);
+
+        const secondRun = runAgentOnMessage('agent-manual-b', 0);
+        await waitFor(() => quietResolvers.length === 1);
+
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(1);
+        expect(toastr.info).toHaveBeenCalledWith('Queued agent run.');
+
+        quietResolvers.shift()('First rewrite');
+        const firstResult = await firstRun;
+
+        expect(firstResult.status).toBe('changed');
+        expect(chat[0].mes).toBe('First rewrite');
+
+        await waitFor(() => generateQuietPrompt.mock.calls.length === 2);
+
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(2);
+        expect(isAgentGenerationActive()).toBe(true);
+
+        quietResolvers.shift()('Second rewrite');
+        const secondResult = await secondRun;
+
+        expect(secondResult.status).toBe('changed');
+        expect(chat[0].mes).toBe('Second rewrite');
+        expect(toastr.warning).not.toHaveBeenCalledWith('Cannot run an agent while another is in progress.');
+        expect(isAgentGenerationActive()).toBe(false);
+    });
 
     test('defers enabled post-processing agents until the main generation is idle', async () => {
         useAppendPostAgent();
