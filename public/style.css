@@ -6201,7 +6201,7 @@ body:not(.movingUI) .drawer-content.maximized {
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor)));
-    padding: 8px 0 4px;
+    padding: 8px 14px 6px;
     margin: 4px 0;
     border-bottom: 1px solid color-mix(in srgb, var(--color-border, var(--SmartThemeBorderColor)) 60%, transparent);
 }
