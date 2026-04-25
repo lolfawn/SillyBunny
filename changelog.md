@@ -60,6 +60,7 @@ Date: 2026-04-25
 - Made the World Info editor shrink safely inside desktop drawers and added a desktop-only resizable pop-up editor for roomier lorebook editing while mobile keeps its inline entry workflow.
 - Shortened the primary character edit shortcut labels to `FAV.` and `ADV.` so they stay centered and readable in compact layouts.
 - Added flat WebKit-safe Ripple chat style fallbacks so the built-in style keeps message text and avatars visible instead of rendering as an empty card.
+- Fixed Moonlit Echoes' mobile input-field override so enabling the extension no longer stretches the bottom composer into an unusable full-height panel.
 - Made the character First Message editor taller by default on desktop and vertically resizable so long greetings are easier to edit without opening the maximized editor.
 - Centered the Top Bar Label option cards so Context Size, Character Name, and Custom Text align cleanly inside their controls on desktop and mobile.
 - Anchored the Sampling documentation help button inside the Sampling drawer header for chat and text completion presets so it no longer floats while scrolling.
@@ -123,6 +124,7 @@ Commits:
 - `feat(chat): add backup cleanup controls`
 - `fix(ui): stabilize persona and ripple mobile layout`
 - `fix(ui): tighten chat bottom spacing`
+- `fix(extension): prevent moonlit mobile composer stretching`
 
 ## v1.4.5
 
