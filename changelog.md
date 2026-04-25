@@ -26,6 +26,7 @@ Date: 2026-04-25
 - Saved Character Author's Note (Private) to group chat metadata so the note persists on the actual group chat across speaker turns.
 
 ### Mobile UI
+- Renamed the top-bar Navigate button and matching onboarding/docs copy to Workspace so the shell label matches the panel title.
 - Fixed the mobile Extensions header controls so the section title, update checkbox, and action buttons keep compact, centered alignment without relying on extension CSS.
 - Restored zoomed chat avatars on desktop and mobile by accepting both thumbnail URLs and full avatar image paths when opening a message avatar.
 - Aligned chat avatar metadata, swipe controls, and icon-only buttons so the default UI keeps strict square control sizing on desktop and mobile.
@@ -97,6 +98,7 @@ Commits:
 - `fix(ui): align pathfinder diagnostics button`
 - `fix(ui): keep pathfinder log detail inline`
 - `fix(agents): queue manual agent runs`
+- `fix(ui): rename navigate button to workspace`
 
 ## v1.4.5
 

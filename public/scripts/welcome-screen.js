@@ -150,11 +150,11 @@ const WELCOME_TUTORIAL_STEPS = Object.freeze([
 
 const WELCOME_GUIDE_CARDS = Object.freeze([
     {
-        title: 'Navigate Menu',
-        body: 'Open the Navigate button in the top bar when you want to change how the AI behaves: connecting APIs, swapping presets, tuning formatting, or loading lore and agent helpers.',
+        title: 'Workspace Menu',
+        body: 'Open the Workspace button in the top bar when you want to change how the AI behaves: connecting APIs, swapping presets, tuning formatting, or loading lore and agent helpers.',
         chips: ['Presets', 'API', 'Advanced Formatting', 'World Info', 'Agents'],
         icon: 'fa-compass-drafting',
-        actionLabel: 'Open the Navigate menu',
+        actionLabel: 'Open the Workspace menu',
         actionType: 'open-tab',
         actionValue: 'left:presets',
     },

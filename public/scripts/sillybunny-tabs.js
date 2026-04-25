@@ -201,7 +201,7 @@ const SB_SHELLS = Object.freeze({
         hostIconSelector: '#leftNavDrawerIcon',
         proxyButtonId: 'sb-left-shell-toggle',
         proxyIcon: 'fa-bars',
-        proxyLabel: 'Navigate',
+        proxyLabel: 'Workspace',
         title: 'Workspace',
         subtitle: 'Back end modifications, model setup, presets, lorebooks, and formatting tools live here.',
         searchPlaceholder: 'Quick find presets, samplers, lorebooks...',

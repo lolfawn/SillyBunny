@@ -15,13 +15,13 @@ An elegant fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), de
 <details>
 <summary><h2>Screenshots</h2></summary>
 
-These screenshots show the graphical shell UI across Navigate, Customize, Agents, Characters, Search, and a Bunny Guide in-chat view on desktop and mobile.
+These screenshots show the graphical shell UI across Workspace, Customize, Agents, Characters, Search, and a Bunny Guide in-chat view on desktop and mobile.
 
 #### Desktop
 
-| Desktop Navigation Menu | Desktop Customize Menu |
+| Desktop Workspace Menu | Desktop Customize Menu |
 | :---: | :---: |
-| <img src="screenshots/sillybunny-ui-desktop-navigate-v1.4.0.png" alt="Desktop Navigation Menu" width="100%"> | <img src="screenshots/sillybunny-ui-desktop-customize-v1.4.0.png" alt="Desktop Customize Menu" width="100%"> |
+| <img src="screenshots/sillybunny-ui-desktop-navigate-v1.4.0.png" alt="Desktop Workspace Menu" width="100%"> | <img src="screenshots/sillybunny-ui-desktop-customize-v1.4.0.png" alt="Desktop Customize Menu" width="100%"> |
 
 | Desktop Agents Menu | Desktop Characters Menu |
 | :---: | :---: |
@@ -33,9 +33,9 @@ These screenshots show the graphical shell UI across Navigate, Customize, Agents
 
 #### Mobile
 
-| Mobile Navigation Menu | Mobile Customize Menu | Mobile Agents Menu |
+| Mobile Workspace Menu | Mobile Customize Menu | Mobile Agents Menu |
 | :---: | :---: | :---: |
-| <img src="screenshots/sillybunny-ui-mobile-navigate-v1.4.0.png" alt="Mobile Navigation Menu" width="100%"> | <img src="screenshots/sillybunny-ui-mobile-customize-v1.4.0.png" alt="Mobile Customize Menu" width="100%"> | <img src="screenshots/sillybunny-ui-mobile-agents-v1.4.0.png" alt="Mobile Agents Menu" width="100%"> |
+| <img src="screenshots/sillybunny-ui-mobile-navigate-v1.4.0.png" alt="Mobile Workspace Menu" width="100%"> | <img src="screenshots/sillybunny-ui-mobile-customize-v1.4.0.png" alt="Mobile Customize Menu" width="100%"> | <img src="screenshots/sillybunny-ui-mobile-agents-v1.4.0.png" alt="Mobile Agents Menu" width="100%"> |
 
 | Mobile Characters Menu | Mobile Search | Mobile Chat |
 | :---: | :---: | :---: |
@@ -153,7 +153,7 @@ Our primary goals for SillyBunny are as follows:
 
 The original SillyTavern layout is replaced with a custom, easy-to-navigate graphical shell:
 
-- **Top bar**: Reworked with cleaner, better-defined nested menus. Includes Navigate, Customize, Home, and Characters.
+- **Top bar**: Reworked with cleaner, better-defined nested menus. Includes Workspace, Customize, Home, and Characters.
 - **Bottom bar**: New bottom bar designed for quick access to persona switching, quick chat switching, and add/edit/remove existing chat functionality.
 - **Panel-oriented navigation**: Easy access to all settings in nested panels. Collapsible settings sections in both Chat Completions and Text Completions presets.
 - **Global search**: A global search bar that queries across presets, lore, extensions, personas, and settings at once.
