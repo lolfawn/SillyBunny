@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+Date: 2026-04-25
+
+### Launcher And Dependencies
+- Added a dependency-state marker so Windows and shell launchers skip routine installs when `package.json`, lockfiles, runtime profile, and `NODE_ENV` have not changed.
+- Reduced Bun launcher install noise by using quiet install flags and kept Node launcher parity with `npm ci` when a lockfile is present.
+
+### Optional Moonlit Echoes
+- Made extension-owned chat styles fall back to the default flat chat class when Moonlit Echoes is disabled or uninstalled, while preserving the saved style value for when the extension is re-enabled.
+- Removed Moonlit-specific core search copy and avoided hard-coding the Moonlit drawer in Nemo's extension category list.
+- Kept optional theme compatibility styles generic so the default UI remains presentable without Moonlit.
+
+### Mobile UI
+- Fixed the mobile Extensions header controls so the section title, update checkbox, and action buttons keep compact, centered alignment without relying on extension CSS.
+
+Commits:
+- `fix(ui): make Moonlit Echoes optional`
+
 ## v1.4.5
 
 Date: 2026-04-24

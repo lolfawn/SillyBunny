@@ -52,8 +52,16 @@ if "%_need_git%"=="1" if "%_auto_update%"=="1" (
 )
 
 set NODE_ENV=production
-call bun install --frozen-lockfile --production
-if %errorlevel% neq 0 goto end
+bun scripts\dependency-state.js check bun-production > nul 2>&1
+if !errorlevel! neq 0 (
+    echo Installing Bun packages...
+    call bun install --frozen-lockfile --production --no-progress --no-summary
+    if !errorlevel! neq 0 goto end
+    bun scripts\dependency-state.js mark bun-production
+    if !errorlevel! neq 0 goto end
+) else (
+    echo Dependencies are up to date.
+)
 
 REM Check if running on ARM — Bun has CPU overhead issues on ARM (oven-sh/bun#26415)
 if /I "%PROCESSOR_ARCHITECTURE%"=="ARM64" (

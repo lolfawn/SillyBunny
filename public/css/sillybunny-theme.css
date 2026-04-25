@@ -303,11 +303,11 @@ body.chrome-macos #sb-chatbar-layer {
 }
 
 /*
- * Moonlit Echoes keeps the legacy top-settings stack above the managed
- * SillyBunny top bar and also adds its own header blur treatment. On some
- * browser/GPU combinations that legacy layer can mispaint as opaque black
- * blocks over the centered brand. Keep the managed header above it, flatten
- * the Moonlit header surface, and avoid extra containment in the top-bar stack.
+ * Optional extension chat styles can keep the legacy top-settings stack above
+ * the managed SillyBunny top bar and add their own header blur treatment. On
+ * some browser/GPU combinations that legacy layer can mispaint as opaque black
+ * blocks over the centered brand. Keep the managed header above it, flatten the
+ * legacy header surface, and avoid extra containment in the top-bar stack.
  */
 body.echostyle #top-bar,
 body.hushstyle #top-bar {
@@ -652,7 +652,7 @@ select.text_pole {
         max-height: var(--bottomFormBlockSize) !important;
     }
 
-    /* Override any theme-specific sizing (Moonlit Echoes etc.) */
+    /* Override any optional theme-specific sizing. */
     #leftSendForm > *,
     #rightSendForm > *:not(.mes_stop),
     #form_sheld #options_button {
@@ -2761,6 +2761,17 @@ input[type='range']::-moz-range-thumb {
         display: flex;
         flex-direction: column;
         align-items: stretch;
+    }
+
+    #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > h3,
+    #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label {
+        flex: 0 0 auto;
+        min-height: 0;
+    }
+
+    #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label[for='extensions_notify_updates'] {
+        flex: 0 0 auto;
+        min-width: 0;
     }
 
     #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label {

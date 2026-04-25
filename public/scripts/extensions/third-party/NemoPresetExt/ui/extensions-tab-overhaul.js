@@ -97,7 +97,7 @@ export const ExtensionsTabOverhaul = {
             'nemovrm_settings',
             'nemo-ext-nemovrm'
         ],
-        'UI & Themes': ['SillyTavernMoonlitEchoesTheme-drawer', 'rewrite-extension-settings', 'loremanager_settings', 'noass_settings', 'stsc--settings', 'charCreator_settings', 'weatherpack-settings', 'worldInfoRecommender_settings', 'lootTipEnabled', 'example-extension-settings'],
+        'UI & Themes': ['rewrite-extension-settings', 'loremanager_settings', 'noass_settings', 'stsc--settings', 'charCreator_settings', 'weatherpack-settings', 'worldInfoRecommender_settings', 'lootTipEnabled', 'example-extension-settings'],
     },
 
     initialize: function() {
@@ -377,6 +377,11 @@ export const ExtensionsTabOverhaul = {
         this.setupContextMenu();
     },
 
+    isThemeLikeExtension: function(extension) {
+        const searchable = `${extension.id} ${extension.title}`.toLowerCase();
+        return searchable.includes('theme') || searchable.includes('appearance') || searchable.includes('styling');
+    },
+
     groupExtensions: function(extensions) {
         const grouped = {};
         
@@ -397,6 +402,10 @@ export const ExtensionsTabOverhaul = {
                     category = cat;
                     break;
                 }
+            }
+
+            if (category === 'Other' && this.isThemeLikeExtension(ext)) {
+                category = 'UI & Themes';
             }
             
             if (!grouped[category]) grouped[category] = [];

@@ -12,8 +12,20 @@ if %errorlevel% neq 0 (
 )
 
 set NODE_ENV=production
-call npm install --no-audit --no-fund --omit=dev
-if %errorlevel% neq 0 goto end
+node scripts\dependency-state.js check node-production > nul 2>&1
+if !errorlevel! neq 0 (
+    echo Installing packages via npm (Node.js mode)...
+    if exist package-lock.json (
+        call npm ci --no-audit --no-fund --omit=dev --loglevel=error
+    ) else (
+        call npm install --no-audit --no-fund --omit=dev --loglevel=error
+    )
+    if !errorlevel! neq 0 goto end
+    node scripts\dependency-state.js mark node-production
+    if !errorlevel! neq 0 goto end
+) else (
+    echo Dependencies are up to date.
+)
 
 echo Entering SillyBunny (Node.js mode)...
 set NODE_NO_WARNINGS=1

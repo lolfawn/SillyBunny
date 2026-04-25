@@ -250,7 +250,7 @@ const SB_SHELLS = Object.freeze({
         title: 'Customize',
         subtitle: 'Personalize your workspace, add/remove extensions, change personas, modify server settings, or check logs here.',
         searchPlaceholder: 'Search themes, top bar, personas, backgrounds, or extensions',
-        searchExamples: ['Moonlit', 'top bar', 'Appearance', 'notify extension updates', 'persona'],
+        searchExamples: ['theme', 'top bar', 'Appearance', 'notify extension updates', 'persona'],
         storageKey: SB_STORAGE_KEYS.rightTab,
         defaultTabId: 'settings',
         baseTab: {
@@ -258,7 +258,7 @@ const SB_SHELLS = Object.freeze({
             label: 'Settings',
             icon: 'fa-sliders',
             searchPlaceholder: 'Search Appearance, top bar, chat style, blur, or update notices',
-            searchExamples: ['Moonlit', 'top bar', 'Appearance', 'notify extension updates'],
+            searchExamples: ['theme', 'top bar', 'Appearance', 'notify extension updates'],
         },
         embeddedTabs: [
             {
@@ -266,8 +266,8 @@ const SB_SHELLS = Object.freeze({
                 drawerId: 'extensions-settings-button',
                 label: 'Extensions',
                 icon: 'fa-cubes',
-                searchPlaceholder: 'Search Moonlit, Quick Reply, Dialogue Colors, or Image Gen',
-                searchExamples: ['Moonlit', 'Quick Reply', 'Dialogue Colors', 'Image Gen'],
+                searchPlaceholder: 'Search themes, Quick Reply, Dialogue Colors, or Image Gen',
+                searchExamples: ['themes', 'Quick Reply', 'Dialogue Colors', 'Image Gen'],
             },
             {
                 id: 'persona',

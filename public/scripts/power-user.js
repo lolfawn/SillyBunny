@@ -188,6 +188,14 @@ const CHAT_STYLE_BODY_CLASSES = Object.freeze({
     [chat_styles.DOCUMENT]: 'documentstyle',
 });
 
+const OPTIONAL_EXTENSION_CHAT_STYLE_BODY_CLASSES = Object.freeze([
+    'echostyle',
+    'whisperstyle',
+    'hushstyle',
+    'ripplestyle',
+    'tidestyle',
+]);
+
 function isValidChatDisplayValue(value) {
     return Number.isInteger(value) && value >= 0;
 }
@@ -1167,10 +1175,13 @@ function applyChatDisplay() {
         }
     }
 
-    const nextClass = CHAT_STYLE_BODY_CLASSES[power_user.chat_display] ?? '';
-    const allClasses = Object.values(CHAT_STYLE_BODY_CLASSES).join(' ');
+    const nextClass = CHAT_STYLE_BODY_CLASSES[power_user.chat_display] ?? CHAT_STYLE_BODY_CLASSES[chat_styles.DEFAULT];
+    const allClasses = [
+        ...Object.values(CHAT_STYLE_BODY_CLASSES),
+        ...OPTIONAL_EXTENSION_CHAT_STYLE_BODY_CLASSES,
+    ].join(' ');
 
-    console.debug(`applying ${nextClass || '(extension-managed)'}`);
+    console.debug(`applying ${nextClass}`);
     $('body').removeClass(allClasses);
 
     if (nextClass) {
