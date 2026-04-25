@@ -396,6 +396,11 @@ h3:not(.popup h3):not(#chat h3) {
     gap: 8px;
 }
 
+:root[data-sb-compact-mode='true'] .checkbox_label {
+    min-height: 30px;
+    gap: 6px;
+}
+
 .checkbox_label > input[type="checkbox"],
 .checkbox_label > input[type="radio"] {
     flex: 0 0 auto;
@@ -415,6 +420,11 @@ h3:not(.popup h3):not(#chat h3) {
     line-height: 1.45;
 }
 
+:root[data-sb-compact-mode='true'] .checkbox_label small,
+:root[data-sb-compact-mode='true'] .checkbox_label span {
+    line-height: 1.32;
+}
+
 @media screen and (min-width: 769px) and (max-width: 1280px) and (pointer: fine) {
     .checkbox_label {
         min-height: 32px;
@@ -429,6 +439,17 @@ h3:not(.popup h3):not(#chat h3) {
     transform: translateY(-1px);
     background: var(--sb-button-hover);
     box-shadow: 0 12px 20px color-mix(in srgb, var(--SmartThemeShadowColor) 12%, transparent);
+}
+
+:root[data-sb-compact-mode='true'] .sb-shell-panel-scroller .menu_button,
+:root[data-sb-compact-mode='true'] .sb-shell-panel-scroller .menu_button_icon,
+:root[data-sb-compact-mode='true'] .sb-shell-panel-scroller button.menu_button,
+:root[data-sb-compact-mode='true'] .sb-shell-panel-scroller button.menu_button_icon {
+    min-height: 32px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: calc(var(--mainFontSize) * 0.86);
+    line-height: 1.2;
 }
 
 .menu_button:not(.disabled):not([disabled]):active,
@@ -600,6 +621,29 @@ select.text_pole {
     caret-color: var(--color-primary, var(--sb-accent));
     font-size: calc(var(--mainFontSize) * 0.98);
     transition: border-color var(--sb-transition-fast), box-shadow var(--sb-transition-fast), background-color var(--sb-transition-fast);
+}
+
+:root[data-sb-compact-mode='true'] #send_form {
+    padding: 6px;
+    border-radius: 20px;
+}
+
+:root[data-sb-compact-mode='true'] #nonQRFormItems {
+    gap: 5px;
+    padding: 4px 6px;
+}
+
+:root[data-sb-compact-mode='true'] #leftSendForm,
+:root[data-sb-compact-mode='true'] #rightSendForm {
+    gap: 5px;
+}
+
+:root[data-sb-compact-mode='true'] #send_textarea {
+    min-height: 56px;
+    padding: 10px 12px;
+    line-height: 1.45;
+    border-radius: 12px;
+    font-size: calc(var(--mainFontSize) * 0.94);
 }
 
 #send_textarea::placeholder {

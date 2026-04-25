@@ -18,6 +18,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     bottomBarScale: 'sb-bottom-bar-scale',
     mobileButtonScale: 'sb-mobile-button-scale',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
+    compactMode: 'sb-compact-mode',
 });
 
 const SB_SHORTCUT_TARGETS = Object.freeze([
@@ -185,6 +186,11 @@ const SB_MESSAGE_STYLES = Object.freeze([
     { id: '0', label: 'Flat', icon: 'fa-grip-lines' },
     { id: '1', label: 'Bubbles', icon: 'fa-comment-dots' },
     { id: '2', label: 'Document', icon: 'fa-file-lines' },
+    { id: '3', label: 'Echo', icon: 'fa-wave-square' },
+    { id: '4', label: 'Whisper', icon: 'fa-comment' },
+    { id: '5', label: 'Hush', icon: 'fa-volume-xmark' },
+    { id: '6', label: 'Ripple', icon: 'fa-water' },
+    { id: '7', label: 'Tide', icon: 'fa-water' },
 ]);
 
 const SB_SHELLS = Object.freeze({
@@ -349,6 +355,7 @@ const sbState = {
     inlineDrawerAutoClose: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.settingsDrawerAutoClose), false),
     theme: normalizeTheme(safeGetItem(SB_STORAGE_KEYS.theme)),
     surfaceTransparency: normalizeSurfaceTransparency(safeGetItem(SB_STORAGE_KEYS.surfaceTransparency)),
+    compactMode: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), false),
     bottomBarScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale)),
     mobileButtonScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.mobileButtonScale)),
     topbarScale: {
@@ -416,6 +423,11 @@ const sbState = {
         dragListenersBound: false,
         chatbarToggleButton: null,
         dragHandleButton: null,
+    },
+    chatAvatars: {
+        observer: null,
+        debounceTimer: 0,
+        retryTimer: 0,
     },
     bottomChatBar: {
         chatSelect: null,
@@ -635,6 +647,7 @@ function restorePersistedTopbarState() {
     sbState.topbarLabel.customText = normalizeTopbarCustomText(safeGetItem(SB_STORAGE_KEYS.topbarLabelCustomText));
     sbState.chatbar.visible = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.chatbarVisible), sbState.chatbar.visible);
     sbState.chatbar.topbarOffset = normalizeTopbarOffset(safeGetItem(SB_STORAGE_KEYS.topbarOffset));
+    sbState.compactMode = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), sbState.compactMode);
 }
 
 function clampTopbarOffset(offset) {
@@ -728,6 +741,19 @@ function setMobileButtonScale(value, { persist = true } = {}) {
 
     if (persist) {
         safeSetItem(SB_STORAGE_KEYS.mobileButtonScale, String(nextScale));
+    }
+
+    updateThemePickerUi();
+}
+
+function setCompactMode(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.compactMode = nextEnabled;
+    document.documentElement.dataset.sbCompactMode = String(nextEnabled);
+    document.body?.classList.toggle('sb-compact-mode', nextEnabled);
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.compactMode, String(nextEnabled));
     }
 
     updateThemePickerUi();
@@ -1378,6 +1404,175 @@ function setMessageStyle(styleId) {
     }
 
     updateThemePickerUi();
+}
+
+function stripAvatarOrigin(url) {
+    const normalizedUrl = String(url ?? '').trim();
+    if (!normalizedUrl) {
+        return '';
+    }
+
+    return normalizedUrl.startsWith(window.location.origin)
+        ? normalizedUrl.slice(window.location.origin.length)
+        : normalizedUrl;
+}
+
+function safeDecodeUriComponent(value) {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
+}
+
+function parseChatAvatarSource(rawSrc) {
+    const normalizedSrc = stripAvatarOrigin(rawSrc);
+    if (!normalizedSrc) {
+        return null;
+    }
+
+    const trimmedSrc = normalizedSrc.startsWith('/') ? normalizedSrc.slice(1) : normalizedSrc;
+
+    try {
+        const parsedUrl = new URL(normalizedSrc, window.location.origin);
+        if (parsedUrl.pathname.endsWith('thumbnail')) {
+            const type = parsedUrl.searchParams.get('type');
+            const file = parsedUrl.searchParams.get('file');
+
+            if (type && file) {
+                return { type, file: safeDecodeUriComponent(file) };
+            }
+        }
+    } catch {
+        // Fall back to direct path inspection below.
+    }
+
+    if (trimmedSrc.startsWith('characters/')) {
+        return { type: 'avatar', file: trimmedSrc.replace(/^characters\//, '') };
+    }
+
+    if (trimmedSrc.startsWith('User Avatars/')) {
+        return { type: 'persona', file: trimmedSrc.replace(/^User Avatars\//, '') };
+    }
+
+    return { type: null, file: normalizedSrc };
+}
+
+function isAbsoluteAvatarUrl(path) {
+    return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(String(path ?? ''));
+}
+
+function ensureAvatarPath(path) {
+    const normalizedPath = String(path ?? '').trim();
+    if (!normalizedPath || isAbsoluteAvatarUrl(normalizedPath)) {
+        return normalizedPath;
+    }
+
+    return normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
+}
+
+function getChatAvatarSources(rawSrc) {
+    const avatarInfo = parseChatAvatarSource(rawSrc);
+    if (!avatarInfo) {
+        return { thumb: '', original: '' };
+    }
+
+    const { type, file } = avatarInfo;
+    const thumb = type === 'avatar' || type === 'persona'
+        ? `/thumbnail?type=${type}&file=${encodeURIComponent(file)}`
+        : ensureAvatarPath(file);
+    const original = type === 'avatar'
+        ? ensureAvatarPath(`characters/${file}`)
+        : type === 'persona'
+            ? ensureAvatarPath(`User Avatars/${file}`)
+            : ensureAvatarPath(file);
+
+    return {
+        thumb: stripAvatarOrigin(thumb),
+        original: stripAvatarOrigin(original),
+    };
+}
+
+function formatAvatarCssUrl(url) {
+    const normalizedUrl = stripAvatarOrigin(url);
+    return normalizedUrl ? `url(${JSON.stringify(normalizedUrl)})` : '';
+}
+
+function updateChatAvatarVariables(root = document) {
+    const messages = root instanceof HTMLElement && root.matches('.mes')
+        ? [root]
+        : Array.from(root.querySelectorAll?.('.mes') ?? []);
+
+    for (const message of messages) {
+        if (!(message instanceof HTMLElement)) {
+            continue;
+        }
+
+        const avatarImg = message.querySelector('.avatar img');
+        if (!(avatarImg instanceof HTMLImageElement)) {
+            continue;
+        }
+
+        const srcCandidate = avatarImg.getAttribute('src') || avatarImg.getAttribute('data-src') || avatarImg.currentSrc;
+        const { thumb, original } = getChatAvatarSources(srcCandidate);
+
+        if (!thumb && !original) {
+            continue;
+        }
+
+        const thumbUrl = thumb || original;
+        const originalUrl = original || thumbUrl;
+        const displayUrl = originalUrl || thumbUrl;
+
+        message.dataset.avatarThumb = thumbUrl;
+        message.dataset.avatarOriginal = originalUrl;
+        message.dataset.avatar = displayUrl;
+        message.style.setProperty('--mes-avatar-thumb-url', formatAvatarCssUrl(thumbUrl));
+        message.style.setProperty('--mes-avatar-original-url', formatAvatarCssUrl(originalUrl));
+        message.style.setProperty('--mes-avatar-url', formatAvatarCssUrl(displayUrl));
+    }
+}
+
+function scheduleChatAvatarVariableUpdate(delay = 80) {
+    window.clearTimeout(sbState.chatAvatars.debounceTimer);
+    sbState.chatAvatars.debounceTimer = window.setTimeout(() => {
+        sbState.chatAvatars.debounceTimer = 0;
+        updateChatAvatarVariables();
+    }, delay);
+}
+
+function initChatAvatarVariables() {
+    window.updateSillyBunnyChatAvatars = updateChatAvatarVariables;
+    updateChatAvatarVariables();
+
+    if (sbState.chatAvatars.observer instanceof MutationObserver) {
+        return;
+    }
+
+    const chatContainer = document.getElementById('chat');
+    if (!(chatContainer instanceof HTMLElement)) {
+        if (!sbState.chatAvatars.retryTimer) {
+            sbState.chatAvatars.retryTimer = window.setTimeout(() => {
+                sbState.chatAvatars.retryTimer = 0;
+                initChatAvatarVariables();
+            }, SB_INIT_RETRY_DELAY_MS);
+        }
+        return;
+    }
+
+    window.clearTimeout(sbState.chatAvatars.retryTimer);
+    sbState.chatAvatars.retryTimer = 0;
+
+    const observer = new MutationObserver(() => scheduleChatAvatarVariableUpdate());
+    observer.observe(chatContainer, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['src', 'data-src'],
+    });
+
+    sbState.chatAvatars.observer = observer;
+    document.addEventListener('sb:chat-style-updated', () => scheduleChatAvatarVariableUpdate(0));
 }
 
 function setShellTheme(themeId, { persist = true } = {}) {
@@ -6144,6 +6339,40 @@ function createShortcutSettingsGroup() {
     return group;
 }
 
+function createCompactModeSettingsGroup() {
+    const group = createElement('section', {
+        className: 'sb-theme-slider-group sb-compact-mode-group',
+    });
+    const label = createElement('label', {
+        className: 'sb-compact-mode-option',
+        attrs: {
+            for: 'sb-compact-mode-input',
+        },
+    });
+    const checkbox = createElement('input', {
+        id: 'sb-compact-mode-input',
+        className: 'sb-compact-mode-checkbox',
+        attrs: {
+            type: 'checkbox',
+        },
+    });
+    const copy = createElement('span', { className: 'sb-compact-mode-copy' });
+    const title = createElement('strong', { text: 'Compact Mode' });
+    const description = createElement('small', {
+        text: 'Reduce spacing, controls, and mobile composer height for denser screens.',
+    });
+
+    checkbox.addEventListener('change', event => {
+        const input = event.currentTarget;
+        setCompactMode(input instanceof HTMLInputElement && input.checked);
+    });
+
+    copy.append(title, description);
+    label.append(checkbox, copy);
+    group.appendChild(label);
+    return group;
+}
+
 function updateShortcutButton(side) {
     const buttonId = side === 'left' ? 'sb-shortcut-left' : 'sb-shortcut-right';
     const button = document.getElementById(buttonId);
@@ -6299,6 +6528,7 @@ function injectThemePicker() {
         className: 'sb-mobile-only-setting',
     });
     const topbarLabelSettingsGroup = createTopbarLabelSettingsGroup();
+    const compactModeSettingsGroup = createCompactModeSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();
     header.append(title, description);
 
@@ -6323,7 +6553,7 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
-    card.append(header, optionRow, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
+    card.append(header, optionRow, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
     themeBlock.prepend(card);
     updateThemePickerUi();
 }
@@ -6338,6 +6568,7 @@ function updateThemePickerUi() {
     const mobileButtonScaleInput = document.getElementById('sb-mobile-button-scale-input');
     const mobileButtonScaleValue = document.getElementById('sb-mobile-button-scale-value');
     const customTextInput = document.getElementById('sb-topbar-custom-text-input');
+    const compactModeInput = document.getElementById('sb-compact-mode-input');
 
     for (const button of document.querySelectorAll('[data-sb-theme-option]')) {
         const themeId = button.getAttribute('data-sb-theme-option');
@@ -6395,6 +6626,11 @@ function updateThemePickerUi() {
 
     if (customTextInput instanceof HTMLInputElement && customTextInput.value !== sbState.topbarLabel.customText) {
         customTextInput.value = sbState.topbarLabel.customText;
+    }
+
+    if (compactModeInput instanceof HTMLInputElement) {
+        compactModeInput.checked = sbState.compactMode;
+        compactModeInput.closest('.sb-compact-mode-option')?.classList.toggle('is-selected', sbState.compactMode);
     }
 
     for (const button of document.querySelectorAll('[data-sb-message-style]')) {
@@ -8190,10 +8426,12 @@ function initAll() {
     bindCharacterEditorExitButton();
     setShellTheme(sbState.theme, { persist: false });
     setSurfaceTransparency(sbState.surfaceTransparency, { persist: false });
+    setCompactMode(sbState.compactMode, { persist: false });
     setTopbarScale('desktop', sbState.topbarScale.desktop, { persist: false });
     setTopbarScale('mobile', sbState.topbarScale.mobile, { persist: false });
     setBottomBarScale(sbState.bottomBarScale, { persist: false });
     setMobileButtonScale(sbState.mobileButtonScale, { persist: false });
+    initChatAvatarVariables();
     syncDesktopShellSizing();
     buildTopBar();
     bindLandingPageObserver();
@@ -8246,6 +8484,9 @@ function initAll() {
         setMobileButtonScale(value) {
             setMobileButtonScale(value);
         },
+        setCompactMode(value) {
+            setCompactMode(value);
+        },
         setMessageStyle,
         openChatTools() {
             if (isMobileViewport()) {
@@ -8278,6 +8519,9 @@ function initAll() {
         },
         getMobileButtonScale() {
             return sbState.mobileButtonScale;
+        },
+        getCompactMode() {
+            return sbState.compactMode;
         },
     };
 }

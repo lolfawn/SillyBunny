@@ -180,24 +180,26 @@ export const chat_styles = Object.freeze({
     DEFAULT: 0,
     BUBBLES: 1,
     DOCUMENT: 2,
+    ECHO: 3,
+    WHISPER: 4,
+    HUSH: 5,
+    RIPPLE: 6,
+    TIDE: 7,
 });
 
 const CHAT_STYLE_BODY_CLASSES = Object.freeze({
     [chat_styles.DEFAULT]: 'flatchat',
     [chat_styles.BUBBLES]: 'bubblechat',
     [chat_styles.DOCUMENT]: 'documentstyle',
+    [chat_styles.ECHO]: 'echostyle',
+    [chat_styles.WHISPER]: 'whisperstyle',
+    [chat_styles.HUSH]: 'hushstyle',
+    [chat_styles.RIPPLE]: 'ripplestyle',
+    [chat_styles.TIDE]: 'tidestyle',
 });
 
-const OPTIONAL_EXTENSION_CHAT_STYLE_BODY_CLASSES = Object.freeze([
-    'echostyle',
-    'whisperstyle',
-    'hushstyle',
-    'ripplestyle',
-    'tidestyle',
-]);
-
 function isValidChatDisplayValue(value) {
-    return Number.isInteger(value) && value >= 0;
+    return Number.isInteger(value) && Object.hasOwn(CHAT_STYLE_BODY_CLASSES, value);
 }
 
 export const send_on_enter_options = {
@@ -1176,10 +1178,7 @@ function applyChatDisplay() {
     }
 
     const nextClass = CHAT_STYLE_BODY_CLASSES[power_user.chat_display] ?? CHAT_STYLE_BODY_CLASSES[chat_styles.DEFAULT];
-    const allClasses = [
-        ...Object.values(CHAT_STYLE_BODY_CLASSES),
-        ...OPTIONAL_EXTENSION_CHAT_STYLE_BODY_CLASSES,
-    ].join(' ');
+    const allClasses = Object.values(CHAT_STYLE_BODY_CLASSES).join(' ');
 
     console.debug(`applying ${nextClass}`);
     $('body').removeClass(allClasses);
