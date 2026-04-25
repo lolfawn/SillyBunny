@@ -42,6 +42,7 @@ Date: 2026-04-25
 - Aligned Chat Completion prompt/template preset selectors with their action buttons so the select field and icon controls share the same centered height on desktop and mobile.
 - Normalized context-size quick buttons, added common 4K through 2M presets, aligned the Chat Completion token-budget slider row, and attached the same clickable presets directly to Text Completions context sizing.
 - Normalized Chat Completion sampling number fields so range counters and standalone numeric inputs use equal, centered widths and heights instead of stretching into long thin boxes.
+- Reworked Advanced Definitions into a left-aligned editor layout with less top padding, full-width sections, roomier resizable textareas, and a cleaner Character's Note control grid.
 - Removed deprecated wording from visible Extras source labels while keeping the underlying Extras compatibility options available.
 - Normalized native and Select2 dropdown heights, radii, arrow spacing, and Chat Translation field layout so selects align evenly on desktop and mobile.
 - Equalized User Settings drawer headers so top-level rows use the same centered title lane, height, and font size.
@@ -105,6 +106,7 @@ Commits:
 - `fix(ui): align prompt preset controls`
 - `fix(ui): normalize context size presets`
 - `fix(ui): normalize sampling number fields`
+- `fix(ui): improve advanced definitions editing`
 
 ## v1.4.5
 
