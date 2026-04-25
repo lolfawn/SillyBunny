@@ -41,6 +41,7 @@ Date: 2026-04-25
 - Restored Individual recent chats by balancing the recent-chat fetch across individual and group conversations, and made Recent Chats filters manage their own collapsed, empty, and show-more states on desktop and mobile.
 - Improved the default mobile chat composer so the textarea keeps a full-width row with square controls, and made default mobile header/composer surfaces more opaque to stop chat text from bleeding through.
 - Reworked the final mobile composer layout so the textarea gets a larger full-width row and the tool buttons sit on the same row as the send/action controls.
+- Tightened the vertical handoff between short chats and the bottom chat bar so the last message no longer floats far above the chat controls on desktop or mobile.
 - Added a persistent compact mode that reduces shell, top-bar, mobile tools, and mobile composer density while preserving checkbox and text alignment.
 - Tightened default-theme settings, drawer, prompt manager, extension, and import surfaces so controls have consistent spacing, fixed icon sizing, theme-aware button text, and more bottom breathing room on desktop and mobile.
 - Locked the agent-changes message icon to a square control and realigned the mobile prompt manager editor rows, labels, checkbox, and footer actions.
@@ -121,6 +122,7 @@ Commits:
 - `feat(chat): add auto-label and cleanup tools`
 - `feat(chat): add backup cleanup controls`
 - `fix(ui): stabilize persona and ripple mobile layout`
+- `fix(ui): tighten chat bottom spacing`
 
 ## v1.4.5
 

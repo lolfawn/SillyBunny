@@ -242,7 +242,17 @@ body::before {
 #chat {
     position: relative;
     isolation: isolate;
+    bottom: 0;
     background: var(--sb-chat-surface-bg);
+    scroll-padding-bottom: 8px;
+}
+
+#chat:not(:has(.welcomePanel))::before {
+    content: '';
+    display: block;
+    flex: 1 1 0;
+    min-height: 0;
+    pointer-events: none;
 }
 
 #top-bar {
