@@ -31,6 +31,7 @@ Date: 2026-04-25
 - Restored Individual recent chats by balancing the recent-chat fetch across individual and group conversations, and made Recent Chats filters manage their own collapsed, empty, and show-more states on desktop and mobile.
 - Improved the default mobile chat composer so the textarea keeps a full-width row with square controls, and made default mobile header/composer surfaces more opaque to stop chat text from bleeding through.
 - Added a persistent compact mode that reduces shell, top-bar, mobile tools, and mobile composer density while preserving checkbox and text alignment.
+- Tightened default-theme settings, drawer, prompt manager, extension, and import surfaces so controls have consistent spacing, fixed icon sizing, theme-aware button text, and more bottom breathing room on desktop and mobile.
 
 ### Server Tools
 - Added thumbnail quality controls to Customize > Server for toggling thumbnail generation, choosing JPG or PNG, setting quality and dimensions, applying SillyBunny's recommended sharp-avatar preset, and clearing the current user's thumbnail cache for rebuilds without manually editing `config.yaml`.
@@ -51,6 +52,7 @@ Commits:
 - `fix(ui): improve mobile composer readability`
 - `feat(ui): add built-in chat styles and compact mode`
 - `fix(ui): stabilize group DM avatar actions`
+- `fix(ui): polish default theme alignment`
 
 ## v1.4.5
 

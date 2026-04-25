@@ -428,6 +428,14 @@
         min-height: 44px;
     }
 
+    .menu_button.sb-accent-preset,
+    button.sb-accent-preset {
+        min-height: var(--sb-accent-swatch-size, 30px);
+        height: var(--sb-accent-swatch-size, 30px);
+        max-height: var(--sb-accent-swatch-size, 30px);
+        padding: 0;
+    }
+
     .drawer-content .floating_panel_maximize,
     .drawer-content .inline-drawer-maximize {
         display: none;
