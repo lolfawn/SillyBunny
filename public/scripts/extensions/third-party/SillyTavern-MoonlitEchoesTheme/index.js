@@ -447,7 +447,7 @@ export function toggleCss(shouldLoad) {
 
         // Load theme style
         if (!existingLinkStyle) {
-            const cssUrl = baseUrl + '/style.css?v=20260425a';
+            const cssUrl = baseUrl + '/style.css?v=20260425b';
             const linkStyle = document.createElement('link');
             linkStyle.id = 'MoonlitEchosTheme-style';
             linkStyle.rel = 'stylesheet';
@@ -495,7 +495,7 @@ function ensureChatStyleCss() {
     const linkChatStyles = document.createElement('link');
     linkChatStyles.id = 'MoonlitEchosTheme-chat-styles';
     linkChatStyles.rel = 'stylesheet';
-    linkChatStyles.href = `${baseUrl}/chat-styles.css?v=20260425a`;
+    linkChatStyles.href = `${baseUrl}/chat-styles.css?v=20260425b`;
     document.head.append(linkChatStyles);
 }
 

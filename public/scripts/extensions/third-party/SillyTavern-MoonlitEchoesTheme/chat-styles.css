@@ -1238,3 +1238,22 @@ body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .
     margin-top: var(--mesParagraphSpacingTop, 0.5em) !important;
     margin-bottom: var(--mesParagraphSpacingBottom, 0.5em) !important;
 }
+
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
+    overflow: hidden !important;
+    box-sizing: border-box;
+}
+
+body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar > img {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover;
+    object-position: center;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+}

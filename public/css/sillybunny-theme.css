@@ -921,7 +921,30 @@ select.text_pole {
 #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
     inline-size: var(--avatar-base-width);
     block-size: var(--avatar-base-height);
+    min-inline-size: var(--avatar-base-width);
+    min-block-size: var(--avatar-base-height);
+    max-inline-size: var(--avatar-base-width);
+    max-block-size: var(--avatar-base-height);
     flex: 0 0 var(--avatar-base-height);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden !important;
+    box-sizing: border-box;
+}
+
+#chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar > img {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    min-inline-size: 0;
+    min-block-size: 0;
+    max-inline-size: 100%;
+    max-block-size: 100%;
+    object-fit: cover;
+    object-position: center;
+    box-sizing: border-box;
+    flex: 0 0 auto;
 }
 
 #chat .mes .mesAvatarWrapper > :is(.mesIDDisplay, .mes_timer, .tokenCounterDisplay) {
