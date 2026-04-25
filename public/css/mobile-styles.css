@@ -1269,8 +1269,32 @@
         display: none !important;
     }
 
+    #send_form.sb-generating-controls #rightSendForm {
+        grid-area: action !important;
+        align-self: center !important;
+        align-items: center !important;
+        justify-content: center !important;
+        height: var(--bottomFormBlockSize) !important;
+        min-height: var(--bottomFormBlockSize) !important;
+        max-height: var(--bottomFormBlockSize) !important;
+        margin-block: 0 !important;
+    }
+
     #send_form.sb-generating-controls #mes_stop {
         display: flex !important;
+        order: 2 !important;
+        position: static !important;
+        inset: auto !important;
+        top: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        left: auto !important;
+        transform: none !important;
+        translate: none !important;
+        align-self: center !important;
+        justify-self: center !important;
+        place-self: center !important;
+        margin: 0 !important;
         opacity: 1 !important;
     }
 
