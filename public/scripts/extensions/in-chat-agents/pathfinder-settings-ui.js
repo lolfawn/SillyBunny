@@ -5,7 +5,7 @@
 import { renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { saveSettingsDebounced } from '../../../script.js';
 import { world_names, loadWorldInfo } from '../../world-info.js';
-import { saveAgent } from './agent-store.js';
+import { persistAgentGlobalSettings, saveAgent, setAgentEnabledForCurrentScope } from './agent-store.js';
 import {
     getPathfinderSettings,
     setPathfinderSettings,
@@ -1054,9 +1054,10 @@ async function updateAgentSettings() {
     delete agentSettings.pipelinePrompts;
     delete agentSettings.pipelines;
     currentAgent.settings = { ...agentSettings };
-    currentAgent.enabled = (s.enabledLorebooks || []).length > 0 && (s.sidecarEnabled || s.pipelineEnabled || s.autoSummary || isPathfinderToolEnabled('Pathfinder_Summarize'));
+    const agentEnabled = (s.enabledLorebooks || []).length > 0 && (s.sidecarEnabled || s.pipelineEnabled || s.autoSummary || isPathfinderToolEnabled('Pathfinder_Summarize'));
+    setAgentEnabledForCurrentScope(currentAgent, agentEnabled);
     logPathfinder('Agent settings synchronized.', {
-        enabled: currentAgent.enabled,
+        enabled: agentEnabled,
         lorebooks: s.enabledLorebooks || [],
         toolMode: Boolean(s.sidecarEnabled),
         pipelineMode: Boolean(s.pipelineEnabled),
@@ -1066,6 +1067,7 @@ async function updateAgentSettings() {
     });
 
     await saveAgent(currentAgent);
+    persistAgentGlobalSettings();
     saveSettingsDebounced();
 }
 

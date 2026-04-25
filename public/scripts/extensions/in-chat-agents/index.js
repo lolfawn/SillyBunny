@@ -18,9 +18,13 @@ import {
     AGENT_CATEGORIES,
     DEFAULT_AGENT_MAX_TOKENS,
     getGlobalSettings,
+    initializeScopedAgentEnableState,
+    isAgentEnabledForCurrentScope,
     LEGACY_AGENT_MAX_TOKENS,
     normalizeAgentCategory,
+    getAgentChatScopeLabel,
     resolveConnectionProfile,
+    setAgentEnabledForCurrentScope,
     setGlobalSettings,
     getGroups,
     getCustomGroups,
@@ -161,8 +165,9 @@ function sortAgentsByOrder(agentList = []) {
 }
 
 async function toggleAgentEnabled(agent) {
-    agent.enabled = !agent.enabled;
+    setAgentEnabledForCurrentScope(agent, !isAgentEnabledForCurrentScope(agent));
     await saveAgent(agent);
+    persistExtensionState();
     syncToolAgentRegistrations();
     renderAgentList();
 }
@@ -1133,15 +1138,16 @@ function renderAgentList() {
             quickGrid.append('<div class="ica--quick-empty">No pinned agents yet. Use the star button on an agent card or in the editor to keep it here.</div>');
         } else {
             for (const agent of favoriteAgents) {
-                const enabledClass = agent.enabled ? 'is-enabled' : '';
+                const agentEnabled = isAgentEnabledForCurrentScope(agent);
+                const enabledClass = agentEnabled ? 'is-enabled' : '';
                 const categoryLabel = AGENT_CATEGORIES[agent.category]?.label ?? 'Custom';
                 const phaseLabel = AGENT_PHASE_LABELS[agent.phase] || agent.phase;
                 const canApplyToLastReply = !isPathfinderAgent(agent);
                 const quickItem = $(`
                     <div class="ica--quick-chip ${enabledClass}">
-                        <button type="button" class="ica--quick-chip-main" title="${agent.enabled ? 'Disable agent' : 'Enable agent'}">
+                        <button type="button" class="ica--quick-chip-main" title="${agentEnabled ? 'Disable agent' : 'Enable agent'}">
                             <span class="ica--quick-chip-status">
-                                <i class="fa-solid ${agent.enabled ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>
+                                <i class="fa-solid ${agentEnabled ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>
                             </span>
                             <span class="ica--quick-chip-copy">
                                 <span class="ica--quick-chip-name">${escapeHtml(agent.name || 'Untitled Agent')}</span>
@@ -1230,8 +1236,9 @@ function renderAgentList() {
         const items = $('<div class="ica--category-items"></div>');
 
         for (const agent of catAgents) {
-            const enabledClass = agent.enabled ? 'is-enabled' : '';
-            const toggleClass = agent.enabled ? 'is-on' : '';
+            const agentEnabled = isAgentEnabledForCurrentScope(agent);
+            const enabledClass = agentEnabled ? 'is-enabled' : '';
+            const toggleClass = agentEnabled ? 'is-on' : '';
             const desc = agent.description || agent.prompt.substring(0, 80).replace(/\n/g, ' ') + (agent.prompt.length > 80 ? '...' : '');
             const regexCount = getAgentRegexScripts(agent).length;
             const promptTransformEnabled = hasPromptTransform(agent);
@@ -1246,7 +1253,7 @@ function renderAgentList() {
             const card = $(`
                 <div class="ica--agent-card ${enabledClass}${selectModeActive ? ' ica--selectable' : ''}${selectedAgentIds.has(agent.id) ? ' ica--selected' : ''}" data-agent-id="${escapeHtml(agent.id)}">
                     <div class="ica--card-header">
-                        ${selectModeActive ? `<input type="checkbox" class="ica--card-select" title="Select agent" ${selectedAgentIds.has(agent.id) ? 'checked' : ''} />` : `<button type="button" class="ica--card-toggle ${toggleClass}" title="${agent.enabled ? 'Disable' : 'Enable'}"></button>`}
+                        ${selectModeActive ? `<input type="checkbox" class="ica--card-select" title="Select agent" ${selectedAgentIds.has(agent.id) ? 'checked' : ''} />` : `<button type="button" class="ica--card-toggle ${toggleClass}" title="${agentEnabled ? 'Disable' : 'Enable'}"></button>`}
                         <span class="ica--card-name">${escapeHtml(agent.name)}</span>
                         <div class="ica--card-header-actions">
                             <button type="button" class="ica--card-favorite ${agent.favorite ? 'is-active' : ''}" title="${agent.favorite ? 'Remove from Quick Toggles' : 'Add to Quick Toggles'}">
@@ -2921,6 +2928,10 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         toastr.success(`Removed ${removedDuplicateCount} redundant bundled agent duplicate(s).`);
     }
 
+    if (getGlobalSettings().separateRecentChats && initializeScopedAgentEnableState()) {
+        persistExtensionState();
+    }
+
     // Initialize the pipeline runner
     try {
         initAgentRunner();
@@ -2981,22 +2992,34 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         renderAgentList();
     });
     $('#ica--bulkEnable').on('click', async () => {
+        let changed = false;
         for (const id of selectedAgentIds) {
             const agent = getAgentById(id);
-            if (agent && !agent.enabled) {
-                agent.enabled = true;
+            if (agent && !isAgentEnabledForCurrentScope(agent)) {
+                setAgentEnabledForCurrentScope(agent, true);
                 await saveAgent(agent);
+                changed = true;
             }
+        }
+        if (changed) {
+            persistExtensionState();
+            syncToolAgentRegistrations();
         }
         exitSelectMode();
     });
     $('#ica--bulkDisable').on('click', async () => {
+        let changed = false;
         for (const id of selectedAgentIds) {
             const agent = getAgentById(id);
-            if (agent && agent.enabled) {
-                agent.enabled = false;
+            if (agent && isAgentEnabledForCurrentScope(agent)) {
+                setAgentEnabledForCurrentScope(agent, false);
                 await saveAgent(agent);
+                changed = true;
             }
+        }
+        if (changed) {
+            persistExtensionState();
+            syncToolAgentRegistrations();
         }
         exitSelectMode();
     });
@@ -3062,9 +3085,17 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         renderAgentList();
     });
     $('#ica--separateRecentChats').on('change', function () {
-        setGlobalSettings({ separateRecentChats: $(this).prop('checked') });
+        const separated = $(this).prop('checked');
+        setGlobalSettings({ separateRecentChats: separated });
+        if (separated) {
+            initializeScopedAgentEnableState();
+        }
         persistExtensionState();
-        toastr.info('Agent chats will be separated from Individual and Group chats after refreshing the home screen.');
+        renderAgentList();
+        syncToolAgentRegistrations();
+        toastr.info(separated
+            ? `Agent toggles are now scoped to ${getAgentChatScopeLabel().toLowerCase()}. Switch chat types to configure the other scope.`
+            : 'Agent toggles are shared across Individual and Group chats again.');
     });
     $('#ica--promptTransformShowNotifications').on('change', function () {
         setGlobalSettings({ promptTransformShowNotifications: $(this).prop('checked') });
