@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -11,6 +12,7 @@ const STATE_FILES = [
     'bun.lock',
     'package-lock.json',
 ];
+const requireFromCwd = createRequire(path.join(process.cwd(), 'package.json'));
 
 function hashFileState(profile) {
     const hash = crypto.createHash('sha256');
@@ -68,6 +70,45 @@ function getCurrentState(profile) {
     };
 }
 
+function readPackageJson(packageName, baseRequire = requireFromCwd) {
+    try {
+        const packageJsonPath = baseRequire.resolve(`${packageName}/package.json`);
+        return {
+            path: packageJsonPath,
+            data: JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')),
+        };
+    } catch {
+        return null;
+    }
+}
+
+function getFirstMajor(rangeOrVersion) {
+    return String(rangeOrVersion || '').match(/\d+/)?.[0] || '';
+}
+
+function getDevelopmentInstallIssue() {
+    const eslintrc = readPackageJson('@eslint/eslintrc');
+
+    if (!eslintrc) {
+        return 'development lint dependencies are missing';
+    }
+
+    const expectedAjvMajor = getFirstMajor(eslintrc.data?.dependencies?.ajv);
+    if (!expectedAjvMajor) {
+        return '';
+    }
+
+    const eslintrcRequire = createRequire(eslintrc.path);
+    const ajv = readPackageJson('ajv', eslintrcRequire);
+    const actualAjvMajor = getFirstMajor(ajv?.data?.version);
+
+    if (actualAjvMajor !== expectedAjvMajor) {
+        return `ESLint resolved ajv ${ajv?.data?.version || 'missing'} but requires ${eslintrc.data.dependencies.ajv}`;
+    }
+
+    return '';
+}
+
 function needsInstall(profile) {
     if (!fs.existsSync(path.join(process.cwd(), 'node_modules'))) {
         return 'node_modules is missing';
@@ -75,6 +116,14 @@ function needsInstall(profile) {
 
     if (!fs.existsSync(path.join(process.cwd(), 'config.yaml'))) {
         return 'config.yaml is missing';
+    }
+
+    if (profile.endsWith('-development')) {
+        const developmentInstallIssue = getDevelopmentInstallIssue();
+
+        if (developmentInstallIssue) {
+            return developmentInstallIssue;
+        }
     }
 
     const marker = readMarker();

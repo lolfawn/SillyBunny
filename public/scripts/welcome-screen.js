@@ -46,7 +46,6 @@ const bundledAssistantNahidaAvatarKey = 'bundledAssistantNahidaAvatar';
 const DEFAULT_NEUTRAL_ASSISTANT_NAME = 'Assistant';
 
 const DEFAULT_DISPLAYED = 3;
-const MAX_DISPLAYED = 15;
 const MAX_RECENT_FETCH = 60;
 const AGENT_MESSAGE_EXTRA_KEY = 'inChatAgents';
 const AGENT_PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
@@ -678,7 +677,7 @@ function buildPresetStarterPackItem() {
     const hasBundledPreset = Boolean(sillyBunnyPreset);
     const chips = ['Chat Completions', 'Bundled', 'Agent-aware', STARTER_PACK_CREATOR_NAME];
     const chipColumnCount = Math.max(2, Math.min(chips.length, 4));
-    const body = `purachina's website contains his character cards, presets, and other projects. A SillyBunny-tuned version of his Director Preset ships included and is ready to use for Chat Completions.`;
+    const body = 'purachina\'s website contains his character cards, presets, and other projects. A SillyBunny-tuned version of his Director Preset ships included and is ready to use for Chat Completions.';
 
     if (!isOpenAiStyleApi) {
         return {

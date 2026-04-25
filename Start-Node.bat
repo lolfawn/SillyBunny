@@ -12,16 +12,30 @@ if %errorlevel% neq 0 (
 )
 
 set NODE_ENV=production
-node scripts\dependency-state.js check node-production > nul 2>&1
+set "_dependency_profile=node-production"
+if exist node_modules\eslint\package.json set "_dependency_profile=node-development"
+node scripts\dependency-state.js check !_dependency_profile! > nul 2>&1
 if !errorlevel! neq 0 (
-    echo Installing packages via npm (Node.js mode)...
-    if exist package-lock.json (
-        call npm ci --no-audit --no-fund --omit=dev --loglevel=error
+    if "!_dependency_profile!"=="node-development" (
+        echo Installing packages via npm including development tooling (Node.js mode)...
     ) else (
-        call npm install --no-audit --no-fund --omit=dev --loglevel=error
+        echo Installing packages via npm (Node.js mode)...
+    )
+    if exist package-lock.json (
+        if "!_dependency_profile!"=="node-development" (
+            call npm ci --no-audit --no-fund --loglevel=error
+        ) else (
+            call npm ci --no-audit --no-fund --omit=dev --loglevel=error
+        )
+    ) else (
+        if "!_dependency_profile!"=="node-development" (
+            call npm install --no-audit --no-fund --loglevel=error
+        ) else (
+            call npm install --no-audit --no-fund --omit=dev --loglevel=error
+        )
     )
     if !errorlevel! neq 0 goto end
-    node scripts\dependency-state.js mark node-production
+    node scripts\dependency-state.js mark !_dependency_profile!
     if !errorlevel! neq 0 goto end
 ) else (
     echo Dependencies are up to date.

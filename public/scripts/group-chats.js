@@ -19,7 +19,7 @@ import {
     waitUntilCondition,
     uuidv4,
 } from './utils.js';
-import { RA_CountCharTokens, humanizedDateTime, dragElement, favsToHotswap, getMessageTimeStamp } from './RossAscends-mods.js';
+import { RA_CountCharTokens, humanizedDateTime, dragElement, favsToHotswap } from './RossAscends-mods.js';
 import { power_user, loadMovingUIState, sortEntitiesList } from './power-user.js';
 import { debounce_timeout } from './constants.js';
 
@@ -27,10 +27,8 @@ import {
     chat,
     sendSystemMessage,
     printMessages,
-    substituteParams,
     characters,
     default_avatar,
-    addOneMessage,
     clearChat,
     Generate,
     generateRaw,
@@ -283,8 +281,6 @@ async function runWithGroupMemberModelOverride(group, avatarId, callback) {
     }
 }
 
-
-
 let selectedGroupSpeakerAvatar = '';
 let groupSpeakerControlsInitialized = false;
 let selectedGroupDmAvatar = '';
@@ -528,16 +524,6 @@ function clearSelectedGroupSpeaker() {
     $('#group_speaker_controls .group_speaker_avatar').removeClass('selected');
 }
 
-function getGroupTurnStartIndex() {
-    for (let index = chat.length - 1; index >= 0; index--) {
-        if (chat[index]?.is_user || chat[index]?.is_system || chat[index]?.extra?.type === system_message_types.NARRATOR) {
-            return index + 1;
-        }
-    }
-
-    return Math.max(0, chat.length - 1);
-}
-
 function limitGroupSpeakersForControl(activatedMembers, forceSingleSpeaker) {
     if (!forceSingleSpeaker || activatedMembers.length <= 1) {
         return activatedMembers;
@@ -575,8 +561,8 @@ function removeGroupDmThreadMessages(participantAvatar, startIndex) {
 }
 
 function getGroupDmChatName(group, character) {
-    const safeGroupName = String(group?.name || 'Group').replace(/[\/:*?"<>|]/g, '-');
-    const safeCharacterName = String(character?.name || 'Character').replace(/[\/:*?"<>|]/g, '-');
+    const safeGroupName = String(group?.name || 'Group').replace(/[/:*?"<>|]/g, '-');
+    const safeCharacterName = String(character?.name || 'Character').replace(/[/:*?"<>|]/g, '-');
     return `DM - ${safeGroupName} - ${safeCharacterName}`;
 }
 
@@ -896,7 +882,6 @@ function initGroupSpeakerControls() {
         saveGlobalGroupDmSettings({ autoDmEnabled: enabled, autoDmMember: '' });
         updateGroupSpeakerControls();
     });
-
 }
 
 export const group_activation_strategy = {
@@ -1434,44 +1419,6 @@ export function getGroupCharacterCardsLazy(groupId, characterId) {
         mesExamples: () => baseChatReplace(mesExamplesOverride?.trim()) ||
             collectField('Example Messages', c => c.mes_example, x => !x.startsWith('<START>') ? `<START>\n${x}` : x),
     });
-}
-
-/**
- * Gets the first message for a character.
- * @param {Character} character Character object
- * @returns {Promise<ChatMessage>} First message object
- */
-async function getFirstCharacterMessage(character) {
-    let messageText = character.first_mes;
-
-    // if there are alternate greetings, pick one at random
-    if (Array.isArray(character.data?.alternate_greetings)) {
-        const messageTexts = [character.first_mes, ...character.data.alternate_greetings].filter(x => x);
-        messageText = messageTexts[Math.floor(Math.random() * messageTexts.length)];
-    }
-
-    // Allow extensions to change the first message
-    const eventArgs = { input: messageText, output: '', character: character };
-    await eventSource.emit(event_types.CHARACTER_FIRST_MESSAGE_SELECTED, eventArgs);
-    if (eventArgs.output) {
-        messageText = eventArgs.output;
-    }
-
-    const mes = {};
-    mes.is_user = false;
-    mes.is_system = false;
-    mes.name = character.name;
-    mes.send_date = getMessageTimeStamp();
-    mes.original_avatar = character.avatar;
-    mes.extra = { 'gen_id': Date.now() * Math.random() * 1000000 };
-    mes.mes = messageText
-        ? substituteParams(messageText.trim(), { name2Override: character.name })
-        : '';
-    mes.force_avatar =
-        character.avatar != 'none'
-            ? getThumbnailUrl('avatar', character.avatar)
-            : default_avatar;
-    return mes;
 }
 
 function resetSelectedGroup() {

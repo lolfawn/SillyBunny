@@ -52,12 +52,19 @@ if "%_need_git%"=="1" if "%_auto_update%"=="1" (
 )
 
 set NODE_ENV=production
-bun scripts\dependency-state.js check bun-production > nul 2>&1
+set "_dependency_profile=bun-production"
+if exist node_modules\eslint\package.json set "_dependency_profile=bun-development"
+bun scripts\dependency-state.js check !_dependency_profile! > nul 2>&1
 if !errorlevel! neq 0 (
-    echo Installing Bun packages...
-    call bun install --frozen-lockfile --production --no-progress --no-summary
+    if "!_dependency_profile!"=="bun-development" (
+        echo Installing Bun packages including development tooling...
+        call bun install --frozen-lockfile --no-progress --no-summary
+    ) else (
+        echo Installing Bun packages...
+        call bun install --frozen-lockfile --production --no-progress --no-summary
+    )
     if !errorlevel! neq 0 goto end
-    bun scripts\dependency-state.js mark bun-production
+    bun scripts\dependency-state.js mark !_dependency_profile!
     if !errorlevel! neq 0 goto end
 ) else (
     echo Dependencies are up to date.

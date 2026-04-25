@@ -124,8 +124,8 @@
         "start:global": "bun server.js --global",
         "start:no-csrf": "bun server.js --disableCsrf",
         "postinstall": "node post-install.js || bun post-install.js",
-        "lint": "eslint \"src/**/*.js\" \"public/**/*.js\" ./*.js",
-        "lint:fix": "eslint \"src/**/*.js\" \"public/**/*.js\" ./*.js --fix",
+        "lint": "eslint \"src/**/*.js\" \"public/**/*.js\" \"scripts/**/*.js\" ./*.js",
+        "lint:fix": "eslint \"src/**/*.js\" \"public/**/*.js\" \"scripts/**/*.js\" ./*.js --fix",
         "plugins:update": "bun plugins.js update",
         "plugins:install": "bun plugins.js install"
     },

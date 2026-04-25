@@ -7,6 +7,10 @@ Date: 2026-04-25
 ### Launcher And Dependencies
 - Added a dependency-state marker so Windows and shell launchers skip routine installs when `package.json`, lockfiles, runtime profile, and `NODE_ENV` have not changed.
 - Reduced Bun launcher install noise by using quiet install flags and kept Node launcher parity with `npm ci` when a lockfile is present.
+- Preserved existing development dependency trees during launcher installs so ESLint keeps its compatible AJV dependency after future Bun or Node launcher runs.
+
+### Tooling
+- Added `scripts/**/*.js` to the standard lint targets and fixed existing lint errors so `npm run lint -- --quiet` passes again.
 
 ### Optional Moonlit Echoes
 - Made extension-owned chat styles fall back to the default flat chat class when Moonlit Echoes is disabled or uninstalled, while preserving the saved style value for when the extension is re-enabled.
@@ -18,6 +22,7 @@ Date: 2026-04-25
 
 Commits:
 - `fix(ui): make Moonlit Echoes optional`
+- `fix(tooling): keep eslint stable after launcher installs`
 
 ## v1.4.5
 
