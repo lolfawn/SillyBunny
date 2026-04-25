@@ -2,86 +2,29 @@
 
 ## Unreleased
 
-Date: 2026-04-25
+Date: 2026-04-26
 
-### Launcher And Dependencies
-- Added a dependency-state marker so Windows and shell launchers skip routine installs when `package.json`, lockfiles, runtime profile, and `NODE_ENV` have not changed.
-- Reduced Bun launcher install noise by using quiet install flags and kept Node launcher parity with `npm ci` when a lockfile is present.
-- Preserved existing development dependency trees during launcher installs so ESLint keeps its compatible AJV dependency after future Bun or Node launcher runs.
+### Added
+- Added built-in Echo, Whisper, Hush, Ripple, and Tide chat styles plus a persistent compact mode so the core UI no longer depends on Moonlit Echoes.
+- Added Chat History tools for LLM-assisted chat labels, old-chat cleanup, and backup cleanup with previews, confirmations, retention filters, and mobile-friendly controls.
+- Added Customize > Server thumbnail controls for format, quality, dimensions, sharp defaults, and per-user cache clearing; sharp PNG thumbnails are now the default.
+- Added roomier editing tools, including a resizable first-message field, a desktop World Info pop-up editor, expanded context-size presets, and Text Completions preset parity.
 
-### Tooling
-- Added `scripts/**/*.js` to the standard lint targets and fixed existing lint errors so `npm run lint -- --quiet` passes again.
+### Changed
+- Reworked the default desktop and mobile UI for more consistent spacing, square icon buttons, aligned drawers, normalized dropdowns, readable highlighted text, and a less cramped composer.
+- Made Moonlit Echoes optional by removing core UI assumptions about its drawers, search copy, and chat-style ownership while keeping compatibility when the extension is enabled.
+- Renamed Navigate to Workspace, shortened the primary character shortcut labels to `FAV.` and `ADV.`, and removed deprecated visible Extras wording.
+- Cleaned up launcher installs so routine starts are quieter, preserve ESLint dependencies, and avoid unnecessary dependency work when runtime inputs have not changed.
 
-### Optional Moonlit Echoes
-- Made extension-owned chat styles fall back to the default flat chat class when Moonlit Echoes is disabled or uninstalled, while preserving the saved style value for when the extension is re-enabled.
-- Removed Moonlit-specific core search copy and avoided hard-coding the Moonlit drawer in Nemo's extension category list.
-- Kept optional theme compatibility styles generic so the default UI remains presentable without Moonlit.
-- Tightened the default chat, chat-management, and composer surfaces so transparent Moonlit-style chat tint values no longer make the core chat pane noisy or hard to read.
-- Fixed Moonlit Echoes' enabled-theme chat avatar sizing inside the vendored extension so message thumbnails stay clipped to their configured frame on desktop and mobile.
-- Added SB-owned Echo, Whisper, Hush, Ripple, and Tide chat styles so these layouts work without Moonlit Echoes installed or enabled, while Moonlit can still override its own custom variables when active.
+### Fixed
+- Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, and bottom chat spacing.
+- Fixed group chat edge cases so unread DM avatars stay aligned, DM taps open the correct private chat, and Character Author's Note (Private) persists on the group chat.
+- Fixed In-Chat Agent behavior for separated Individual/Group enablement, queued manual runs, hidden idle cancel buttons, Pathfinder control alignment, and automatic post-generation runs on desktop and mobile.
+- Fixed duplicate extension settings drawers so repeated extension activation does not create doubled panels.
+- Fixed Moonlit Echoes fork styling so enabled Moonlit chat thumbnails and the mobile composer remain usable.
+- Fixed lint coverage by including `scripts/**/*.js` in the standard ESLint target and resolving the existing lint failures.
 
-### Group Chats
-- Kept unread DM avatar pulsing in the group bottom bar from changing avatar alignment on desktop or mobile.
-- Made unread avatar taps inside an existing group DM switch to that character's DM instead of inviting them into the current DM.
-- Saved Character Author's Note (Private) to group chat metadata so the note persists on the actual group chat across speaker turns.
-
-### Chat Management
-- Added LLM-assisted chat labeling from the Chat History popup, with options to rename the current chat or batch-label timestamp-named chats while preserving chat contents.
-- Added old-chat cleanup controls for age, time unit, newest-chat retention, dated-name-only filtering, preview, confirmation, cancellation, and current-chat protection.
-- Added chat-backup cleanup controls inside the Chat History Backups drawer, including age/unit filters, newest-backup retention, preview, confirmation, and mobile-aligned controls.
-- Reworked the Chat History popup controls so the new labeling and cleanup tools align cleanly on desktop and mobile, including full-width mobile search and balanced checkbox/text spacing.
-
-### Mobile UI
-- Renamed the top-bar Navigate button and matching onboarding/docs copy to Workspace so the shell label matches the panel title.
-- Fixed the mobile Extensions header controls so the section title, update checkbox, and action buttons keep compact, centered alignment without relying on extension CSS.
-- Kept Persona rows on one line where space allows and added quick rename/delete actions to each listed Persona without breaking mobile alignment.
-- Restored zoomed chat avatars on desktop and mobile by accepting both thumbnail URLs and full avatar image paths when opening a message avatar.
-- Aligned chat avatar metadata, swipe controls, and icon-only buttons so the default UI keeps strict square control sizing on desktop and mobile.
-- Kept message prompt-visibility controls mutually exclusive so only the eye action for the current message state is shown.
-- Contained chat character thumbnails inside their avatar frames across the default UI, built-in chat styles, and the vendored Moonlit Echoes fork so oversized source images no longer spill into message content on desktop or mobile.
-- Restored Individual recent chats by balancing the recent-chat fetch across individual and group conversations, and made Recent Chats filters manage their own collapsed, empty, and show-more states on desktop and mobile.
-- Improved the default mobile chat composer so the textarea keeps a full-width row with square controls, and made default mobile header/composer surfaces more opaque to stop chat text from bleeding through.
-- Reworked the final mobile composer layout so the textarea gets a larger full-width row and the tool buttons sit on the same row as the send/action controls.
-- Tightened the vertical handoff between short chats and the bottom chat bar so the last message no longer floats far above the chat controls on desktop or mobile.
-- Added a persistent compact mode that reduces shell, top-bar, mobile tools, and mobile composer density while preserving checkbox and text alignment.
-- Tightened default-theme settings, drawer, prompt manager, extension, and import surfaces so controls have consistent spacing, fixed icon sizing, theme-aware button text, and more bottom breathing room on desktop and mobile.
-- Locked the agent-changes message icon to a square control and realigned the mobile prompt manager editor rows, labels, checkbox, and footer actions.
-- Normalized icon-only buttons, drawer headers, recent-chat rows, prompt manager controls, World Info toolbars, background controls, and extension toolbars so mobile and desktop alignment stays centered, symmetrical, and square where expected.
-- Made primary and highlighted accent button labels choose a contrast-aware theme color so pale highlights remain readable on desktop and mobile.
-- Gave compact settings section headers consistent horizontal padding so titles no longer hug rounded panel edges.
-- Aligned Chat Completion prompt/template preset selectors with their action buttons so the select field and icon controls share the same centered height on desktop and mobile.
-- Normalized context-size quick buttons, added common 4K through 2M presets, aligned the Chat Completion token-budget slider row, and attached the same clickable presets directly to Text Completions context sizing.
-- Normalized Chat Completion sampling number fields so range counters and standalone numeric inputs use equal, centered widths and heights instead of stretching into long thin boxes.
-- Reworked Advanced Definitions into a left-aligned editor layout with less top padding, full-width sections, roomier resizable textareas, and a cleaner Character's Note control grid.
-- Aligned group rows with character rows in the character list so avatars, titles, descriptions, counters, and secondary metadata share the same columns in list view.
-- Removed deprecated wording from visible Extras source labels while keeping the underlying Extras compatibility options available.
-- Normalized native and Select2 dropdown heights, radii, arrow spacing, and Chat Translation field layout so selects align evenly on desktop and mobile.
-- Equalized User Settings drawer headers so top-level rows use the same centered title lane, height, and font size.
-- Balanced the Prompt Manager list and editor into equal-width panes with roomier prompt row spacing so prompts no longer look squeezed against the panel edge.
-- Made the World Info editor shrink safely inside desktop drawers and added a desktop-only resizable pop-up editor for roomier lorebook editing while mobile keeps its inline entry workflow.
-- Shortened the primary character edit shortcut labels to `FAV.` and `ADV.` so they stay centered and readable in compact layouts.
-- Added flat WebKit-safe Ripple chat style fallbacks so the built-in style keeps message text and avatars visible instead of rendering as an empty card.
-- Fixed Moonlit Echoes' mobile input-field override so enabling the extension no longer stretches the bottom composer into an unusable full-height panel.
-- Pinned the mobile mid-generation stop button to the same bottom action lane as Send so it no longer raises or shifts while a reply is running.
-- Made the character First Message editor taller by default on desktop and vertically resizable so long greetings are easier to edit without opening the maximized editor.
-- Centered the Top Bar Label option cards so Context Size, Character Name, and Custom Text align cleanly inside their controls on desktop and mobile.
-- Anchored the Sampling documentation help button inside the Sampling drawer header for chat and text completion presets so it no longer floats while scrolling.
-
-### Server Tools
-- Added thumbnail quality controls to Customize > Server for toggling thumbnail generation, choosing JPG or PNG, setting quality and dimensions, applying SillyBunny's recommended sharp-avatar preset, and clearing the current user's thumbnail cache for rebuilds without manually editing `config.yaml`.
-- Made SillyBunny's sharp thumbnail preset the default: PNG thumbnails, quality 100, 240x135 backgrounds, and 864x1280 avatar/persona thumbnails.
-- Equalized the Thumbnail Quality control grid so format, quality, dimension fields, and cache action buttons align symmetrically on desktop and mobile.
-
-### Extensions
-- Hardened the shared extension settings columns so duplicate top-level drawers for the same extension are removed automatically, including stale Quick Reply drawers after repeated activation.
-- Fixed enabled In-Chat post-processing agents so automatic append, extract, and prompt-transform passes wait until the main generation is fully idle before applying.
-- Made the In-Chat Agents separation checkbox actually scope enabled agents between Individual and Group chats, with UI toggles, bulk actions, tool registration, and Pathfinder enablement following the active chat type.
-- Left-aligned Pathfinder diagnostics actions and fixed the Run Diagnostics button so its label determines the button width instead of being clipped as an icon-only control.
-- Kept Pathfinder's Retrieval Log detail label and dropdown on one line with a dedicated, non-checkbox control layout.
-- Hid Cancel Agent during ordinary chat generation and queued manual In-Chat Agent runs so multiple Apply actions run one at a time instead of being rejected.
-- Hardened automatic In-Chat post-generation agents on mobile by reconciling after rendered assistant messages and generation-end fallbacks without double-applying the same agent pass.
-
-Commits:
+### Commits
 - `fix(ui): make Moonlit Echoes optional`
 - `fix(tooling): keep eslint stable after launcher installs`
 - `fix(ui): improve default chat surface readability`
@@ -131,6 +74,7 @@ Commits:
 - `fix(ui): keep mobile stop button aligned`
 - `fix(agents): run automatic post agents on mobile`
 - `fix(ui): show one message visibility icon`
+- `docs(changelog): condense unreleased notes`
 
 ## v1.4.5
 
