@@ -290,12 +290,13 @@
             <i class="fa-solid fa-chevron-right pf--chevron"></i>
             <strong>Diagnostics</strong>
         </div>
-        <div class="pf--section-body" style="display: none;">
+        <div class="pf--section-body pf--diagnostics-panel" style="display: none;">
             <div id="pf--diagnostics-output" class="pf--diagnostics-output">
                 Click "Run Diagnostics" to check your Pathfinder configuration.
             </div>
             <button type="button" id="pf--run-diagnostics" class="menu_button">
-                <i class="fa-solid fa-stethoscope"></i> Run Diagnostics
+                <i class="fa-solid fa-stethoscope"></i>
+                <span>Run Diagnostics</span>
             </button>
         </div>
     </div>
@@ -855,6 +856,28 @@
     overflow-y: auto;
     margin-bottom: 10px;
     text-align: left !important;
+}
+
+.pf--diagnostics-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+#pf--run-diagnostics {
+    display: inline-flex;
+    align-self: flex-start;
+    width: fit-content;
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    min-inline-size: var(--sb-control-min-height, 30px);
+    white-space: normal;
+}
+
+#pf--run-diagnostics span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    text-align: center;
 }
 
 .pf--section-body {

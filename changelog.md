@@ -57,6 +57,7 @@ Date: 2026-04-25
 - Hardened the shared extension settings columns so duplicate top-level drawers for the same extension are removed automatically, including stale Quick Reply drawers after repeated activation.
 - Fixed enabled In-Chat post-processing agents so automatic append, extract, and prompt-transform passes wait until the main generation is fully idle before applying.
 - Made the In-Chat Agents separation checkbox actually scope enabled agents between Individual and Group chats, with UI toggles, bulk actions, tool registration, and Pathfinder enablement following the active chat type.
+- Left-aligned Pathfinder diagnostics actions and fixed the Run Diagnostics button so its label determines the button width instead of being clipped as an icon-only control.
 
 Commits:
 - `fix(ui): make Moonlit Echoes optional`
@@ -91,6 +92,7 @@ Commits:
 - `fix(ui): center top bar label options`
 - `fix(ui): anchor sampling docs link`
 - `fix(agents): separate enabled agents by chat type`
+- `fix(ui): align pathfinder diagnostics button`
 
 ## v1.4.5
 
