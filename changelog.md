@@ -17,6 +17,7 @@ Date: 2026-04-25
 - Removed Moonlit-specific core search copy and avoided hard-coding the Moonlit drawer in Nemo's extension category list.
 - Kept optional theme compatibility styles generic so the default UI remains presentable without Moonlit.
 - Tightened the default chat, chat-management, and composer surfaces so transparent Moonlit-style chat tint values no longer make the core chat pane noisy or hard to read.
+- Fixed Moonlit Echoes' enabled-theme chat avatar sizing inside the vendored extension so message thumbnails stay clipped to their configured frame on desktop and mobile.
 
 ### Mobile UI
 - Fixed the mobile Extensions header controls so the section title, update checkbox, and action buttons keep compact, centered alignment without relying on extension CSS.
@@ -31,6 +32,7 @@ Commits:
 - `fix(ui): restore zoomed chat avatars`
 - `fix(ui): align chat icon controls`
 - `fix(ui): restore individual recent chats`
+- `fix(extension): contain moonlit chat avatars`
 
 ## v1.4.5
 

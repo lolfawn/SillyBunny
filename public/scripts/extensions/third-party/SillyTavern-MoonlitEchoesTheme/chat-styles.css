@@ -5,7 +5,75 @@
 :root {
     --customMesPadding: 1em;
     --customRippleAvatarRatio: 1.5;
-    --custom-echo-avatar: calc(var(--custom-ChatAvatar, 40px) + 8px);
+    --custom-chat-avatar-size: var(--custom-ChatAvatar, 40px);
+    --custom-chat-avatar-frame-size: calc(var(--custom-chat-avatar-size) + 8px);
+    --custom-big-chat-avatar-width: calc(var(--custom-chat-avatar-size) * var(--big-avatar-width-factor));
+    --custom-big-chat-avatar-height: calc(var(--custom-chat-avatar-size) * var(--big-avatar-height-factor));
+    --custom-big-chat-avatar-frame-width: calc(var(--custom-big-chat-avatar-width) + 8px);
+    --custom-big-chat-avatar-frame-height: calc(var(--custom-big-chat-avatar-height) + 8px);
+    --custom-echo-avatar: var(--custom-chat-avatar-frame-size);
+}
+
+body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes {
+    .mesAvatarWrapper {
+        flex: 0 0 var(--custom-chat-avatar-frame-size);
+        width: var(--custom-chat-avatar-frame-size);
+        min-width: var(--custom-chat-avatar-frame-size);
+    }
+
+    .avatar {
+        box-sizing: border-box;
+        flex: 0 0 var(--custom-chat-avatar-frame-size);
+        width: var(--custom-chat-avatar-frame-size);
+        height: var(--custom-chat-avatar-frame-size);
+        min-width: var(--custom-chat-avatar-frame-size);
+        min-height: var(--custom-chat-avatar-frame-size);
+        max-width: var(--custom-chat-avatar-frame-size);
+        max-height: var(--custom-chat-avatar-frame-size);
+        overflow: hidden;
+    }
+
+    .avatar img {
+        display: block;
+        box-sizing: border-box;
+        flex: 0 0 var(--custom-chat-avatar-size);
+        width: var(--custom-chat-avatar-size);
+        height: var(--custom-chat-avatar-size);
+        min-width: var(--custom-chat-avatar-size) !important;
+        min-height: var(--custom-chat-avatar-size) !important;
+        max-width: var(--custom-chat-avatar-size) !important;
+        max-height: var(--custom-chat-avatar-size) !important;
+        object-fit: cover;
+        object-position: center;
+    }
+}
+
+body.big-avatars:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes {
+    .mesAvatarWrapper {
+        flex-basis: var(--custom-big-chat-avatar-frame-width);
+        width: var(--custom-big-chat-avatar-frame-width);
+        min-width: var(--custom-big-chat-avatar-frame-width) !important;
+    }
+
+    .avatar {
+        flex-basis: var(--custom-big-chat-avatar-frame-width);
+        width: var(--custom-big-chat-avatar-frame-width);
+        height: var(--custom-big-chat-avatar-frame-height);
+        min-width: var(--custom-big-chat-avatar-frame-width) !important;
+        min-height: var(--custom-big-chat-avatar-frame-height) !important;
+        max-width: var(--custom-big-chat-avatar-frame-width) !important;
+        max-height: var(--custom-big-chat-avatar-frame-height) !important;
+    }
+
+    .avatar img {
+        flex-basis: var(--custom-big-chat-avatar-width);
+        width: var(--custom-big-chat-avatar-width);
+        height: var(--custom-big-chat-avatar-height);
+        min-width: var(--custom-big-chat-avatar-width) !important;
+        min-height: var(--custom-big-chat-avatar-height) !important;
+        max-width: var(--custom-big-chat-avatar-width) !important;
+        max-height: var(--custom-big-chat-avatar-height) !important;
+    }
 }
 
 body.hideChatAvatars:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) {

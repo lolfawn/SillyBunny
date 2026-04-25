@@ -5,6 +5,7 @@
 
 ## SillyBunny Fork Changelog
 
+- 2026-04-25: Locked Moonlit chat avatar frames and images to the extension's configured avatar sizes, including big-avatar layouts, so enabling the theme no longer lets message thumbnails overflow their wrappers on desktop or mobile.
 - 2026-04-22: Cache-busted SillyBunny's self-hosted Figtree stylesheet and font asset URLs on both the app shell and login page, so browsers are forced off stale Noto Sans-era font caches on desktop and mobile.
 - 2026-04-22: Bundled SillyBunny's default Figtree font locally and switched the app plus login page to the self-hosted stylesheet, so the body keeps the original Figtree look instead of falling back to Noto Sans when remote font loading fails.
 - 2026-04-22: Fixed SillyBunny's login page font loading so the body now imports the same Figtree stack as the main app instead of falling back to bundled Noto Sans.

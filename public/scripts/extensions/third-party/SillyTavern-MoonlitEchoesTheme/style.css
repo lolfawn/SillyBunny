@@ -26,6 +26,12 @@ body {
 
 :root {
     --custom-avatar: calc(var(--avatar-base-width) * 0.8);
+    --custom-chat-avatar-size: var(--custom-ChatAvatar, 40px);
+    --custom-chat-avatar-frame-size: calc(var(--custom-chat-avatar-size) + 8px);
+    --custom-big-chat-avatar-width: calc(var(--custom-chat-avatar-size) * var(--big-avatar-width-factor));
+    --custom-big-chat-avatar-height: calc(var(--custom-chat-avatar-size) * var(--big-avatar-height-factor));
+    --custom-big-chat-avatar-frame-width: calc(var(--custom-big-chat-avatar-width) + 8px);
+    --custom-big-chat-avatar-frame-height: calc(var(--custom-big-chat-avatar-height) + 8px);
     --customThemeMenuColor: var(--SmartThemeChatTintColor);
     --active: var(--customThemeColor);
     --SmartThemeCheckboxTickColor: var(--SmartThemeBlurTintColor);
@@ -48,7 +54,7 @@ body {
     /* !!! Important: Do Not Modify 不要修改 !!! */
     --topBarBlockSize: calc(var(--topBarIconSize) + var(--topBarBlockPadding) - 1px);
     --bottomInputAreaHeight: 115px;
-    --custom-echo-avatar: calc(var(--custom-ChatAvatar, 40px) + 8px);
+    --custom-echo-avatar: var(--custom-chat-avatar-frame-size);
 }
 @media screen and (max-width: 1000px) {
     :root {
@@ -952,25 +958,40 @@ body.movingUI ::-webkit-scrollbar-thumb:vertical {
 
         /* General Avatar 一般頭像 */
         .avatar {
+            box-sizing: border-box;
             display: flex;
+            flex: 0 0 var(--custom-chat-avatar-frame-size);
             justify-content: center;
             align-items: center;
-            width: calc(var(--custom-ChatAvatar, 40px) + 8px);
-            height: calc(var(--custom-ChatAvatar, 40px) + 8px);
-            max-width: calc(var(--custom-ChatAvatar, 40px) + 8px);
-            max-height: calc(var(--custom-ChatAvatar, 40px) + 8px);
+            width: var(--custom-chat-avatar-frame-size);
+            height: var(--custom-chat-avatar-frame-size);
+            min-width: var(--custom-chat-avatar-frame-size);
+            min-height: var(--custom-chat-avatar-frame-size);
+            max-width: var(--custom-chat-avatar-frame-size);
+            max-height: var(--custom-chat-avatar-frame-size);
             border: 1px solid var(--SmartThemeBodyColor);
+            overflow: hidden;
 
             img {
-                width: var(--custom-ChatAvatar, 40px);
-                height: var(--custom-ChatAvatar, 40px);
-                max-width: var(--custom-ChatAvatar) !important;
-                max-height: var(--custom-ChatAvatar) !important;
+                display: block;
+                box-sizing: border-box;
+                flex: 0 0 var(--custom-chat-avatar-size);
+                width: var(--custom-chat-avatar-size);
+                height: var(--custom-chat-avatar-size);
+                min-width: var(--custom-chat-avatar-size) !important;
+                min-height: var(--custom-chat-avatar-size) !important;
+                max-width: var(--custom-chat-avatar-size) !important;
+                max-height: var(--custom-chat-avatar-size) !important;
                 border: 0 !important;
+                object-fit: cover;
+                object-position: center;
             }
         }
         /* User Avatar 使用者頭像 */
         .mesAvatarWrapper {
+            flex: 0 0 var(--custom-chat-avatar-frame-size);
+            width: var(--custom-chat-avatar-frame-size);
+            min-width: var(--custom-chat-avatar-frame-size);
             padding-right: 0;
             margin-right: calc(var(--customMesPadding) / 2);
         }
@@ -1155,28 +1176,43 @@ body.big-avatars #chat .mes {
     .mes_block {
         border-radius: 10px;
     }
+
+    .mesAvatarWrapper {
+        flex-basis: var(--custom-big-chat-avatar-frame-width);
+        width: var(--custom-big-chat-avatar-frame-width);
+        min-width: var(--custom-big-chat-avatar-frame-width) !important;
+    }
+
     .avatar {
-        width: calc((var(--custom-ChatAvatar) * var(--big-avatar-width-factor)) + 8px);
-        height: calc((var(--custom-ChatAvatar) * var(--big-avatar-height-factor)) + 8px);
-        min-width: calc((var(--custom-ChatAvatar) * var(--big-avatar-width-factor)) + 8px) !important;
-        min-height: calc((var(--custom-ChatAvatar) * var(--big-avatar-height-factor)) + 8px) !important;
+        flex-basis: var(--custom-big-chat-avatar-frame-width);
+        width: var(--custom-big-chat-avatar-frame-width);
+        height: var(--custom-big-chat-avatar-frame-height);
+        min-width: var(--custom-big-chat-avatar-frame-width) !important;
+        min-height: var(--custom-big-chat-avatar-frame-height) !important;
+        max-width: var(--custom-big-chat-avatar-frame-width) !important;
+        max-height: var(--custom-big-chat-avatar-frame-height) !important;
 
         img {
-            width: calc(var(--custom-ChatAvatar) * var(--big-avatar-width-factor));
-            height: calc(var(--custom-ChatAvatar) * var(--big-avatar-height-factor));
-            min-width: calc(var(--custom-ChatAvatar) * var(--big-avatar-width-factor)) !important;
-            min-height: calc(var(--custom-ChatAvatar) * var(--big-avatar-height-factor)) !important;
+            flex-basis: var(--custom-big-chat-avatar-width);
+            width: var(--custom-big-chat-avatar-width);
+            height: var(--custom-big-chat-avatar-height);
+            min-width: var(--custom-big-chat-avatar-width) !important;
+            min-height: var(--custom-big-chat-avatar-height) !important;
+            max-width: var(--custom-big-chat-avatar-width) !important;
+            max-height: var(--custom-big-chat-avatar-height) !important;
         }
     }
 }
 body.big-avatars #chat .mes[is_user="true"] {
     .avatar {
-        width: calc((var(--custom-ChatAvatar) * var(--big-avatar-width-factor)) + 8px);
-        height: calc((var(--custom-ChatAvatar) * var(--big-avatar-height-factor)) + 8px);
+        flex-basis: var(--custom-big-chat-avatar-frame-width);
+        width: var(--custom-big-chat-avatar-frame-width);
+        height: var(--custom-big-chat-avatar-frame-height);
 
         img {
-            width: calc(var(--custom-ChatAvatar) * var(--big-avatar-width-factor));
-            height: calc(var(--custom-ChatAvatar) * var(--big-avatar-height-factor));
+            flex-basis: var(--custom-big-chat-avatar-width);
+            width: var(--custom-big-chat-avatar-width);
+            height: var(--custom-big-chat-avatar-height);
         }
     }
 }
