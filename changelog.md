@@ -41,6 +41,7 @@ Date: 2026-04-25
 - Removed deprecated wording from visible Extras source labels while keeping the underlying Extras compatibility options available.
 - Normalized native and Select2 dropdown heights, radii, arrow spacing, and Chat Translation field layout so selects align evenly on desktop and mobile.
 - Equalized User Settings drawer headers so top-level rows use the same centered title lane, height, and font size.
+- Balanced the Prompt Manager list and editor into equal-width panes with roomier prompt row spacing so prompts no longer look squeezed against the panel edge.
 
 ### Server Tools
 - Added thumbnail quality controls to Customize > Server for toggling thumbnail generation, choosing JPG or PNG, setting quality and dimensions, applying SillyBunny's recommended sharp-avatar preset, and clearing the current user's thumbnail cache for rebuilds without manually editing `config.yaml`.
@@ -77,6 +78,7 @@ Commits:
 - `fix(ui): remove deprecated extras labels`
 - `fix(ui): normalize dropdown sizing`
 - `fix(ui): equalize settings drawer headers`
+- `fix(ui): balance prompt manager panes`
 
 ## v1.4.5
 
