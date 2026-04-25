@@ -37,6 +37,7 @@ Date: 2026-04-25
 - Kept Persona rows on one line where space allows and added quick rename/delete actions to each listed Persona without breaking mobile alignment.
 - Restored zoomed chat avatars on desktop and mobile by accepting both thumbnail URLs and full avatar image paths when opening a message avatar.
 - Aligned chat avatar metadata, swipe controls, and icon-only buttons so the default UI keeps strict square control sizing on desktop and mobile.
+- Kept message prompt-visibility controls mutually exclusive so only the eye action for the current message state is shown.
 - Contained chat character thumbnails inside their avatar frames across the default UI, built-in chat styles, and the vendored Moonlit Echoes fork so oversized source images no longer spill into message content on desktop or mobile.
 - Restored Individual recent chats by balancing the recent-chat fetch across individual and group conversations, and made Recent Chats filters manage their own collapsed, empty, and show-more states on desktop and mobile.
 - Improved the default mobile chat composer so the textarea keeps a full-width row with square controls, and made default mobile header/composer surfaces more opaque to stop chat text from bleeding through.
@@ -129,6 +130,7 @@ Commits:
 - `fix(extension): prevent moonlit mobile composer stretching`
 - `fix(ui): keep mobile stop button aligned`
 - `fix(agents): run automatic post agents on mobile`
+- `fix(ui): show one message visibility icon`
 
 ## v1.4.5
 

@@ -1230,6 +1230,11 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     text-align: center;
 }
 
+#chat .mes[is_system="true"] .mes_hide,
+#chat .mes:not([is_system="true"]) .mes_unhide {
+    display: none !important;
+}
+
 #chat .mes .mes_view_agent_changes {
     width: var(--sb-message-icon-size) !important;
     inline-size: var(--sb-message-icon-size) !important;
