@@ -3448,12 +3448,12 @@ export async function renameGroupChat(groupId, oldChatId, newChatId) {
  * Deletes a group chat by its name. Doesn't affect displayed chat.
  * @param {string} groupId Group ID
  * @param {string} chatName Name of the chat to delete
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>} Whether the chat was deleted
  */
 export async function deleteGroupChatByName(groupId, chatName) {
     const group = groups.find(x => x.id === groupId);
     if (!group || !group.chats.includes(chatName)) {
-        return;
+        return false;
     }
 
     group.chats.splice(group.chats.indexOf(chatName), 1);
@@ -3467,7 +3467,7 @@ export async function deleteGroupChatByName(groupId, chatName) {
     if (!response.ok) {
         toastr.error(t`Check the server connection and reload the page to prevent data loss.`, t`Group chat could not be deleted`);
         console.error('Group chat could not be deleted');
-        return;
+        return false;
     }
 
     // If the deleted chat was the current chat, switch to the last chat in the group
@@ -3478,6 +3478,7 @@ export async function deleteGroupChatByName(groupId, chatName) {
 
     await editGroup(groupId, true, true);
     await eventSource.emit(event_types.GROUP_CHAT_DELETED, chatName);
+    return true;
 }
 
 /**

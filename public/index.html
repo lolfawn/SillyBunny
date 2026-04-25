@@ -42,7 +42,7 @@
     <link rel="stylesheet" type="text/css" href="css/world-info.css?v=20260425b">
     <link rel="stylesheet" type="text/css" href="css/extensions-panel.css?v=20260425a">
     <link rel="stylesheet" type="text/css" href="css/select2-overrides.css">
-    <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260425c">
+    <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260425d">
     <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260425k">
     <link rel="stylesheet" type="text/css" href="css/sillybunny-chat-styles.css?v=20260425b">
     <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260425c">
@@ -7008,6 +7008,50 @@
                     <input type="search" id="select_chat_search" class="text_pole flex1" data-i18n="[placeholder]Search..." placeholder="Search..." autocomplete="off">
                     <div id="select_chat_cross" class="opacity50p hoverglow fa-solid fa-circle-xmark fontsize120p" alt="Close Past Chat Popup"></div>
                 </div>
+                <div id="chat_management_tools" class="chat_management_tools">
+                    <div class="chat_management_group chat_label_group" aria-label="Chat labeling tools">
+                        <button type="button" id="chat_auto_label_current" class="menu_button menu_button_icon" title="Ask the LLM to rename the current chat" data-i18n="[title]Ask the LLM to rename the current chat">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span data-i18n="Label current">Label current</span>
+                        </button>
+                        <button type="button" id="chat_auto_label_dated" class="menu_button menu_button_icon" title="Ask the LLM to rename timestamp-named chats" data-i18n="[title]Ask the LLM to rename timestamp-named chats">
+                            <i class="fa-solid fa-tags"></i>
+                            <span data-i18n="Label dated">Label dated</span>
+                        </button>
+                        <button type="button" id="chat_tools_cancel" class="menu_button menu_button_icon displayNone" title="Cancel the running chat tool" data-i18n="[title]Cancel the running chat tool">
+                            <i class="fa-solid fa-ban"></i>
+                            <span data-i18n="Cancel">Cancel</span>
+                        </button>
+                    </div>
+                    <div class="chat_management_group chat_cleanup_group" aria-label="Chat cleanup tools">
+                        <label class="chat_cleanup_field" for="chat_cleanup_age">
+                            <span data-i18n="Older than">Older than</span>
+                            <input type="number" id="chat_cleanup_age" class="text_pole" min="0" max="9999" step="1" value="90" inputmode="numeric">
+                        </label>
+                        <select id="chat_cleanup_unit" class="text_pole" aria-label="Cleanup age unit" data-i18n="[aria-label]Cleanup age unit">
+                            <option value="days" data-i18n="days">days</option>
+                            <option value="weeks" data-i18n="weeks">weeks</option>
+                            <option value="months" data-i18n="months">months</option>
+                        </select>
+                        <label class="chat_cleanup_field" for="chat_cleanup_keep">
+                            <span data-i18n="Keep newest">Keep newest</span>
+                            <input type="number" id="chat_cleanup_keep" class="text_pole" min="0" max="9999" step="1" value="25" inputmode="numeric">
+                        </label>
+                        <label class="checkbox_label chat_cleanup_checkbox" for="chat_cleanup_only_dated" title="Only clean timestamp-named chats" data-i18n="[title]Only clean timestamp-named chats">
+                            <input type="checkbox" id="chat_cleanup_only_dated" checked>
+                            <span data-i18n="Dated only">Dated only</span>
+                        </label>
+                        <button type="button" id="chat_cleanup_preview" class="menu_button menu_button_icon" title="Preview chats that match the cleanup settings" data-i18n="[title]Preview chats that match the cleanup settings">
+                            <i class="fa-solid fa-list-check"></i>
+                            <span data-i18n="Preview">Preview</span>
+                        </button>
+                        <button type="button" id="chat_cleanup_run" class="menu_button menu_button_icon" title="Delete chats that match the cleanup settings" data-i18n="[title]Delete chats that match the cleanup settings">
+                            <i class="fa-solid fa-broom"></i>
+                            <span data-i18n="Clean">Clean</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="chat_cleanup_status" class="chat_cleanup_status" aria-live="polite"></div>
                 <div id="select_chat_div"></div>
             </div>
         </div>

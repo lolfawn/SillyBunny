@@ -5110,7 +5110,9 @@ h5 {
 #select_chat_popup {
     display: flex;
     flex-direction: column;
-    max-width: var(--sheldWidth);
+    gap: 8px;
+    width: min(92vw, 860px);
+    max-width: min(92vw, 860px);
     height: min-content;
     max-height: calc(100vh - var(--topBarBlockSize));
     max-height: calc(100dvh - var(--topBarBlockSize));
@@ -5139,6 +5141,120 @@ h5 {
     padding: 0;
     height: 100%;
     overflow-y: auto;
+}
+
+#select_chat_popup [name="selectChatPopupHeader"] {
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+
+#selectChatPopupHeaderText {
+    flex: 1 1 12rem;
+    min-width: max-content;
+}
+
+#select_chat_search {
+    flex: 1 1 14rem;
+    min-width: 12rem;
+}
+
+#select_chat_cross {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    min-height: 34px;
+}
+
+.chat_management_tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+}
+
+.chat_management_group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: min(100%, 260px);
+}
+
+.chat_label_group {
+    flex: 1 1 290px;
+}
+
+.chat_cleanup_group {
+    flex: 2 1 460px;
+    justify-content: flex-end;
+}
+
+.chat_management_tools .menu_button {
+    min-height: 34px;
+    margin: 0;
+    padding-inline: 10px;
+}
+
+.chat_cleanup_field {
+    display: inline-grid;
+    grid-template-columns: max-content minmax(4.5rem, 5.5rem);
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+}
+
+.chat_cleanup_field span,
+.chat_cleanup_checkbox span {
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.chat_cleanup_field input,
+#chat_cleanup_unit {
+    height: 34px;
+    min-height: 34px;
+    box-sizing: border-box;
+}
+
+.chat_cleanup_field input {
+    width: 100%;
+    text-align: center;
+}
+
+#chat_cleanup_unit {
+    width: 7rem;
+}
+
+.chat_cleanup_checkbox {
+    min-height: 34px;
+    margin: 0;
+}
+
+.chat_cleanup_status {
+    min-height: 1.2em;
+    font-size: calc(var(--mainFontSize) - 0.15rem);
+    opacity: 0.78;
+    text-align: center;
+}
+
+.chat_cleanup_preview_list {
+    display: grid;
+    gap: 4px;
+    max-height: min(45vh, 24rem);
+    overflow: auto;
+    padding-inline-start: 1.4rem;
+    text-align: left;
+}
+
+.chat_cleanup_preview_list li {
+    line-height: 1.35;
+}
+
+.chat_cleanup_preview_list code {
+    overflow-wrap: anywhere;
 }
 
 #select_chat_div hr,
@@ -5213,6 +5329,57 @@ h5 {
     color: red;
     filter: drop-shadow(0 0 2px red);
     animation: infinite-spinning 1s ease-out 0s infinite normal;
+}
+
+@media screen and (max-width: 700px) {
+    .chat_management_tools,
+    .chat_management_group {
+        align-items: stretch;
+    }
+
+    .chat_management_group {
+        flex: 1 1 100%;
+    }
+
+    .chat_cleanup_group {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        justify-content: stretch;
+    }
+
+    .chat_label_group,
+    .chat_cleanup_group {
+        width: 100%;
+    }
+
+    .chat_management_tools .menu_button,
+    .chat_cleanup_checkbox,
+    #chat_cleanup_unit {
+        width: 100%;
+    }
+
+    #selectChatPopupHeaderText {
+        flex: 1 1 auto;
+        min-width: min-content;
+    }
+
+    #newChatFromManageScreenButton,
+    #chat_import_button {
+        flex: 1 1 calc(50% - 4px);
+    }
+
+    #select_chat_search {
+        flex: 1 1 calc(100% - 42px);
+        min-width: 0;
+    }
+
+    #select_chat_cross {
+        flex: 0 0 34px;
+    }
+
+    .chat_cleanup_field {
+        grid-template-columns: 1fr minmax(4.5rem, 5.5rem);
+    }
 }
 
 .swipe_picker_delete.disabled {

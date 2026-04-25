@@ -473,6 +473,7 @@
         align-items: start;
         height: min-content;
         align-content: start;
+        width: calc(100vw - 20px);
         max-width: unset;
     }
 

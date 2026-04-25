@@ -25,6 +25,11 @@ Date: 2026-04-25
 - Made unread avatar taps inside an existing group DM switch to that character's DM instead of inviting them into the current DM.
 - Saved Character Author's Note (Private) to group chat metadata so the note persists on the actual group chat across speaker turns.
 
+### Chat Management
+- Added LLM-assisted chat labeling from the Chat History popup, with options to rename the current chat or batch-label timestamp-named chats while preserving chat contents.
+- Added old-chat cleanup controls for age, time unit, newest-chat retention, dated-name-only filtering, preview, confirmation, cancellation, and current-chat protection.
+- Reworked the Chat History popup controls so the new labeling and cleanup tools align cleanly on desktop and mobile, including full-width mobile search and balanced checkbox/text spacing.
+
 ### Mobile UI
 - Renamed the top-bar Navigate button and matching onboarding/docs copy to Workspace so the shell label matches the panel title.
 - Fixed the mobile Extensions header controls so the section title, update checkbox, and action buttons keep compact, centered alignment without relying on extension CSS.
@@ -109,6 +114,7 @@ Commits:
 - `fix(ui): normalize sampling number fields`
 - `fix(ui): improve advanced definitions editing`
 - `fix(ui): align group character list rows`
+- `feat(chat): add auto-label and cleanup tools`
 
 ## v1.4.5
 
