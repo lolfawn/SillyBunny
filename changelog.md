@@ -39,6 +39,7 @@ Date: 2026-04-25
 - Normalized icon-only buttons, drawer headers, recent-chat rows, prompt manager controls, World Info toolbars, background controls, and extension toolbars so mobile and desktop alignment stays centered, symmetrical, and square where expected.
 - Made primary and highlighted accent button labels choose a contrast-aware theme color so pale highlights remain readable on desktop and mobile.
 - Gave compact settings section headers consistent horizontal padding so titles no longer hug rounded panel edges.
+- Aligned Chat Completion prompt/template preset selectors with their action buttons so the select field and icon controls share the same centered height on desktop and mobile.
 - Removed deprecated wording from visible Extras source labels while keeping the underlying Extras compatibility options available.
 - Normalized native and Select2 dropdown heights, radii, arrow spacing, and Chat Translation field layout so selects align evenly on desktop and mobile.
 - Equalized User Settings drawer headers so top-level rows use the same centered title lane, height, and font size.
@@ -99,6 +100,7 @@ Commits:
 - `fix(ui): keep pathfinder log detail inline`
 - `fix(agents): queue manual agent runs`
 - `fix(ui): rename navigate button to workspace`
+- `fix(ui): align prompt preset controls`
 
 ## v1.4.5
 

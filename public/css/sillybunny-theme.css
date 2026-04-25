@@ -1918,8 +1918,25 @@ input[type='range']::-moz-range-thumb {
     gap: 8px;
 }
 
+#openai_api-presets .flex-container.flexNoGap:has(> select[data-preset-manager-for]),
+#AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) {
+    --sb-preset-row-control-size: var(--sb-field-min-height);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
 #openai_api-presets .flex-container.flexNoGap > select {
     min-width: 0;
+}
+
+#openai_api-presets .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > select,
+#AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > select {
+    height: var(--sb-preset-row-control-size);
+    min-height: var(--sb-preset-row-control-size);
+    margin-block: 0;
+    align-self: center;
 }
 
 #openai_api-presets .flex-container.marginLeft5 {
@@ -1927,8 +1944,35 @@ input[type='range']::-moz-range-thumb {
     justify-content: flex-start;
 }
 
+#openai_api-presets .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5,
+#AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 {
+    height: var(--sb-preset-row-control-size);
+    align-items: center;
+    align-self: center;
+    flex-wrap: nowrap;
+    gap: 6px;
+}
+
+#openai_api-presets .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 > .menu_button,
+#openai_api-presets .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 > .menu_button_icon,
+#AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 > .menu_button,
+#AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 > .menu_button_icon {
+    width: var(--sb-preset-row-control-size) !important;
+    min-width: var(--sb-preset-row-control-size) !important;
+    max-width: var(--sb-preset-row-control-size) !important;
+    height: var(--sb-preset-row-control-size) !important;
+    min-height: var(--sb-preset-row-control-size) !important;
+    max-height: var(--sb-preset-row-control-size) !important;
+}
+
 @media screen and (max-width: 760px) {
     #openai_api-presets .flex-container.flexNoGap {
+        grid-template-columns: 1fr;
+    }
+
+    #openai_api-presets .flex-container.flexNoGap:has(> select[data-preset-manager-for]),
+    #AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) {
+        --sb-preset-row-control-size: max(var(--sb-field-min-height), 44px);
         grid-template-columns: 1fr;
     }
 
@@ -1963,6 +2007,13 @@ input[type='range']::-moz-range-thumb {
     #openai_api-presets .flex-container.marginLeft5,
     #openai_api-presets .flex-container.gap3px {
         width: 100%;
+        justify-content: center;
+    }
+
+    #openai_api-presets .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5,
+    #AdvancedFormatting .flex-container.flexNoGap:has(> select[data-preset-manager-for]) > .flex-container.marginLeft5 {
+        height: auto;
+        flex-wrap: wrap;
         justify-content: center;
     }
 
