@@ -41,6 +41,7 @@ Date: 2026-04-25
 
 ### Extensions
 - Hardened the shared extension settings columns so duplicate top-level drawers for the same extension are removed automatically, including stale Quick Reply drawers after repeated activation.
+- Fixed enabled In-Chat post-processing agents so automatic append, extract, and prompt-transform passes wait until the main generation is fully idle before applying.
 
 Commits:
 - `fix(ui): make Moonlit Echoes optional`
@@ -59,6 +60,7 @@ Commits:
 - `fix(ui): align mobile prompt controls`
 - `fix(ui): normalize responsive alignment`
 - `fix(group): persist private author notes in group chats`
+- `fix(agents): apply post-processing after generation`
 
 ## v1.4.5
 

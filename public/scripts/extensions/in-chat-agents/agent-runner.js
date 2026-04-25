@@ -60,7 +60,7 @@ let pendingGenerationSnapshot = null;
 let internalPromptTransformDepth = 0;
 let isGenerationInProgress = false;
 let generationStopRequested = false;
-let deferredPostProcessing = null;
+const deferredPostProcessingQueue = new Map();
 let deferredPostProcessingTimeout = null;
 const activePromptTransformToasts = new Set();
 
@@ -238,6 +238,13 @@ function isStreamingMessageStillActive(messageIndex) {
     );
 }
 
+function isMainGenerationStillActive() {
+    return Boolean(
+        isGenerationInProgress ||
+        document.body?.dataset?.generating === 'true',
+    );
+}
+
 function wasStreamingMessageStopped(messageIndex) {
     const liveStreamingProcessor = getStreamingTarget(messageIndex);
     if (!liveStreamingProcessor) {
@@ -251,20 +258,63 @@ function wasStreamingMessageStopped(messageIndex) {
     );
 }
 
-function clearDeferredPostProcessing() {
-    if (deferredPostProcessingTimeout) {
+function clearDeferredPostProcessing(messageIndex = null) {
+    if (messageIndex !== null && messageIndex !== undefined) {
+        const numericMessageIndex = Number(messageIndex);
+        if (Number.isInteger(numericMessageIndex)) {
+            deferredPostProcessingQueue.delete(numericMessageIndex);
+        }
+    } else {
+        deferredPostProcessingQueue.clear();
+    }
+
+    if (deferredPostProcessingQueue.size === 0 && deferredPostProcessingTimeout) {
         clearTimeout(deferredPostProcessingTimeout);
         deferredPostProcessingTimeout = null;
     }
+}
 
-    deferredPostProcessing = null;
+function cloneActivationSnapshot(snapshot, generationType) {
+    const normalizedGenerationType = normalizeGenerationType(snapshot?.generationType ?? generationType);
+
+    return {
+        generationType: normalizedGenerationType,
+        activeAgentIds: Array.isArray(snapshot?.activeAgentIds)
+            ? [...snapshot.activeAgentIds]
+            : [],
+    };
+}
+
+function getDeferredActivationSnapshot(generationType) {
+    return cloneActivationSnapshot(
+        pendingGenerationSnapshot ?? buildActivationSnapshot(generationType),
+        generationType,
+    );
 }
 
 function deferPostProcessing(messageIndex, generationType) {
-    deferredPostProcessing = {
-        messageIndex: Number(messageIndex),
-        generationType: normalizeGenerationType(generationType),
-    };
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return;
+    }
+
+    deferredPostProcessingQueue.set(numericMessageIndex, {
+        messageIndex: numericMessageIndex,
+        generationType: String(generationType ?? '').trim() || 'normal',
+        message: chat[numericMessageIndex] ?? null,
+        activationSnapshot: getDeferredActivationSnapshot(generationType),
+    });
+}
+
+function isDeferredPostProcessingMessageCurrent(pendingMessage) {
+    const message = chat[pendingMessage.messageIndex];
+
+    return Boolean(
+        message &&
+        message === pendingMessage.message &&
+        !message.is_user &&
+        !message.is_system,
+    );
 }
 
 function scheduleDeferredPostProcessingFlush() {
@@ -275,24 +325,64 @@ function scheduleDeferredPostProcessingFlush() {
     deferredPostProcessingTimeout = setTimeout(async () => {
         deferredPostProcessingTimeout = null;
 
-        if (!deferredPostProcessing || isGenerationInProgress || generationStopRequested) {
+        if (deferredPostProcessingQueue.size === 0 || generationStopRequested) {
             return;
         }
 
-        const pendingMessage = deferredPostProcessing;
+        if (isGenerationInProgress) {
+            return;
+        }
 
-        if (isStreamingMessageStillActive(pendingMessage.messageIndex)) {
+        if (internalPromptTransformDepth > 0) {
             scheduleDeferredPostProcessingFlush();
             return;
         }
 
-        if (wasStreamingMessageStopped(pendingMessage.messageIndex)) {
-            deferredPostProcessing = null;
+        if (document.body?.dataset?.generating === 'true') {
+            scheduleDeferredPostProcessingFlush();
             return;
         }
 
-        deferredPostProcessing = null;
-        await processReceivedMessage(pendingMessage.messageIndex, pendingMessage.generationType);
+        const pendingMessages = [...deferredPostProcessingQueue.values()]
+            .sort((a, b) => a.messageIndex - b.messageIndex);
+
+        for (const pendingMessage of pendingMessages) {
+            if (!deferredPostProcessingQueue.has(pendingMessage.messageIndex)) {
+                continue;
+            }
+
+            if (!isDeferredPostProcessingMessageCurrent(pendingMessage)) {
+                deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
+                continue;
+            }
+
+            if (isStreamingMessageStillActive(pendingMessage.messageIndex)) {
+                scheduleDeferredPostProcessingFlush();
+                return;
+            }
+
+            if (wasStreamingMessageStopped(pendingMessage.messageIndex)) {
+                deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
+                continue;
+            }
+
+            deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
+            await processReceivedMessage(pendingMessage.messageIndex, pendingMessage.generationType, pendingMessage.activationSnapshot);
+
+            if (generationStopRequested) {
+                clearDeferredPostProcessing();
+                return;
+            }
+
+            if (isMainGenerationStillActive()) {
+                scheduleDeferredPostProcessingFlush();
+                return;
+            }
+        }
+
+        if (deferredPostProcessingQueue.size > 0) {
+            scheduleDeferredPostProcessingFlush();
+        }
     }, 0);
 }
 
@@ -352,8 +442,8 @@ function getSnapshotAgents(snapshot) {
         .filter(Boolean);
 }
 
-function getActiveAgentsForMessage(generationType) {
-    const snapshot = pendingGenerationSnapshot ?? buildActivationSnapshot(generationType);
+function getActiveAgentsForMessage(generationType, activationSnapshot = null) {
+    const snapshot = activationSnapshot ?? pendingGenerationSnapshot ?? buildActivationSnapshot(generationType);
     return getSnapshotAgents(snapshot);
 }
 
@@ -1201,7 +1291,6 @@ function onGenerationStarted() {
     isGenerationInProgress = true;
     toolSyncDuringGeneration = true;
     generationStopRequested = false;
-    clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
     pendingGenerationSnapshot = null;
 
@@ -1308,14 +1397,15 @@ async function onGenerationAfterCommands(generationType, _options, dryRun) {
  * Runs post-generation utilities on the received message and snapshots active regex scripts.
  * @param {number} messageIndex
  * @param {string} generationType
+ * @param {{ generationType: string, activeAgentIds: string[] } | null} activationSnapshot
  */
-async function processReceivedMessage(messageIndex, generationType) {
+async function processReceivedMessage(messageIndex, generationType, activationSnapshot = null) {
     const message = chat[messageIndex];
     if (!message || message.is_user || message.is_system) {
         return;
     }
 
-    const activeAgents = getActiveAgentsForMessage(generationType);
+    const activeAgents = getActiveAgentsForMessage(generationType, activationSnapshot);
     const promptTransformAgents = getPromptTransformAgentsForMessage(activeAgents, generationType);
     const utilityAgents = activeAgents.filter(agent =>
         agent.postProcess?.enabled &&
@@ -1473,15 +1563,16 @@ async function onMessageReceived(messageIndex, generationType) {
     }
 
     if (wasStreamingMessageStopped(numericMessageIndex)) {
-        if (deferredPostProcessing?.messageIndex === numericMessageIndex) {
-            clearDeferredPostProcessing();
-        }
+        clearDeferredPostProcessing(numericMessageIndex);
         return;
     }
 
-    if (deferredPostProcessing?.messageIndex === numericMessageIndex) {
-        clearDeferredPostProcessing();
+    if (isMainGenerationStillActive()) {
+        deferPostProcessing(numericMessageIndex, generationType);
+        return;
     }
+
+    clearDeferredPostProcessing(numericMessageIndex);
 
     await processReceivedMessage(numericMessageIndex, generationType);
 }
@@ -1523,15 +1614,16 @@ async function onImpersonateReady() {
     }
 
     if (wasStreamingMessageStopped(messageIndex)) {
-        if (deferredPostProcessing?.messageIndex === messageIndex) {
-            clearDeferredPostProcessing();
-        }
+        clearDeferredPostProcessing(messageIndex);
         return;
     }
 
-    if (deferredPostProcessing?.messageIndex === messageIndex) {
-        clearDeferredPostProcessing();
+    if (isMainGenerationStillActive()) {
+        deferPostProcessing(messageIndex, generationType);
+        return;
     }
+
+    clearDeferredPostProcessing(messageIndex);
 
     await processReceivedMessage(messageIndex, generationType);
 }
