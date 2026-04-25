@@ -45,6 +45,7 @@ Date: 2026-04-25
 - Made the World Info editor shrink safely inside desktop drawers and added a desktop-only resizable pop-up editor for roomier lorebook editing while mobile keeps its inline entry workflow.
 - Shortened the primary character edit shortcut labels to `FAV.` and `ADV.` so they stay centered and readable in compact layouts.
 - Made the character First Message editor taller by default on desktop and vertically resizable so long greetings are easier to edit without opening the maximized editor.
+- Centered the Top Bar Label option cards so Context Size, Character Name, and Custom Text align cleanly inside their controls on desktop and mobile.
 
 ### Server Tools
 - Added thumbnail quality controls to Customize > Server for toggling thumbnail generation, choosing JPG or PNG, setting quality and dimensions, applying SillyBunny's recommended sharp-avatar preset, and clearing the current user's thumbnail cache for rebuilds without manually editing `config.yaml`.
@@ -85,6 +86,7 @@ Commits:
 - `fix(ui): add world info editor popout`
 - `fix(ui): shorten character shortcut labels`
 - `fix(ui): allow resizing first message editor`
+- `fix(ui): center top bar label options`
 
 ## v1.4.5
 
