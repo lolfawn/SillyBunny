@@ -310,7 +310,7 @@
         <div class="pf--section-body" style="display: none;">
             <div class="pf--section-desc">Shows what Pathfinder actually selected or injected, including selected lore entries, stage results, and the prompt payload Pathfinder added before generation.</div>
             <div class="pf--log-mode-row">
-                <label class="checkbox_label" for="pf--log-mode">
+                <label class="pf--log-mode-control" for="pf--log-mode">
                     <span>Log detail</span>
                     <select id="pf--log-mode" class="text_pole">
                         <option value="summary">Summarized</option>
@@ -530,15 +530,27 @@
 .pf--log-mode-row {
     display: flex;
     justify-content: flex-start;
+    align-items: center;
     margin-bottom: 10px;
+    max-width: 100%;
 }
 
-.pf--log-mode-row .checkbox_label {
+.pf--log-mode-control {
+    display: grid;
+    grid-template-columns: max-content minmax(128px, 160px);
+    align-items: center;
     gap: 8px;
+    max-width: 100%;
+    min-height: var(--sb-control-min-height, 30px);
+}
+
+.pf--log-mode-control span {
+    white-space: nowrap;
 }
 
 #pf--log-mode {
-    min-width: 140px;
+    width: 100%;
+    min-width: 0;
 }
 
 .pf--retrieval-log-output,

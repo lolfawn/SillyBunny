@@ -58,6 +58,7 @@ Date: 2026-04-25
 - Fixed enabled In-Chat post-processing agents so automatic append, extract, and prompt-transform passes wait until the main generation is fully idle before applying.
 - Made the In-Chat Agents separation checkbox actually scope enabled agents between Individual and Group chats, with UI toggles, bulk actions, tool registration, and Pathfinder enablement following the active chat type.
 - Left-aligned Pathfinder diagnostics actions and fixed the Run Diagnostics button so its label determines the button width instead of being clipped as an icon-only control.
+- Kept Pathfinder's Retrieval Log detail label and dropdown on one line with a dedicated, non-checkbox control layout.
 
 Commits:
 - `fix(ui): make Moonlit Echoes optional`
@@ -93,6 +94,7 @@ Commits:
 - `fix(ui): anchor sampling docs link`
 - `fix(agents): separate enabled agents by chat type`
 - `fix(ui): align pathfinder diagnostics button`
+- `fix(ui): keep pathfinder log detail inline`
 
 ## v1.4.5
 
