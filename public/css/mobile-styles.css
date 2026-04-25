@@ -424,7 +424,7 @@
     }
 
     /* Minimum touch targets for mobile */
-    button, .menu_button, .right_menu_button, select {
+    button, .menu_button, .right_menu_button, select:not(.select2-hidden-accessible) {
         min-height: 44px;
     }
 
@@ -434,6 +434,17 @@
         height: var(--sb-accent-swatch-size, 30px);
         max-height: var(--sb-accent-swatch-size, 30px);
         padding: 0;
+    }
+
+    #chat .mes .mes_view_agent_changes {
+        width: var(--sb-message-icon-size, 2rem);
+        min-width: var(--sb-message-icon-size, 2rem);
+        max-width: var(--sb-message-icon-size, 2rem);
+        height: var(--sb-message-icon-size, 2rem);
+        min-height: var(--sb-message-icon-size, 2rem);
+        max-height: var(--sb-message-icon-size, 2rem);
+        padding: 0;
+        aspect-ratio: 1 / 1;
     }
 
     .drawer-content .floating_panel_maximize,
