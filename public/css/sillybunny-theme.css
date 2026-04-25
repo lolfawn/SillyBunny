@@ -15,6 +15,7 @@
     --sb-icon-control-radius: 10px;
     --sb-inline-drawer-icon-size: 2rem;
     --sb-control-min-height: 38px;
+    --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
     --sb-row-gap: 10px;
     --sb-section-gap: 14px;
     --sb-settings-card-padding: 12px 14px;
@@ -89,6 +90,7 @@
 
 :root[data-sb-compact-mode='true'] {
     --sb-control-min-height: 32px;
+    --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
     --sb-row-gap: 8px;
     --sb-section-gap: 10px;
     --sb-settings-card-padding: 10px 12px;
@@ -416,6 +418,55 @@ h3:not(.popup h3):not(#chat h3) {
     line-height: 1.2;
 }
 
+.menu_button,
+.menu_button_icon,
+.right_menu_button {
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-block: 0;
+    min-width: var(--sb-control-min-height);
+}
+
+.menu_button > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img),
+.menu_button_icon > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img),
+.right_menu_button > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img),
+.drawer-icon > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img),
+.inline-drawer-icon > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img) {
+    flex: 0 0 auto;
+    line-height: 1;
+}
+
+.menu_button > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i),
+.menu_button_icon > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i),
+.right_menu_button > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i),
+.drawer-icon > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i),
+.inline-drawer-icon > :is(.fa, .fa-solid, .fa-regular, .fa-brands, i) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1em;
+    height: 1em;
+    margin: 0;
+}
+
+.flex-container:has(> :is(.menu_button, .menu_button_icon, .right_menu_button)) {
+    align-items: center;
+}
+
+.title_restorable:has(> :is(.menu_button, .menu_button_icon, .right_menu_button)),
+.openai_restorable:has(> :is(.menu_button, .menu_button_icon, .right_menu_button)),
+.range-block-title:has(> :is(.menu_button, .menu_button_icon, .right_menu_button)) {
+    align-items: center;
+    gap: var(--sb-row-gap);
+}
+
+.title_restorable > :is(.flex-container, .menu_button, .menu_button_icon, .right_menu_button),
+.openai_restorable > :is(.flex-container, .menu_button, .menu_button_icon, .right_menu_button),
+.range-block-title > :is(.flex-container, .menu_button, .menu_button_icon, .right_menu_button) {
+    flex: 0 0 auto;
+}
+
 .menu_button:not(.disabled):not([disabled]),
 .menu_button_icon:not(.disabled):not([disabled]) {
     background: var(--sb-button-bg);
@@ -499,24 +550,42 @@ h3:not(.popup h3):not(#chat h3) {
 
 .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
 .menu_button_icon:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
-.right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty {
-    inline-size: var(--sb-icon-control-size);
-    block-size: var(--sb-icon-control-size);
-    min-inline-size: var(--sb-icon-control-size);
-    min-block-size: var(--sb-icon-control-size);
-    max-inline-size: var(--sb-icon-control-size);
-    max-block-size: var(--sb-icon-control-size);
+.right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+.menu_button_icon:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child),
+.menu_button_icon:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> input[hidden] + :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):last-child),
+.menu_button:not(.sb-server-action):not(.api_button):not(.openrouter_authorize):not(#bg_selection_mode_button):not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child),
+.menu_button:not(.sb-server-action):not(.api_button):not(.openrouter_authorize):not(#bg_selection_mode_button):not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> input[hidden] + :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):last-child),
+.right_menu_button:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child) {
+    width: var(--sb-control-icon-physical-size);
+    inline-size: var(--sb-control-icon-physical-size);
+    height: var(--sb-control-icon-physical-size);
+    block-size: var(--sb-control-icon-physical-size);
+    min-width: var(--sb-control-icon-physical-size);
+    min-inline-size: var(--sb-control-icon-physical-size);
+    min-height: var(--sb-control-icon-physical-size);
+    min-block-size: var(--sb-control-icon-physical-size);
+    max-width: var(--sb-control-icon-physical-size);
+    max-inline-size: var(--sb-control-icon-physical-size);
+    max-height: var(--sb-control-icon-physical-size);
+    max-block-size: var(--sb-control-icon-physical-size);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
-    padding: 0;
+    padding: 0 !important;
+    margin: 0;
     border-radius: var(--sb-icon-control-radius);
     aspect-ratio: 1 / 1;
     box-sizing: border-box;
-    line-height: var(--sb-icon-control-size);
+    line-height: 1;
     text-align: center;
     overflow: hidden;
+}
+
+.menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty::before,
+.menu_button_icon:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty::before,
+.right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty::before {
+    line-height: 1;
 }
 
 .menu_button.menu_button_primary:not(.disabled):not([disabled]),
@@ -997,6 +1066,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
 @media screen and (max-width: 768px) {
     :root {
         --sb-icon-control-size: 2.5rem;
+        --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
         --sb-message-icon-size: 2rem;
     }
 
@@ -1216,6 +1286,29 @@ body.bubblechat .mes[is_user='true'] .mes_block {
         margin-top: 0;
         padding-bottom: max(4px, env(safe-area-inset-bottom, 0px));
     }
+
+    .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .menu_button_icon:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .menu_button_icon:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child),
+    .menu_button_icon:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> input[hidden] + :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):last-child),
+    .menu_button:not(.sb-server-action):not(.api_button):not(.openrouter_authorize):not(#bg_selection_mode_button):not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child),
+    .menu_button:not(.sb-server-action):not(.api_button):not(.openrouter_authorize):not(#bg_selection_mode_button):not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> input[hidden] + :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):last-child),
+    .right_menu_button:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child) {
+        width: var(--sb-control-icon-physical-size);
+        inline-size: var(--sb-control-icon-physical-size);
+        height: var(--sb-control-icon-physical-size);
+        block-size: var(--sb-control-icon-physical-size);
+        min-width: var(--sb-control-icon-physical-size);
+        min-inline-size: var(--sb-control-icon-physical-size);
+        min-height: var(--sb-control-icon-physical-size);
+        min-block-size: var(--sb-control-icon-physical-size);
+        max-width: var(--sb-control-icon-physical-size);
+        max-inline-size: var(--sb-control-icon-physical-size);
+        max-height: var(--sb-control-icon-physical-size);
+        max-block-size: var(--sb-control-icon-physical-size);
+        padding: 0 !important;
+    }
 }
 
 .character_select:hover,
@@ -1326,7 +1419,7 @@ input[type='range']::-moz-range-thumb {
 
 .sb-setting-inline-center {
     flex-direction: row;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
@@ -1356,7 +1449,7 @@ input[type='range']::-moz-range-thumb {
     flex: 0 0 auto;
     width: min(100%, 220px);
     min-width: 180px;
-    align-self: flex-start;
+    align-self: center;
 }
 
 .sb-chat-completion-server-config.is-nested {
@@ -1368,7 +1461,7 @@ input[type='range']::-moz-range-thumb {
 }
 
 .sb-chat-completion-server-config.is-nested .sb-chat-completion-config-header {
-    align-items: flex-start;
+    align-items: center;
 }
 
 .sb-chat-completion-server-config {
@@ -1380,7 +1473,7 @@ input[type='range']::-moz-range-thumb {
 
 .sb-chat-completion-server-config .sb-chat-completion-config-header {
     justify-content: flex-start;
-    align-items: flex-start;
+    align-items: center;
     flex-wrap: wrap;
     gap: 12px;
 }
@@ -1500,6 +1593,21 @@ input[type='range']::-moz-range-thumb {
     align-items: stretch;
     justify-content: flex-start;
     gap: 10px;
+}
+
+#openai_api .title_restorable,
+#openai_settings .title_restorable,
+#range_block_openai .title_restorable,
+#openai_api .openai_restorable,
+#openai_settings .openai_restorable,
+#range_block_openai .openai_restorable,
+#openai_api .range-block-title,
+#openai_settings .range-block-title,
+#range_block_openai .range-block-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sb-row-gap);
+    min-width: 0;
 }
 
 #openai_api .range-block > *,
@@ -1632,6 +1740,13 @@ input[type='range']::-moz-range-thumb {
     min-height: 44px;
 }
 
+#openai_api .flex-container:has(> :is([data-preset-manager-update], [data-preset-manager-rename], [data-preset-manager-new], [data-preset-manager-restore], [data-preset-manager-import], [data-preset-manager-export], [data-preset-manager-delete], .editor_maximize, .right_menu_button, .menu_button_icon)),
+#openai_settings .flex-container:has(> :is([data-preset-manager-update], [data-preset-manager-rename], [data-preset-manager-new], [data-preset-manager-restore], [data-preset-manager-import], [data-preset-manager-export], [data-preset-manager-delete], .editor_maximize, .right_menu_button, .menu_button_icon)),
+#range_block_openai .flex-container:has(> :is([data-preset-manager-update], [data-preset-manager-rename], [data-preset-manager-new], [data-preset-manager-restore], [data-preset-manager-import], [data-preset-manager-export], [data-preset-manager-delete], .editor_maximize, .right_menu_button, .menu_button_icon)) {
+    align-items: center;
+    gap: 6px;
+}
+
 #rm_api_block .flex-container:has(> .api_button),
 #rm_api_block .flex-container:has(> #test_api_button),
 #rm_api_block .flex-container:has(> .openrouter_authorize),
@@ -1665,7 +1780,7 @@ input[type='range']::-moz-range-thumb {
 
 #rm_api_block .flex-container.alignitemscenter.spaceBetween.wide100p {
     flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: center;
     gap: 10px;
 }
 
@@ -1959,12 +2074,14 @@ input[type='range']::-moz-range-thumb {
 }
 
 #PersonaManagement > .flex-container.wide100p.alignitemscenter.spaceBetween.flexNoGap > .flex-container.alignItemsBaseline.wide100p {
+    align-items: center;
     flex-wrap: wrap;
     gap: 12px;
     min-width: 0;
 }
 
 #PersonaManagement > .flex-container.wide100p.alignitemscenter.spaceBetween.flexNoGap > .flex-container.alignItemsBaseline.wide100p > .flex-container:last-child {
+    align-items: center;
     flex-wrap: wrap;
     gap: 10px;
     min-width: 0;
@@ -2016,7 +2133,7 @@ input[type='range']::-moz-range-thumb {
 
 #PersonaManagement .persona-management-browser > #persona_grid_toggle {
     flex: 0 0 44px;
-    align-self: stretch;
+    align-self: center;
 }
 
 #persona-management-block .persona_management_left_column,
@@ -3087,13 +3204,13 @@ input[type='range']::-moz-range-thumb {
         'notify notify'
         'manage install';
     gap: 12px 16px;
-    align-items: start;
+    align-items: center;
 }
 
 #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > h3 {
     grid-area: title;
     margin: 0;
-    align-self: start;
+    align-self: center;
 }
 
 #rm_extensions_block .extensions_block > .alignitemscenter.flex-container.wide100p > label {
@@ -3183,7 +3300,7 @@ input[type='range']::-moz-range-thumb {
 .sb-openai-settings-subdrawer > .inline-drawer-header > .flex-container {
     flex: 1 1 auto;
     min-width: 0;
-    align-items: flex-start;
+    align-items: center;
 }
 
 .sb-openai-settings-subdrawer > .inline-drawer-header > .flex-container > b {
@@ -3452,6 +3569,7 @@ input[type='range']::-moz-range-thumb {
     #UI-presets-block > h4,
     #UI-presets-block .flex-container.flexnowrap.alignitemscenter,
     .sb-settings-subdrawer-toolbar {
+        align-items: center;
         flex-wrap: wrap;
     }
 

@@ -308,7 +308,7 @@
     flex: 1 1 auto;
     flex-direction: row;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     color: var(--SmartThemeBodyColor);
     margin-top: 0;
@@ -327,7 +327,7 @@
 }
 
 #completion_prompt_manager .completion_prompt_manager_drawer > .inline-drawer-header {
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
 }
 
@@ -399,7 +399,7 @@
     flex-direction: row;
     justify-content: flex-end;
     flex-wrap: wrap;
-    align-items: stretch;
+    align-items: center;
     gap: 0.25em;
     padding: 0 0.25em;
     width: 100%;
@@ -566,6 +566,7 @@
 }
 
 #completion_prompt_manager_popup .completion_prompt_manager_prompt_header {
+    align-items: center;
     justify-content: space-between;
     gap: 10px;
 }
@@ -707,7 +708,7 @@
 
     #completion_prompt_manager .completion_prompt_manager_editor_host .completion_prompt_manager_popup_entry_form > .flex-container.gap10px {
         flex-wrap: wrap;
-        align-items: flex-start;
+        align-items: center;
     }
 
     #completion_prompt_manager .completion_prompt_manager_editor_host .completion_prompt_manager_popup_entry_form > .flex-container.gap10px > .completion_prompt_manager_popup_entry_form_control {
@@ -718,7 +719,7 @@
     #completion_prompt_manager .completion_prompt_manager_editor_host .completion_prompt_manager_popup_entry_form > .completion_prompt_manager_popup_entry_form_control > .flex-container {
         flex-wrap: wrap;
         gap: 10px;
-        align-items: flex-start;
+        align-items: center;
     }
 
     #completion_prompt_manager .completion_prompt_manager_editor_host .completion_prompt_manager_popup_entry_form > .flex-container.gap10px,
@@ -738,7 +739,7 @@
     }
 
     #completion_prompt_manager .completion_prompt_manager_editor_host .completion_prompt_manager_prompt_header {
-        align-items: flex-start;
+        align-items: center;
     }
 
     #completion_prompt_manager .completion_prompt_manager_editor_host .completion_prompt_manager_prompt_header_actions {

@@ -428,6 +428,23 @@
         min-height: 44px;
     }
 
+    .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .menu_button_icon:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .menu_button_icon:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child),
+    .menu_button_icon:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> input[hidden] + :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):last-child),
+    .menu_button:not(.sb-server-action):not(.api_button):not(.openrouter_authorize):not(#bg_selection_mode_button):not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child),
+    .menu_button:not(.sb-server-action):not(.api_button):not(.openrouter_authorize):not(#bg_selection_mode_button):not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> input[hidden] + :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):last-child),
+    .right_menu_button:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child) {
+        width: var(--sb-control-icon-physical-size, 44px);
+        min-width: var(--sb-control-icon-physical-size, 44px);
+        max-width: var(--sb-control-icon-physical-size, 44px);
+        height: var(--sb-control-icon-physical-size, 44px);
+        min-height: var(--sb-control-icon-physical-size, 44px);
+        max-height: var(--sb-control-icon-physical-size, 44px);
+        padding: 0 !important;
+    }
+
     .menu_button.sb-accent-preset,
     button.sb-accent-preset {
         min-height: var(--sb-accent-swatch-size, 30px);
@@ -583,12 +600,12 @@
     .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
     .menu_button_icon:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
     .right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty {
-        inline-size: var(--sb-icon-control-size, 2.5rem);
-        block-size: var(--sb-icon-control-size, 2.5rem);
-        min-inline-size: var(--sb-icon-control-size, 2.5rem);
-        min-block-size: var(--sb-icon-control-size, 2.5rem);
-        max-inline-size: var(--sb-icon-control-size, 2.5rem);
-        max-block-size: var(--sb-icon-control-size, 2.5rem);
+        inline-size: var(--sb-control-icon-physical-size, 44px);
+        block-size: var(--sb-control-icon-physical-size, 44px);
+        min-inline-size: var(--sb-control-icon-physical-size, 44px);
+        min-block-size: var(--sb-control-icon-physical-size, 44px);
+        max-inline-size: var(--sb-control-icon-physical-size, 44px);
+        max-block-size: var(--sb-control-icon-physical-size, 44px);
         display: inline-flex;
         align-items: center;
         justify-content: center;

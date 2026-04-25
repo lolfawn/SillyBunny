@@ -2017,7 +2017,7 @@ body.sb-shell-resizing * {
 
 .sb-admin-card-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
 }
@@ -2139,7 +2139,7 @@ body.sb-shell-resizing * {
     display: grid;
     grid-template-columns: minmax(180px, 1.2fr) repeat(2, minmax(128px, 0.9fr));
     gap: 12px;
-    align-items: end;
+    align-items: center;
 }
 
 .sb-thumbnail-enabled {
@@ -2294,12 +2294,14 @@ body.sb-shell-resizing * {
 .sb-import-path-row {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 10px;
 }
 
 .sb-import-action-row {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 10px;
 }
 
@@ -2402,7 +2404,7 @@ body.sb-shell-resizing * {
 .sb-import-report-item-title {
     flex: 1 1 auto;
     min-width: 0;
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
 }
 
