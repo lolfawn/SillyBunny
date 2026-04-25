@@ -2076,6 +2076,57 @@ body.sb-shell-resizing * {
     text-align: center;
 }
 
+.sb-thumbnail-controls {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.2fr) repeat(2, minmax(128px, 0.9fr));
+    gap: 12px;
+    align-items: end;
+}
+
+.sb-thumbnail-enabled {
+    min-height: 44px;
+    align-items: center;
+}
+
+.sb-thumbnail-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+    font-size: calc(var(--mainFontSize) * 0.76);
+}
+
+.sb-thumbnail-field > span,
+.sb-thumbnail-size-label {
+    opacity: 0.72;
+    font-size: calc(var(--mainFontSize) * 0.72);
+    line-height: 1.25;
+}
+
+.sb-thumbnail-sizes {
+    display: grid;
+    gap: 10px;
+}
+
+.sb-thumbnail-size-row {
+    display: grid;
+    grid-template-columns: minmax(104px, 1fr) minmax(74px, 0.48fr) 18px minmax(74px, 0.48fr);
+    gap: 8px;
+    align-items: center;
+}
+
+.sb-thumbnail-size-separator {
+    justify-self: center;
+    opacity: 0.64;
+    font-size: calc(var(--mainFontSize) * 0.72);
+}
+
+.sb-thumbnail-number {
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+}
+
 .sb-server-config-meta {
     display: flex;
     align-items: center;
@@ -2313,6 +2364,15 @@ body.sb-shell-resizing * {
     .sb-server-inline-state {
         align-self: flex-start;
         white-space: normal;
+    }
+
+    .sb-thumbnail-controls {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .sb-thumbnail-size-row {
+        grid-template-columns: 1fr minmax(68px, 0.6fr) 14px minmax(68px, 0.6fr);
     }
 
     .sb-import-path-row {

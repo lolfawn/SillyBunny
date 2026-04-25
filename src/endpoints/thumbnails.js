@@ -8,7 +8,12 @@ import { sync as writeFileAtomicSync } from 'write-file-atomic';
 import { imageSize as sizeOf } from 'image-size';
 
 import { getConfigValue, invalidateFirefoxCache } from '../util.js';
-import { getThumbnailResolution, isAnimatedWebP, isAnimatedApng, thumbnailDimensions as dimensions } from './image-metadata.js';
+import {
+    getThumbnailResolution,
+    isAnimatedWebP,
+    isAnimatedApng,
+    thumbnailDimensions as dimensions,
+} from './image-metadata.js';
 import { ResizeStrategy } from '@jimp/plugin-resize';
 import { safeCover } from '../jimp-safe.js';
 
@@ -18,9 +23,11 @@ export const apiRouter = express.Router();
 export const SKIPPED_EXTENSIONS = new Set(['.apng', '.mp4', '.webm', '.avi', '.mkv', '.flv', '.gif']);
 export const ALLOWED_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.apng']);
 
-const thumbnailsEnabled = !!getConfigValue('thumbnails.enabled', true, 'boolean');
-const quality = Math.min(100, Math.max(1, parseInt(getConfigValue('thumbnails.quality', 95, 'number'))));
-const pngFormat = String(getConfigValue('thumbnails.format', 'jpg')).toLowerCase().trim() === 'png';
+const thumbnailRuntimeSettings = {
+    enabled: !!getConfigValue('thumbnails.enabled', true, 'boolean'),
+    quality: Math.min(100, Math.max(1, parseInt(getConfigValue('thumbnails.quality', 95, 'number')))),
+    format: String(getConfigValue('thumbnails.format', 'jpg')).toLowerCase().trim() === 'png' ? 'png' : 'jpg',
+};
 
 /**
  * @typedef {'bg' | 'avatar' | 'persona'} ThumbnailType
@@ -90,6 +97,16 @@ export function invalidateThumbnail(directories, type, file) {
     if (fs.existsSync(pathToThumbnail)) {
         fs.unlinkSync(pathToThumbnail);
     }
+}
+
+export function setThumbnailRuntimeSettings(settings = {}) {
+    thumbnailRuntimeSettings.enabled = Boolean(settings.enabled);
+    thumbnailRuntimeSettings.quality = Math.min(100, Math.max(1, parseInt(settings.quality, 10) || 95));
+    thumbnailRuntimeSettings.format = String(settings.format).toLowerCase().trim() === 'png' ? 'png' : 'jpg';
+}
+
+export function getThumbnailRuntimeSettings() {
+    return { ...thumbnailRuntimeSettings };
 }
 
 /**
@@ -229,9 +246,9 @@ async function processSingleImage(file, originalFolder, thumbnailFolder, type) {
             safeCover(thumbImage, { w: configWidth, h: configHeight, mode: ResizeStrategy.BILINEAR });
         }
 
-        const buffer = pngFormat
+        const buffer = thumbnailRuntimeSettings.format === 'png'
             ? await thumbImage.getBuffer(JimpMime.png)
-            : await thumbImage.getBuffer(JimpMime.jpeg, { quality: quality, jpegColorSpace: 'ycbcr' });
+            : await thumbImage.getBuffer(JimpMime.jpeg, { quality: thumbnailRuntimeSettings.quality, jpegColorSpace: 'ycbcr' });
 
         writeFileAtomicSync(pathToCachedFile, buffer);
 
@@ -266,7 +283,7 @@ publicRouter.get('/', async function (request, response) {
             return response.sendFile(pathToOriginalFile);
         };
 
-        if (!thumbnailsEnabled) {
+        if (!thumbnailRuntimeSettings.enabled) {
             return serveOriginal();
         }
 

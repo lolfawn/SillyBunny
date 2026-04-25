@@ -429,6 +429,8 @@ const sbState = {
         refs: null,
         originalConfig: '',
         lastModifiedMs: 0,
+        thumbnailLastModifiedMs: 0,
+        thumbnailSettingsLoaded: false,
         lastStatusData: null,
         busy: false,
         restarting: false,
@@ -4390,6 +4392,73 @@ function setServerAdminButtonLabel(button, isBusy, busyLabel) {
     button.textContent = isBusy ? busyLabel : button.dataset.idleLabel;
 }
 
+function getThumbnailSettingsFromRefs(refs = getServerAdminRefs()) {
+    const parseSize = (input, fallback) => {
+        const value = Number.parseInt(input?.value, 10);
+        return Number.isFinite(value) ? Math.min(4096, Math.max(1, value)) : fallback;
+    };
+
+    return {
+        enabled: Boolean(refs?.thumbnailEnabled?.checked),
+        format: refs?.thumbnailFormat?.value === 'png' ? 'png' : 'jpg',
+        quality: parseSize(refs?.thumbnailQuality, 95),
+        dimensions: {
+            bg: [
+                parseSize(refs?.thumbnailBgWidth, 240),
+                parseSize(refs?.thumbnailBgHeight, 135),
+            ],
+            avatar: [
+                parseSize(refs?.thumbnailAvatarWidth, 864),
+                parseSize(refs?.thumbnailAvatarHeight, 1280),
+            ],
+            persona: [
+                parseSize(refs?.thumbnailPersonaWidth, 864),
+                parseSize(refs?.thumbnailPersonaHeight, 1280),
+            ],
+        },
+    };
+}
+
+function setThumbnailInputValues(settings = {}, refs = getServerAdminRefs()) {
+    if (!refs) {
+        return;
+    }
+
+    refs.thumbnailEnabled.checked = Boolean(settings.enabled);
+    refs.thumbnailFormat.value = settings.format === 'png' ? 'png' : 'jpg';
+    refs.thumbnailQuality.value = String(settings.quality ?? 95);
+    refs.thumbnailBgWidth.value = String(settings.dimensions?.bg?.[0] ?? 160);
+    refs.thumbnailBgHeight.value = String(settings.dimensions?.bg?.[1] ?? 90);
+    refs.thumbnailAvatarWidth.value = String(settings.dimensions?.avatar?.[0] ?? 96);
+    refs.thumbnailAvatarHeight.value = String(settings.dimensions?.avatar?.[1] ?? 144);
+    refs.thumbnailPersonaWidth.value = String(settings.dimensions?.persona?.[0] ?? 96);
+    refs.thumbnailPersonaHeight.value = String(settings.dimensions?.persona?.[1] ?? 144);
+}
+
+function setThumbnailInputsDisabled(disabled, refs = getServerAdminRefs()) {
+    const controls = [
+        refs?.thumbnailEnabled,
+        refs?.thumbnailFormat,
+        refs?.thumbnailQuality,
+        refs?.thumbnailBgWidth,
+        refs?.thumbnailBgHeight,
+        refs?.thumbnailAvatarWidth,
+        refs?.thumbnailAvatarHeight,
+        refs?.thumbnailPersonaWidth,
+        refs?.thumbnailPersonaHeight,
+        refs?.thumbnailUseRecommendedButton,
+        refs?.thumbnailSaveButton,
+        refs?.thumbnailSaveClearButton,
+        refs?.thumbnailClearButton,
+    ];
+
+    for (const control of controls) {
+        if (control instanceof HTMLElement) {
+            control.disabled = disabled;
+        }
+    }
+}
+
 function appendServerAdminStat(target, label, value) {
     if (!(target instanceof HTMLElement)) {
         return;
@@ -4425,6 +4494,7 @@ function updateServerAdminInteractivity() {
     }
 
     const locked = state.busy || state.restarting;
+    const thumbnailLocked = locked || !state.thumbnailSettingsLoaded;
     const canUpdate = refs.updateButton?.dataset.sbCanUpdate === 'true';
     const hasConfigContent = Boolean(refs.configEditor?.value.trim());
 
@@ -4434,6 +4504,7 @@ function updateServerAdminInteractivity() {
     setButtonDisabled(refs.restartButton, locked);
     setButtonDisabled(refs.saveConfigButton, locked || !hasConfigContent);
     setButtonDisabled(refs.saveConfigRestartButton, locked || !hasConfigContent);
+    setThumbnailInputsDisabled(thumbnailLocked);
 
     if (refs.configEditor instanceof HTMLTextAreaElement) {
         refs.configEditor.disabled = locked;
@@ -4553,6 +4624,21 @@ function renderServerAdminConfig(data, { overwrite = true } = {}) {
     }
 }
 
+function renderServerThumbnailSettings(data) {
+    const state = getServerAdminState();
+    const refs = getServerAdminRefs();
+
+    if (!refs) {
+        return;
+    }
+
+    setThumbnailInputValues(data?.settings ?? {});
+    state.thumbnailLastModifiedMs = Number(data?.lastModifiedMs ?? 0) || state.thumbnailLastModifiedMs;
+    state.thumbnailRecommended = data?.recommended ?? state.thumbnailRecommended;
+    state.thumbnailSettingsLoaded = true;
+    setServerAdminMessage(refs.thumbnailNote, 'Thumbnail settings loaded. Saving applies to new thumbnails immediately.', 'neutral');
+}
+
 async function waitForServerReturn(expectedRevision = '', { clearCacheBeforeReload = false } = {}) {
     let sawOffline = false;
 
@@ -4598,6 +4684,7 @@ async function refreshServerAdminPanel({ includeConfig = false, forceConfig = fa
     const state = getServerAdminState();
     const refs = getServerAdminRefs();
     const shouldLoadConfig = includeConfig || forceConfig || !state.configLoaded;
+    const shouldLoadThumbnails = forceConfig || !state.thumbnailSettingsLoaded;
 
     if (!refs || state.busy || state.restarting) {
         return;
@@ -4613,6 +4700,9 @@ async function refreshServerAdminPanel({ includeConfig = false, forceConfig = fa
 
     const statusPromise = requestServerAdmin('/api/server-admin/status');
     const configPromise = shouldLoadConfig ? requestServerAdmin('/api/server-admin/config/get') : null;
+    const thumbnailPromise = shouldLoadThumbnails
+        ? requestServerAdmin('/api/server-admin/config/thumbnail-settings/get')
+        : null;
 
     if (configPromise) {
         try {
@@ -4635,6 +4725,19 @@ async function refreshServerAdminPanel({ includeConfig = false, forceConfig = fa
             setServerAdminMessage(refs.configNote, error.message || 'Failed to load config.yaml.', tone);
             if (error?.status !== 403) {
                 console.error('Failed to load config.yaml.', error);
+            }
+        }
+    }
+
+    if (thumbnailPromise) {
+        try {
+            renderServerThumbnailSettings(await thumbnailPromise);
+        } catch (error) {
+            state.thumbnailSettingsLoaded = false;
+            const tone = error?.status === 403 ? 'warn' : 'danger';
+            setServerAdminMessage(refs.thumbnailNote, error.message || 'Failed to load thumbnail settings.', tone);
+            if (error?.status !== 403) {
+                console.error('Failed to load thumbnail settings.', error);
             }
         }
     }
@@ -4721,6 +4824,126 @@ async function handleServerAdminSaveConfig({ restart = false } = {}) {
             updateServerAdminInteractivity();
         }
     }
+}
+
+async function handleServerThumbnailSave({ clearCache = false } = {}) {
+    const state = getServerAdminState();
+    const refs = getServerAdminRefs();
+
+    if (!refs || state.busy || state.restarting) {
+        return;
+    }
+
+    if (updateServerConfigDirtyState()) {
+        setServerAdminMessage(refs.thumbnailNote, 'Save or reload the config.yaml editor before changing thumbnail settings.', 'warn');
+        toastr.warning('Save or reload the config.yaml editor before changing thumbnail settings.', 'Thumbnails');
+        return;
+    }
+
+    state.busy = true;
+    updateServerAdminInteractivity();
+    setServerAdminMessage(refs.thumbnailNote, clearCache ? 'Saving settings and clearing thumbnail cache…' : 'Saving thumbnail settings…');
+
+    try {
+        const result = await requestServerAdmin('/api/server-admin/config/thumbnail-settings/save', {
+            settings: getThumbnailSettingsFromRefs(refs),
+            expectedLastModifiedMs: state.thumbnailLastModifiedMs || state.lastModifiedMs,
+            clearCache,
+        });
+
+        renderServerThumbnailSettings(result);
+        state.lastModifiedMs = Number(result?.lastModifiedMs ?? 0) || state.lastModifiedMs;
+        setServerAdminMessage(refs.thumbnailNote, result?.message || 'Thumbnail settings saved.', 'good');
+        toastr.success(result?.message || 'Thumbnail settings saved.', 'Thumbnails');
+        renderServerAdminConfig(await requestServerAdmin('/api/server-admin/config/get'), { overwrite: true });
+    } catch (error) {
+        console.error('Failed to save thumbnail settings.', error);
+        setServerAdminMessage(refs.thumbnailNote, error.message || 'Failed to save thumbnail settings.', 'danger');
+        toastr.error(error.message || 'Failed to save thumbnail settings.', 'Thumbnails');
+    } finally {
+        state.busy = false;
+        updateServerAdminInteractivity();
+    }
+}
+
+async function handleServerThumbnailClearCache() {
+    const state = getServerAdminState();
+    const refs = getServerAdminRefs();
+
+    if (!refs || state.busy || state.restarting) {
+        return;
+    }
+
+    if (!window.confirm('Clear cached thumbnails for this user? They will be rebuilt as images are loaded.')) {
+        return;
+    }
+
+    state.busy = true;
+    updateServerAdminInteractivity();
+    setServerAdminMessage(refs.thumbnailNote, 'Clearing thumbnail cache…');
+
+    try {
+        const result = await requestServerAdmin('/api/server-admin/thumbnails/clear-cache');
+        setServerAdminMessage(refs.thumbnailNote, result?.message || 'Thumbnail cache cleared.', 'good');
+        toastr.success(result?.message || 'Thumbnail cache cleared.', 'Thumbnails');
+    } catch (error) {
+        console.error('Failed to clear thumbnail cache.', error);
+        setServerAdminMessage(refs.thumbnailNote, error.message || 'Failed to clear thumbnail cache.', 'danger');
+        toastr.error(error.message || 'Failed to clear thumbnail cache.', 'Thumbnails');
+    } finally {
+        state.busy = false;
+        updateServerAdminInteractivity();
+    }
+}
+
+function handleUseRecommendedThumbnailSettings() {
+    const state = getServerAdminState();
+    const refs = getServerAdminRefs();
+    const recommended = state.thumbnailRecommended ?? {
+        enabled: true,
+        format: 'png',
+        quality: 100,
+        dimensions: {
+            bg: [240, 135],
+            avatar: [864, 1280],
+            persona: [864, 1280],
+        },
+    };
+
+    setThumbnailInputValues(recommended, refs);
+    setServerAdminMessage(refs.thumbnailNote, 'Recommended high-quality thumbnail settings are staged. Save them when ready.', 'warn');
+}
+
+function createThumbnailSizeRow(label, key) {
+    const row = createElement('div', { className: 'sb-thumbnail-size-row' });
+    const rowLabel = createElement('span', { className: 'sb-thumbnail-size-label', text: label });
+    const widthInput = createElement('input', {
+        className: 'text_pole sb-thumbnail-number',
+        attrs: {
+            type: 'number',
+            inputmode: 'numeric',
+            min: '1',
+            max: '4096',
+            step: '1',
+            'aria-label': `${label} thumbnail width`,
+        },
+    });
+    const separator = createElement('span', { className: 'sb-thumbnail-size-separator', text: 'x' });
+    const heightInput = createElement('input', {
+        className: 'text_pole sb-thumbnail-number',
+        attrs: {
+            type: 'number',
+            inputmode: 'numeric',
+            min: '1',
+            max: '4096',
+            step: '1',
+            'aria-label': `${label} thumbnail height`,
+        },
+    });
+
+    row.dataset.thumbnailSize = key;
+    row.append(rowLabel, widthInput, separator, heightInput);
+    return { row, widthInput, heightInput };
 }
 
 async function handleServerAdminRestart() {
@@ -4977,6 +5200,59 @@ function buildServerAdminPanel() {
     updateHeader.append(updateCopy);
     updateCard.append(updateHeader, updateActions, autoStashLabel, updateNote, updateOutput);
 
+    const thumbnailCard = createElement('section', { className: 'sb-admin-card sb-server-card sb-thumbnail-card' });
+    const thumbnailHeader = createElement('div', { className: 'sb-admin-card-header' });
+    const thumbnailCopy = createElement('div', { className: 'sb-admin-card-copy' });
+    const thumbnailTitle = createElement('strong', { text: 'Thumbnail Quality' });
+    const thumbnailDescription = createElement('p', { text: 'Set thumbnail format, quality, and generated sizes without hand-editing config.yaml.' });
+    thumbnailCopy.append(thumbnailTitle, thumbnailDescription);
+    thumbnailHeader.append(thumbnailCopy);
+
+    const thumbnailControls = createElement('div', { className: 'sb-thumbnail-controls' });
+    const thumbnailEnabledLabel = createElement('label', { className: 'checkbox_label sb-thumbnail-enabled' });
+    const thumbnailEnabled = createElement('input', { attrs: { type: 'checkbox' } });
+    const thumbnailEnabledText = createElement('small', { text: 'Generate thumbnails' });
+    thumbnailEnabledLabel.append(thumbnailEnabled, thumbnailEnabledText);
+
+    const thumbnailFormatGroup = createElement('label', { className: 'sb-thumbnail-field' });
+    const thumbnailFormatText = createElement('span', { text: 'Format' });
+    const thumbnailFormat = createElement('select', { className: 'text_pole' });
+    thumbnailFormat.append(
+        createElement('option', { text: 'JPG', attrs: { value: 'jpg' } }),
+        createElement('option', { text: 'PNG', attrs: { value: 'png' } }),
+    );
+    thumbnailFormatGroup.append(thumbnailFormatText, thumbnailFormat);
+
+    const thumbnailQualityGroup = createElement('label', { className: 'sb-thumbnail-field' });
+    const thumbnailQualityText = createElement('span', { text: 'Quality' });
+    const thumbnailQuality = createElement('input', {
+        className: 'text_pole sb-thumbnail-number',
+        attrs: {
+            type: 'number',
+            inputmode: 'numeric',
+            min: '1',
+            max: '100',
+            step: '1',
+        },
+    });
+    thumbnailQualityGroup.append(thumbnailQualityText, thumbnailQuality);
+    thumbnailControls.append(thumbnailEnabledLabel, thumbnailFormatGroup, thumbnailQualityGroup);
+
+    const thumbnailSizes = createElement('div', { className: 'sb-thumbnail-sizes' });
+    const bgSize = createThumbnailSizeRow('Background', 'bg');
+    const avatarSize = createThumbnailSizeRow('Character', 'avatar');
+    const personaSize = createThumbnailSizeRow('Persona', 'persona');
+    thumbnailSizes.append(bgSize.row, avatarSize.row, personaSize.row);
+
+    const thumbnailActions = createElement('div', { className: 'sb-server-actions' });
+    const thumbnailUseRecommendedButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Use recommended', attrs: { type: 'button' } });
+    const thumbnailSaveButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Save thumbnails', attrs: { type: 'button' } });
+    const thumbnailSaveClearButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action menu_button_primary', text: 'Save & Clear Cache', attrs: { type: 'button' } });
+    const thumbnailClearButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Clear cache only', attrs: { type: 'button' } });
+    const thumbnailNote = createElement('div', { className: 'sb-server-note', text: 'Use PNG at 100 quality with larger avatar/persona dimensions for sharper character thumbnails, then clear the cache to rebuild them.' });
+    thumbnailActions.append(thumbnailUseRecommendedButton, thumbnailSaveButton, thumbnailSaveClearButton, thumbnailClearButton);
+    thumbnailCard.append(thumbnailHeader, thumbnailControls, thumbnailSizes, thumbnailActions, thumbnailNote);
+
     const configCard = createElement('section', { className: 'sb-admin-card sb-server-card' });
     const configHeader = createElement('div', { className: 'sb-admin-card-header' });
     const configCopy = createElement('div', { className: 'sb-admin-card-copy' });
@@ -5004,7 +5280,7 @@ function buildServerAdminPanel() {
     configActions.append(reloadConfigButton, saveConfigButton, saveConfigRestartButton);
     configCard.append(configHeader, configMeta, configEditor, configActions, configNote);
 
-    column.append(callout, statusCard, updateCard, configCard);
+    column.append(callout, statusCard, updateCard, thumbnailCard, configCard);
     scroller.appendChild(column);
 
     const state = getServerAdminState();
@@ -5018,6 +5294,20 @@ function buildServerAdminPanel() {
         updateNote,
         updateOutput,
         autoStashCheckbox,
+        thumbnailEnabled,
+        thumbnailFormat,
+        thumbnailQuality,
+        thumbnailBgWidth: bgSize.widthInput,
+        thumbnailBgHeight: bgSize.heightInput,
+        thumbnailAvatarWidth: avatarSize.widthInput,
+        thumbnailAvatarHeight: avatarSize.heightInput,
+        thumbnailPersonaWidth: personaSize.widthInput,
+        thumbnailPersonaHeight: personaSize.heightInput,
+        thumbnailUseRecommendedButton,
+        thumbnailSaveButton,
+        thumbnailSaveClearButton,
+        thumbnailClearButton,
+        thumbnailNote,
         configPath,
         configState,
         configEditor,
@@ -5034,6 +5324,10 @@ function buildServerAdminPanel() {
     refreshButton.addEventListener('click', () => refreshServerAdminPanel({ includeConfig: false }));
     updateButton.addEventListener('click', handleServerAdminUpdate);
     restartButton.addEventListener('click', handleServerAdminRestart);
+    thumbnailUseRecommendedButton.addEventListener('click', handleUseRecommendedThumbnailSettings);
+    thumbnailSaveButton.addEventListener('click', () => handleServerThumbnailSave({ clearCache: false }));
+    thumbnailSaveClearButton.addEventListener('click', () => handleServerThumbnailSave({ clearCache: true }));
+    thumbnailClearButton.addEventListener('click', handleServerThumbnailClearCache);
     reloadConfigButton.addEventListener('click', handleServerAdminReloadConfig);
     saveConfigButton.addEventListener('click', () => handleServerAdminSaveConfig({ restart: false }));
     saveConfigRestartButton.addEventListener('click', () => handleServerAdminSaveConfig({ restart: true }));

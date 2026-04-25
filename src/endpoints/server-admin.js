@@ -13,7 +13,9 @@ import { APP_NAME, formatRuntimeLabel, isBunRuntime, isNativeTermuxEnvironment }
 import { getServerLogSnapshot } from '../server-log-buffer.js';
 import { serverDirectory } from '../server-directory.js';
 import { requireAdminMiddleware } from '../users.js';
-import { getConfigValue, getVersion } from '../util.js';
+import { getConfigValue, getVersion, isPathUnderParent } from '../util.js';
+import { getThumbnailDimensions, setThumbnailDimensions } from './image-metadata.js';
+import { getThumbnailRuntimeSettings, setThumbnailRuntimeSettings } from './thumbnails.js';
 
 const GIT_OPTIONS = Object.freeze({ timeout: { block: 10 * 60 * 1000 } });
 const RESTART_RESPONSE_DELAY_MS = 200;
@@ -28,6 +30,26 @@ const CHAT_COMPLETION_CONFIG_DEFAULTS = Object.freeze({
         apiVersion: 'v1beta',
         thoughtSignatures: true,
         enableSystemPromptCache: false,
+    }),
+});
+const THUMBNAIL_CONFIG_DEFAULTS = Object.freeze({
+    enabled: true,
+    format: 'jpg',
+    quality: 95,
+    dimensions: Object.freeze({
+        bg: Object.freeze([160, 90]),
+        avatar: Object.freeze([96, 144]),
+        persona: Object.freeze([96, 144]),
+    }),
+});
+const SILLYBUNNY_RECOMMENDED_THUMBNAILS = Object.freeze({
+    enabled: true,
+    format: 'png',
+    quality: 100,
+    dimensions: Object.freeze({
+        bg: Object.freeze([240, 135]),
+        avatar: Object.freeze([864, 1280]),
+        persona: Object.freeze([864, 1280]),
     }),
 });
 
@@ -56,6 +78,29 @@ function normalizeInteger(value, { min = 0, max = Number.MAX_SAFE_INTEGER, fallb
     }
 
     return Math.min(max, Math.max(min, Math.trunc(numericValue)));
+}
+
+function normalizeThumbnailDimensionsPair(value, fallback) {
+    const plainValue = typeof value?.toJSON === 'function' ? value.toJSON() : value;
+    const source = Array.isArray(plainValue) ? plainValue : fallback;
+    return [
+        normalizeInteger(source?.[0], { min: 1, max: 4096, fallback: fallback[0] }),
+        normalizeInteger(source?.[1], { min: 1, max: 4096, fallback: fallback[1] }),
+    ];
+}
+
+function normalizeThumbnailSettingsInput(settings = {}) {
+    const format = String(settings?.format ?? THUMBNAIL_CONFIG_DEFAULTS.format).toLowerCase().trim() === 'png' ? 'png' : 'jpg';
+    return {
+        enabled: Boolean(settings?.enabled ?? THUMBNAIL_CONFIG_DEFAULTS.enabled),
+        format,
+        quality: normalizeInteger(settings?.quality, { min: 1, max: 100, fallback: THUMBNAIL_CONFIG_DEFAULTS.quality }),
+        dimensions: {
+            bg: normalizeThumbnailDimensionsPair(settings?.dimensions?.bg, THUMBNAIL_CONFIG_DEFAULTS.dimensions.bg),
+            avatar: normalizeThumbnailDimensionsPair(settings?.dimensions?.avatar, THUMBNAIL_CONFIG_DEFAULTS.dimensions.avatar),
+            persona: normalizeThumbnailDimensionsPair(settings?.dimensions?.persona, THUMBNAIL_CONFIG_DEFAULTS.dimensions.persona),
+        },
+    };
 }
 
 function truncateOutput(value, maxLength = 6000) {
@@ -121,6 +166,91 @@ function getChatCompletionConfigState(document) {
             thoughtSignatures: Boolean(geminiNode?.thoughtSignatures ?? CHAT_COMPLETION_CONFIG_DEFAULTS.gemini.thoughtSignatures),
             enableSystemPromptCache: Boolean(geminiNode?.enableSystemPromptCache ?? CHAT_COMPLETION_CONFIG_DEFAULTS.gemini.enableSystemPromptCache),
         },
+    };
+}
+
+function getThumbnailConfigState(document) {
+    const getConfig = (pathParts, fallback) => document.getIn(pathParts) ?? fallback;
+    return normalizeThumbnailSettingsInput({
+        enabled: getConfig(['thumbnails', 'enabled'], THUMBNAIL_CONFIG_DEFAULTS.enabled),
+        format: getConfig(['thumbnails', 'format'], THUMBNAIL_CONFIG_DEFAULTS.format),
+        quality: getConfig(['thumbnails', 'quality'], THUMBNAIL_CONFIG_DEFAULTS.quality),
+        dimensions: {
+            bg: getConfig(['thumbnails', 'dimensions', 'bg'], THUMBNAIL_CONFIG_DEFAULTS.dimensions.bg),
+            avatar: getConfig(['thumbnails', 'dimensions', 'avatar'], THUMBNAIL_CONFIG_DEFAULTS.dimensions.avatar),
+            persona: getConfig(['thumbnails', 'dimensions', 'persona'], THUMBNAIL_CONFIG_DEFAULTS.dimensions.persona),
+        },
+    });
+}
+
+function applyThumbnailConfigState(document, settings) {
+    document.setIn(['thumbnails', 'enabled'], settings.enabled);
+    document.setIn(['thumbnails', 'format'], settings.format);
+    document.setIn(['thumbnails', 'quality'], settings.quality);
+    document.setIn(['thumbnails', 'dimensions', 'bg'], settings.dimensions.bg);
+    document.setIn(['thumbnails', 'dimensions', 'avatar'], settings.dimensions.avatar);
+    document.setIn(['thumbnails', 'dimensions', 'persona'], settings.dimensions.persona);
+}
+
+function applyThumbnailRuntimeConfig(settings) {
+    setThumbnailRuntimeSettings(settings);
+    setThumbnailDimensions(settings.dimensions);
+}
+
+function countFilesRecursively(directory) {
+    if (!fs.existsSync(directory)) {
+        return 0;
+    }
+
+    let count = 0;
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const entryPath = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+            count += countFilesRecursively(entryPath);
+        } else if (entry.isFile()) {
+            count++;
+        }
+    }
+    return count;
+}
+
+function clearDirectoryContents(directory) {
+    if (!fs.existsSync(directory)) {
+        fs.mkdirSync(directory, { recursive: true });
+        return;
+    }
+
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        fs.rmSync(path.join(directory, entry.name), { recursive: true, force: true });
+    }
+}
+
+function clearThumbnailCacheForUser(directories) {
+    const userRoot = path.resolve(directories.root);
+    const thumbnailRoot = path.resolve(directories.thumbnails);
+    const thumbnailSubdirectories = [directories.thumbnailsBg, directories.thumbnailsAvatar, directories.thumbnailsPersona]
+        .map(directory => path.resolve(directory));
+
+    if (thumbnailRoot === userRoot || !isPathUnderParent(userRoot, thumbnailRoot)) {
+        throw createHttpError(400, 'Thumbnail directory is outside the active user data folder.');
+    }
+
+    for (const directory of thumbnailSubdirectories) {
+        if (directory === thumbnailRoot || !isPathUnderParent(thumbnailRoot, directory)) {
+            throw createHttpError(400, 'Thumbnail subdirectory is outside the thumbnail cache folder.');
+        }
+    }
+
+    const filesDeleted = countFilesRecursively(thumbnailRoot);
+    clearDirectoryContents(thumbnailRoot);
+
+    for (const directory of thumbnailSubdirectories) {
+        fs.mkdirSync(directory, { recursive: true });
+    }
+
+    return {
+        directory: thumbnailRoot,
+        filesDeleted,
     };
 }
 
@@ -457,6 +587,77 @@ router.post('/config/chat-completions/save', requireAdminMiddleware, async (requ
     } catch (error) {
         console.error('Failed to save chat completions config settings.', error);
         response.status(error.status || 500).json({ error: error.message || 'Failed to save chat completions config settings.' });
+    }
+});
+
+router.post('/config/thumbnail-settings/get', requireAdminMiddleware, async (_request, response) => {
+    try {
+        const { configPath, stat, document } = readConfigDocument();
+        const settings = getThumbnailConfigState(document);
+
+        applyThumbnailRuntimeConfig(settings);
+
+        response.json({
+            path: configPath,
+            lastModifiedMs: stat.mtimeMs,
+            settings,
+            runtime: {
+                ...getThumbnailRuntimeSettings(),
+                dimensions: getThumbnailDimensions(),
+            },
+            recommended: SILLYBUNNY_RECOMMENDED_THUMBNAILS,
+        });
+    } catch (error) {
+        console.error('Failed to read thumbnail config settings.', error);
+        response.status(error.status || 500).json({ error: error.message || 'Failed to read thumbnail config settings.' });
+    }
+});
+
+router.post('/config/thumbnail-settings/save', requireAdminMiddleware, async (request, response) => {
+    try {
+        const clearCache = Boolean(request.body?.clearCache);
+        const expectedLastModifiedMs = Number(request.body?.expectedLastModifiedMs);
+        const normalizedSettings = normalizeThumbnailSettingsInput(request.body?.settings);
+        const { configPath, stat, document } = readConfigDocument();
+
+        ensureExpectedConfigMtime(stat, expectedLastModifiedMs);
+        applyThumbnailConfigState(document, normalizedSettings);
+
+        const nextStat = writeConfigDocument(configPath, document);
+        applyThumbnailRuntimeConfig(normalizedSettings);
+
+        let clearResult = null;
+        if (clearCache) {
+            clearResult = clearThumbnailCacheForUser(request.user.directories);
+        }
+
+        response.json({
+            ok: true,
+            path: configPath,
+            lastModifiedMs: nextStat.mtimeMs,
+            settings: normalizedSettings,
+            cleared: clearResult,
+            message: clearResult
+                ? `Thumbnail settings saved and ${clearResult.filesDeleted} cached file${clearResult.filesDeleted === 1 ? '' : 's'} cleared.`
+                : 'Thumbnail settings saved. New thumbnails will use these values.',
+        });
+    } catch (error) {
+        console.error('Failed to save thumbnail config settings.', error);
+        response.status(error.status || 500).json({ error: error.message || 'Failed to save thumbnail config settings.' });
+    }
+});
+
+router.post('/thumbnails/clear-cache', requireAdminMiddleware, async (request, response) => {
+    try {
+        const result = clearThumbnailCacheForUser(request.user.directories);
+        response.json({
+            ok: true,
+            cleared: result,
+            message: `Cleared ${result.filesDeleted} cached thumbnail file${result.filesDeleted === 1 ? '' : 's'}.`,
+        });
+    } catch (error) {
+        console.error('Failed to clear thumbnail cache.', error);
+        response.status(error.status || 500).json({ error: error.message || 'Failed to clear thumbnail cache.' });
     }
 });
 
