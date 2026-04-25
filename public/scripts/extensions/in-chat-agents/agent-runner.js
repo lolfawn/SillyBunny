@@ -69,6 +69,9 @@ let manualAgentRunQueueProcessing = false;
 let manualAgentRunCancelRequested = false;
 let activeManualAgentRun = null;
 const promptTransformIdleResolvers = new Set();
+let generationStartChatLength = 0;
+let generationStartLastAssistantMessage = null;
+let generationStartLastAssistantRevision = '';
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -78,6 +81,9 @@ let toolSyncDuringGeneration = false;
 
 /** Recursion depth tracker for tool-call passes. */
 let toolRecursionDepth = 0;
+
+/** Tracks automatic post-processing per generated message revision so fallback events cannot double-apply agents. */
+const processedPostProcessingRuns = new WeakMap();
 
 export function isAgentGenerationActive() {
     return internalPromptTransformDepth > 0 || manualAgentRunQueueProcessing || manualAgentRunQueue.length > 0;
@@ -418,6 +424,60 @@ function cloneActivationSnapshot(snapshot, generationType) {
     };
 }
 
+function normalizeMessageRunValue(value) {
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    if (value === null || value === undefined) {
+        return '';
+    }
+
+    return String(value);
+}
+
+function getPostProcessingRunKey(message, generationType, activationSnapshot = null) {
+    const snapshotAgentIds = Array.isArray(activationSnapshot?.activeAgentIds)
+        ? activationSnapshot.activeAgentIds.join(',')
+        : '';
+
+    return [
+        normalizeGenerationType(activationSnapshot?.generationType ?? generationType),
+        normalizeMessageRunValue(message?.gen_started),
+        normalizeMessageRunValue(message?.gen_finished),
+        normalizeMessageRunValue(message?.send_date),
+        normalizeMessageRunValue(message?.swipe_id),
+        snapshotAgentIds,
+    ].join('|');
+}
+
+function getMessageRevisionKey(message) {
+    return [
+        normalizeMessageRunValue(message?.gen_started),
+        normalizeMessageRunValue(message?.gen_finished),
+        normalizeMessageRunValue(message?.send_date),
+        normalizeMessageRunValue(message?.swipe_id),
+    ].join('|');
+}
+
+function hasProcessedPostProcessingRun(message, runKey) {
+    return Boolean(message && processedPostProcessingRuns.get(message)?.has(runKey));
+}
+
+function markPostProcessingRunProcessed(message, runKey) {
+    if (!message || !runKey) {
+        return;
+    }
+
+    let processedRuns = processedPostProcessingRuns.get(message);
+    if (!processedRuns) {
+        processedRuns = new Set();
+        processedPostProcessingRuns.set(message, processedRuns);
+    }
+
+    processedRuns.add(runKey);
+}
+
 function getDeferredActivationSnapshot(generationType) {
     return cloneActivationSnapshot(
         pendingGenerationSnapshot ?? buildActivationSnapshot(generationType),
@@ -425,17 +485,21 @@ function getDeferredActivationSnapshot(generationType) {
     );
 }
 
-function deferPostProcessing(messageIndex, generationType) {
+function deferPostProcessing(messageIndex, generationType, activationSnapshot = null) {
     const numericMessageIndex = Number(messageIndex);
     if (!Number.isInteger(numericMessageIndex)) {
         return;
     }
 
+    const snapshot = activationSnapshot
+        ? cloneActivationSnapshot(activationSnapshot, generationType)
+        : getDeferredActivationSnapshot(generationType);
+
     deferredPostProcessingQueue.set(numericMessageIndex, {
         messageIndex: numericMessageIndex,
-        generationType: String(generationType ?? '').trim() || 'normal',
+        generationType: snapshot.generationType,
         message: chat[numericMessageIndex] ?? null,
-        activationSnapshot: getDeferredActivationSnapshot(generationType),
+        activationSnapshot: snapshot,
     });
 }
 
@@ -546,6 +610,50 @@ function shouldActivate(agent, generationType) {
     }
 
     return true;
+}
+
+function getLatestAssistantMessageIndex() {
+    for (let index = chat.length - 1; index >= 0; index--) {
+        const message = chat[index];
+        if (message && !message.is_user && !message.is_system) {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+function queueLatestAssistantPostProcessingFromSnapshot() {
+    if (!pendingGenerationSnapshot || deferredPostProcessingQueue.size > 0 || generationStopRequested) {
+        return;
+    }
+
+    const activationSnapshot = cloneActivationSnapshot(pendingGenerationSnapshot, pendingGenerationSnapshot.generationType);
+    if (activationSnapshot.activeAgentIds.length === 0) {
+        return;
+    }
+
+    const messageIndex = getLatestAssistantMessageIndex();
+    if (messageIndex < 0) {
+        return;
+    }
+
+    const message = chat[messageIndex];
+    const isNewAssistantMessage = messageIndex >= generationStartChatLength;
+    const isUpdatedExistingAssistantMessage = message === generationStartLastAssistantMessage &&
+        getMessageRevisionKey(message) !== generationStartLastAssistantRevision;
+
+    if (!isNewAssistantMessage && !isUpdatedExistingAssistantMessage) {
+        return;
+    }
+
+    const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
+
+    if (hasProcessedPostProcessingRun(message, runKey)) {
+        return;
+    }
+
+    deferPostProcessing(messageIndex, activationSnapshot.generationType, activationSnapshot);
 }
 
 function buildActivationSnapshot(generationType) {
@@ -1429,6 +1537,10 @@ function onGenerationStarted() {
     generationStopRequested = false;
     clearAllPromptTransformRunningToasts();
     pendingGenerationSnapshot = null;
+    generationStartChatLength = chat.length;
+    const latestAssistantMessageIndex = getLatestAssistantMessageIndex();
+    generationStartLastAssistantMessage = latestAssistantMessageIndex >= 0 ? chat[latestAssistantMessageIndex] : null;
+    generationStartLastAssistantRevision = getMessageRevisionKey(generationStartLastAssistantMessage);
 
     const lastMsg = chat[chat.length - 1];
     const isRecursiveToolPass = lastMsg?.extra?.tool_invocations != null;
@@ -1454,6 +1566,7 @@ function onGenerationEnded() {
     toolSyncDuringGeneration = false;
     generationStopRequested = false;
     clearAllPromptTransformRunningToasts();
+    queueLatestAssistantPostProcessingFromSnapshot();
     scheduleDeferredPostProcessingFlush();
 }
 
@@ -1541,7 +1654,16 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
         return;
     }
 
-    const activeAgents = getActiveAgentsForMessage(generationType, activationSnapshot);
+    const resolvedActivationSnapshot = activationSnapshot
+        ? cloneActivationSnapshot(activationSnapshot, generationType)
+        : cloneActivationSnapshot(pendingGenerationSnapshot ?? buildActivationSnapshot(generationType), generationType);
+    const runKey = getPostProcessingRunKey(message, generationType, resolvedActivationSnapshot);
+    if (hasProcessedPostProcessingRun(message, runKey)) {
+        return;
+    }
+    markPostProcessingRunProcessed(message, runKey);
+
+    const activeAgents = getActiveAgentsForMessage(generationType, resolvedActivationSnapshot);
     const promptTransformAgents = getPromptTransformAgentsForMessage(activeAgents, generationType);
     const utilityAgents = activeAgents.filter(agent =>
         agent.postProcess?.enabled &&
@@ -1711,6 +1833,10 @@ async function onMessageReceived(messageIndex, generationType) {
     clearDeferredPostProcessing(numericMessageIndex);
 
     await processReceivedMessage(numericMessageIndex, generationType);
+}
+
+async function onCharacterMessageRendered(messageIndex, generationType) {
+    await onMessageReceived(messageIndex, generationType);
 }
 
 function onMessageEdited(messageIndex) {
@@ -1948,6 +2074,10 @@ export function initAgentRunner() {
     eventSource.on(event_types.GENERATION_STOPPED, onGenerationStopped);
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
     eventSource.on(event_types.MESSAGE_EDITED, onMessageEdited);
+
+    if (event_types.CHARACTER_MESSAGE_RENDERED) {
+        eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onCharacterMessageRendered);
+    }
 
     if (event_types.IMPERSONATE_READY) {
         eventSource.on(event_types.IMPERSONATE_READY, onImpersonateReady);

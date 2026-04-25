@@ -78,6 +78,7 @@ Date: 2026-04-25
 - Left-aligned Pathfinder diagnostics actions and fixed the Run Diagnostics button so its label determines the button width instead of being clipped as an icon-only control.
 - Kept Pathfinder's Retrieval Log detail label and dropdown on one line with a dedicated, non-checkbox control layout.
 - Hid Cancel Agent during ordinary chat generation and queued manual In-Chat Agent runs so multiple Apply actions run one at a time instead of being rejected.
+- Hardened automatic In-Chat post-generation agents on mobile by reconciling after rendered assistant messages and generation-end fallbacks without double-applying the same agent pass.
 
 Commits:
 - `fix(ui): make Moonlit Echoes optional`
@@ -127,6 +128,7 @@ Commits:
 - `fix(ui): tighten chat bottom spacing`
 - `fix(extension): prevent moonlit mobile composer stretching`
 - `fix(ui): keep mobile stop button aligned`
+- `fix(agents): run automatic post agents on mobile`
 
 ## v1.4.5
 
