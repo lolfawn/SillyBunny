@@ -140,6 +140,7 @@ export function saveMetadataDebounced() {
     const context = getContext();
     const groupId = context.groupId;
     const characterId = context.characterId;
+    const chatId = context.chatId;
 
     cancelDebouncedMetadataSave();
 
@@ -151,7 +152,12 @@ export function saveMetadataDebounced() {
             return;
         }
 
-        if (characterId !== newContext.characterId) {
+        if (chatId !== newContext.chatId) {
+            console.warn('Chat changed, not saving metadata');
+            return;
+        }
+
+        if (!groupId && characterId !== newContext.characterId) {
             console.warn('Character changed, not saving metadata');
             return;
         }

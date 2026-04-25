@@ -23,6 +23,7 @@ Date: 2026-04-25
 ### Group Chats
 - Kept unread DM avatar pulsing in the group bottom bar from changing avatar alignment on desktop or mobile.
 - Made unread avatar taps inside an existing group DM switch to that character's DM instead of inviting them into the current DM.
+- Saved Character Author's Note (Private) to group chat metadata so the note persists on the actual group chat across speaker turns.
 
 ### Mobile UI
 - Fixed the mobile Extensions header controls so the section title, update checkbox, and action buttons keep compact, centered alignment without relying on extension CSS.
@@ -57,6 +58,7 @@ Commits:
 - `fix(ui): polish default theme alignment`
 - `fix(ui): align mobile prompt controls`
 - `fix(ui): normalize responsive alignment`
+- `fix(group): persist private author notes in group chats`
 
 ## v1.4.5
 
