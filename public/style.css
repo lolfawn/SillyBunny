@@ -2698,8 +2698,12 @@ textarea::placeholder {
     }
 
     #firstmessage_textarea {
-        resize: none;
-        flex: 1;
+        flex: 0 0 auto;
+        height: clamp(10rem, 22dvh, 18rem);
+        min-height: 10rem;
+        max-height: min(60dvh, 36rem);
+        overflow: auto;
+        resize: vertical;
     }
 }
 
