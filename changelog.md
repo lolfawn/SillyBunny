@@ -39,6 +39,7 @@ Date: 2026-04-25
 - Made primary and highlighted accent button labels choose a contrast-aware theme color so pale highlights remain readable on desktop and mobile.
 - Gave compact settings section headers consistent horizontal padding so titles no longer hug rounded panel edges.
 - Removed deprecated wording from visible Extras source labels while keeping the underlying Extras compatibility options available.
+- Normalized native and Select2 dropdown heights, radii, arrow spacing, and Chat Translation field layout so selects align evenly on desktop and mobile.
 
 ### Server Tools
 - Added thumbnail quality controls to Customize > Server for toggling thumbnail generation, choosing JPG or PNG, setting quality and dimensions, applying SillyBunny's recommended sharp-avatar preset, and clearing the current user's thumbnail cache for rebuilds without manually editing `config.yaml`.
@@ -73,6 +74,7 @@ Commits:
 - `fix(ui): improve highlighted button contrast`
 - `fix(ui): pad settings section headers`
 - `fix(ui): remove deprecated extras labels`
+- `fix(ui): normalize dropdown sizing`
 
 ## v1.4.5
 

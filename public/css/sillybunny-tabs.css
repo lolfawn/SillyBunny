@@ -1150,10 +1150,6 @@ body:not(.movingUI) .drawer-content.maximized {
     position: relative;
     z-index: 1;
     touch-action: auto;
-    -moz-appearance: auto !important;
-    -webkit-appearance: auto !important;
-    appearance: auto !important;
-    background-image: none !important;
 }
 
 .sb-hidden-toggle,

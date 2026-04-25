@@ -16,6 +16,10 @@
     --sb-inline-drawer-icon-size: 2rem;
     --sb-control-min-height: 38px;
     --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
+    --sb-field-min-height: 46px;
+    --sb-field-padding-x: 12px;
+    --sb-select-arrow-space: 38px;
+    --sb-select-arrow-inset: 14px;
     --sb-row-gap: 10px;
     --sb-section-gap: 14px;
     --sb-settings-card-padding: 12px 14px;
@@ -92,6 +96,9 @@
 :root[data-sb-compact-mode='true'] {
     --sb-control-min-height: 32px;
     --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
+    --sb-field-min-height: 40px;
+    --sb-select-arrow-space: 34px;
+    --sb-select-arrow-inset: 12px;
     --sb-row-gap: 8px;
     --sb-section-gap: 10px;
     --sb-settings-card-padding: 10px 12px;
@@ -644,7 +651,9 @@ h3:not(.popup h3):not(#chat h3) {
 textarea.text_pole,
 select.text_pole,
 input.text_pole {
-    background: var(--sb-input-bg);
+    box-sizing: border-box;
+    min-width: 0;
+    background-color: var(--sb-input-bg);
     border-color: var(--sb-input-border);
     border-radius: var(--sb-radius-button);
     color: var(--SmartThemeBodyColor);
@@ -676,7 +685,45 @@ textarea.text_pole {
 
 input.text_pole,
 select.text_pole {
-    min-height: 46px;
+    min-height: var(--sb-field-min-height);
+}
+
+select:where(:not([multiple]):not([size]):not(.select2-hidden-accessible)) {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: var(--sb-field-min-height);
+    height: var(--sb-field-min-height);
+    box-sizing: border-box;
+    margin: 5px 0;
+    padding: 0 var(--sb-select-arrow-space) 0 var(--sb-field-padding-x);
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: var(--mainFontFamily);
+    font-size: var(--mainFontSize);
+    line-height: 1.2;
+    color: var(--SmartThemeBodyColor);
+    background-color: var(--sb-input-bg);
+    background-image: url('/img/down-arrow.svg');
+    background-repeat: no-repeat;
+    background-position: right var(--sb-select-arrow-inset) center;
+    background-size: 10px 7px;
+    border: 1px solid var(--sb-input-border);
+    border-radius: var(--sb-radius-button);
+}
+
+select:where(:not([multiple]):not([size]):not(.select2-hidden-accessible)):focus {
+    border-color: color-mix(in srgb, var(--sb-focus-ring) 85%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sb-focus-ring) 20%, transparent);
+    outline: none;
+}
+
+select.margin0:where(:not([multiple]):not([size]):not(.select2-hidden-accessible)) {
+    margin: 0;
+}
+
+select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessible)) {
+    padding-right: var(--sb-select-arrow-space);
 }
 
 #send_form {
@@ -1382,8 +1429,9 @@ input[type='range']::-moz-range-thumb {
 }
 
 .select2-container--default .select2-selection--single {
-    min-height: 46px;
-    padding: 8px 40px 8px 12px;
+    min-height: var(--sb-field-min-height);
+    height: var(--sb-field-min-height);
+    padding: 0 var(--sb-select-arrow-space) 0 var(--sb-field-padding-x);
     background: var(--sb-input-bg);
     border: 1px solid var(--sb-input-border);
     border-radius: var(--sb-radius-button);
@@ -1393,13 +1441,15 @@ input[type='range']::-moz-range-thumb {
 
 .select2-container--default .select2-selection--single .select2-selection__rendered {
     color: var(--SmartThemeBodyColor);
-    line-height: 1.45;
+    line-height: 1.2;
     padding: 0;
 }
 
 .select2-container--default .select2-selection--single .select2-selection__arrow {
     height: 100%;
-    right: 10px;
+    top: 0;
+    right: 0;
+    width: var(--sb-select-arrow-space);
 }
 
 .select2-container--default .select2-search--dropdown .select2-search__field {
