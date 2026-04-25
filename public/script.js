@@ -7880,6 +7880,48 @@ function getFullAvatarUrl(type, file, t = false) {
     return `${basePath}${encodeURIComponent(file)}${t ? `?t=${Date.now()}` : ''}`;
 }
 
+/**
+ * Parses an avatar URL from either the thumbnail endpoint or the full avatar path.
+ * @param {string} rawSrc Avatar image source.
+ * @returns {{ type: 'avatar' | 'persona' | null, file: string, original: string } | null}
+ */
+function parseAvatarSource(rawSrc) {
+    if (!rawSrc) {
+        return null;
+    }
+
+    if (isDataURL(rawSrc)) {
+        return { type: null, file: rawSrc, original: rawSrc };
+    }
+
+    try {
+        const parsed = new URL(rawSrc, window.location.origin);
+        const pathName = decodeURIComponent(parsed.pathname);
+
+        if (pathName === '/thumbnail') {
+            const type = parsed.searchParams.get('type');
+            const file = parsed.searchParams.get('file');
+            if ((type === 'avatar' || type === 'persona') && file) {
+                return { type, file, original: getFullAvatarUrl(type, file) };
+            }
+        }
+
+        if (pathName.startsWith('/characters/')) {
+            const file = pathName.replace(/^\/characters\//, '');
+            return { type: 'avatar', file, original: getFullAvatarUrl('avatar', file) };
+        }
+
+        if (pathName.startsWith('/User Avatars/')) {
+            const file = pathName.replace(/^\/User Avatars\//, '');
+            return { type: 'persona', file, original: getFullAvatarUrl('persona', file) };
+        }
+    } catch {
+        // Fall through to using the original source unchanged.
+    }
+
+    return { type: null, file: rawSrc, original: rawSrc };
+}
+
 export function buildAvatarList(block, entities, { templateId = 'inline_avatar_template', empty = true, interactable = false, highlightFavs = true } = {}) {
     if (empty) {
         block.empty();
@@ -13235,11 +13277,13 @@ jQuery(async function () {
 
     $(document).on('click', '.mes .avatar', function () {
         const messageElement = $(this).closest('.mes');
-        const thumbURL = $(this).children('img').attr('src');
-        const charsPath = '/characters/';
-        const targetAvatarImg = thumbURL.substring(thumbURL.lastIndexOf('=') + 1);
+        const avatarImage = $(this).children('img');
+        const fullAvatarURL = avatarImage.attr('src');
+        const thumbURL = avatarImage.attr('data-thumbnail-src') || fullAvatarURL;
+        const avatarSource = parseAvatarSource(thumbURL) || parseAvatarSource(fullAvatarURL);
+        const targetAvatarImg = avatarSource?.file || '';
         const charname = targetAvatarImg.replace('.png', '');
-        const isValidCharacter = characters.some(x => x.avatar === decodeURIComponent(targetAvatarImg));
+        const isValidCharacter = avatarSource?.type === 'avatar' && characters.some(x => x.avatar === targetAvatarImg);
 
         // Remove existing zoomed avatars for characters that are not the clicked character when moving UI is not enabled
         if (!power_user.movingUI) {
@@ -13252,7 +13296,7 @@ jQuery(async function () {
             });
         }
 
-        const avatarSrc = (isDataURL(thumbURL) || /^\/?img\/(?:.+)/.test(thumbURL)) ? thumbURL : charsPath + targetAvatarImg;
+        const avatarSrc = avatarSource?.original || fullAvatarURL || thumbURL;
         if ($(`.zoomed_avatar[forChar="${charname}"]`).length) {
             console.debug('removing container as it already existed');
             $(`.zoomed_avatar[forChar="${charname}"]`).fadeOut(animation_duration, () => {
