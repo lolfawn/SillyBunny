@@ -38,6 +38,7 @@ Date: 2026-04-25
 - Normalized icon-only buttons, drawer headers, recent-chat rows, prompt manager controls, World Info toolbars, background controls, and extension toolbars so mobile and desktop alignment stays centered, symmetrical, and square where expected.
 - Made primary and highlighted accent button labels choose a contrast-aware theme color so pale highlights remain readable on desktop and mobile.
 - Gave compact settings section headers consistent horizontal padding so titles no longer hug rounded panel edges.
+- Removed deprecated wording from visible Extras source labels while keeping the underlying Extras compatibility options available.
 
 ### Server Tools
 - Added thumbnail quality controls to Customize > Server for toggling thumbnail generation, choosing JPG or PNG, setting quality and dimensions, applying SillyBunny's recommended sharp-avatar preset, and clearing the current user's thumbnail cache for rebuilds without manually editing `config.yaml`.
@@ -71,6 +72,7 @@ Commits:
 - `fix(ui): equalize thumbnail settings layout`
 - `fix(ui): improve highlighted button contrast`
 - `fix(ui): pad settings section headers`
+- `fix(ui): remove deprecated extras labels`
 
 ## v1.4.5
 
