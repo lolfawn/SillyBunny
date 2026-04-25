@@ -2781,26 +2781,31 @@ input[type='range']::-moz-range-thumb {
 .quick_context_size_container {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: 6px;
     width: 100%;
-    margin-top: 10px;
+    margin-top: 8px;
     padding-bottom: 2px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-wrap: nowrap;
+    overflow: visible;
+    flex-wrap: wrap;
     scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
 }
 
 .quick_context_size {
+    width: 54px;
+    min-width: 54px;
+    max-width: 54px;
+    height: 34px;
     min-height: 34px;
-    padding: 0 12px;
+    max-height: 34px;
+    padding: 0;
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     flex: 0 0 auto;
-    border-radius: 999px;
+    border-radius: var(--sb-icon-control-radius);
     white-space: nowrap;
     background: color-mix(in srgb, var(--sb-button-bg) 92%, transparent);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 80%, transparent);
@@ -2826,6 +2831,34 @@ input[type='range']::-moz-range-thumb {
     line-height: 1;
     text-transform: uppercase;
     opacity: 0.82;
+}
+
+.quick_context_size_container[data-sb-quick-context-target='text'] {
+    align-self: stretch;
+    justify-content: center;
+}
+
+#range_block_openai .range-block:has(#openai_max_context) .range-block-range-and-counter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 11rem);
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+#range_block_openai .range-block:has(#openai_max_context) .range-block-range,
+#range_block_openai .range-block:has(#openai_max_context) .range-block-counter {
+    min-width: 0;
+    margin: 0;
+}
+
+#range_block_openai .range-block:has(#openai_max_context) .range-block-range {
+    display: flex;
+    align-items: center;
+}
+
+#range_block_openai .range-block:has(#openai_max_context) .range-block-counter input {
+    width: 100%;
 }
 
 .sb-accent-color-controls {
@@ -2982,11 +3015,33 @@ input[type='range']::-moz-range-thumb {
     .quick_context_size_container {
         gap: 6px;
         margin-top: 8px;
+        justify-content: center;
     }
 
     .quick_context_size {
-        min-height: 30px;
-        padding: 0 10px;
+        width: 50px;
+        min-width: 50px;
+        max-width: 50px;
+        height: 32px;
+        min-height: 32px;
+        max-height: 32px;
+        padding: 0;
+    }
+
+    .sb-shell-panel-scroller .quick_context_size_container .quick_context_size {
+        width: 50px;
+        min-width: 50px;
+        max-width: 50px;
+        height: 32px;
+        min-height: 32px;
+        max-height: 32px;
+        padding: 0;
+        border-radius: var(--sb-icon-control-radius);
+        line-height: 1;
+    }
+
+    #range_block_openai .range-block:has(#openai_max_context) .range-block-range-and-counter {
+        grid-template-columns: 1fr;
     }
 
     .sb-accent-preset-row {

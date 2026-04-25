@@ -81,9 +81,9 @@ export const toastPositionClasses = [
 
 export const MAX_CONTEXT_DEFAULT = 8192;
 export const MAX_RESPONSE_DEFAULT = 2048;
-const MAX_CONTEXT_UNLOCKED = 512 * 1024;
+const MAX_CONTEXT_UNLOCKED = 2000 * 1000;
 const MAX_RESPONSE_UNLOCKED = 64 * 1024;
-const unlockedMaxContextStep = 512;
+const unlockedMaxContextStep = 1;
 const maxContextMin = 512;
 const maxContextStep = 64;
 

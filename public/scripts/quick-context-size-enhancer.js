@@ -13,16 +13,26 @@ const EXTRA_CONTEXT_TARGETS = Object.freeze([
     Object.freeze({
         id: 'text',
         sliderSelector: '#max_context',
-        anchorSelector: '#pro-settings-block',
+        anchorSelector: '#max_context_block',
         unlockSelector: '#max_context_unlocked',
         resolveContainer(anchor) {
-            return anchor.nextElementSibling ?? null;
+            return anchor.querySelector(':scope > .quick_context_size_container[data-sb-quick-context-target="text"]');
+        },
+        insertContainer(anchor, container) {
+            anchor.appendChild(container);
         },
     }),
 ]);
 
 const EXTRA_CONTEXT_SIZES = Object.freeze([
+    Object.freeze({ size: 4096, label: '4k' }),
+    Object.freeze({ size: 8192, label: '8k' }),
+    Object.freeze({ size: 16 * 1024, label: '16k' }),
+    Object.freeze({ size: 32 * 1024, label: '32k' }),
+    Object.freeze({ size: 64 * 1024, label: '64k' }),
+    Object.freeze({ size: 128 * 1000, label: '128k' }),
     Object.freeze({ size: 256 * 1000, label: '256k' }),
+    Object.freeze({ size: 512 * 1000, label: '512k' }),
     Object.freeze({ size: 1000 * 1000, label: '1m' }),
     Object.freeze({ size: 2000 * 1000, label: '2m' }),
 ]);
@@ -50,6 +60,18 @@ function getOptionalUnlockToggle(selector) {
     return unlockToggle instanceof HTMLInputElement ? unlockToggle : null;
 }
 
+function syncQuickContextCounter(slider) {
+    if (!slider.id) {
+        return;
+    }
+
+    document.querySelectorAll(`#${slider.id}_counter, .neo-range-input[data-for="${slider.id}"], .range-block-counter input[data-for="${slider.id}"]`).forEach((counter) => {
+        if (counter instanceof HTMLInputElement) {
+            counter.value = slider.value;
+        }
+    });
+}
+
 function createExtraQuickContextContainer(targetConfig, anchor) {
     if (!(anchor instanceof HTMLElement)) {
         return null;
@@ -58,7 +80,11 @@ function createExtraQuickContextContainer(targetConfig, anchor) {
     const container = document.createElement('div');
     container.classList.add('quick_context_size_container');
     container.dataset.sbQuickContextTarget = targetConfig.id;
-    anchor.insertAdjacentElement('afterend', container);
+    if (typeof targetConfig.insertContainer === 'function') {
+        targetConfig.insertContainer(anchor, container);
+    } else {
+        anchor.insertAdjacentElement('afterend', container);
+    }
     return container;
 }
 
@@ -91,6 +117,8 @@ function applyExtraQuickContextSize(slider, unlockToggle, size) {
     const resolvedMax = Number(slider.max || size);
     slider.value = String(Math.min(size, resolvedMax));
     slider.dispatchEvent(new Event('input', { bubbles: true }));
+    syncQuickContextCounter(slider);
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function buildExtraQuickContextButton(slider, unlockToggle, extraConfig) {
@@ -99,8 +127,8 @@ function buildExtraQuickContextButton(slider, unlockToggle, extraConfig) {
     button.classList.add('menu_button', 'quick_context_size', 'quick_context_size_extra');
     button.dataset.sbExtra = 'true';
     button.dataset.size = String(extraConfig.size);
-    button.id = `${slider.id}_quick_context_size_${extraConfig.size}`;
-    button.title = `Set context to ${extraConfig.label}`;
+    button.title = `Set context to ${extraConfig.label.toUpperCase()} (${extraConfig.size.toLocaleString()} tokens)`;
+    button.setAttribute('aria-label', button.title);
 
     const splitLabel = splitContextLabel(extraConfig.label);
     if (splitLabel) {
@@ -132,6 +160,13 @@ function ensureExtraQuickContextButtons(targetConfig) {
     if (!(container instanceof HTMLElement)) {
         return false;
     }
+
+    const allowedSizes = new Set(EXTRA_CONTEXT_SIZES.map(extraConfig => String(extraConfig.size)));
+    container.querySelectorAll('.quick_context_size[data-sb-extra="true"]').forEach((button) => {
+        if (!allowedSizes.has(button.dataset.size ?? '')) {
+            button.remove();
+        }
+    });
 
     EXTRA_CONTEXT_SIZES.forEach((extraConfig) => {
         const hasButton = container.querySelector(`.quick_context_size[data-sb-extra="true"][data-size="${extraConfig.size}"]`);
