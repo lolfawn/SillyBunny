@@ -39,7 +39,7 @@
     <link rel="stylesheet" type="text/css" href="css/rm-groups.css">
     <link rel="stylesheet" type="text/css" href="css/group-avatars.css">
     <link rel="stylesheet" type="text/css" href="css/toggle-dependent.css">
-    <link rel="stylesheet" type="text/css" href="css/world-info.css?v=20260425a">
+    <link rel="stylesheet" type="text/css" href="css/world-info.css?v=20260425b">
     <link rel="stylesheet" type="text/css" href="css/extensions-panel.css?v=20260425a">
     <link rel="stylesheet" type="text/css" href="css/select2-overrides.css">
     <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260425c">
@@ -4973,9 +4973,14 @@
                                         <strong id="world_popup_editor_title" data-i18n="No entry selected">No entry selected</strong>
                                         <span id="world_popup_editor_uid" class="text_muted"></span>
                                     </div>
-                                    <button id="world_popup_editor_close" class="menu_button menu_button_icon" type="button" title="Close entry editor" aria-label="Close entry editor">
-                                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                                    </button>
+                                    <div class="world_popup_editor_actions">
+                                        <button id="world_popup_editor_popout" class="menu_button menu_button_icon" type="button" title="Open editor as pop-up" aria-label="Open editor as pop-up" aria-pressed="false" data-i18n="[title]Open editor as pop-up;[aria-label]Open editor as pop-up">
+                                            <i class="fa-solid fa-window-restore" aria-hidden="true"></i>
+                                        </button>
+                                        <button id="world_popup_editor_close" class="menu_button menu_button_icon" type="button" title="Close entry editor" aria-label="Close entry editor">
+                                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div id="world_popup_editor_empty" class="sb-workspace-empty" data-i18n="Select an entry to edit its keywords and content">
                                     Select an entry to edit its keywords and content

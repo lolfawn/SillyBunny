@@ -54,9 +54,10 @@
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 14px;
+    min-width: 0;
 }
 
-#world_popup_editor_heading {
+#world_popup_editor_header .world_popup_editor_heading {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -72,6 +73,20 @@
     font-size: calc(var(--mainFontSize) * 0.9);
 }
 
+.world_popup_editor_actions {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 6px;
+}
+
+.world_popup_editor_actions .menu_button {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    padding: 0;
+}
+
 #world_popup_editor_host {
     display: none;
 }
@@ -81,6 +96,14 @@
 }
 
 #world_popup_workspace.world_popup_has_selection #world_popup_editor_host {
+    display: block;
+}
+
+#world_popup_editor_pane.world_popup_editor_pane_has_selection #world_popup_editor_empty {
+    display: none;
+}
+
+#world_popup_editor_pane.world_popup_editor_pane_has_selection #world_popup_editor_host {
     display: block;
 }
 
@@ -872,6 +895,10 @@ select.keyselect+span.select2-container .select2-selection--multiple {
         display: none !important;
     }
 
+    #world_popup_editor_popout {
+        display: none !important;
+    }
+
     #wiSliders,
     #wiCheckboxes {
         grid-template-columns: 1fr;
@@ -928,7 +955,7 @@ select.keyselect+span.select2-container .select2-selection--multiple {
 @media screen and (min-width: 961px) {
     #world_popup_workspace {
         display: grid;
-        grid-template-columns: minmax(480px, 1fr) minmax(460px, 1fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         align-items: start;
         gap: clamp(18px, 2vw, 28px);
         min-height: 0;
@@ -950,6 +977,7 @@ select.keyselect+span.select2-container .select2-selection--multiple {
     #world_popup_editor_pane {
         display: flex;
         flex-direction: column;
+        width: 100%;
         min-height: clamp(360px, 58vh, 820px);
         padding: 14px;
         border-radius: 22px;
@@ -959,6 +987,45 @@ select.keyselect+span.select2-container .select2-selection--multiple {
             color-mix(in srgb, var(--SmartThemeBodyColor) 3%, transparent);
         box-shadow: 0 18px 36px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent);
         overflow: hidden;
+    }
+
+    #world_popup_editor_pane.world_popup_editor_pane_popout {
+        position: fixed;
+        top: calc(var(--sb-topbar-layout-offset, var(--topBarBlockSize)) + 18px);
+        left: 50%;
+        z-index: 4010;
+        box-sizing: border-box;
+        width: min(920px, calc(100dvw - 48px));
+        max-width: calc(100dvw - 24px);
+        height: min(760px, calc(100dvh - var(--sb-topbar-layout-offset, var(--topBarBlockSize)) - 42px));
+        min-width: min(520px, calc(100dvw - 48px));
+        min-height: 360px;
+        max-height: calc(100dvh - var(--sb-topbar-layout-offset, var(--topBarBlockSize)) - 24px);
+        transform: translateX(-50%);
+        resize: both;
+        overflow: hidden;
+        background:
+            linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 8%, transparent), transparent 26%),
+            color-mix(in srgb, var(--SmartThemeBlurTintColor) 94%, var(--SmartThemeBodyColor) 6%);
+        box-shadow: 0 18px 52px color-mix(in srgb, var(--SmartThemeShadowColor) 34%, transparent);
+    }
+
+    #world_popup_workspace.world_popup_editor_popout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #world_popup_workspace.world_popup_editor_popout #world_popup_entries_column {
+        grid-column: 1 / -1;
+    }
+
+    #world_popup_editor_pane.world_popup_editor_pane_popout #world_popup_editor_header {
+        cursor: default;
+    }
+
+    #world_popup_editor_pane.world_popup_editor_pane_popout #world_popup_editor_host,
+    #world_popup_editor_pane.world_popup_editor_pane_popout #world_popup_editor_empty {
+        flex: 1 1 auto;
+        min-height: 0;
     }
 
     #world_popup_editor_host {
@@ -1122,7 +1189,7 @@ select.keyselect+span.select2-container .select2-selection--multiple {
     }
 
     #world_popup_workspace {
-        grid-template-columns: minmax(380px, 0.96fr) minmax(0, 1.04fr);
+        grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr);
         gap: 16px;
     }
 
@@ -1145,7 +1212,7 @@ select.keyselect+span.select2-container .select2-selection--multiple {
 
 @media screen and (min-width: 1280px) {
     #world_popup_workspace {
-        grid-template-columns: minmax(560px, 1.02fr) minmax(520px, 0.98fr);
+        grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
     }
 }
 
