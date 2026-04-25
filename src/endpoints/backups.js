@@ -19,7 +19,8 @@ router.post('/chat/get', async (request, response) => {
             if (!info || !info.file_name) {
                 continue;
             }
-            backupModels.push(info);
+            const stats = await fsPromises.stat(filePath);
+            backupModels.push({ ...info, mtime: stats.mtimeMs });
         }
 
         return response.json(backupModels);

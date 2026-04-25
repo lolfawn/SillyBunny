@@ -28,6 +28,7 @@ Date: 2026-04-25
 ### Chat Management
 - Added LLM-assisted chat labeling from the Chat History popup, with options to rename the current chat or batch-label timestamp-named chats while preserving chat contents.
 - Added old-chat cleanup controls for age, time unit, newest-chat retention, dated-name-only filtering, preview, confirmation, cancellation, and current-chat protection.
+- Added chat-backup cleanup controls inside the Chat History Backups drawer, including age/unit filters, newest-backup retention, preview, confirmation, and mobile-aligned controls.
 - Reworked the Chat History popup controls so the new labeling and cleanup tools align cleanly on desktop and mobile, including full-width mobile search and balanced checkbox/text spacing.
 
 ### Mobile UI
@@ -115,6 +116,7 @@ Commits:
 - `fix(ui): improve advanced definitions editing`
 - `fix(ui): align group character list rows`
 - `feat(chat): add auto-label and cleanup tools`
+- `feat(chat): add backup cleanup controls`
 
 ## v1.4.5
 
