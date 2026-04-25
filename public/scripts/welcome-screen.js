@@ -894,7 +894,7 @@ function buildWelcomeTemplateData(chats) {
         chats,
         empty: !chats.length,
         version: displayVersion,
-        more: chats.some(chat => chat.hidden),
+        more: chats.length > DEFAULT_DISPLAYED,
         activeDeckView,
         deckCollapsed,
         welcomePanelMode,
@@ -914,6 +914,80 @@ function buildWelcomeTemplateData(chats) {
         bundledAssistants: buildBundledAssistantCards(),
         starterPackItems: buildStarterPackItems(),
     };
+}
+
+/**
+ * Gets the filter bucket used by the Recent Chats tabs.
+ * @param {RecentChat} chat Recent chat data
+ * @returns {'agent'|'group'|'individual'}
+ */
+function getRecentChatType(chat) {
+    if (chat.is_agent) {
+        return 'agent';
+    }
+
+    if (chat.is_group) {
+        return 'group';
+    }
+
+    return 'individual';
+}
+
+/**
+ * Gets the filter bucket for a rendered Recent Chat item.
+ * @param {Element} item Recent chat element
+ * @returns {'agent'|'group'|'individual'}
+ */
+function getRecentChatItemType(item) {
+    if (item instanceof HTMLElement && ['agent', 'group', 'individual'].includes(item.dataset.recentChatType || '')) {
+        return /** @type {'agent'|'group'|'individual'} */ (item.dataset.recentChatType);
+    }
+
+    if (item.classList.contains('agent')) {
+        return 'agent';
+    }
+
+    if (item.classList.contains('group')) {
+        return 'group';
+    }
+
+    return 'individual';
+}
+
+/**
+ * Applies the Recent Chats tab filter and per-filter collapsed state.
+ * @param {HTMLElement} root Welcome panel root
+ * @param {object} [options] Options
+ * @param {boolean} [options.expanded] Whether all chats in the active filter should be shown
+ */
+function updateRecentChatFilterView(root, { expanded = false } = {}) {
+    const filter = root.dataset.recentChatFilter || 'all';
+    const chatItems = Array.from(root.querySelectorAll('.recentChat'));
+    let matchingCount = 0;
+
+    chatItems.forEach((chatItem) => {
+        const chatType = getRecentChatItemType(chatItem);
+        const matchesFilter = filter === 'all' || chatType === filter;
+        const hiddenByLimit = matchesFilter && !expanded && matchingCount >= DEFAULT_DISPLAYED;
+
+        if (matchesFilter) {
+            matchingCount++;
+        }
+
+        chatItem.classList.toggle('recentChatFiltered', !matchesFilter);
+        chatItem.classList.toggle('hidden', hiddenByLimit);
+    });
+
+    root.querySelectorAll('[data-recent-chat-empty-state="filtered"]').forEach((emptyState) => {
+        emptyState.classList.toggle('displayNone', filter === 'all' || matchingCount > 0 || chatItems.length === 0);
+    });
+
+    root.querySelectorAll('button.showMoreChats').forEach((button) => {
+        const hasMoreChats = matchingCount > DEFAULT_DISPLAYED;
+        button.classList.toggle('displayNone', !hasMoreChats);
+        button.classList.toggle('rotated', expanded && hasMoreChats);
+        button.setAttribute('aria-expanded', String(expanded && hasMoreChats));
+    });
 }
 
 function openShellTab(route) {
@@ -1303,6 +1377,7 @@ async function sendWelcomePanel(chats, expand = false) {
                         tab.classList.toggle('active', active);
                         tab.setAttribute('aria-pressed', String(active));
                     });
+                    updateRecentChatFilterView(root);
                 });
             });
 
@@ -1374,7 +1449,6 @@ async function sendWelcomePanel(chats, expand = false) {
                 }
             });
         });
-        const hiddenChats = fragment.querySelectorAll('.recentChat.hidden');
         fragment.querySelectorAll('button.showMoreChats').forEach((button) => {
             const showRecentChatsTitle = t`Show more recent chats`;
             const hideRecentChatsTitle = t`Show less recent chats`;
@@ -1382,10 +1456,10 @@ async function sendWelcomePanel(chats, expand = false) {
             button.setAttribute('title', showRecentChatsTitle);
             button.addEventListener('click', () => {
                 const rotate = button.classList.contains('rotated');
-                hiddenChats.forEach((chatItem) => {
-                    chatItem.classList.toggle('hidden', rotate);
-                });
-                button.classList.toggle('rotated', !rotate);
+                const root = button.closest('.welcomePanel');
+                if (root instanceof HTMLElement) {
+                    updateRecentChatFilterView(root, { expanded: !rotate });
+                }
                 button.setAttribute('title', rotate ? showRecentChatsTitle : hideRecentChatsTitle);
             });
         });
@@ -1471,6 +1545,11 @@ async function sendWelcomePanel(chats, expand = false) {
         } else if (nextPanel) {
             chatElement.append(nextPanel);
         }
+        chatElement.querySelectorAll('.welcomePanel').forEach((root) => {
+            if (root instanceof HTMLElement) {
+                updateRecentChatFilterView(root);
+            }
+        });
         if (expand) {
             chatElement.querySelectorAll('button.showMoreChats').forEach((button) => {
                 if (button instanceof HTMLButtonElement) {
@@ -1787,6 +1866,7 @@ async function getRecentChats() {
         chat.group = chat.group || '';
         chat.pinned = PinnedChatsManager.isPinned(chat);
         chat.is_agent = shouldSeparateAgentRecentChats() && isAgentRecentChat(chat);
+        chat.recent_chat_type = getRecentChatType(chat);
     });
 
     return dataWithEntities.map(t => t.chat);

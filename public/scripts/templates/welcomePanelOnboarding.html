@@ -401,9 +401,16 @@
                     </div>
                 </div>
             {{/if}}
+                <div class="noRecentChat displayNone" data-recent-chat-empty-state="filtered">
+                    <i class="fa-solid fa-comment-dots"></i>
+                    <div>
+                        <strong>No recent chats in this view</strong>
+                        <span>Try a different recent chat filter or start a new conversation.</span>
+                    </div>
+                </div>
             {{#each chats}}
                 {{#with this}}
-                <div class="recentChat {{#if hidden}}hidden{{/if}} {{#if is_group}}group{{else}}individual{{/if}} {{#if is_agent}}agent{{/if}}" data-file="{{chat_name}}" data-avatar="{{avatar}}" data-group="{{group}}">
+                <div class="recentChat {{#if hidden}}hidden{{/if}} {{#if is_group}}group{{else}}individual{{/if}} {{#if is_agent}}agent{{/if}}" data-recent-chat-type="{{recent_chat_type}}" data-file="{{chat_name}}" data-avatar="{{avatar}}" data-group="{{group}}">
                     {{#if pinned}}
                         <div class="recentChatPinned">
                             <i class="fa-solid fa-thumbtack fa-fw fa-xs" title="Pinned chat" data-i18n="[title]Pinned chat"></i>

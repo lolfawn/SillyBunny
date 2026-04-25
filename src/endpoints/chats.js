@@ -1077,9 +1077,10 @@ router.post('/recent', async function (request, response) {
 
         await Promise.allSettled([getCharacterChatFiles(), getGroupChatFiles(), getRootChatFiles()]);
 
-        const max = parseInt(request.body.max ?? Number.MAX_SAFE_INTEGER) + pinnedChats.length;
+        const parsedMax = parseInt(request.body.max ?? Number.MAX_SAFE_INTEGER);
+        const max = (Number.isFinite(parsedMax) ? parsedMax : Number.MAX_SAFE_INTEGER) + pinnedChats.length;
         const isPinned = (/** @type {ChatFile} */ chatFile) => pinnedChats.some(p => p.file_name === path.basename(chatFile.filePath) && (p.avatar === chatFile.pngFile || p.group === chatFile.groupId));
-        const recentChats = allChatFiles.sort((a, b) => {
+        const sortRecentChatFiles = (/** @type {ChatFile} */ a, /** @type {ChatFile} */ b) => {
             const isAPinned = isPinned(a);
             const isBPinned = isPinned(b);
 
@@ -1087,7 +1088,50 @@ router.post('/recent', async function (request, response) {
             if (!isAPinned && isBPinned) return 1;
 
             return b.mtime - a.mtime;
-        }).slice(0, max);
+        };
+        /**
+         * Keeps Recent Chats filters populated when one chat category dominates the newest files.
+         * @param {ChatFile[]} sortedChatFiles Chat files sorted by recency
+         * @param {number} limit Maximum number of files to include per recent-chat bucket
+         * @returns {ChatFile[]} Balanced recent chat files
+         */
+        const getBalancedRecentChatFiles = (sortedChatFiles, limit) => {
+            if (limit >= sortedChatFiles.length) {
+                return sortedChatFiles;
+            }
+
+            /** @type {Map<string, ChatFile>} */
+            const selectedChats = new Map();
+            const addChat = (/** @type {ChatFile} */ chatFile) => {
+                selectedChats.set(`${chatFile.groupId || ''}\0${chatFile.pngFile || ''}\0${chatFile.filePath}`, chatFile);
+            };
+
+            sortedChatFiles.slice(0, limit).forEach(addChat);
+
+            // SillyBunny: include the same recent depth per filter so Individual does not disappear behind a busy Groups list.
+            let groupCount = 0;
+            let individualCount = 0;
+
+            for (const chatFile of sortedChatFiles) {
+                if (chatFile.groupId) {
+                    if (groupCount < limit) {
+                        addChat(chatFile);
+                        groupCount++;
+                    }
+                } else if (individualCount < limit) {
+                    addChat(chatFile);
+                    individualCount++;
+                }
+
+                if (groupCount >= limit && individualCount >= limit) {
+                    break;
+                }
+            }
+
+            return Array.from(selectedChats.values()).sort(sortRecentChatFiles);
+        };
+        const sortedChatFiles = allChatFiles.sort(sortRecentChatFiles);
+        const recentChats = getBalancedRecentChatFiles(sortedChatFiles, max);
         const jsonFilesPromise = recentChats.map((file) => {
             const withMetadata = !!request.body.metadata;
             const previewMessageLimit = Math.max(0, Math.min(20, Number(request.body.previewMessages) || 0));

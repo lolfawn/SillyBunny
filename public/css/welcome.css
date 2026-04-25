@@ -778,15 +778,6 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--SmartThemeQuoteColor) 45%, transparent) inset;
 }
 
-.welcomePanel[data-recent-chat-filter='individual'] .recentChat.group,
-.welcomePanel[data-recent-chat-filter='individual'] .recentChat.agent,
-.welcomePanel[data-recent-chat-filter='group'] .recentChat.individual,
-.welcomePanel[data-recent-chat-filter='group'] .recentChat.agent,
-.welcomePanel[data-recent-chat-filter='agent'] .recentChat.individual,
-.welcomePanel[data-recent-chat-filter='agent'] .recentChat.group {
-    display: none;
-}
-
 .welcomePanelModeChip {
     min-height: 36px;
     gap: 8px;
@@ -1085,14 +1076,13 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
     color: color-mix(in srgb, var(--sb-shell-border, var(--SmartThemeBorderColor)) 84%, transparent);
 }
 
-.welcomeRecent .recentChatList .recentChat.hidden {
-    display: none;
+.welcomeRecent .recentChatList .recentChat:not(.hidden):not(.recentChatFiltered) {
+    display: flex;
 }
 
-.welcomePanel[data-recent-chat-filter='individual'] .recentChat.individual.hidden,
-.welcomePanel[data-recent-chat-filter='group'] .recentChat.group.hidden,
-.welcomePanel[data-recent-chat-filter='agent'] .recentChat.agent.hidden {
-    display: flex;
+.welcomeRecent .recentChatList .recentChat.hidden,
+.welcomeRecent .recentChatList .recentChat.recentChatFiltered {
+    display: none;
 }
 
 .welcomeRecent .recentChatList .showMoreChats {
