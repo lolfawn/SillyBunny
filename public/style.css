@@ -7112,6 +7112,7 @@ body:not(.movingUI) .drawer-content.maximized {
 
 .group_speaker_avatar {
     position: relative;
+    isolation: isolate;
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -7122,6 +7123,8 @@ body:not(.movingUI) .drawer-content.maximized {
     padding: 2px 7px 2px 2px;
     max-width: 150px;
     cursor: pointer;
+    flex: 0 0 auto;
+    overflow: visible;
 }
 
 .group_speaker_avatar.selected {
@@ -7131,7 +7134,34 @@ body:not(.movingUI) .drawer-content.maximized {
 
 .group_speaker_avatar.has-unread-dm {
     border-color: #ff3b3b;
-    box-shadow: 0 0 0 2px color-mix(in srgb, #ff3b3b 28%, transparent), 0 0 10px color-mix(in srgb, #ff3b3b 55%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, #ff3b3b 42%, transparent);
+}
+
+.group_speaker_avatar.has-unread-dm::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    z-index: -1;
+    border-radius: inherit;
+    background: color-mix(in srgb, #ff3b3b 24%, transparent);
+    box-shadow: 0 0 10px color-mix(in srgb, #ff3b3b 55%, transparent);
+    opacity: 0.78;
+    pointer-events: none;
+    transform: scale(1);
+    transform-origin: center;
+    animation: groupUnreadDmPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes groupUnreadDmPulse {
+    0%, 100% {
+        opacity: 0.68;
+        transform: scale(0.96);
+    }
+
+    50% {
+        opacity: 0.98;
+        transform: scale(1.08);
+    }
 }
 
 #group_speaker_dm_now.selected,
@@ -7287,7 +7317,7 @@ body:not(.movingUI) .drawer-content.maximized {
     position: absolute;
     top: -1px;
     right: -1px;
-    z-index: 2;
+    z-index: 3;
     display: block !important;
     width: 10px;
     height: 10px;

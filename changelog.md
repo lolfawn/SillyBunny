@@ -20,6 +20,10 @@ Date: 2026-04-25
 - Fixed Moonlit Echoes' enabled-theme chat avatar sizing inside the vendored extension so message thumbnails stay clipped to their configured frame on desktop and mobile.
 - Added SB-owned Echo, Whisper, Hush, Ripple, and Tide chat styles so these layouts work without Moonlit Echoes installed or enabled, while Moonlit can still override its own custom variables when active.
 
+### Group Chats
+- Kept unread DM avatar pulsing in the group bottom bar from changing avatar alignment on desktop or mobile.
+- Made unread avatar taps inside an existing group DM switch to that character's DM instead of inviting them into the current DM.
+
 ### Mobile UI
 - Fixed the mobile Extensions header controls so the section title, update checkbox, and action buttons keep compact, centered alignment without relying on extension CSS.
 - Restored zoomed chat avatars on desktop and mobile by accepting both thumbnail URLs and full avatar image paths when opening a message avatar.
@@ -46,6 +50,7 @@ Commits:
 - `fix(extension): prevent duplicate settings drawers`
 - `fix(ui): improve mobile composer readability`
 - `feat(ui): add built-in chat styles and compact mode`
+- `fix(ui): stabilize group DM avatar actions`
 
 ## v1.4.5
 

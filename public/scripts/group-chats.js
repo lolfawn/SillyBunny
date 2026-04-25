@@ -664,36 +664,46 @@ async function appendMessageToGroupDmChat(group, character, message, mainGroupCh
     return response.ok;
 }
 
-async function openSelectedGroupDmChat() {
+async function openGroupDmChatForAvatar(avatarId) {
     const group = selected_group ? groups.find(x => x.id === selected_group) : null;
-    if (!group || !selectedGroupSpeakerAvatar) {
+    const targetAvatar = String(avatarId || '');
+    if (!group || !targetAvatar) {
         toastr.warning(t`Pick a group member first.`);
-        return;
+        return false;
     }
 
-    const character = characters.find(x => x.avatar === selectedGroupSpeakerAvatar);
+    const character = characters.find(x => x.avatar === targetAvatar);
+    if (!character) {
+        return false;
+    }
+
     const previousGroupChatId = isGroupDmChatMetadata() ? String(chat_metadata.main_group_chat_id || '') : group.chat_id;
-    const startIndex = getGroupDmThreadStartIndex(selectedGroupSpeakerAvatar);
-    const dmMessages = group.chats.includes(getGroupDmChatName(group, character)) ? [] : getGroupDmThreadMessages(selectedGroupSpeakerAvatar, startIndex);
+    const startIndex = getGroupDmThreadStartIndex(targetAvatar);
+    const dmMessages = group.chats.includes(getGroupDmChatName(group, character)) ? [] : getGroupDmThreadMessages(targetAvatar, startIndex);
     const dmChatName = await ensureGroupDmChat(group, character, previousGroupChatId, dmMessages);
     if (!dmChatName) {
-        return;
+        return false;
     }
 
     if (dmMessages.length) {
-        removeGroupDmThreadMessages(selectedGroupSpeakerAvatar, startIndex);
+        removeGroupDmThreadMessages(targetAvatar, startIndex);
         await printMessages();
         await saveChatConditional();
     }
 
     setUnreadGroupDm(group.id, character.avatar, false);
 
-    selectedGroupSpeakerAvatar = selectedGroupSpeakerAvatar || character.avatar;
+    selectedGroupSpeakerAvatar = character.avatar;
     selectedGroupDmAvatar = character.avatar;
     groupDmModeEnabled = true;
     groupDmModeForced = true;
     updateGroupSpeakerControls();
     await openGroupChat(group.id, dmChatName);
+    return true;
+}
+
+async function openSelectedGroupDmChat() {
+    return openGroupDmChatForAvatar(selectedGroupSpeakerAvatar);
 }
 
 function setGroupTypingIndicator(characterName = '') {
@@ -792,10 +802,16 @@ function initGroupSpeakerControls() {
     const container = $('#group_speaker_controls');
     container.on('click', '.group_speaker_avatar', async function (event) {
         const avatarId = String($(this).data('avatar') || '');
-        if (selected_group && hasUnreadGroupDm(selected_group, avatarId) && !groupDmModeForced && !event.shiftKey) {
+        if (selected_group && hasUnreadGroupDm(selected_group, avatarId) && !event.shiftKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            await openGroupDmChatForAvatar(avatarId);
+            return;
+        }
+
+        if (groupDmModeForced && avatarId && !isGroupDmParticipant(avatarId) && !event.shiftKey) {
             selectedGroupSpeakerAvatar = avatarId;
             updateGroupSpeakerControls();
-            await openSelectedGroupDmChat();
             return;
         }
 
