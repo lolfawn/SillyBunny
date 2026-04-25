@@ -546,6 +546,36 @@
         flex: 0 0 auto;
     }
 
+    #chat .mes .mes_button,
+    #chat .mes .extraMesButtons > div {
+        inline-size: var(--sb-message-icon-size, 2rem);
+        block-size: var(--sb-message-icon-size, 2rem);
+        min-inline-size: var(--sb-message-icon-size, 2rem);
+        min-block-size: var(--sb-message-icon-size, 2rem);
+        max-inline-size: var(--sb-message-icon-size, 2rem);
+        max-block-size: var(--sb-message-icon-size, 2rem);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-basis: var(--sb-message-icon-size, 2rem);
+        padding: 0;
+    }
+
+    .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .menu_button_icon:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty {
+        inline-size: var(--sb-icon-control-size, 2.5rem);
+        block-size: var(--sb-icon-control-size, 2.5rem);
+        min-inline-size: var(--sb-icon-control-size, 2.5rem);
+        min-block-size: var(--sb-icon-control-size, 2.5rem);
+        max-inline-size: var(--sb-icon-control-size, 2.5rem);
+        max-block-size: var(--sb-icon-control-size, 2.5rem);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+
     .checkbox_label {
         align-items: center;
         gap: 8px;

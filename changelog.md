@@ -21,12 +21,14 @@ Date: 2026-04-25
 ### Mobile UI
 - Fixed the mobile Extensions header controls so the section title, update checkbox, and action buttons keep compact, centered alignment without relying on extension CSS.
 - Restored zoomed chat avatars on desktop and mobile by accepting both thumbnail URLs and full avatar image paths when opening a message avatar.
+- Aligned chat avatar metadata, swipe controls, and icon-only buttons so the default UI keeps strict square control sizing on desktop and mobile.
 
 Commits:
 - `fix(ui): make Moonlit Echoes optional`
 - `fix(tooling): keep eslint stable after launcher installs`
 - `fix(ui): improve default chat surface readability`
 - `fix(ui): restore zoomed chat avatars`
+- `fix(ui): align chat icon controls`
 
 ## v1.4.5
 

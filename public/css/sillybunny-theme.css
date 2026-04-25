@@ -11,6 +11,9 @@
     --sb-transition-fast: 180ms ease;
     --sb-transition: 240ms ease;
     --sb-transition-slow: 360ms ease;
+    --sb-icon-control-size: 2rem;
+    --sb-message-icon-size: 1.75rem;
+    --sb-message-meta-line-height: 1.18;
     --sb-everforest-dusk-main: rgba(131, 179, 142, 1);
     --sb-everforest-dusk-soft: rgba(161, 209, 172, 1);
     --sb-everforest-dusk-surface: rgba(55, 60, 63, 1);
@@ -399,6 +402,14 @@ h3:not(.popup h3):not(#chat h3) {
     margin: 0;
 }
 
+.checkbox_label > input[type="checkbox"] {
+    transform: none;
+}
+
+.checkbox_label > input[type="checkbox"]:hover {
+    transform: scale(1.03);
+}
+
 .checkbox_label small,
 .checkbox_label span {
     line-height: 1.45;
@@ -424,6 +435,27 @@ h3:not(.popup h3):not(#chat h3) {
 .menu_button_icon:not(.disabled):not([disabled]):active,
 .right_menu_button:active {
     transform: translateY(0);
+}
+
+.menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+.menu_button_icon:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+.right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty {
+    inline-size: var(--sb-icon-control-size);
+    block-size: var(--sb-icon-control-size);
+    min-inline-size: var(--sb-icon-control-size);
+    min-block-size: var(--sb-icon-control-size);
+    max-inline-size: var(--sb-icon-control-size);
+    max-block-size: var(--sb-icon-control-size);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    padding: 0;
+    border-radius: var(--sb-radius-sm);
+    aspect-ratio: 1 / 1;
+    box-sizing: border-box;
+    line-height: var(--sb-icon-control-size);
+    text-align: center;
 }
 
 .menu_button.menu_button_primary:not(.disabled):not([disabled]),
@@ -689,6 +721,91 @@ select.text_pole {
     transition: background-color var(--sb-transition-fast), border-color var(--sb-transition-fast);
 }
 
+#chat .mes:not(.smallSysMes) .mesAvatarWrapper {
+    inline-size: var(--avatar-base-width);
+    min-inline-size: var(--avatar-base-width);
+    flex: 0 0 var(--avatar-base-width);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+#chat .last_mes:not(.smallSysMes) .mesAvatarWrapper {
+    padding-bottom: var(--avatar-base-height);
+}
+
+#chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
+    inline-size: var(--avatar-base-width);
+    block-size: var(--avatar-base-height);
+    flex: 0 0 var(--avatar-base-height);
+}
+
+#chat .mes .mesAvatarWrapper > :is(.mesIDDisplay, .mes_timer, .tokenCounterDisplay) {
+    inline-size: 100%;
+    min-block-size: calc(var(--mainFontSize) * var(--sb-message-meta-line-height));
+    padding: 0 2px;
+    box-sizing: border-box;
+    line-height: var(--sb-message-meta-line-height);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#chat .mes .mes_buttons,
+#chat .mes .extraMesButtons {
+    align-items: center;
+    gap: 4px;
+    min-block-size: var(--sb-message-icon-size);
+    padding: 0;
+}
+
+#chat .mes .mes_button,
+#chat .mes .extraMesButtons > div {
+    inline-size: var(--sb-message-icon-size);
+    block-size: var(--sb-message-icon-size);
+    min-inline-size: var(--sb-message-icon-size);
+    min-block-size: var(--sb-message-icon-size);
+    max-inline-size: var(--sb-message-icon-size);
+    max-block-size: var(--sb-message-icon-size);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 var(--sb-message-icon-size);
+    padding: 0;
+    border-radius: 8px;
+    box-sizing: border-box;
+    line-height: var(--sb-message-icon-size);
+    text-align: center;
+}
+
+#chat .mes .swipeRightBlock {
+    inline-size: 44px;
+    align-items: center;
+}
+
+#chat .mes :is(.swipe_left, .swipe_right) {
+    inline-size: var(--sb-message-icon-size);
+    block-size: var(--sb-message-icon-size);
+    border-radius: 8px;
+    line-height: var(--sb-message-icon-size);
+    text-align: center;
+}
+
+#chat .mes .swipes-counter {
+    inline-size: 44px;
+    min-inline-size: 44px;
+    block-size: 18px;
+    padding: 0 4px;
+    margin-bottom: 0;
+    align-items: center;
+    line-height: 1;
+    box-sizing: border-box;
+    border-radius: 8px;
+}
+
 body.bubblechat .mes {
     position: relative;
     isolation: isolate;
@@ -727,6 +844,34 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     .mes .mes_video_container {
         max-width: 100%;
         min-width: 0;
+    }
+
+    #chat .mes .mes_buttons,
+    #chat .mes .extraMesButtons {
+        align-items: center;
+        row-gap: 4px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    :root {
+        --sb-icon-control-size: 2.5rem;
+        --sb-message-icon-size: 2rem;
+    }
+
+    #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
+        gap: 3px;
+    }
+
+    #chat .mes .mesAvatarWrapper > :is(.mesIDDisplay, .mes_timer, .tokenCounterDisplay) {
+        min-block-size: calc(var(--mainFontSize) * 1.12);
+        font-size: calc(var(--mainFontSize) * 0.82);
+    }
+
+    #chat .mes .mes_button,
+    #chat .mes .extraMesButtons > div,
+    #chat .mes :is(.swipe_left, .swipe_right) {
+        border-radius: 9px;
     }
 }
 
