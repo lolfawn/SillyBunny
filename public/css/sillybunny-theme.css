@@ -859,6 +859,57 @@ body.bubblechat .mes[is_user='true'] .mes_block {
         --sb-message-icon-size: 2rem;
     }
 
+    :root:not([data-sb-theme]),
+    :root[data-sb-theme='clean-minimal'] {
+        --sb-mobile-default-surface-solid: color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, black 8%);
+        --sb-mobile-default-input-solid: color-mix(in srgb, var(--SmartThemeChatTintColor) 94%, var(--SmartThemeBodyColor) 6%);
+        --sb-chat-surface-source: color-mix(in srgb, var(--SmartThemeBlurTintColor) 98%, var(--SmartThemeChatTintColor) 2%);
+        --sb-topbar-surface-bg: var(--sb-mobile-default-surface-solid);
+        --sb-chatbar-surface-bg: var(--sb-mobile-default-surface-solid);
+        --sb-mobile-overlay-bg: var(--sb-mobile-default-surface-solid);
+        --sb-mobile-panel-bg: var(--sb-mobile-default-surface-solid);
+        --sb-input-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 96%, var(--SmartThemeBodyColor) 4%);
+    }
+
+    @supports (color: rgb(from black r g b / 1)) {
+        :root:not([data-sb-theme]),
+        :root[data-sb-theme='clean-minimal'] {
+            --sb-mobile-default-surface-solid: rgb(from var(--SmartThemeBlurTintColor) r g b / 0.98);
+            --sb-mobile-default-input-solid: rgb(from var(--SmartThemeChatTintColor) r g b / 0.96);
+        }
+    }
+
+    :root:not([data-sb-theme]) #top-bar,
+    :root[data-sb-theme='clean-minimal'] #top-bar {
+        background: var(--sb-topbar-surface-bg) !important;
+        backdrop-filter: blur(12px) saturate(110%);
+        -webkit-backdrop-filter: blur(12px) saturate(110%);
+    }
+
+    :root:not([data-sb-theme]) #send_form,
+    :root[data-sb-theme='clean-minimal'] #send_form {
+        background: var(--sb-mobile-default-surface-solid) !important;
+        border-color: color-mix(in srgb, var(--SmartThemeBorderColor) 86%, transparent) !important;
+        backdrop-filter: blur(12px) saturate(110%);
+        -webkit-backdrop-filter: blur(12px) saturate(110%);
+    }
+
+    :root:not([data-sb-theme]) #send_textarea,
+    :root[data-sb-theme='clean-minimal'] #send_textarea {
+        background: var(--sb-mobile-default-input-solid);
+    }
+
+    :root:not([data-sb-theme]) #top-bar::before,
+    :root:not([data-sb-theme]) #send_form::before,
+    :root:not([data-sb-theme]) #sb-chatbar::before,
+    :root:not([data-sb-theme]) #sb-mobile-chat-tools-panel::before,
+    :root[data-sb-theme='clean-minimal'] #top-bar::before,
+    :root[data-sb-theme='clean-minimal'] #send_form::before,
+    :root[data-sb-theme='clean-minimal'] #sb-chatbar::before,
+    :root[data-sb-theme='clean-minimal'] #sb-mobile-chat-tools-panel::before {
+        opacity: 1 !important;
+    }
+
     #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
         gap: 3px;
     }

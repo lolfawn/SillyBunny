@@ -1084,29 +1084,60 @@
     :root {
         --bottomFormBlockSize: 42px;
         --bottomFormIconSize: 20px;
+        --sb-mobile-composer-action-size: 48px;
     }
 
     #send_form {
-        border-radius: 0;
+        border-radius: 18px 18px 0 0;
     }
 
     #nonQRFormItems {
-        flex-wrap: nowrap !important;
-        align-items: center !important;
-        gap: 6px !important;
-        min-height: 42px !important;
-        padding: 4px 6px !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) var(--sb-mobile-composer-action-size) !important;
+        grid-template-areas:
+            "tools action"
+            "input action" !important;
+        align-items: stretch !important;
+        column-gap: 8px !important;
+        row-gap: 6px !important;
+        min-height: 102px !important;
+        padding: 6px 8px 8px !important;
+        box-sizing: border-box !important;
     }
 
     #leftSendForm,
     #rightSendForm {
         flex: 0 0 auto !important;
-        width: auto !important;
         min-width: 0 !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+    }
+
+    #leftSendForm {
+        grid-area: tools !important;
+        width: 100% !important;
         min-height: 42px !important;
         height: 42px !important;
-        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 6px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scrollbar-width: none !important;
+    }
+
+    #leftSendForm::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    #rightSendForm {
+        grid-area: action !important;
+        width: var(--sb-mobile-composer-action-size) !important;
+        min-width: var(--sb-mobile-composer-action-size) !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        align-items: flex-end !important;
         justify-content: center !important;
+        align-self: stretch !important;
     }
 
     #leftSendForm > div,
@@ -1132,12 +1163,18 @@
     }
 
     #send_textarea {
-        flex: 1 1 auto !important;
+        grid-area: input !important;
+        flex: 1 1 100% !important;
+        width: 100% !important;
         min-width: 0 !important;
-        min-height: 42px !important;
-        height: 42px !important;
-        padding: 8px !important;
+        min-height: 54px !important;
+        height: 54px !important;
+        max-height: 36dvh !important;
+        padding: 10px 14px !important;
         font-size: 16px !important;
+        line-height: 1.35 !important;
+        align-self: stretch !important;
+        box-sizing: border-box !important;
     }
 
     #send_but::before,

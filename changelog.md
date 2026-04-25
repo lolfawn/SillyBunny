@@ -24,6 +24,7 @@ Date: 2026-04-25
 - Restored zoomed chat avatars on desktop and mobile by accepting both thumbnail URLs and full avatar image paths when opening a message avatar.
 - Aligned chat avatar metadata, swipe controls, and icon-only buttons so the default UI keeps strict square control sizing on desktop and mobile.
 - Restored Individual recent chats by balancing the recent-chat fetch across individual and group conversations, and made Recent Chats filters manage their own collapsed, empty, and show-more states on desktop and mobile.
+- Improved the default mobile chat composer so the textarea keeps a full-width row with square controls, and made default mobile header/composer surfaces more opaque to stop chat text from bleeding through.
 
 ### Server Tools
 - Added thumbnail quality controls to Customize > Server for toggling thumbnail generation, choosing JPG or PNG, setting quality and dimensions, applying SillyBunny's recommended sharp-avatar preset, and clearing the current user's thumbnail cache for rebuilds without manually editing `config.yaml`.
@@ -41,6 +42,7 @@ Commits:
 - `fix(extension): contain moonlit chat avatars`
 - `feat(server): add thumbnail quality controls`
 - `fix(extension): prevent duplicate settings drawers`
+- `fix(ui): improve mobile composer readability`
 
 ## v1.4.5
 
