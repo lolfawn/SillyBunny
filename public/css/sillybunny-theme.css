@@ -2661,9 +2661,9 @@ input[type='range']::-moz-range-thumb {
 
 #persona_controls {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(186px, 240px);
-    align-items: start;
-    gap: 12px 14px;
+    grid-template-columns: minmax(8rem, 1fr) minmax(12rem, 0.9fr) max-content;
+    align-items: center;
+    gap: 10px;
     padding: 12px 14px;
     border-radius: var(--sb-radius-md);
     background: var(--color-surface, color-mix(in srgb, var(--SmartThemeBlurTintColor) 96%, var(--SmartThemeBodyColor) 4%));
@@ -2751,10 +2751,27 @@ input[type='range']::-moz-range-thumb {
     grid-column: 2;
     grid-row: 1 / span 2;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
-    align-content: flex-start;
+    align-items: center;
+    align-content: center;
     gap: 8px;
+}
+
+#persona-management-block .avatar_container_states .persona_quick_rename,
+#persona-management-block .avatar_container_states .persona_quick_delete,
+#persona_controls .persona_controls_buttons_block > .menu_button,
+#persona_controls .persona-controls-actions > .menu_button {
+    flex: 0 0 38px;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    min-height: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
 }
 
 #persona_controls .persona_name {
@@ -2773,20 +2790,21 @@ input[type='range']::-moz-range-thumb {
 #persona_controls .persona_controls_buttons_block,
 #persona_controls .persona-controls-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-wrap: nowrap;
+    gap: 8px;
     justify-content: flex-end;
-    align-content: flex-start;
-    grid-column: 2;
-    grid-row: 1 / span 2;
+    align-items: center;
+    align-content: center;
+    grid-column: 3;
+    grid-row: 1;
     max-width: none;
 }
 
 #persona_controls > label {
     min-width: 0;
     width: 100%;
-    grid-column: 1;
-    grid-row: 2;
+    grid-column: 2;
+    grid-row: 1;
 }
 
 #persona_controls > label select,
@@ -2896,18 +2914,28 @@ input[type='range']::-moz-range-thumb {
 
     #persona_controls {
         grid-template-columns: 1fr;
+        align-items: stretch;
     }
 
     #persona_controls .persona_controls_buttons_block,
     #persona_controls .persona-controls-actions,
     #persona_controls > label {
         grid-column: 1;
-        grid-row: auto;
         max-width: none;
+    }
+
+    #persona_controls > label {
+        grid-row: 2;
     }
 
     #persona_controls .persona_controls_buttons_block,
     #persona_controls .persona-controls-actions {
+        grid-row: 3;
+    }
+
+    #persona_controls .persona_controls_buttons_block,
+    #persona_controls .persona-controls-actions {
+        flex-wrap: wrap;
         justify-content: flex-start;
     }
 
@@ -2988,6 +3016,39 @@ input[type='range']::-moz-range-thumb {
     #persona_depth_position_settings,
     #persona_connections_buttons {
         grid-template-columns: 1fr;
+    }
+
+    #persona_controls .persona_controls_buttons_block,
+    #persona_controls .persona-controls-actions {
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        gap: 6px;
+        width: 100%;
+    }
+
+    #persona_controls .persona_controls_buttons_block > .menu_button,
+    #persona_controls .persona-controls-actions > .menu_button {
+        flex: 0 0 34px;
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
+        min-height: 34px;
+    }
+}
+
+@media screen and (max-width: 360px) {
+    #persona_controls .persona_controls_buttons_block,
+    #persona_controls .persona-controls-actions {
+        gap: 5px;
+    }
+
+    #persona_controls .persona_controls_buttons_block > .menu_button,
+    #persona_controls .persona-controls-actions > .menu_button {
+        flex-basis: 30px;
+        width: 30px;
+        min-width: 30px;
+        height: 30px;
+        min-height: 30px;
     }
 }
 

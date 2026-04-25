@@ -1280,6 +1280,111 @@ body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .
     flex: 0 0 auto;
 }
 
+/* WebKit-safe Ripple fallback. Keep these selectors flat so older WKWebView
+   builds still render the layout even when nested CSS support is incomplete. */
+body.ripplestyle #chat .mes:not(.smallSysMes) {
+    display: grid !important;
+    grid-template-columns: minmax(0, var(--customRippleAvatarWidth)) minmax(0, 1fr);
+    align-items: start;
+    gap: 0;
+    overflow: hidden;
+    color: var(--SmartThemeBodyColor);
+    background: var(--SmartThemeBotMesBlurTintColor) !important;
+    border-radius: 15px;
+    padding: 0 !important;
+    margin: 8px 0 !important;
+}
+
+body.ripplestyle #chat .mes:not(.smallSysMes)[is_user="true"] {
+    background-color: var(--SmartThemeUserMesBlurTintColor) !important;
+}
+
+body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
+    grid-column: 1;
+    align-self: stretch;
+    position: sticky;
+    top: 0;
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    width: var(--customRippleAvatarWidth);
+    min-width: var(--customRippleAvatarWidth);
+    max-width: var(--customRippleAvatarWidth);
+    padding: 0 0 45px !important;
+    margin: 0;
+    overflow: hidden;
+}
+
+body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto !important;
+    width: var(--customRippleAvatarWidth) !important;
+    min-width: var(--customRippleAvatarWidth) !important;
+    max-width: var(--customRippleAvatarWidth) !important;
+    height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio)) !important;
+    min-height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio)) !important;
+    max-height: calc(var(--customRippleAvatarWidth) * var(--customRippleAvatarRatio)) !important;
+    aspect-ratio: 2 / 3;
+    border: 0 !important;
+    border-radius: 15px 0 0 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    box-sizing: border-box;
+}
+
+body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar > img {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    object-fit: cover;
+    object-position: center;
+    border: 0 !important;
+    border-radius: inherit !important;
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+    -webkit-mask-composite: initial !important;
+    mask-composite: add !important;
+}
+
+body.ripplestyle #chat .mes:not(.smallSysMes) .mes_block {
+    grid-column: 2;
+    min-width: 0;
+    width: 100%;
+    display: block;
+    color: var(--SmartThemeBodyColor);
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 20px 12px 12px 8px;
+    overflow: visible;
+    box-sizing: border-box;
+}
+
+body.ripplestyle #chat .mes:not(.smallSysMes) .mes_text {
+    display: block !important;
+    visibility: visible !important;
+    min-width: 0;
+    min-height: 0;
+    color: var(--SmartThemeBodyColor);
+    opacity: 1;
+    overflow: visible;
+}
+
+body.ripplestyle #chat .mes:not(.smallSysMes) .mes_block .ch_name::after {
+    content: "";
+    width: 100%;
+    border-bottom: 1px solid var(--SmartThemeBodyColor);
+    padding-bottom: 5px;
+    margin-bottom: 5px;
+    opacity: 0.45;
+}
+
 @media screen and (max-width: 768px) {
     :root {
         --custom-ChatAvatar: 36px;
@@ -1330,6 +1435,27 @@ body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .
     body.ripplestyle #chat .mes .mes_block {
         min-width: 0;
         padding: 12px 10px 10px;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) {
+        grid-template-columns: minmax(0, var(--customRippleAvatarMobileWidth)) minmax(0, 1fr);
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper,
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
+        width: var(--customRippleAvatarMobileWidth) !important;
+        min-width: var(--customRippleAvatarMobileWidth) !important;
+        max-width: var(--customRippleAvatarMobileWidth) !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
+        padding-bottom: 0 !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar {
+        height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+        min-height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+        max-height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
     }
 
     body.tidestyle #chat {

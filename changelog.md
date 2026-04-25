@@ -34,11 +34,13 @@ Date: 2026-04-25
 ### Mobile UI
 - Renamed the top-bar Navigate button and matching onboarding/docs copy to Workspace so the shell label matches the panel title.
 - Fixed the mobile Extensions header controls so the section title, update checkbox, and action buttons keep compact, centered alignment without relying on extension CSS.
+- Kept Persona rows on one line where space allows and added quick rename/delete actions to each listed Persona without breaking mobile alignment.
 - Restored zoomed chat avatars on desktop and mobile by accepting both thumbnail URLs and full avatar image paths when opening a message avatar.
 - Aligned chat avatar metadata, swipe controls, and icon-only buttons so the default UI keeps strict square control sizing on desktop and mobile.
 - Contained chat character thumbnails inside their avatar frames across the default UI, built-in chat styles, and the vendored Moonlit Echoes fork so oversized source images no longer spill into message content on desktop or mobile.
 - Restored Individual recent chats by balancing the recent-chat fetch across individual and group conversations, and made Recent Chats filters manage their own collapsed, empty, and show-more states on desktop and mobile.
 - Improved the default mobile chat composer so the textarea keeps a full-width row with square controls, and made default mobile header/composer surfaces more opaque to stop chat text from bleeding through.
+- Reworked the final mobile composer layout so the textarea gets a larger full-width row and the tool buttons sit on the same row as the send/action controls.
 - Added a persistent compact mode that reduces shell, top-bar, mobile tools, and mobile composer density while preserving checkbox and text alignment.
 - Tightened default-theme settings, drawer, prompt manager, extension, and import surfaces so controls have consistent spacing, fixed icon sizing, theme-aware button text, and more bottom breathing room on desktop and mobile.
 - Locked the agent-changes message icon to a square control and realigned the mobile prompt manager editor rows, labels, checkbox, and footer actions.
@@ -56,6 +58,7 @@ Date: 2026-04-25
 - Balanced the Prompt Manager list and editor into equal-width panes with roomier prompt row spacing so prompts no longer look squeezed against the panel edge.
 - Made the World Info editor shrink safely inside desktop drawers and added a desktop-only resizable pop-up editor for roomier lorebook editing while mobile keeps its inline entry workflow.
 - Shortened the primary character edit shortcut labels to `FAV.` and `ADV.` so they stay centered and readable in compact layouts.
+- Added flat WebKit-safe Ripple chat style fallbacks so the built-in style keeps message text and avatars visible instead of rendering as an empty card.
 - Made the character First Message editor taller by default on desktop and vertically resizable so long greetings are easier to edit without opening the maximized editor.
 - Centered the Top Bar Label option cards so Context Size, Character Name, and Custom Text align cleanly inside their controls on desktop and mobile.
 - Anchored the Sampling documentation help button inside the Sampling drawer header for chat and text completion presets so it no longer floats while scrolling.
@@ -117,6 +120,7 @@ Commits:
 - `fix(ui): align group character list rows`
 - `feat(chat): add auto-label and cleanup tools`
 - `feat(chat): add backup cleanup controls`
+- `fix(ui): stabilize persona and ripple mobile layout`
 
 ## v1.4.5
 

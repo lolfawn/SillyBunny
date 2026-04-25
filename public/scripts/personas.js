@@ -1219,13 +1219,17 @@ async function lockPersona(type = 'chat') {
 }
 
 
-async function deleteUserAvatar() {
-    const avatarId = user_avatar;
-
+/**
+ * Deletes a persona avatar and its stored metadata.
+ * @param {string} avatarId Avatar ID of the persona to delete
+ * @returns {Promise<void>}
+ */
+async function deletePersonaAvatar(avatarId) {
     if (!avatarId) {
         console.warn('No avatar id found');
         return;
     }
+
     const name = power_user.personas[avatarId] || '';
     const confirm = await Popup.show.confirm(
         t`Delete Persona` + `: ${name}`,
@@ -1262,9 +1266,19 @@ async function deleteUserAvatar() {
 
         saveSettingsDebounced();
 
-        // Use the existing mechanism to re-render the persona list and choose the next persona here
-        await loadPersonaForCurrentChat({ doRender: true });
+        if (avatarId === user_avatar) {
+            // Re-run persona selection for the current chat after removing the active persona.
+            personaLastLoadedChatId = null;
+            await loadPersonaForCurrentChat({ doRender: true });
+        } else {
+            await getUserAvatars(true);
+            updatePersonaUIStates();
+        }
     }
+}
+
+async function deleteUserAvatar() {
+    await deletePersonaAvatar(user_avatar);
 }
 
 function onPersonaDescriptionInput() {
@@ -2167,6 +2181,20 @@ export async function initPersonas() {
     });
 
     $('#persona_rename_button').on('click', () => renamePersona(user_avatar));
+    $(document).on('click', '#user_avatar_block .persona_quick_rename', async function (event) {
+        event.stopPropagation();
+        const avatarId = $(this).closest('.avatar-container').attr('data-avatar-id');
+        if (avatarId) {
+            await renamePersona(avatarId);
+        }
+    });
+    $(document).on('click', '#user_avatar_block .persona_quick_delete', async function (event) {
+        event.stopPropagation();
+        const avatarId = $(this).closest('.avatar-container').attr('data-avatar-id');
+        if (avatarId) {
+            await deletePersonaAvatar(avatarId);
+        }
+    });
 
     $(document).on('click', '#user_avatar_block .avatar_upload', function () {
         $('#avatar_upload_overwrite').val('');
