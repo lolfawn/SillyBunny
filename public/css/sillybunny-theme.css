@@ -3353,23 +3353,44 @@ input[type='range']::-moz-range-thumb {
     margin-top: 12px;
 }
 
-.sb-settings-subdrawer > .inline-drawer-header {
-    padding: 16px 18px;
-    min-height: 52px;
-    gap: 12px;
+#user-settings-block .sb-settings-subdrawer > .inline-drawer-header {
+    position: relative;
+    justify-content: center;
     align-items: center;
+    min-height: 52px;
+    height: 52px;
+    margin: 5px 0;
+    padding: 10px calc(var(--sb-inline-drawer-icon-size) + 20px) !important;
+    gap: 12px;
+    font-size: var(--mainFontSize);
+    line-height: 1.25;
+    text-align: center;
 }
 
-.sb-settings-subdrawer > .inline-drawer-header b {
+#user-settings-block .sb-settings-subdrawer > .inline-drawer-header b {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
     flex: 1 1 auto;
     min-width: 0;
-    padding-left: 18px;
-    padding-right: 10px;
+    padding: 0;
+    font-size: inherit;
+    line-height: inherit;
     text-align: center;
+}
+
+#user-settings-block .sb-settings-subdrawer > .inline-drawer-header b > :is(i, span) {
+    font-size: inherit;
+    line-height: inherit;
+}
+
+#user-settings-block .sb-settings-subdrawer > .inline-drawer-header > .inline-drawer-icon {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    margin: 0;
+    transform: translateY(-50%);
 }
 
 .sb-openai-settings-subdrawer > .inline-drawer-header > .flex-container {
