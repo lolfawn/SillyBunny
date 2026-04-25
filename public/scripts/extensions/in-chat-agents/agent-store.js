@@ -370,6 +370,22 @@ export function resolveConnectionProfile(profileId = '') {
 export const LEGACY_AGENT_MAX_TOKENS = 2000;
 export const DEFAULT_AGENT_MAX_TOKENS = 8192;
 
+export function areAgentsGloballyEnabled() {
+    return globalSettings.enabled !== false;
+}
+
+export function getPromptTransformMode(agent) {
+    return agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite';
+}
+
+export function normalizePromptTransformMaxTokens(value) {
+    if (!Number.isFinite(Number(value))) {
+        return DEFAULT_AGENT_MAX_TOKENS;
+    }
+
+    return Math.max(16, Math.min(16000, Number(value)));
+}
+
 const TRACKER_CATEGORY_TEMPLATE_IDS = new Set([
     'tpl-cyoa-choices',
     'tpl-direction-menu',

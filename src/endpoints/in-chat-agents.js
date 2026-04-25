@@ -5,17 +5,9 @@ import express from 'express';
 import sanitize from 'sanitize-filename';
 import { sync as writeFileAtomicSync } from 'write-file-atomic';
 
-export const router = express.Router();
+import { ensureDirectory } from '../util.js';
 
-/**
- * Ensures a directory exists before reading or writing agent data.
- * @param {string} directory
- */
-function ensureDirectory(directory) {
-    if (!fs.existsSync(directory)) {
-        fs.mkdirSync(directory, { recursive: true });
-    }
-}
+export const router = express.Router();
 
 /**
  * Resolves a storage filename for an agent or agent group.

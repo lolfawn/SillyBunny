@@ -18,15 +18,19 @@ import { getContext } from '../../extensions.js';
 import { eventSource, event_types } from '../../events.js';
 import { ToolManager } from '../../tool-calling.js';
 import {
-    DEFAULT_AGENT_MAX_TOKENS,
+    areAgentsGloballyEnabled,
     getAgentById,
     getAgentRegexScripts,
     getEnabledAgents,
     getEnabledToolAgents,
     getGlobalSettings,
+    getPromptTransformMode,
     isToolAgent,
+    normalizePromptTransformMaxTokens,
     resolveConnectionProfile,
 } from './agent-store.js';
+import { buildFallbackPromptText, extractProfileResponseText } from './llm-utils.js';
+import { getConnectionProfileDisplayName } from './profile-utils.js';
 import {
     getToolAction,
     getToolFormatter,
@@ -46,7 +50,6 @@ export const PROMPT_RUNS_EXTRA_KEY = 'inChatAgentPromptRuns';
 export const PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
 const MAX_TRANSFORM_HISTORY = 10;
 const pendingRefreshTimeouts = new Map();
-const DEFAULT_PROMPT_TRANSFORM_MAX_TOKENS = DEFAULT_AGENT_MAX_TOKENS;
 const GREETING_GENERATION_TYPE = 'first_message';
 const PREPEND_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
     'tpl-scene-tracker',
@@ -256,10 +259,6 @@ function syncPathfinderRuntimeSettings(agent = getPathfinderRuntimeAgent()) {
         };
 
     setPathfinderRuntimeSettings(nextRuntimeSettings);
-}
-
-function areAgentsGloballyEnabled() {
-    return getGlobalSettings()?.enabled !== false;
 }
 
 function getRegisterableAgentTools(agent) {
@@ -730,14 +729,6 @@ function updateMessageRegexSnapshot(message, activeAgents, generationType) {
     return true;
 }
 
-function normalizePromptTransformMaxTokens(value) {
-    if (!Number.isFinite(Number(value))) {
-        return DEFAULT_PROMPT_TRANSFORM_MAX_TOKENS;
-    }
-
-    return Math.max(16, Math.min(16000, Number(value)));
-}
-
 function resolveAgentConnectionProfile(agent) {
     return resolveConnectionProfile(agent?.connectionProfile);
 }
@@ -759,10 +750,6 @@ function getPromptTransformAgentsForMessage(activeAgents, generationType) {
     return getPromptTransformAgents(activeAgents);
 }
 
-function getPromptTransformMode(agent) {
-    return agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite';
-}
-
 function describePromptTransformMode(mode) {
     return mode === 'append' ? 'prompt append' : 'prompt rewrite';
 }
@@ -773,39 +760,6 @@ function shouldShowPromptTransformNotifications(agent) {
         agent?.postProcess?.promptTransformEnabled &&
         agent?.postProcess?.promptTransformShowNotifications,
     );
-}
-
-function getConnectionProfileDisplayName(profileId = '') {
-    const normalizedProfileId = String(profileId ?? '').trim();
-    if (!normalizedProfileId) {
-        return '';
-    }
-
-    const connectionProfilesSelect = document.getElementById('connection_profiles');
-    if (connectionProfilesSelect instanceof HTMLSelectElement) {
-        const matchingOption = Array.from(connectionProfilesSelect.options)
-            .find(option => String(option.value ?? '').trim() === normalizedProfileId);
-        const optionLabel = String(matchingOption?.textContent ?? '').trim();
-        if (optionLabel) {
-            return optionLabel;
-        }
-    }
-
-    const context = getContext();
-    const CMRS = context?.ConnectionManagerRequestService;
-    if (CMRS && typeof CMRS.getProfile === 'function') {
-        try {
-            const profile = CMRS.getProfile(normalizedProfileId);
-            const profileName = String(profile?.name ?? '').trim();
-            if (profileName) {
-                return profileName;
-            }
-        } catch {
-            // Fall back to the raw profile id when the profile no longer exists.
-        }
-    }
-
-    return normalizedProfileId;
 }
 
 function describePromptTransformTarget(profileId = '', runner = '') {
@@ -1115,25 +1069,6 @@ function consolidateAppendPromptTransformOutputs(baseText, agents, results) {
         changed: mergedText !== normalizedBaseText,
         beforeText: normalizedBaseText,
     };
-}
-
-function extractProfileResponseText(response) {
-    return normalizeContentText(response?.content)
-        || normalizeContentText(response?.choices?.[0]?.message?.content)
-        || normalizeContentText(response?.candidates?.[0]?.content?.parts)
-        || normalizeContentText(response?.candidates?.[0]?.output?.parts)
-        || normalizeContentText(response?.text)
-        || normalizeContentText(response?.output)
-        || normalizeContentText(response?.message?.content)
-        || normalizeContentText(response?.message?.tool_plan)
-        || normalizeContentText(response?.message)
-        || '';
-}
-
-function buildFallbackPromptText(promptMessages) {
-    return promptMessages
-        .map(message => `${String(message?.role ?? 'user').toUpperCase()}:\n${normalizeContentText(message?.content)}`)
-        .join('\n\n');
 }
 
 async function requestProfilePromptTransform(CMRS, profileId, promptMessages, maxTokens, modelOverride = '') {

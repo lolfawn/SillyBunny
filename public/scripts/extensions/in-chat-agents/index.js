@@ -1,10 +1,11 @@
 import { DiffMatchPatch } from '../../../lib.js';
 import { extension_settings, renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../popup.js';
-import { download, getSortableDelay, uuidv4 } from '../../utils.js';
+import { download, escapeHtml, escapeRegex, getSortableDelay, uuidv4 } from '../../utils.js';
 import { CLIENT_VERSION, chat, getRequestHeaders, generateQuietPrompt, normalizeContentText, saveSettingsDebounced } from '../../../script.js';
 import { eventSource, event_types } from '../../events.js';
 import {
+    areAgentsGloballyEnabled,
     getAgents,
     getAgentById,
     getAgentRegexScripts,
@@ -23,6 +24,7 @@ import {
     LEGACY_AGENT_MAX_TOKENS,
     normalizeAgentCategory,
     getAgentChatScopeLabel,
+    getPromptTransformMode,
     resolveConnectionProfile,
     setAgentEnabledForCurrentScope,
     setGlobalSettings,
@@ -53,6 +55,12 @@ import {
 } from './regex-scripts.js';
 import { initPathfinder } from './pathfinder-init.js';
 import { openPathfinderSettings, isPathfinderAgent } from './pathfinder-settings-ui.js';
+import { buildFallbackPromptText, extractProfileResponseText } from './llm-utils.js';
+import {
+    buildConnectionProfileNameMap,
+    getConnectionManagerRequestService,
+    populateConnectionProfileSelect,
+} from './profile-utils.js';
 
 const MODULE_NAME = 'in-chat-agents';
 
@@ -142,10 +150,6 @@ function updateCancelGenerationButton() {
     $('#ica--cancelGeneration').toggle(isAgentGenerationActive());
 }
 
-function areAgentsGloballyEnabled() {
-    return getGlobalSettings().enabled !== false;
-}
-
 function updateGlobalAgentToggle() {
     const enabled = areAgentsGloballyEnabled();
     const button = $('#ica--globalEnabled');
@@ -177,65 +181,6 @@ async function toggleAgentFavorite(agent) {
     agent.favorite = !agent.favorite;
     await saveAgent(agent);
     renderAgentList();
-}
-
-function getConnectionManagerRequestService() {
-    try {
-        return SillyTavern.getContext().ConnectionManagerRequestService ?? null;
-    } catch {
-        return null;
-    }
-}
-
-function getSupportedConnectionProfiles() {
-    const CMRS = getConnectionManagerRequestService();
-    if (!CMRS || typeof CMRS.getSupportedProfiles !== 'function') {
-        return [];
-    }
-
-    try {
-        return CMRS.getSupportedProfiles();
-    } catch {
-        return [];
-    }
-}
-
-function populateConnectionProfileSelect(select, { emptyLabel = 'Use default profile', selectedValue = '' } = {}) {
-    if (!(select instanceof HTMLSelectElement)) {
-        return;
-    }
-
-    const profiles = getSupportedConnectionProfiles();
-    const resolvedValue = typeof selectedValue === 'string' ? selectedValue : '';
-    select.innerHTML = '';
-
-    const emptyOption = document.createElement('option');
-    emptyOption.value = '';
-    emptyOption.textContent = emptyLabel;
-    select.appendChild(emptyOption);
-
-    for (const profile of profiles) {
-        const option = document.createElement('option');
-        option.value = profile.id;
-        option.textContent = profile.name || profile.id;
-        select.appendChild(option);
-    }
-
-    if (resolvedValue && !profiles.some(profile => profile.id === resolvedValue)) {
-        const missingOption = document.createElement('option');
-        missingOption.value = resolvedValue;
-        missingOption.textContent = `Missing profile (${resolvedValue})`;
-        select.appendChild(missingOption);
-    }
-
-    select.value = resolvedValue;
-}
-
-function buildProfileNameMap() {
-    return new Map(
-        getSupportedConnectionProfiles()
-            .map(profile => [profile.id, profile.name || profile.id]),
-    );
 }
 
 function findTemplateById(templateId) {
@@ -407,10 +352,6 @@ function hasPromptTransform(agent) {
         ['post', 'both'].includes(String(agent?.phase ?? '')) &&
         String(agent?.prompt ?? '').trim(),
     );
-}
-
-function getPromptTransformMode(agent) {
-    return agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite';
 }
 
 function getPromptTransformLabel(agent) {
@@ -1099,7 +1040,7 @@ function renderAgentList() {
     const scrollState = captureAgentListScrollState(container[0]);
     container.empty();
     updateCancelGenerationButton();
-    const profileNames = buildProfileNameMap();
+    const profileNames = buildConnectionProfileNameMap();
     const allAgents = sortAgentsByOrder(getAgents());
 
     const searchTerm = ($('#ica--search').val() || '').toString().toLowerCase();
@@ -2167,17 +2108,6 @@ function handleExportAll() {
 
 // ===================== Utilities =====================
 
-/**
- * Simple HTML escape.
- * @param {string} str
- * @returns {string}
- */
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
-
 function normalizeMultilineInput(value) {
     return String(value ?? '').replace(/\r\n?/g, '\n').trim();
 }
@@ -2202,7 +2132,7 @@ function slugifyIdentifier(value, fallback = 'tracker_data') {
 }
 
 function escapeRegexPattern(value) {
-    return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return escapeRegex(String(value ?? ''));
 }
 
 function parseTrackerFormat(formatText) {
@@ -2567,25 +2497,6 @@ function populateGlobalNotificationToggle() {
 function populateGlobalExecutionModeDropdown() {
     const mode = getGlobalSettings().appendAgentsExecutionMode || 'parallel';
     $('#ica--appendAgentsExecutionMode').val(mode);
-}
-
-function extractProfileResponseText(response) {
-    return normalizeContentText(response?.content)
-        || normalizeContentText(response?.choices?.[0]?.message?.content)
-        || normalizeContentText(response?.candidates?.[0]?.content?.parts)
-        || normalizeContentText(response?.candidates?.[0]?.output?.parts)
-        || normalizeContentText(response?.text)
-        || normalizeContentText(response?.output)
-        || normalizeContentText(response?.message?.content)
-        || normalizeContentText(response?.message?.tool_plan)
-        || normalizeContentText(response?.message)
-        || '';
-}
-
-function buildFallbackPromptText(messages) {
-    return messages
-        .map(message => `${String(message?.role ?? 'user').toUpperCase()}:\n${normalizeContentText(message?.content)}`)
-        .join('\n\n');
 }
 
 /**

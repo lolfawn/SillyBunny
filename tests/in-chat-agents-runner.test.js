@@ -132,6 +132,7 @@ describe('in-chat agent post-processing runner', () => {
 
         await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agent-store.js', () => ({
             DEFAULT_AGENT_MAX_TOKENS: 8192,
+            areAgentsGloballyEnabled: jest.fn(() => true),
             getAgentById: jest.fn(id => enabledAgents.find(agent => agent.id === id)),
             getAgentRegexScripts: jest.fn(() => []),
             getEnabledAgents: jest.fn(() => [...enabledAgents]),
@@ -140,7 +141,9 @@ describe('in-chat agent post-processing runner', () => {
                 enabled: true,
                 promptTransformShowNotifications: false,
             })),
+            getPromptTransformMode: jest.fn(agent => agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite'),
             isToolAgent: jest.fn(() => false),
+            normalizePromptTransformMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
             resolveConnectionProfile: jest.fn(value => value ?? ''),
         }));
 

@@ -4,6 +4,7 @@
 
 import { renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { saveSettingsDebounced } from '../../../script.js';
+import { escapeHtml } from '../../utils.js';
 import { world_names, loadWorldInfo } from '../../world-info.js';
 import { persistAgentGlobalSettings, saveAgent, setAgentEnabledForCurrentScope } from './agent-store.js';
 import {
@@ -1131,16 +1132,6 @@ function showPromptStatus(message, type) {
 
 function clearPromptStatus() {
     settingsEl.find('#pf--prompt-status').text('');
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
 }
 
 /**

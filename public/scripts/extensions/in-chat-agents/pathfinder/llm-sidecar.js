@@ -1,4 +1,5 @@
 import { generateRaw } from '../../../../script.js';
+import { extractProfileResponseText } from '../llm-utils.js';
 import { getSettings } from './tree-store.js';
 
 /**
@@ -39,7 +40,7 @@ export async function sidecarGenerateWithProfile(prompt, systemPrompt = '', prof
                 stream: false,
                 signal,
             });
-            return typeof result === 'string' ? result : result?.content || '';
+            return typeof result === 'string' ? result : extractProfileResponseText(result);
         } catch (err) {
             console.warn(`[Pathfinder] Sidecar via profile "${profileId}" failed:`, err);
         }
