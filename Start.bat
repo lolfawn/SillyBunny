@@ -52,6 +52,7 @@ if "%_need_git%"=="1" if "%_auto_update%"=="1" (
 )
 
 set NODE_ENV=production
+set NODE_NO_WARNINGS=1
 set "_dependency_profile=bun-production"
 if exist node_modules\eslint\package.json set "_dependency_profile=bun-development"
 bun scripts\dependency-state.js check !_dependency_profile! > nul 2>&1

@@ -116,6 +116,7 @@ if %errorlevel% neq 0 (
 
 echo Installing Bun packages and starting server
 set NODE_ENV=production
+set NODE_NO_WARNINGS=1
 set "_dependency_profile=bun-production"
 if exist node_modules\eslint\package.json set "_dependency_profile=bun-development"
 bun scripts\dependency-state.js check !_dependency_profile! > nul 2>&1

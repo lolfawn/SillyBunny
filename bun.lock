@@ -135,6 +135,10 @@
       },
     },
   },
+  "overrides": {
+    "openai": "^4.17.0",
+    "whatwg-url": "^14.0.0",
+  },
   "packages": {
     "@aashutoshrathi/word-wrap": ["@aashutoshrathi/word-wrap@1.2.6", "", {}, "sha512-1Yjs2SvM8TflER/OD3cOjhWWOZb58A2t7wpE2S9XfBYTiIl+XFhQG2bjy4Pu1I+EAlCNUzRDYDdFwFYUKvXcIA=="],
 
