@@ -34,12 +34,12 @@ const CHAT_COMPLETION_CONFIG_DEFAULTS = Object.freeze({
 });
 const THUMBNAIL_CONFIG_DEFAULTS = Object.freeze({
     enabled: true,
-    format: 'jpg',
-    quality: 95,
+    format: 'png',
+    quality: 100,
     dimensions: Object.freeze({
-        bg: Object.freeze([160, 90]),
-        avatar: Object.freeze([96, 144]),
-        persona: Object.freeze([96, 144]),
+        bg: Object.freeze([240, 135]),
+        avatar: Object.freeze([864, 1280]),
+        persona: Object.freeze([864, 1280]),
     }),
 });
 const SILLYBUNNY_RECOMMENDED_THUMBNAILS = Object.freeze({

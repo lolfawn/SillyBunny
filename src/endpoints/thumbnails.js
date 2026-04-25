@@ -25,8 +25,8 @@ export const ALLOWED_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif'
 
 const thumbnailRuntimeSettings = {
     enabled: !!getConfigValue('thumbnails.enabled', true, 'boolean'),
-    quality: Math.min(100, Math.max(1, parseInt(getConfigValue('thumbnails.quality', 95, 'number')))),
-    format: String(getConfigValue('thumbnails.format', 'jpg')).toLowerCase().trim() === 'png' ? 'png' : 'jpg',
+    quality: Math.min(100, Math.max(1, parseInt(getConfigValue('thumbnails.quality', 100, 'number')))),
+    format: String(getConfigValue('thumbnails.format', 'png')).toLowerCase().trim() === 'png' ? 'png' : 'jpg',
 };
 
 /**
@@ -101,8 +101,8 @@ export function invalidateThumbnail(directories, type, file) {
 
 export function setThumbnailRuntimeSettings(settings = {}) {
     thumbnailRuntimeSettings.enabled = Boolean(settings.enabled);
-    thumbnailRuntimeSettings.quality = Math.min(100, Math.max(1, parseInt(settings.quality, 10) || 95));
-    thumbnailRuntimeSettings.format = String(settings.format).toLowerCase().trim() === 'png' ? 'png' : 'jpg';
+    thumbnailRuntimeSettings.quality = Math.min(100, Math.max(1, parseInt(settings.quality, 10) || 100));
+    thumbnailRuntimeSettings.format = String(settings.format ?? 'png').toLowerCase().trim() === 'png' ? 'png' : 'jpg';
 }
 
 export function getThumbnailRuntimeSettings() {

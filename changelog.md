@@ -39,6 +39,7 @@ Date: 2026-04-25
 
 ### Server Tools
 - Added thumbnail quality controls to Customize > Server for toggling thumbnail generation, choosing JPG or PNG, setting quality and dimensions, applying SillyBunny's recommended sharp-avatar preset, and clearing the current user's thumbnail cache for rebuilds without manually editing `config.yaml`.
+- Made SillyBunny's sharp thumbnail preset the default: PNG thumbnails, quality 100, 240x135 backgrounds, and 864x1280 avatar/persona thumbnails.
 
 ### Extensions
 - Hardened the shared extension settings columns so duplicate top-level drawers for the same extension are removed automatically, including stale Quick Reply drawers after repeated activation.
@@ -63,6 +64,7 @@ Commits:
 - `fix(group): persist private author notes in group chats`
 - `fix(agents): apply post-processing after generation`
 - `fix(ui): contain chat thumbnails`
+- `fix(server): sharpen default thumbnails`
 
 ## v1.4.5
 

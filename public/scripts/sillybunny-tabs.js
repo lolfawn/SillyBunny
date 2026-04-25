@@ -4595,8 +4595,8 @@ function getThumbnailSettingsFromRefs(refs = getServerAdminRefs()) {
 
     return {
         enabled: Boolean(refs?.thumbnailEnabled?.checked),
-        format: refs?.thumbnailFormat?.value === 'png' ? 'png' : 'jpg',
-        quality: parseSize(refs?.thumbnailQuality, 95),
+        format: refs?.thumbnailFormat?.value === 'jpg' ? 'jpg' : 'png',
+        quality: parseSize(refs?.thumbnailQuality, 100),
         dimensions: {
             bg: [
                 parseSize(refs?.thumbnailBgWidth, 240),
@@ -4620,14 +4620,14 @@ function setThumbnailInputValues(settings = {}, refs = getServerAdminRefs()) {
     }
 
     refs.thumbnailEnabled.checked = Boolean(settings.enabled);
-    refs.thumbnailFormat.value = settings.format === 'png' ? 'png' : 'jpg';
-    refs.thumbnailQuality.value = String(settings.quality ?? 95);
-    refs.thumbnailBgWidth.value = String(settings.dimensions?.bg?.[0] ?? 160);
-    refs.thumbnailBgHeight.value = String(settings.dimensions?.bg?.[1] ?? 90);
-    refs.thumbnailAvatarWidth.value = String(settings.dimensions?.avatar?.[0] ?? 96);
-    refs.thumbnailAvatarHeight.value = String(settings.dimensions?.avatar?.[1] ?? 144);
-    refs.thumbnailPersonaWidth.value = String(settings.dimensions?.persona?.[0] ?? 96);
-    refs.thumbnailPersonaHeight.value = String(settings.dimensions?.persona?.[1] ?? 144);
+    refs.thumbnailFormat.value = settings.format === 'jpg' ? 'jpg' : 'png';
+    refs.thumbnailQuality.value = String(settings.quality ?? 100);
+    refs.thumbnailBgWidth.value = String(settings.dimensions?.bg?.[0] ?? 240);
+    refs.thumbnailBgHeight.value = String(settings.dimensions?.bg?.[1] ?? 135);
+    refs.thumbnailAvatarWidth.value = String(settings.dimensions?.avatar?.[0] ?? 864);
+    refs.thumbnailAvatarHeight.value = String(settings.dimensions?.avatar?.[1] ?? 1280);
+    refs.thumbnailPersonaWidth.value = String(settings.dimensions?.persona?.[0] ?? 864);
+    refs.thumbnailPersonaHeight.value = String(settings.dimensions?.persona?.[1] ?? 1280);
 }
 
 function setThumbnailInputsDisabled(disabled, refs = getServerAdminRefs()) {

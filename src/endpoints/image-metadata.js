@@ -38,13 +38,13 @@ export const METADATA_FILE = 'image-metadata.json';
  */
 
 const THUMBNAIL_DIMENSION_DEFAULTS = Object.freeze({
-    bg: Object.freeze([160, 90]),
-    avatar: Object.freeze([96, 144]),
-    persona: Object.freeze([96, 144]),
+    bg: Object.freeze([240, 135]),
+    avatar: Object.freeze([864, 1280]),
+    persona: Object.freeze([864, 1280]),
 });
 
 function normalizeDimensionPair(value, fallback) {
-    const fallbackPair = Array.isArray(fallback) ? fallback : [96, 144];
+    const fallbackPair = Array.isArray(fallback) ? fallback : THUMBNAIL_DIMENSION_DEFAULTS.avatar;
     const sourcePair = Array.isArray(value) ? value : fallbackPair;
     const width = Math.min(4096, Math.max(1, Math.trunc(Number(sourcePair[0]) || fallbackPair[0])));
     const height = Math.min(4096, Math.max(1, Math.trunc(Number(sourcePair[1]) || fallbackPair[1])));
