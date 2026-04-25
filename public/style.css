@@ -4749,12 +4749,6 @@ input[type="range"]::-webkit-slider-thumb {
     line-height: 1;
 }
 
-.topRightInset {
-    position: absolute;
-    top: 6px;
-    right: 23px;
-}
-
 .note-link-span:hover,
 .note-link-span-lrg:hover {
     opacity: 1;

@@ -1484,6 +1484,19 @@ input[type='range']::-moz-range-thumb {
     opacity: 1;
 }
 
+.sb-sampling-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.sb-sampling-docs-link .note-link-span {
+    inline-size: 24px;
+    block-size: 24px;
+    flex-basis: 24px;
+}
+
 .sb-openai-settings-subdrawer {
     margin-top: 6px;
 }

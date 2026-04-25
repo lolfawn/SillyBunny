@@ -958,15 +958,6 @@
         height: unset;
     }
 
-    /* Fix help button positioning - make it sticky */
-    .topRightInset {
-        position: sticky;
-        top: calc(var(--topBarBlockSize) + 10px);
-        z-index: 100;
-        float: right;
-        margin-left: 10px;
-    }
-
     .note-link-span {
         display: inline-flex;
         align-items: center;

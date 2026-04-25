@@ -3833,6 +3833,13 @@ body.sb-shell-resizing * {
         grid-template-columns: 1fr;
     }
 
+    .sb-sampling-docs-link .note-link-span {
+        inline-size: 24px;
+        block-size: 24px;
+        flex-basis: 24px;
+        font-size: inherit;
+    }
+
     .sb-shell-search {
         min-height: 44px;
         padding: 0 12px;
@@ -3896,11 +3903,6 @@ body.sb-shell-resizing * {
     }
 
     #clickSlidersTips {
-        display: none !important;
-    }
-
-    /* Hide help button on Presets page */
-    .topRightInset {
         display: none !important;
     }
 

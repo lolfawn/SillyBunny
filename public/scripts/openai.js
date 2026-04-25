@@ -2258,8 +2258,25 @@ function createOpenAISettingsDrawer(id, title, description) {
         class: 'inline-drawer wide100p flexFlowColumn sb-openai-settings-drawer',
     });
     const $header = $('<div>', { class: 'inline-drawer-toggle inline-drawer-header' });
+    const $title = $('<b>').text(title);
     const $label = $('<div>', { class: 'flex-container flexFlowColumn' })
-        .append($('<b>').text(title));
+        .append($title);
+
+    if (id === 'sb-openai-sampling') {
+        const $helpLink = $('<a>', {
+            class: 'notes-link sb-sampling-docs-link',
+            href: 'https://docs.sillytavern.app/usage/common-settings/',
+            target: '_blank',
+            title: 'Documentation on sampling parameters.',
+            'data-i18n': '[title]Documentation on sampling parameters',
+        }).append($('<span>', {
+            name: 'samplerHelpButton',
+            class: 'note-link-span fa-solid fa-circle-question',
+        }));
+
+        $helpLink.on('click', event => event.stopPropagation());
+        $label.empty().append($('<div>', { class: 'sb-sampling-title-row' }).append($title, $helpLink));
+    }
 
     if (description) {
         $label.append($('<small>', { class: 'sb-group-meta' }).text(description));
