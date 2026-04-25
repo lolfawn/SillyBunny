@@ -68,7 +68,8 @@
     --sb-positive-bg: color-mix(in srgb, var(--SmartThemeQuoteColor) 22%, transparent);
     --sb-muted-fg: color-mix(in srgb, var(--SmartThemeBodyColor) 74%, transparent);
     --sb-muted-bg: color-mix(in srgb, var(--SmartThemeBodyColor) 7%, transparent);
-    --sb-on-accent: color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeBodyColor) 8%);
+    --sb-on-accent: rgb(0, 0, 0);
+    --sb-on-solid-accent: var(--sb-on-accent);
     --sb-warning-fg: color-mix(in srgb, var(--warning, #ff6b6b) 72%, var(--SmartThemeBodyColor) 28%);
     --sb-warning-bg: color-mix(in srgb, var(--warning, #ff6b6b) 12%, var(--SmartThemeBlurTintColor) 88%);
     --sb-warning-border: color-mix(in srgb, var(--warning, #ff6b6b) 42%, var(--SmartThemeBorderColor) 58%);
@@ -594,6 +595,7 @@ h3:not(.popup h3):not(#chat h3) {
     color: var(--sb-on-accent);
     border-color: transparent;
     box-shadow: 0 14px 28px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 18%, transparent);
+    text-shadow: none;
 }
 
 .menu_button.menu_button_primary:not(.disabled):not([disabled]):hover,

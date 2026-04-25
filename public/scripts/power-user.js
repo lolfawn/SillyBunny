@@ -1237,16 +1237,66 @@ function getRelativeLuminance(channel) {
     return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
 }
 
+function getRelativeLuminanceFromChannels(channels) {
+    const [red, green, blue] = channels;
+    return (0.2126 * getRelativeLuminance(red))
+        + (0.7152 * getRelativeLuminance(green))
+        + (0.0722 * getRelativeLuminance(blue));
+}
+
+function getContrastRatioFromLuminance(firstLuminance, secondLuminance) {
+    const lighter = Math.max(firstLuminance, secondLuminance);
+    const darker = Math.min(firstLuminance, secondLuminance);
+    return (lighter + 0.05) / (darker + 0.05);
+}
+
+function mixColorChannels(firstChannels, secondChannels, firstWeight = 1) {
+    const secondWeight = 1 - firstWeight;
+    return [0, 1, 2].map(index => Math.round(
+        (firstChannels[index] * firstWeight) + (secondChannels[index] * secondWeight),
+    ));
+}
+
+function getContrastAwareInk(backgroundChannelsList) {
+    const darkInkChannels = [0, 0, 0];
+    const lightInkChannels = [255, 255, 255];
+    const darkInkLuminance = getRelativeLuminanceFromChannels(darkInkChannels);
+    const lightInkLuminance = getRelativeLuminanceFromChannels(lightInkChannels);
+    const darkMinimumContrast = Math.min(...backgroundChannelsList.map(channels => (
+        getContrastRatioFromLuminance(darkInkLuminance, getRelativeLuminanceFromChannels(channels))
+    )));
+    const lightMinimumContrast = Math.min(...backgroundChannelsList.map(channels => (
+        getContrastRatioFromLuminance(lightInkLuminance, getRelativeLuminanceFromChannels(channels))
+    )));
+
+    return darkMinimumContrast >= lightMinimumContrast ? 'rgb(0, 0, 0)' : 'rgb(255, 255, 255)';
+}
+
+function applyAccentContrastPalette() {
+    const quoteChannels = parseColorChannels(power_user.quote_text_color);
+    const bodyChannels = parseColorChannels(power_user.main_text_color);
+    if (!quoteChannels || !bodyChannels) {
+        return;
+    }
+
+    const accentChannels = mixColorChannels(quoteChannels, bodyChannels, 0.62);
+    const primaryButtonTextColor = getContrastAwareInk([
+        mixColorChannels(accentChannels, [255, 255, 255], 0.88),
+        mixColorChannels(accentChannels, [255, 255, 255], 0.82),
+    ]);
+    const solidAccentTextColor = getContrastAwareInk([accentChannels]);
+
+    document.documentElement.style.setProperty('--sb-on-accent', primaryButtonTextColor);
+    document.documentElement.style.setProperty('--sb-on-solid-accent', solidAccentTextColor);
+}
+
 function applyLandingContrastPalette() {
     const blurChannels = parseColorChannels(power_user.blur_tint_color);
     if (!blurChannels) {
         return;
     }
 
-    const [red, green, blue] = blurChannels;
-    const luminance = (0.2126 * getRelativeLuminance(red))
-        + (0.7152 * getRelativeLuminance(green))
-        + (0.0722 * getRelativeLuminance(blue));
+    const luminance = getRelativeLuminanceFromChannels(blurChannels);
     const isLightSurface = luminance > 0.36;
     const landingStrong = isLightSurface ? 'rgba(52, 31, 25, 0.96)' : 'rgba(249, 242, 236, 0.96)';
     const landingMuted = isLightSurface ? 'rgba(96, 70, 61, 0.84)' : 'rgba(228, 216, 208, 0.84)';
@@ -1303,6 +1353,7 @@ function applyThemeColor(type) {
     if (!type || type === 'main' || type === 'blurTint') {
         applyLandingContrastPalette();
     }
+    applyAccentContrastPalette();
 }
 
 function syncThemeColorPickersFromState() {

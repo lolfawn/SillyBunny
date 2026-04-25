@@ -962,10 +962,11 @@ body .panelControlBar {
 #send_but {
     order: 2;
     background-color: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) !important;
-    color: var(--color-background, var(--SmartThemeBlurTintColor)) !important;
+    color: var(--sb-on-solid-accent, var(--sb-on-accent, var(--color-background, var(--SmartThemeBlurTintColor)))) !important;
     border-color: transparent !important;
     border-radius: var(--avatar-roundness, 8px);
     font-weight: 600;
+    text-shadow: none !important;
 }
 
 #mes_continue {
@@ -994,10 +995,11 @@ body .panelControlBar {
     flex: 0 0 var(--bottomFormBlockSize);
     place-self: center;
     background-color: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor))) !important;
-    color: var(--color-background, var(--SmartThemeBlurTintColor)) !important;
+    color: var(--sb-on-solid-accent, var(--sb-on-accent, var(--color-background, var(--SmartThemeBlurTintColor)))) !important;
     border-color: transparent !important;
     border-radius: var(--avatar-roundness, 8px);
     opacity: 1;
+    text-shadow: none !important;
 }
 
 #send_form .mes_stop {
@@ -4086,6 +4088,7 @@ grammarly-extension {
     color: var(--sb-on-accent, var(--SmartThemeBlurTintColor));
     border-color: transparent;
     font-weight: 600;
+    text-shadow: none;
 }
 .menu_button.menu_button_primary:hover,
 .menu_button.popup-button-ok:hover {

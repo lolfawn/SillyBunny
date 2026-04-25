@@ -2357,6 +2357,7 @@ body.sb-shell-resizing * {
 .sb-import-action-row .sb-server-action.menu_button_primary,
 .sb-import-pane > .sb-server-action.menu_button_primary {
     color: var(--sb-on-accent, var(--SmartThemeBlurTintColor));
+    text-shadow: none;
 }
 
 .sb-import-path-input {
