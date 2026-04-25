@@ -2929,10 +2929,15 @@ body.sb-shell-resizing * {
     display: flex;
     align-items: center;
     gap: 8px;
+    box-sizing: border-box;
+    margin-block-end: var(--sb-chat-composer-gap, 8px);
     padding: 6px 12px;
-    border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 50%, transparent);
-    background: var(--sb-composer-surface-bg, color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeChatTintColor) 8%));
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 72%, transparent);
+    border-radius: var(--sb-radius-xl, 22px);
+    background: var(--sb-chat-surface-bg, var(--sb-composer-surface-bg, color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeChatTintColor) 8%)));
+    box-shadow: 0 10px 26px color-mix(in srgb, var(--SmartThemeShadowColor) 12%, transparent);
     min-height: 34px;
+    overflow: hidden;
 }
 
 #sb-bottom-chat-bar:empty {

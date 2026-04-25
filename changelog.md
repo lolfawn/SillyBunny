@@ -17,7 +17,7 @@ Date: 2026-04-26
 - Cleaned up launcher installs so routine starts are quieter, preserve ESLint dependencies, and avoid unnecessary dependency work when runtime inputs have not changed.
 
 ### Fixed
-- Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, and bottom chat spacing.
+- Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, bottom chat spacing, and composer panel theming.
 - Fixed group chat edge cases so unread DM avatars stay aligned, DM taps open the correct private chat, and Character Author's Note (Private) persists on the group chat.
 - Fixed In-Chat Agent behavior for separated Individual/Group enablement, queued manual runs, hidden idle cancel buttons, Pathfinder control alignment, and automatic post-generation runs on desktop and mobile.
 - Fixed duplicate extension settings drawers so repeated extension activation does not create doubled panels.
@@ -75,6 +75,7 @@ Date: 2026-04-26
 - `fix(agents): run automatic post agents on mobile`
 - `fix(ui): show one message visibility icon`
 - `docs(changelog): condense unreleased notes`
+- `fix(ui): theme rounded chat composer`
 
 ## v1.4.5
 

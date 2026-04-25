@@ -25,6 +25,8 @@
     --sb-settings-card-padding: 12px 14px;
     --sb-message-icon-size: 1.75rem;
     --sb-message-meta-line-height: 1.18;
+    --sb-chat-composer-gap: 8px;
+    --sb-chat-composer-edge-gap: 8px;
     --sb-everforest-dusk-main: rgba(131, 179, 142, 1);
     --sb-everforest-dusk-soft: rgba(161, 209, 172, 1);
     --sb-everforest-dusk-surface: rgba(55, 60, 63, 1);
@@ -60,7 +62,7 @@
     --sb-chat-surface-base: var(--sb-chat-surface-source);
     --sb-composer-surface-base: var(--sb-chat-surface-source);
     --sb-chat-surface-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-chat-surface-base)), var(--sb-chat-surface-base));
-    --sb-composer-surface-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base)), var(--sb-composer-surface-base));
+    --sb-composer-surface-bg: var(--sb-chat-surface-bg);
     --sb-card-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 6%, var(--SmartThemeBlurTintColor)), color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, transparent));
     --sb-button-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 84%, transparent);
     --sb-button-hover: color-mix(in srgb, var(--SmartThemeQuoteColor) 14%, transparent);
@@ -102,6 +104,8 @@
     --sb-row-gap: 8px;
     --sb-section-gap: 10px;
     --sb-settings-card-padding: 10px 12px;
+    --sb-chat-composer-gap: 6px;
+    --sb-chat-composer-edge-gap: 6px;
     --sb-icon-control-size: 1.85rem;
     --sb-inline-drawer-icon-size: 1.85rem;
 }
@@ -736,13 +740,23 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     padding-right: var(--sb-select-arrow-space);
 }
 
+#form_sheld {
+    box-sizing: border-box;
+    margin: var(--sb-chat-composer-gap) auto 0;
+    padding-inline: var(--sb-chat-composer-edge-gap);
+    padding-block-end: max(var(--sb-chat-composer-edge-gap), env(safe-area-inset-bottom, 0px));
+}
+
 #send_form {
     position: relative;
     isolation: isolate;
+    box-sizing: border-box;
     padding: 8px;
     border-radius: var(--sb-radius-xl);
+    border-color: color-mix(in srgb, var(--sb-shell-border) 92%, transparent);
     box-shadow: 0 -10px 40px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent);
     background: transparent;
+    overflow: hidden;
 }
 
 #send_form::before {
@@ -754,7 +768,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     pointer-events: none;
     background:
         linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent), transparent 90%),
-        var(--sb-composer-surface-bg);
+        var(--sb-chat-surface-bg);
     opacity: 1;
 }
 
@@ -1372,7 +1386,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
 
     :root:not([data-sb-theme]) #send_form,
     :root[data-sb-theme='clean-minimal'] #send_form {
-        background: var(--sb-mobile-default-surface-solid) !important;
+        background: var(--sb-chat-surface-bg) !important;
         border-color: color-mix(in srgb, var(--SmartThemeBorderColor) 86%, transparent) !important;
         backdrop-filter: blur(12px) saturate(110%);
         -webkit-backdrop-filter: blur(12px) saturate(110%);
