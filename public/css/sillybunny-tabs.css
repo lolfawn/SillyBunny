@@ -3051,9 +3051,9 @@ body.sb-shell-resizing * {
 }
 
 #sb-persona-picker {
-    position: absolute;
-    bottom: calc(100% + 8px);
+    position: fixed;
     left: 0;
+    top: 0;
     min-width: 200px;
     max-width: 280px;
     max-height: 300px;

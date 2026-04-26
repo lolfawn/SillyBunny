@@ -8900,12 +8900,37 @@ function togglePersonaPicker() {
         }
     }
 
-    // Position relative to the bubble
     const bubble = document.getElementById('sb-persona-bubble');
-    if (bubble) {
-        bubble.parentElement.style.position = 'relative';
-        bubble.parentElement.appendChild(picker);
+    if (bubble instanceof HTMLElement) {
+        document.body.appendChild(picker);
+        positionPersonaPicker(picker, bubble);
     }
+}
+
+function positionPersonaPicker(picker, bubble) {
+    const bubbleRect = bubble.getBoundingClientRect();
+    picker.style.visibility = 'hidden';
+    picker.style.left = '0px';
+    picker.style.top = '0px';
+    picker.style.right = 'auto';
+    picker.style.bottom = 'auto';
+
+    requestAnimationFrame(() => {
+        const pickerRect = picker.getBoundingClientRect();
+        const viewportPadding = 8;
+        const left = Math.min(
+            Math.max(viewportPadding, bubbleRect.left),
+            Math.max(viewportPadding, window.innerWidth - pickerRect.width - viewportPadding),
+        );
+        const top = Math.max(
+            viewportPadding,
+            bubbleRect.top - pickerRect.height - viewportPadding,
+        );
+
+        picker.style.left = `${Math.round(left)}px`;
+        picker.style.top = `${Math.round(top)}px`;
+        picker.style.visibility = '';
+    });
 }
 
 function addPersonaOption(picker, avatarId, name, title, isActive, context) {
