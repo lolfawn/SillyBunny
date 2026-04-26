@@ -1,20 +1,5 @@
 # Changelog
 
-## Unreleased
-
-Date: 2026-04-26
-
-Changes:
-- Added an OpenRouter/NanoGPT-only `Unlocked Context Size` toggle in Chat Completion token budget settings.
-- Preserved SillyBunny's always-unlocked context behavior for other Chat Completion providers while allowing OpenRouter and NanoGPT to clamp context size to model-provided limits when the toggle is disabled.
-- Fixed in-chat agent regex scripts so they attach during streamed assistant replies and render immediately, matching the native Regex extension timing.
-- Fixed in-chat agent post-processing recovery for regenerated assistant replies and preserved prompt-transform diff/undo controls after chat reloads.
-
-Commits:
-- `feat(ui): expose context unlock for nanogpt and openrouter`
-- `fix(agents): apply regex scripts during streaming`
-- `fix(agents): recover regenerated post-processing history`
-
 ## v1.5.0
 
 Date: 2026-04-26
@@ -43,6 +28,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Added backend-aware sampler cards, mobile quick access, anchored documentation links, normalized numeric sampler fields, and a Neutralize Samplers action for Chat Completions.
 - Added bundled Chat Completions presets for `Geechan - Universal Roleplay (Chat Completions) (v5.0)` and `Geechan's Chatroom Prompt`, with `Geechan's Chatroom Prompt` defaulting to a 256k context window.
 - Added roomier editing tools, including a resizable first-message field, a desktop World Info pop-up editor, expanded context-size presets, Text Completions preset parity, and better advanced definitions editing.
+- Added an OpenRouter/NanoGPT-only `Unlocked Context Size` toggle in Chat Completion token budget settings, preserving SillyBunny's always-unlocked behavior for other providers.
 - Fixed preset and settings layout polish, including balanced prompt manager panes, aligned prompt preset controls, equalized Presets dropdown controls, and less-clipped preset action text.
 
 ### Chat History, Server Tools, And RAG
@@ -55,6 +41,8 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Fixed automatic post-generation runs on desktop and mobile, including late mobile render timing after the generation flag clears and delayed iOS Safari page wakeups.
 - Fixed mobile post-processing recovery when iOS Safari misses the generation-ended event, leaves the generation flag stuck, or replaces the rendered message object before queued agents flush.
 - Fixed regex-only agents so their formatter scripts attach as soon as an assistant message is received instead of waiting for post-generation processing.
+- Fixed in-chat agent regex scripts so they attach during streamed assistant replies and render immediately, matching the native Regex extension timing.
+- Fixed in-chat agent post-processing recovery for regenerated assistant replies and preserved prompt-transform diff/undo controls after chat reloads.
 - Added a separate Pathfinder memory summary UI with editable summary text and injection status.
 - Fixed Agents Quick Toggles overflow, Pathfinder control alignment, hidden idle cancel buttons, and Pathfinder log detail layout.
 
@@ -80,6 +68,11 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Fixed frontend cache clearing after updater reloads.
 - Updated `Geechan's Chatroom Prompt` emoji guidance to use normal emojis.
 - Bumped app-owned version strings to `1.5.0` without changing dependency versions.
+
+Commits:
+- `feat(ui): expose context unlock for nanogpt and openrouter`
+- `fix(agents): apply regex scripts during streaming`
+- `fix(agents): recover regenerated post-processing history`
 
 ## v1.4.1
 
