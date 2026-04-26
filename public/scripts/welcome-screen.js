@@ -276,7 +276,7 @@ const WELCOME_DECK_VIEWS = Object.freeze([
     {
         id: 'basics',
         title: 'Core Buttons',
-        summary: 'A plain-English guide on our UI shell.',
+        summary: 'A plain-English guide on our graphical shell.',
         icon: 'fa-compass-drafting',
     },
     {
