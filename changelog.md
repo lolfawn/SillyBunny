@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.4.5
+## v1.5.0
 
 Date: 2026-04-26
 
@@ -55,6 +55,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Removed the bundled Moonlit Echoes extension, built-in Moonlit chat stylesheet, and Echo, Whisper, Hush, Ripple, and Tide options from core Appearance.
 - Kept core chat style validation to Flat, Bubbles, and Document; old saved Moonlit style values now reset to Flat and clear legacy body classes.
 - Added the SillyBunny-specific Moonlit Echoes fork to Launchpad optional installs.
+- Replaced the patched bundled Nemo preset extension with the SillyBunny-owned Bunny Preset Tools local extension, including saved-settings migration and no nested upstream git checkout.
 - Fixed duplicate extension settings drawers so repeated extension activation does not create doubled panels.
 - Fixed Moonlit Echoes fork styling so enabled Moonlit chat thumbnails and the mobile composer remain usable.
 
@@ -63,7 +64,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Fixed lint coverage by including `scripts/**/*.js` in the standard ESLint target and resolving the existing lint failures.
 - Fixed frontend cache clearing after updater reloads.
 - Updated `Geechan's Chatroom Prompt` emoji guidance to use normal emojis.
-- Bumped app-owned version strings to `1.4.5` without changing dependency versions.
+- Bumped app-owned version strings to `1.5.0` without changing dependency versions.
 
 ## v1.4.1
 

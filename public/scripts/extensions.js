@@ -71,12 +71,7 @@ const extensionLoadErrors = new Set();
 
 // SillyBunny: extensions append settings UI into shared columns; keep that surface resilient.
 const extensionSettingsHostIds = ['extensions_settings', 'extensions_settings2'];
-const ignoredExtensionSettingsSelectors = [
-    '#nemo-tab-extension-overlay',
-    '.nemo-extensions-search',
-    '.nemo-extensions-layout',
-    '.nemo-folder-controls',
-];
+const ignoredExtensionSettingsSelectors = [];
 const ignoredExtensionSettingsSelector = ignoredExtensionSettingsSelectors.join(', ');
 const genericExtensionSettingsClasses = new Set([
     'alignitemscenter',
@@ -653,7 +648,7 @@ function getExtensionSettingsUnits(host) {
     const units = [];
 
     for (const child of host.children) {
-        if (!(child instanceof HTMLElement) || child.matches(ignoredExtensionSettingsSelector)) {
+        if (!(child instanceof HTMLElement) || (ignoredExtensionSettingsSelector && child.matches(ignoredExtensionSettingsSelector))) {
             continue;
         }
 
@@ -677,7 +672,7 @@ function dedupeExtensionSettingsDrawers() {
         }
 
         for (const unit of getExtensionSettingsUnits(host)) {
-            if (!(unit instanceof HTMLElement) || unit.matches(ignoredExtensionSettingsSelector)) {
+            if (!(unit instanceof HTMLElement) || (ignoredExtensionSettingsSelector && unit.matches(ignoredExtensionSettingsSelector))) {
                 continue;
             }
 

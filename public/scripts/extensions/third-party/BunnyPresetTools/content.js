@@ -9,7 +9,8 @@ import { extension_settings, saveMetadataDebounced } from '../../../extensions.j
 import { background_settings } from '../../../backgrounds.js';
 import { promptManager } from '../../../openai.js';
 
-const EXTENSION_NAME = 'NemoPresetExt';
+const EXTENSION_NAME = 'BunnyPresetTools';
+const LEGACY_EXTENSION_NAME = 'NemoPresetExt';
 const BUILT_IN_DIVIDER_PATTERNS = ['=+', '-{3,}', '\\*{3,}', '(?:[^\\w\\s]+\\s*)?[─━—-]\\+'];
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'ogv', 'm4v']);
 const BACKGROUND_LOCK_KEY = 'custom_background';
@@ -29,8 +30,31 @@ let backgroundLayerElement = null;
 let backgroundMutationObserver = null;
 let backgroundCardObserversAttached = false;
 let backgroundSyncTimer = null;
+let legacySettingsMigrationChecked = false;
+
+function migrateLegacySettings() {
+    if (legacySettingsMigrationChecked) {
+        return;
+    }
+
+    legacySettingsMigrationChecked = true;
+
+    const legacySettings = extension_settings[LEGACY_EXTENSION_NAME];
+    if (!legacySettings || typeof legacySettings !== 'object') {
+        return;
+    }
+
+    const currentSettings = extension_settings[EXTENSION_NAME];
+    extension_settings[EXTENSION_NAME] = currentSettings && typeof currentSettings === 'object'
+        ? { ...legacySettings, ...currentSettings }
+        : { ...legacySettings };
+    delete extension_settings[LEGACY_EXTENSION_NAME];
+    saveSettingsDebounced();
+}
 
 function ensureSettings() {
+    migrateLegacySettings();
+
     if (!extension_settings[EXTENSION_NAME] || typeof extension_settings[EXTENSION_NAME] !== 'object') {
         extension_settings[EXTENSION_NAME] = {};
     }
@@ -97,7 +121,7 @@ function watchSettingsContainer() {
     }
 
     settingsContainerObserver = new MutationObserver(() => {
-        if (!document.getElementById('nemo-presetext-settings')) {
+        if (!document.getElementById('bpt-settings')) {
             injectSettingsPanel();
         }
     });
@@ -158,7 +182,7 @@ function attachPromptEnhancer() {
         // Ignore mutations caused by our own section rows
         const isOwnMutation = mutations.every(m =>
             Array.from(m.addedNodes).concat(Array.from(m.removedNodes)).every(n =>
-                n instanceof HTMLElement && (n.classList?.contains('nemo-sb-section-row') || n.classList?.contains('nemo-sb-divider-row')),
+                n instanceof HTMLElement && (n.classList?.contains('bpt-section-row') || n.classList?.contains('bpt-divider-row')),
             ),
         );
         if (isOwnMutation) {
@@ -206,25 +230,25 @@ function schedulePromptRefresh() {
 }
 
 function injectPromptToolbar(promptList) {
-    if (!promptList || document.getElementById('nemo-sb-prompt-toolbar')) {
+    if (!promptList || document.getElementById('bpt-prompt-toolbar')) {
         return;
     }
 
     const toolbar = document.createElement('div');
-    toolbar.id = 'nemo-sb-prompt-toolbar';
+    toolbar.id = 'bpt-prompt-toolbar';
     toolbar.innerHTML = `
-        <input id="nemo-sb-prompt-search" class="text_pole" type="search" placeholder="Search prompts by name or content">
-        <div class="nemo-sb-toolbar-actions">
-            <button id="nemo-sb-prompt-clear" class="menu_button menu_button_icon" type="button" title="Clear search">
+        <input id="bpt-prompt-search" class="text_pole" type="search" placeholder="Search prompts by name or content">
+        <div class="bpt-toolbar-actions">
+            <button id="bpt-prompt-clear" class="menu_button menu_button_icon" type="button" title="Clear search">
                 <i class="fa-solid fa-xmark"></i>
             </button>
-            <button id="nemo-sb-prompt-toggle" class="menu_button menu_button_icon" type="button" title="Toggle collapsible sections">
+            <button id="bpt-prompt-toggle" class="menu_button menu_button_icon" type="button" title="Toggle collapsible sections">
                 <i class="fa-solid fa-layer-group"></i>
             </button>
-            <button id="nemo-sb-prompt-collapse" class="menu_button menu_button_icon" type="button" title="Collapse all sections">
+            <button id="bpt-prompt-collapse" class="menu_button menu_button_icon" type="button" title="Collapse all sections">
                 <i class="fa-solid fa-angles-up"></i>
             </button>
-            <button id="nemo-sb-prompt-expand" class="menu_button menu_button_icon" type="button" title="Expand all sections">
+            <button id="bpt-prompt-expand" class="menu_button menu_button_icon" type="button" title="Expand all sections">
                 <i class="fa-solid fa-angles-down"></i>
             </button>
         </div>
@@ -232,30 +256,30 @@ function injectPromptToolbar(promptList) {
 
     promptList.parentElement.insertBefore(toolbar, promptList);
 
-    toolbar.querySelector('#nemo-sb-prompt-search').addEventListener('input', schedulePromptRefresh);
-    toolbar.querySelector('#nemo-sb-prompt-clear').addEventListener('click', () => {
-        toolbar.querySelector('#nemo-sb-prompt-search').value = '';
+    toolbar.querySelector('#bpt-prompt-search').addEventListener('input', schedulePromptRefresh);
+    toolbar.querySelector('#bpt-prompt-clear').addEventListener('click', () => {
+        toolbar.querySelector('#bpt-prompt-search').value = '';
         schedulePromptRefresh();
     });
-    toolbar.querySelector('#nemo-sb-prompt-toggle').addEventListener('click', () => {
+    toolbar.querySelector('#bpt-prompt-toggle').addEventListener('click', () => {
         const settings = ensureSettings();
         settings.enablePromptSections = !settings.enablePromptSections;
         saveSettingsDebounced();
         schedulePromptRefresh();
         syncSettingsPanel();
     });
-    toolbar.querySelector('#nemo-sb-prompt-collapse').addEventListener('click', () => {
+    toolbar.querySelector('#bpt-prompt-collapse').addEventListener('click', () => {
         const settings = ensureSettings();
-        const sections = Array.from(promptList.querySelectorAll('.nemo-sb-section-row'));
+        const sections = Array.from(promptList.querySelectorAll('.bpt-section-row'));
         sections.forEach(section => {
             setPromptSectionOpenState(settings, section.dataset.sectionId, section.dataset.sectionName || section.dataset.sectionId, false);
         });
         saveSettingsDebounced();
         schedulePromptRefresh();
     });
-    toolbar.querySelector('#nemo-sb-prompt-expand').addEventListener('click', () => {
+    toolbar.querySelector('#bpt-prompt-expand').addEventListener('click', () => {
         const settings = ensureSettings();
-        const sections = Array.from(promptList.querySelectorAll('.nemo-sb-section-row'));
+        const sections = Array.from(promptList.querySelectorAll('.bpt-section-row'));
         sections.forEach(section => {
             setPromptSectionOpenState(settings, section.dataset.sectionId, section.dataset.sectionName || section.dataset.sectionId, true);
         });
@@ -265,7 +289,7 @@ function injectPromptToolbar(promptList) {
 }
 
 function getPromptSearchQuery() {
-    return String(document.getElementById('nemo-sb-prompt-search')?.value || '').trim().toLowerCase();
+    return String(document.getElementById('bpt-prompt-search')?.value || '').trim().toLowerCase();
 }
 
 function getPromptRows() {
@@ -320,7 +344,7 @@ function buildDividerRegex() {
     try {
         return new RegExp(`^(${allPatterns.join('|')})`, 'u');
     } catch (error) {
-        console.warn('[NemoPresetExt] Invalid divider regex, falling back to built-ins.', error);
+        console.warn('[BunnyPresetTools] Invalid divider regex, falling back to built-ins.', error);
         return new RegExp(`^(${BUILT_IN_DIVIDER_PATTERNS.join('|')})`, 'u');
     }
 }
@@ -366,10 +390,10 @@ function cleanupPromptSections() {
         return;
     }
 
-    promptListElement.querySelectorAll('.nemo-sb-section-row').forEach(row => row.remove());
+    promptListElement.querySelectorAll('.bpt-section-row').forEach(row => row.remove());
 
     getPromptRows().forEach(row => {
-        row.classList.remove('nemo-sb-section-item', 'nemo-sb-divider-row', 'nemo-sb-divider-source', 'nemo-sb-divider-structural');
+        row.classList.remove('bpt-section-item', 'bpt-divider-row', 'bpt-divider-source', 'bpt-divider-structural');
         row.style.display = '';
         delete row.dataset.sectionId;
     });
@@ -395,7 +419,7 @@ function applySectionRowStyles(row, isOpen) {
     row.style.background = 'color-mix(in srgb, var(--SmartThemeBlurTintColor) 88%, transparent)';
     row.style.opacity = isOpen ? '1' : '0.92';
 
-    const trigger = row.querySelector('.nemo-sb-section-trigger');
+    const trigger = row.querySelector('.bpt-section-trigger');
     if (trigger instanceof HTMLElement) {
         trigger.style.setProperty('display', 'flex', 'important');
         trigger.style.setProperty('align-items', 'center', 'important');
@@ -416,7 +440,7 @@ function applySectionRowStyles(row, isOpen) {
         trigger.style.webkitAppearance = 'none';
     }
 
-    const toggle = row.querySelector('.nemo-sb-section-toggle');
+    const toggle = row.querySelector('.bpt-section-toggle');
     if (toggle instanceof HTMLElement) {
         toggle.style.display = 'flex';
         toggle.style.flex = '0 0 auto';
@@ -429,14 +453,14 @@ function applySectionRowStyles(row, isOpen) {
         toggle.style.color = 'var(--SmartThemeBodyColor)';
     }
 
-    const title = row.querySelector('.nemo-sb-section-title');
+    const title = row.querySelector('.bpt-section-title');
     if (title instanceof HTMLElement) {
         title.style.flex = '1 1 auto';
         title.style.fontWeight = '700';
         title.style.letterSpacing = '0.01em';
     }
 
-    const count = row.querySelector('.nemo-sb-section-count');
+    const count = row.querySelector('.bpt-section-count');
     if (count instanceof HTMLElement) {
         count.style.color = 'var(--SmartThemeEmColor)';
         count.style.fontSize = '0.9em';
@@ -446,20 +470,20 @@ function applySectionRowStyles(row, isOpen) {
 
 function createSectionRow(sectionId, title, sectionName, isOpen) {
     const row = document.createElement('li');
-    row.className = `nemo-sb-section-row ${isOpen ? '' : 'is-collapsed'}`.trim();
+    row.className = `bpt-section-row ${isOpen ? '' : 'is-collapsed'}`.trim();
     row.dataset.sectionId = sectionId;
     row.dataset.sectionName = sectionName;
     row.innerHTML = `
-        <button class="nemo-sb-section-trigger" type="button" aria-expanded="${String(isOpen)}" aria-label="Toggle ${title}">
-            <span class="nemo-sb-section-toggle" aria-hidden="true">
+        <button class="bpt-section-trigger" type="button" aria-expanded="${String(isOpen)}" aria-label="Toggle ${title}">
+            <span class="bpt-section-toggle" aria-hidden="true">
                 <i class="fa-solid ${isOpen ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
             </span>
-            <span class="nemo-sb-section-title"></span>
-            <span class="nemo-sb-section-count"></span>
+            <span class="bpt-section-title"></span>
+            <span class="bpt-section-count"></span>
         </button>
     `;
     applySectionRowStyles(row, isOpen);
-    row.querySelector('.nemo-sb-section-title').textContent = title;
+    row.querySelector('.bpt-section-title').textContent = title;
     const toggleSection = () => {
         const settings = ensureSettings();
         const nextIsOpen = !getPromptSectionOpenState(settings, sectionId, sectionName);
@@ -468,7 +492,7 @@ function createSectionRow(sectionId, title, sectionName, isOpen) {
         schedulePromptRefresh();
     };
 
-    const trigger = row.querySelector('.nemo-sb-section-trigger');
+    const trigger = row.querySelector('.bpt-section-trigger');
     let lastToggleAt = 0;
     const activateTrigger = event => {
         event.preventDefault();
@@ -527,19 +551,19 @@ function refreshPromptSections() {
             const promptName = getPromptRowName(row);
 
             if (isDividerPrompt(promptName, dividerRegex, settings)) {
-                if (row.classList.contains('nemo-header-item') || row.closest('details.nemo-engine-section')) {
+                if (row.classList.contains('bpt-header-item') || row.closest('details.bpt-engine-section')) {
                     currentSection = null;
                     return;
                 }
 
-                const sectionId = row.dataset.pmIdentifier || promptName || `nemo-section-${sections.length}`;
+                const sectionId = row.dataset.pmIdentifier || promptName || `bpt-section-${sections.length}`;
                 const isOpen = getPromptSectionOpenState(settings, sectionId, promptName);
                 const sectionTitle = stripDividerPrefix(promptName, dividerRegex);
                 const sectionRow = createSectionRow(sectionId, sectionTitle, promptName, isOpen);
                 const isSourcePrompt = hasPromptRowContent(row);
 
                 row.before(sectionRow);
-                row.classList.add('nemo-sb-divider-row');
+                row.classList.add('bpt-divider-row');
 
                 currentSection = {
                     id: sectionId,
@@ -551,13 +575,13 @@ function refreshPromptSections() {
                 sections.push(currentSection);
 
                 if (isSourcePrompt) {
-                    row.classList.add('nemo-sb-section-item', 'nemo-sb-divider-source');
+                    row.classList.add('bpt-section-item', 'bpt-divider-source');
                     row.dataset.sectionId = currentSection.id;
                     currentSection.prompts.push(row);
                 } else {
                     // Keep structural divider prompts available inside expanded sections
                     // so they do not disappear permanently from the prompt list/editor flow.
-                    row.classList.add('nemo-sb-section-item', 'nemo-sb-divider-structural');
+                    row.classList.add('bpt-section-item', 'bpt-divider-structural');
                     row.dataset.sectionId = currentSection.id;
                     currentSection.prompts.push(row);
                 }
@@ -566,7 +590,7 @@ function refreshPromptSections() {
             }
 
             if (currentSection) {
-                row.classList.add('nemo-sb-section-item');
+                row.classList.add('bpt-section-item');
                 row.dataset.sectionId = currentSection.id;
                 currentSection.prompts.push(row);
             }
@@ -575,7 +599,7 @@ function refreshPromptSections() {
         sections.forEach(section => {
             const titleMatches = query.length > 0 && section.title.toLowerCase().includes(query);
             let matchedCount = 0;
-            const countablePrompts = section.prompts.filter(row => !row.classList.contains('nemo-sb-divider-structural'));
+            const countablePrompts = section.prompts.filter(row => !row.classList.contains('bpt-divider-structural'));
 
             section.prompts.forEach(row => {
                 const matches = !query || titleMatches || getPromptSearchText(row).includes(query);
@@ -583,24 +607,24 @@ function refreshPromptSections() {
                     matchedCount += 1;
                 }
 
-                const isStructuralDivider = row.classList.contains('nemo-sb-divider-structural');
+                const isStructuralDivider = row.classList.contains('bpt-divider-structural');
                 const shouldShow = !isStructuralDivider && matches && (query.length > 0 || section.isOpen);
                 row.style.display = shouldShow ? '' : 'none';
             });
 
             const enabledCount = countablePrompts.filter(row => row.querySelector('.prompt-manager-toggle-action.fa-toggle-on')).length;
-            section.row.querySelector('.nemo-sb-section-count').textContent = `${enabledCount}/${countablePrompts.length}`;
+            section.row.querySelector('.bpt-section-count').textContent = `${enabledCount}/${countablePrompts.length}`;
             section.row.style.display = query.length === 0 || titleMatches || matchedCount > 0 ? '' : 'none';
             section.row.classList.toggle('is-collapsed', !section.isOpen && query.length === 0);
-            section.row.querySelector('.nemo-sb-section-trigger')?.setAttribute('aria-expanded', String(section.isOpen || query.length > 0));
+            section.row.querySelector('.bpt-section-trigger')?.setAttribute('aria-expanded', String(section.isOpen || query.length > 0));
             applySectionRowStyles(section.row, section.isOpen || query.length > 0);
 
-            const icon = section.row.querySelector('.nemo-sb-section-toggle i');
+            const icon = section.row.querySelector('.bpt-section-toggle i');
             icon.className = `fa-solid ${section.isOpen || query.length > 0 ? 'fa-chevron-down' : 'fa-chevron-right'}`;
         });
 
         rows
-            .filter(row => !row.dataset.sectionId && !row.classList.contains('nemo-sb-divider-row'))
+            .filter(row => !row.dataset.sectionId && !row.classList.contains('bpt-divider-row'))
             .forEach(row => {
                 const matches = !query || getPromptSearchText(row).includes(query);
                 row.style.display = matches ? '' : 'none';
@@ -612,7 +636,7 @@ function refreshPromptSections() {
                 .filter(name => /^(?:=+|-{3,}|\*{3,}|[^\w\s]*[─—-]\+)/u.test(String(name).trim()));
 
             if (dividerCandidates.length) {
-                console.warn('[NemoPresetExt] Divider prompts were detected but no collapsible sections were rendered.', dividerCandidates);
+                console.warn('[BunnyPresetTools] Divider prompts were detected but no collapsible sections were rendered.', dividerCandidates);
             }
         }
     } finally {
@@ -632,7 +656,7 @@ function attachBackgroundEnhancer() {
     const bgBase = document.getElementById('bg1');
     if (bgBase && !backgroundLayerElement) {
         backgroundLayerElement = document.createElement('div');
-        backgroundLayerElement.id = 'nemo-animated-bg-layer';
+        backgroundLayerElement.id = 'bpt-animated-bg-layer';
         bgBase.insertAdjacentElement('afterend', backgroundLayerElement);
 
         backgroundMutationObserver = new MutationObserver(scheduleBackgroundSync);
@@ -666,48 +690,48 @@ function attachBackgroundEnhancer() {
 }
 
 function injectAnimatedBackgroundPanel(backgroundDrawer) {
-    if (document.getElementById('nemo-animated-bg-panel')) {
+    if (document.getElementById('bpt-animated-bg-panel')) {
         syncBackgroundPanel();
         return;
     }
 
     const panel = document.createElement('div');
-    panel.id = 'nemo-animated-bg-panel';
+    panel.id = 'bpt-animated-bg-panel';
     panel.innerHTML = `
-        <div class="nemo-animated-bg-header">
-            <div class="nemo-animated-bg-title">Animated Backgrounds</div>
-            <div class="nemo-animated-bg-note">Use the normal uploader for local MP4/WebM files, or paste a YouTube/direct video URL here.</div>
+        <div class="bpt-animated-bg-header">
+            <div class="bpt-animated-bg-title">Animated Backgrounds</div>
+            <div class="bpt-animated-bg-note">Use the normal uploader for local MP4/WebM files, or paste a YouTube/direct video URL here.</div>
         </div>
-        <div class="nemo-animated-bg-url-row">
-            <input id="nemo-animated-bg-url" class="text_pole" type="text" placeholder="https://youtube.com/... or https://.../loop.mp4">
-            <button id="nemo-animated-bg-apply" class="menu_button menu_button_icon" type="button">
+        <div class="bpt-animated-bg-url-row">
+            <input id="bpt-animated-bg-url" class="text_pole" type="text" placeholder="https://youtube.com/... or https://.../loop.mp4">
+            <button id="bpt-animated-bg-apply" class="menu_button menu_button_icon" type="button">
                 <i class="fa-solid fa-wand-magic-sparkles"></i>
                 <span>Use URL</span>
             </button>
         </div>
-        <div class="nemo-animated-bg-controls">
-            <label class="checkbox_label" for="nemo-animated-bg-enabled">
-                <input id="nemo-animated-bg-enabled" type="checkbox">
+        <div class="bpt-animated-bg-controls">
+            <label class="checkbox_label" for="bpt-animated-bg-enabled">
+                <input id="bpt-animated-bg-enabled" type="checkbox">
                 <span>Enable video and YouTube backgrounds</span>
             </label>
-            <label class="checkbox_label" for="nemo-animated-bg-muted">
-                <input id="nemo-animated-bg-muted" type="checkbox">
+            <label class="checkbox_label" for="bpt-animated-bg-muted">
+                <input id="bpt-animated-bg-muted" type="checkbox">
                 <span>Muted</span>
             </label>
-            <label class="checkbox_label" for="nemo-animated-bg-loop">
-                <input id="nemo-animated-bg-loop" type="checkbox">
+            <label class="checkbox_label" for="bpt-animated-bg-loop">
+                <input id="bpt-animated-bg-loop" type="checkbox">
                 <span>Loop</span>
             </label>
-            <label class="checkbox_label" for="nemo-animated-bg-autoplay">
-                <input id="nemo-animated-bg-autoplay" type="checkbox">
+            <label class="checkbox_label" for="bpt-animated-bg-autoplay">
+                <input id="bpt-animated-bg-autoplay" type="checkbox">
                 <span>Autoplay</span>
             </label>
-            <label class="nemo-animated-bg-volume" for="nemo-animated-bg-volume">
+            <label class="bpt-animated-bg-volume" for="bpt-animated-bg-volume">
                 <span>Volume</span>
-                <input id="nemo-animated-bg-volume" type="range" min="0" max="100" step="1">
+                <input id="bpt-animated-bg-volume" type="range" min="0" max="100" step="1">
             </label>
         </div>
-        <div id="nemo-animated-bg-sources"></div>
+        <div id="bpt-animated-bg-sources"></div>
     `;
 
     const tabs = backgroundDrawer.querySelector('#bg_tabs');
@@ -717,8 +741,8 @@ function injectAnimatedBackgroundPanel(backgroundDrawer) {
         backgroundDrawer.prepend(panel);
     }
 
-    panel.querySelector('#nemo-animated-bg-apply').addEventListener('click', () => {
-        const input = panel.querySelector('#nemo-animated-bg-url');
+    panel.querySelector('#bpt-animated-bg-apply').addEventListener('click', () => {
+        const input = panel.querySelector('#bpt-animated-bg-url');
         const url = String(input.value || '').trim();
         if (!url) {
             return;
@@ -728,39 +752,39 @@ function injectAnimatedBackgroundPanel(backgroundDrawer) {
         input.value = '';
     });
 
-    panel.querySelector('#nemo-animated-bg-url').addEventListener('keydown', event => {
+    panel.querySelector('#bpt-animated-bg-url').addEventListener('keydown', event => {
         if (event.key === 'Enter') {
             event.preventDefault();
-            panel.querySelector('#nemo-animated-bg-apply').click();
+            panel.querySelector('#bpt-animated-bg-apply').click();
         }
     });
 
-    panel.querySelector('#nemo-animated-bg-enabled').addEventListener('change', event => {
+    panel.querySelector('#bpt-animated-bg-enabled').addEventListener('change', event => {
         ensureSettings().enableAnimatedBackgrounds = event.target.checked;
         saveSettingsDebounced();
         scheduleBackgroundSync();
         syncSettingsPanel();
     });
 
-    panel.querySelector('#nemo-animated-bg-muted').addEventListener('change', event => {
+    panel.querySelector('#bpt-animated-bg-muted').addEventListener('change', event => {
         ensureSettings().animatedBackgroundMuted = event.target.checked;
         saveSettingsDebounced();
         scheduleBackgroundSync();
     });
 
-    panel.querySelector('#nemo-animated-bg-loop').addEventListener('change', event => {
+    panel.querySelector('#bpt-animated-bg-loop').addEventListener('change', event => {
         ensureSettings().animatedBackgroundLoop = event.target.checked;
         saveSettingsDebounced();
         scheduleBackgroundSync();
     });
 
-    panel.querySelector('#nemo-animated-bg-autoplay').addEventListener('change', event => {
+    panel.querySelector('#bpt-animated-bg-autoplay').addEventListener('change', event => {
         ensureSettings().animatedBackgroundAutoplay = event.target.checked;
         saveSettingsDebounced();
         scheduleBackgroundSync();
     });
 
-    panel.querySelector('#nemo-animated-bg-volume').addEventListener('input', event => {
+    panel.querySelector('#bpt-animated-bg-volume').addEventListener('input', event => {
         ensureSettings().animatedBackgroundVolume = Number(event.target.value || 0);
         saveSettingsDebounced();
         scheduleBackgroundSync();
@@ -775,17 +799,17 @@ function injectAnimatedBackgroundPanel(backgroundDrawer) {
 }
 
 function syncBackgroundPanel() {
-    const panel = document.getElementById('nemo-animated-bg-panel');
+    const panel = document.getElementById('bpt-animated-bg-panel');
     if (!panel) {
         return;
     }
 
     const settings = ensureSettings();
-    panel.querySelector('#nemo-animated-bg-enabled').checked = settings.enableAnimatedBackgrounds;
-    panel.querySelector('#nemo-animated-bg-muted').checked = settings.animatedBackgroundMuted;
-    panel.querySelector('#nemo-animated-bg-loop').checked = settings.animatedBackgroundLoop;
-    panel.querySelector('#nemo-animated-bg-autoplay').checked = settings.animatedBackgroundAutoplay;
-    panel.querySelector('#nemo-animated-bg-volume').value = String(settings.animatedBackgroundVolume);
+    panel.querySelector('#bpt-animated-bg-enabled').checked = settings.enableAnimatedBackgrounds;
+    panel.querySelector('#bpt-animated-bg-muted').checked = settings.animatedBackgroundMuted;
+    panel.querySelector('#bpt-animated-bg-loop').checked = settings.animatedBackgroundLoop;
+    panel.querySelector('#bpt-animated-bg-autoplay').checked = settings.animatedBackgroundAutoplay;
+    panel.querySelector('#bpt-animated-bg-volume').value = String(settings.animatedBackgroundVolume);
 
     renderAnimatedSourceList();
 }
@@ -912,7 +936,7 @@ function clearAnimatedBackgroundLayer() {
 
     backgroundLayerElement.innerHTML = '';
     backgroundLayerElement.removeAttribute('data-active-key');
-    document.body.classList.remove('nemo-animated-bg-active');
+    document.body.classList.remove('bpt-animated-bg-active');
     renderAnimatedSourceList();
 }
 
@@ -973,7 +997,7 @@ function syncAnimatedBackgroundLayer() {
         }
     }
 
-    document.body.classList.add('nemo-animated-bg-active');
+    document.body.classList.add('bpt-animated-bg-active');
     renderAnimatedSourceList();
 }
 
@@ -1030,7 +1054,7 @@ function applyAnimatedSource(source) {
 }
 
 function renderAnimatedSourceList() {
-    const container = document.getElementById('nemo-animated-bg-sources');
+    const container = document.getElementById('bpt-animated-bg-sources');
     if (!container) {
         return;
     }
@@ -1040,31 +1064,31 @@ function renderAnimatedSourceList() {
     const sources = settings.savedAnimatedSources;
 
     if (!sources.length) {
-        container.innerHTML = '<div class="nemo-animated-source-empty">Saved video and YouTube URLs will show up here.</div>';
+        container.innerHTML = '<div class="bpt-animated-source-empty">Saved video and YouTube URLs will show up here.</div>';
         return;
     }
 
     container.innerHTML = '';
     sources.forEach(source => {
         const card = document.createElement('div');
-        card.className = 'nemo-animated-source-card';
+        card.className = 'bpt-animated-source-card';
         if (source === activeSource) {
             card.classList.add('is-active');
         }
 
         const icon = isYouTubeUrl(source) ? 'fa-brands fa-youtube' : 'fa-solid fa-film';
         card.innerHTML = `
-            <button class="nemo-animated-source-main" type="button">
+            <button class="bpt-animated-source-main" type="button">
                 <i class="${icon}"></i>
-                <span class="nemo-animated-source-label"></span>
+                <span class="bpt-animated-source-label"></span>
             </button>
             <button class="menu_button menu_button_icon" type="button" title="Remove saved source">
                 <i class="fa-solid fa-trash-can"></i>
             </button>
         `;
 
-        card.querySelector('.nemo-animated-source-label').textContent = makeAnimatedSourceLabel(source);
-        card.querySelector('.nemo-animated-source-main').addEventListener('click', () => applyAnimatedSource(source));
+        card.querySelector('.bpt-animated-source-label').textContent = makeAnimatedSourceLabel(source);
+        card.querySelector('.bpt-animated-source-main').addEventListener('click', () => applyAnimatedSource(source));
         card.querySelector('.menu_button').addEventListener('click', () => {
             settings.savedAnimatedSources = settings.savedAnimatedSources.filter(item => item !== source);
             saveSettingsDebounced();
@@ -1077,18 +1101,18 @@ function renderAnimatedSourceList() {
 
 function decorateBackgroundCards() {
     document.querySelectorAll('.bg_example[data-media-type="video"]').forEach(card => {
-        if (!card.querySelector('.nemo-bg-media-badge')) {
+        if (!card.querySelector('.bpt-bg-media-badge')) {
             const badge = document.createElement('div');
-            badge.className = 'nemo-bg-media-badge';
+            badge.className = 'bpt-bg-media-badge';
             badge.innerHTML = '<i class="fa-solid fa-film"></i><span>Video</span>';
             card.appendChild(badge);
         }
 
         const clipper = card.querySelector('.thumbnail-clipper');
-        if (clipper && !clipper.classList.contains('nemo-video-thumb')) {
-            clipper.classList.add('nemo-video-thumb');
+        if (clipper && !clipper.classList.contains('bpt-video-thumb')) {
+            clipper.classList.add('bpt-video-thumb');
             const fill = document.createElement('div');
-            fill.className = 'nemo-video-thumb-fill';
+            fill.className = 'bpt-video-thumb-fill';
             fill.innerHTML = '<i class="fa-solid fa-circle-play"></i>';
             clipper.prepend(fill);
         }
@@ -1096,7 +1120,7 @@ function decorateBackgroundCards() {
 }
 
 function setSettingsPanelExpanded(expand) {
-    const panel = document.getElementById('nemo-presetext-settings');
+    const panel = document.getElementById('bpt-settings');
     if (!panel) {
         return;
     }
@@ -1120,7 +1144,7 @@ function setSettingsPanelExpanded(expand) {
     panel.dataset.expanded = String(expand);
 }
 
-function isSettingsPanelExpanded(panel = document.getElementById('nemo-presetext-settings')) {
+function isSettingsPanelExpanded(panel = document.getElementById('bpt-settings')) {
     if (!(panel instanceof HTMLElement)) {
         return false;
     }
@@ -1147,13 +1171,13 @@ function injectSettingsPanel() {
     watchSettingsContainer();
 
     const settingsContainer = document.getElementById('extensions_settings');
-    if (!settingsContainer || document.getElementById('nemo-presetext-settings')) {
+    if (!settingsContainer || document.getElementById('bpt-settings')) {
         syncSettingsPanel();
         return;
     }
 
     const panel = document.createElement('div');
-    panel.id = 'nemo-presetext-settings';
+    panel.id = 'bpt-settings';
     panel.className = 'inline-drawer wide100p';
     panel.innerHTML = `
         <div class="inline-drawer-toggle inline-drawer-header" role="button" tabindex="0" aria-expanded="false">
@@ -1161,27 +1185,27 @@ function injectSettingsPanel() {
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content" style="display:none;">
-            <div class="nemo-presetext-settings-body">
-                <div class="nemo-presetext-settings-subtitle">Prompt sections and animated backgrounds</div>
-                <div class="nemo-presetext-settings-help">Prompt sections are added directly to the prompt manager. Animated background controls live in the Backgrounds drawer.</div>
-                <div class="nemo-presetext-settings-row">
-                    <label class="checkbox_label" for="nemo-presetext-enable-sections">
-                        <input id="nemo-presetext-enable-sections" type="checkbox">
+            <div class="bpt-settings-body">
+                <div class="bpt-settings-subtitle">Prompt sections and animated backgrounds</div>
+                <div class="bpt-settings-help">Prompt sections are added directly to the prompt manager. Animated background controls live in the Backgrounds drawer.</div>
+                <div class="bpt-settings-row">
+                    <label class="checkbox_label" for="bpt-enable-sections">
+                        <input id="bpt-enable-sections" type="checkbox">
                         <span>Enable collapsible prompt sections</span>
                     </label>
-                    <label class="checkbox_label" for="nemo-presetext-enable-animated">
-                        <input id="nemo-presetext-enable-animated" type="checkbox">
+                    <label class="checkbox_label" for="bpt-enable-animated">
+                        <input id="bpt-enable-animated" type="checkbox">
                         <span>Enable animated backgrounds</span>
                     </label>
                 </div>
-                <div class="nemo-presetext-settings-row">
-                    <input id="nemo-presetext-divider-patterns" class="text_pole" type="text" placeholder="Extra divider regex patterns, comma-separated">
-                    <button id="nemo-presetext-save-divider-patterns" class="menu_button menu_button_icon" type="button">
+                <div class="bpt-settings-row">
+                    <input id="bpt-divider-patterns" class="text_pole" type="text" placeholder="Extra divider regex patterns, comma-separated">
+                    <button id="bpt-save-divider-patterns" class="menu_button menu_button_icon" type="button">
                         <i class="fa-solid fa-save"></i>
                         <span>Save</span>
                     </button>
                 </div>
-                <div class="nemo-presetext-settings-help">Built-in divider patterns include headings that start with <code>===</code>, <code>---</code>, <code>***</code>, or symbol prefixes like <code>⭐─+</code>, <code>🌱 ━+</code>, and <code>━+</code>.</div>
+                <div class="bpt-settings-help">Built-in divider patterns include headings that start with <code>===</code>, <code>---</code>, <code>***</code>, or symbol prefixes like <code>⭐─+</code>, <code>🌱 ━+</code>, and <code>━+</code>.</div>
             </div>
         </div>
     `;
@@ -1206,21 +1230,21 @@ function injectSettingsPanel() {
         });
     }
 
-    panel.querySelector('#nemo-presetext-enable-sections').addEventListener('change', event => {
+    panel.querySelector('#bpt-enable-sections').addEventListener('change', event => {
         ensureSettings().enablePromptSections = event.target.checked;
         saveSettingsDebounced();
         schedulePromptRefresh();
     });
 
-    panel.querySelector('#nemo-presetext-enable-animated').addEventListener('change', event => {
+    panel.querySelector('#bpt-enable-animated').addEventListener('change', event => {
         ensureSettings().enableAnimatedBackgrounds = event.target.checked;
         saveSettingsDebounced();
         scheduleBackgroundSync();
         syncBackgroundPanel();
     });
 
-    panel.querySelector('#nemo-presetext-save-divider-patterns').addEventListener('click', () => {
-        ensureSettings().dividerRegexPattern = String(panel.querySelector('#nemo-presetext-divider-patterns').value || '').trim();
+    panel.querySelector('#bpt-save-divider-patterns').addEventListener('click', () => {
+        ensureSettings().dividerRegexPattern = String(panel.querySelector('#bpt-divider-patterns').value || '').trim();
         saveSettingsDebounced();
         schedulePromptRefresh();
     });
@@ -1229,15 +1253,15 @@ function injectSettingsPanel() {
 }
 
 function syncSettingsPanel() {
-    const panel = document.getElementById('nemo-presetext-settings');
+    const panel = document.getElementById('bpt-settings');
     if (!panel) {
         return;
     }
 
     const settings = ensureSettings();
-    panel.querySelector('#nemo-presetext-enable-sections').checked = settings.enablePromptSections;
-    panel.querySelector('#nemo-presetext-enable-animated').checked = settings.enableAnimatedBackgrounds;
-    panel.querySelector('#nemo-presetext-divider-patterns').value = settings.dividerRegexPattern;
+    panel.querySelector('#bpt-enable-sections').checked = settings.enablePromptSections;
+    panel.querySelector('#bpt-enable-animated').checked = settings.enableAnimatedBackgrounds;
+    panel.querySelector('#bpt-divider-patterns').value = settings.dividerRegexPattern;
     setSettingsPanelExpanded(settings.settingsPanelExpanded);
 }
 
