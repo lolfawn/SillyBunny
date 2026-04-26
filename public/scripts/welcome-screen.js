@@ -112,7 +112,7 @@ const WELCOME_TUTORIAL_STEPS = Object.freeze([
     },
     {
         title: 'Connect a model',
-        body: 'Clicking the API button will bring you to a screen to connect a provider and choose an LLM of your choice. You will need to connect a model before you can begin chatting.',
+        body: 'Clicking the API button will bring you to a screen to connect a provider, and choose an LLM of your choice. You will need to connect a model before you can begin chatting.',
         hint: 'Not sure what provider to use? OpenRouter is a good place to start. SillyBunny needs at least one working connection before you can chat.',
         chips: ['API', 'Providers', 'Models', 'Connection'],
         actionLabel: 'Open API',
@@ -121,16 +121,16 @@ const WELCOME_TUTORIAL_STEPS = Object.freeze([
     },
     {
         title: 'Choose a preset',
-        body: 'First, select a preset of your choice: this helps dictate model responses. Advanced Formatting controls templates and prompt structure, while World Info helps the model remember lore and setting details.',
-        hint: 'You only really need to start with a preset! We recommend our bundled Geechan or Director preset. Access the other tabs once you feel more comfortable.',
-        chips: ['Presets', 'Advanced Formatting', 'World Info', 'Context'],
+        body: 'First, select a preset of your choice: this helps dictate model responses. Chat and Text Completions formatting lives with the presets tab, and World Info helps the model remember lore and setting details.',
+        hint: 'You only really need to start with a preset! We recommend using our bundled Geechan or Director preset. Access the other workspace sections once you feel more comfortable.',
+        chips: ['Presets', 'Formatting', 'World Info', 'Context'],
         actionLabel: 'Open Presets',
         actionType: 'open-tab',
         actionValue: 'left:presets',
     },
     {
         title: 'Personalize your workspace',
-        body: 'The customize menu in the top bar handles your theming and customization needs. You can optionally enable extra extensions, manage personas.',
+        body: 'The Customize menu in the top bar handles your theming and customization needs. You can optionally enable extra extensions, manage personas.',
         hint: 'Customization and extensions are optional, but recommended. While we ship a starter pack, nothing turns itself on without your permission.',
         chips: ['Settings', 'Extensions', 'Persona', 'Background'],
         actionLabel: 'Open Extensions',
@@ -151,8 +151,8 @@ const WELCOME_TUTORIAL_STEPS = Object.freeze([
 const WELCOME_GUIDE_CARDS = Object.freeze([
     {
         title: 'Workspace Menu',
-        body: 'Open the Workspace button in the top bar when you want to change how the AI behaves: connecting APIs, swapping presets, tuning formatting, or loading lore and agent helpers.',
-        chips: ['Presets', 'API', 'Advanced Formatting', 'World Info', 'Agents'],
+        body: 'Open the Workspace button in the top bar when you want to change how the AI behaves: connecting APIs, swapping presets, tuning sampling or formatting, and loading lore and agent helpers.',
+        chips: ['Presets', 'API', 'Sampling', 'World Info', 'Agents'],
         icon: 'fa-compass-drafting',
         actionLabel: 'Open the Workspace menu',
         actionType: 'open-tab',
@@ -1005,7 +1005,6 @@ function openShellTab(route) {
     const fallbackSelector = {
         'left:presets': '#ai-config-button > .drawer-toggle',
         'left:api': '#sys-settings-button > .drawer-toggle',
-        'left:advanced-formatting': '#advanced-formatting-button > .drawer-toggle',
         'left:world-info': '#WI-SP-button > .drawer-toggle',
         'right:settings': '#user-settings-button > .drawer-toggle',
         'right:extensions': '#extensions-settings-button > .drawer-toggle',
