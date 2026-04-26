@@ -1,50 +1,10 @@
 # Changelog
 
-## Staging Cleanup - 2026-04-26
-
-Changes:
-- Removed unused deprecated server utilities for mutable config writes and direct HTTP/2 requests, including the now-unused `node:http2` import.
-- Removed unused deprecated Express parser aliases that were superseded by application-level middleware.
-- Removed redundant root package metadata and unused direct root dev dependencies for test-only ESLint plugins and transitive Chevrotain types.
-- Declared the Jest and Playwright ESLint plugins in the nested `tests` package where the test lint config uses them.
-- Cleaned up test lint references so the nested test lint command runs without warnings or undefined globals.
-- Kept `public/scripts/f-localStorage.js` in place for extension compatibility.
-
-Verification:
-- `npm run lint`
-- `npm run lint --prefix tests`
-- `npm run test:unit --prefix tests`
-- `git diff --check`
-
-Commits:
-- `chore: remove redundant deprecated code`
-
-## Staging Bug Fixes - 2026-04-26
-
-Changes:
-- Fixed OpenAI Responses streaming so expected client disconnects and aborts stop cleanly without noisy `Responses API stream error` logs, while preserving error logging for real upstream stream failures.
-- Added Responses API stream coverage for Chat Completions SSE conversion, reasoning deltas, output deltas, and abort suppression.
-- Restored compact one-line mobile Prompt Manager rows on very narrow screens by keeping prompt names, controls, and token counts aligned in a single row.
-- Fixed In-Chat Agents so Impersonate is treated as user-side generation and no longer runs post-processing, fallback recovery, or regex snapshot mutation against the previous assistant message.
-- Fixed In-Chat Agent prompt-transform runs, transform history, processed-run keys, and regex snapshots to use active swipe metadata instead of leaking shared message metadata across swipes.
-- Fixed In-Chat Agent regex persistence so active swipe regex metadata survives chat reloads and is not cleared after Impersonate events.
-- Updated prompt-transform undo/redo to read active swipe history.
-
-Verification:
-- `npm run test:unit --prefix tests -- tests/in-chat-agents-runner.test.js`
-- `npm run test:unit --prefix tests -- tests/openai-responses.test.js`
-- `npm run lint`
-- `git diff --check`
-- `npm run test:unit --prefix tests`
-
-Commits:
-- `fix: stabilize responses streaming and agent swipes`
-
 ## v1.5.0
 
 Date: 2026-04-26
 
-This is the next main update after `v1.4.2`. It includes the new Group Chat system, the refreshed Workspace/Customize shell, the unified Sampling workspace, improved mobile behavior, In-Chat Agent fixes, RAG enablement fixes, and the Moonlit Echoes cleanup.
+This is the next main update after `v1.4.2`. It includes the new Group Chat system, the refreshed Workspace/Customize shell, the unified Sampling workspace, improved mobile behavior, OpenAI Responses streaming fixes, In-Chat Agent fixes, RAG enablement fixes, the Moonlit Echoes cleanup, and redundant deprecated-code cleanup.
 
 ### Group Chats
 Group Chats still work for normal group RP: you can pick a group, write as the user, choose who speaks next, and run the scene manually just like before. The new work adds optional tools for people who want the group to feel more like a living conversation, chatroom, party scene, or auto-RP setup without taking away the standard flow.
@@ -76,6 +36,8 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Added Chat History tools for LLM-assisted chat labels, old-chat cleanup, and backup cleanup with previews, confirmations, retention filters, and mobile-friendly controls.
 - Added Customize > Server thumbnail controls for format, quality, dimensions, sharp defaults, and per-user cache clearing; sharp PNG thumbnails are now the default.
 - Fixed Vector Storage/RAG enablement so legacy saved flags migrate correctly and extensions can turn RAG on through live settings or the shared `SillyTavern.rag` API.
+- Fixed OpenAI Responses streaming so expected client disconnects and aborts stop cleanly without noisy `Responses API stream error` logs, while preserving error logging for real upstream stream failures.
+- Added Responses API stream coverage for Chat Completions SSE conversion, reasoning deltas, output deltas, and abort suppression.
 
 ### In-Chat Agents
 - Fixed separated Individual/Group enablement, recovered saved toggles that were missing from scoped state, and made manual agent runs queue instead of disappearing.
@@ -84,6 +46,9 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Fixed regex-only agents so their formatter scripts attach as soon as an assistant message is received instead of waiting for post-generation processing.
 - Fixed in-chat agent regex scripts so they attach during streamed assistant replies and render immediately, matching the native Regex extension timing.
 - Fixed in-chat agent post-processing recovery for regenerated assistant replies and preserved prompt-transform diff/undo controls after chat reloads.
+- Fixed Impersonate handling so it is treated as user-side generation and no longer runs post-processing, fallback recovery, or regex snapshot mutation against the previous assistant message.
+- Fixed prompt-transform runs, transform history, processed-run keys, regex snapshots, and undo/redo controls to use active swipe metadata instead of leaking shared message metadata across swipes.
+- Fixed active-swipe regex metadata persistence through chat reloads and prevented Impersonate events from clearing it.
 - Added a separate Pathfinder memory summary UI with editable summary text and injection status.
 - Fixed Agents Quick Toggles overflow, Pathfinder control alignment, hidden idle cancel buttons, and Pathfinder log detail layout.
 
@@ -94,6 +59,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Fixed mobile bottom chat controls, send/stop sizing, group avatar spacing, typing indicator alignment, toggle visibility, unread DM badge visibility, avatar refresh flicker, and mobile prompt control alignment.
 - Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, bottom chat spacing, composer panel theming, and first-message top alignment.
 - Fixed the refreshed mobile composer so the chat text box and bottom action bar stay compact on narrow screens.
+- Restored compact one-line mobile Prompt Manager rows on very narrow screens by keeping prompt names, controls, and token counts aligned in a single row.
 
 ### Extensions And Moonlit Echoes
 - Removed the bundled Moonlit Echoes extension, built-in Moonlit chat stylesheet, and Echo, Whisper, Hush, Ripple, and Tide options from core Appearance.
@@ -107,13 +73,20 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Cleaned up launcher installs so routine starts are quieter, preserve ESLint dependencies, and avoid unnecessary dependency work when runtime inputs have not changed.
 - Fixed lint coverage by including `scripts/**/*.js` in the standard ESLint target and resolving the existing lint failures.
 - Fixed frontend cache clearing after updater reloads.
+- Removed unused deprecated server utilities for mutable config writes and direct HTTP/2 requests, including the now-unused `node:http2` import.
+- Removed unused deprecated Express parser aliases that were superseded by application-level middleware.
+- Removed redundant root package metadata, dropped unused direct Chevrotain types, and moved test-only ESLint plugin ownership into the nested `tests` package.
+- Cleaned up test lint references so nested test lint runs without warnings or undefined globals.
+- Kept `public/scripts/f-localStorage.js` in place for extension compatibility.
 - Bumped app-owned version strings to `1.5.0` without changing dependency versions.
 
 Commits:
 - `feat(ui): expose context unlock for nanogpt and openrouter`
 - `fix(agents): apply regex scripts during streaming`
 - `fix(agents): recover regenerated post-processing history`
+- `fix: stabilize responses streaming and agent swipes`
 - `chore(presets): refresh Geechan bundled presets`
+- `chore: remove redundant deprecated code`
 
 ## v1.4.1
 
