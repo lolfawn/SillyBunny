@@ -9,6 +9,7 @@ Date: 2026-04-26
 - Added Chat History tools for LLM-assisted chat labels, old-chat cleanup, and backup cleanup with previews, confirmations, retention filters, and mobile-friendly controls.
 - Added Customize > Server thumbnail controls for format, quality, dimensions, sharp defaults, and per-user cache clearing; sharp PNG thumbnails are now the default.
 - Added roomier editing tools, including a resizable first-message field, a desktop World Info pop-up editor, expanded context-size presets, and Text Completions preset parity.
+- Added a unified Sampling workspace/menu for Chat Completions, Text Completions, Kobold/Kobold Horde, and NovelAI, with backend-aware sampler cards, mobile quick access, and a Neutralize Samplers action for Chat Completions.
 
 ### Changed
 - Reworked the default desktop and mobile UI for more consistent spacing, square icon buttons, aligned drawers, normalized dropdowns, readable highlighted text, and a less cramped composer.
@@ -21,6 +22,7 @@ Date: 2026-04-26
 
 ### Fixed
 - Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, bottom chat spacing, composer panel theming, and first-message top alignment.
+- Fixed Sampling menu polish around anchored documentation links, normalized numeric sampler fields, backend-specific sampler visibility, and less-clipped preset action text.
 - Fixed group chat edge cases so unread DM avatars stay aligned, DM taps open the correct private chat, and Character Author's Note (Private) persists on the group chat.
 - Fixed In-Chat Agent behavior for separated Individual/Group enablement, queued manual runs, hidden idle cancel buttons, Pathfinder control alignment, recovered saved agent toggles missing from scoped state, and automatic post-generation runs on desktop and mobile, including late mobile render timing after the generation flag clears and delayed iOS Safari page wakeups.
 - Fixed In-Chat Agent mobile post-processing recovery when iOS Safari misses the generation-ended event, leaves the generation flag stuck, or replaces the rendered message object before queued agents flush.
@@ -40,6 +42,7 @@ Date: 2026-04-26
 - `fix(agents): recover missed mobile generation end`
 - `fix(rag): allow extensions to enable vector storage`
 - `fix(ui): compact mobile chat composer`
+- `feat(ui): add unified sampling workspace`
 - `fix(ui): make Moonlit Echoes optional`
 - `fix(tooling): keep eslint stable after launcher installs`
 - `fix(ui): improve default chat surface readability`
