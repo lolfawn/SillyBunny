@@ -211,7 +211,7 @@ const SB_SHELLS = Object.freeze({
             id: 'presets',
             label: 'Presets',
             icon: 'fa-sliders',
-            description: 'Change presets, tune sampling parameters, and modify other output settings here.',
+            description: 'Change presets, edit system prompts, and modify other output settings here.',
         },
         embeddedTabs: [
             {
@@ -9141,3 +9141,4 @@ if (ctx?.eventSource && ctx?.event_types) {
         }
     });
 }
+
