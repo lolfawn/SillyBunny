@@ -763,6 +763,86 @@ describe('in-chat agent post-processing runner', () => {
         expect(saveChatDebounced).toHaveBeenCalledTimes(2);
     });
 
+    test('scopes inherited transform history to the active swipe text', async () => {
+        usePromptTransformPostAgent();
+        generateQuietPrompt.mockResolvedValueOnce('Second swipe rewrite');
+
+        const { initAgentRunner, getPromptTransformHistoryForMessage } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Second swipe original',
+            is_user: false,
+            is_system: false,
+            send_date: '2026-04-26T00:00:10.000Z',
+            gen_started: '2026-04-26T00:00:10.000Z',
+            gen_finished: '2026-04-26T00:00:11.000Z',
+            swipe_id: 1,
+            swipes: ['First swipe rewrite', 'Second swipe original'],
+            swipe_info: [
+                {
+                    send_date: '2026-04-26T00:00:00.000Z',
+                    gen_started: '2026-04-26T00:00:00.000Z',
+                    gen_finished: '2026-04-26T00:00:01.000Z',
+                    extra: {
+                        inChatAgentTransformHistory: [{
+                            agentId: 'agent-post-transform',
+                            agentName: 'Post Transform',
+                            mode: 'rewrite',
+                            beforeText: 'First swipe original',
+                            afterText: 'First swipe rewrite',
+                            timestamp: '2026-04-26T00:00:02.000Z',
+                        }],
+                    },
+                },
+                {
+                    send_date: '2026-04-26T00:00:10.000Z',
+                    gen_started: '2026-04-26T00:00:10.000Z',
+                    gen_finished: '2026-04-26T00:00:11.000Z',
+                    extra: {
+                        inChatAgentTransformHistory: [{
+                            agentId: 'agent-post-transform',
+                            agentName: 'Post Transform',
+                            mode: 'rewrite',
+                            beforeText: 'First swipe original',
+                            afterText: 'First swipe rewrite',
+                            timestamp: '2026-04-26T00:00:02.000Z',
+                        }],
+                    },
+                },
+            ],
+            extra: {
+                inChatAgentTransformHistory: [{
+                    agentId: 'agent-post-transform',
+                    agentName: 'Post Transform',
+                    mode: 'rewrite',
+                    beforeText: 'First swipe original',
+                    afterText: 'First swipe rewrite',
+                    timestamp: '2026-04-26T00:00:02.000Z',
+                }],
+            },
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Second swipe rewrite');
+        expect(chat[0].extra.inChatAgentTransformHistory).toEqual([expect.objectContaining({
+            beforeText: 'Second swipe original',
+            afterText: 'Second swipe rewrite',
+        })]);
+        expect(chat[0].swipe_info[1].extra.inChatAgentTransformHistory).toEqual(chat[0].extra.inChatAgentTransformHistory);
+        expect(getPromptTransformHistoryForMessage(chat[0])).toEqual(chat[0].extra.inChatAgentTransformHistory);
+
+        saveVisibleMessageToSwipe(chat[0]);
+        switchToSwipe(chat[0], 0);
+
+        expect(getPromptTransformHistoryForMessage(chat[0])).toEqual([expect.objectContaining({
+            beforeText: 'First swipe original',
+            afterText: 'First swipe rewrite',
+        })]);
+    });
+
     test('keeps in-chat regex metadata in active swipe storage for chat reloads', async () => {
         useRegexOnlyAgent();
 

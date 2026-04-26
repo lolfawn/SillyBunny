@@ -1445,25 +1445,59 @@ function updatePromptTransformHistory(message, run) {
     }
 
     const storedHistory = getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY);
-    const history = Array.isArray(storedHistory)
-        ? storedHistory
-        : [];
-
-    history.push({
+    const history = getPromptTransformHistoryForText(storedHistory, run.beforeText);
+    const nextEntry = {
         agentId: run.agentId,
         agentName: run.agentName,
         mode: run.mode,
         beforeText: normalizeContentText(run.beforeText),
         afterText: normalizeContentText(run.nextMessageText),
         timestamp: run.timestamp,
-    });
+    };
 
-    while (history.length > MAX_TRANSFORM_HISTORY) {
-        history.shift();
+    history.push(nextEntry);
+
+    const scopedHistory = getPromptTransformHistoryForText(history, run.nextMessageText);
+    if (!scopedHistory.includes(nextEntry)) {
+        scopedHistory.length = 0;
+        scopedHistory.push(nextEntry);
     }
 
-    setAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY, history);
+    while (scopedHistory.length > MAX_TRANSFORM_HISTORY) {
+        scopedHistory.shift();
+    }
+
+    setAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY, scopedHistory);
     return true;
+}
+
+function getPromptTransformHistoryForText(history, currentText) {
+    const entries = Array.isArray(history) ? history : [];
+    const scopedHistory = [];
+    let expectedAfterText = normalizeContentText(currentText);
+
+    // Keep only the contiguous edit chain that produced the active message text.
+    for (let i = entries.length - 1; i >= 0; i--) {
+        const entry = entries[i];
+        if (!entry || typeof entry !== 'object') {
+            continue;
+        }
+
+        const afterText = normalizeContentText(entry.afterText);
+        if (afterText !== expectedAfterText) {
+            continue;
+        }
+
+        scopedHistory.unshift(entry);
+        expectedAfterText = normalizeContentText(entry.beforeText);
+    }
+
+    return scopedHistory;
+}
+
+export function getPromptTransformHistoryForMessage(message) {
+    const storedHistory = getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY);
+    return getPromptTransformHistoryForText(storedHistory, message?.mes);
 }
 
 function unwrapAssistantResponseWrapper(value) {
@@ -2538,10 +2572,7 @@ export function undoPromptTransform(messageIndex) {
         return false;
     }
 
-    const storedHistory = getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY);
-    const history = Array.isArray(storedHistory)
-        ? storedHistory
-        : [];
+    const history = getPromptTransformHistoryForMessage(message);
 
     if (history.length === 0) {
         return false;
@@ -2561,10 +2592,7 @@ export function redoPromptTransform(messageIndex) {
         return false;
     }
 
-    const storedHistory = getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY);
-    const history = Array.isArray(storedHistory)
-        ? storedHistory
-        : [];
+    const history = getPromptTransformHistoryForMessage(message);
 
     if (history.length === 0) {
         return false;

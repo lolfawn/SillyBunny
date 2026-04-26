@@ -48,6 +48,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Fixed in-chat agent post-processing recovery for regenerated assistant replies and preserved prompt-transform diff/undo controls after chat reloads.
 - Fixed Impersonate handling so it is treated as user-side generation and no longer runs post-processing, fallback recovery, or regex snapshot mutation against the previous assistant message.
 - Fixed prompt-transform runs, transform history, processed-run keys, regex snapshots, and undo/redo controls to use active swipe metadata instead of leaking shared message metadata across swipes.
+- Scoped Prose Polisher and agent change history to the active swipe so the document icon only shows edits for the currently visible message.
 - Fixed active-swipe regex metadata persistence through chat reloads and prevented Impersonate events from clearing it.
 - Added a separate Pathfinder memory summary UI with editable summary text and injection status.
 - Fixed Agents Quick Toggles overflow, Pathfinder control alignment, hidden idle cancel buttons, and Pathfinder log detail layout.
@@ -85,6 +86,7 @@ Commits:
 - `feat(ui): expose context unlock for nanogpt and openrouter`
 - `fix(agents): apply regex scripts during streaming`
 - `fix(agents): recover regenerated post-processing history`
+- `fix(agents): scope transform history to active swipe`
 - `fix: stabilize responses streaming and agent swipes`
 - `chore(presets): refresh Geechan bundled presets`
 - `chore: remove redundant deprecated code`

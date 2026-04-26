@@ -42,11 +42,11 @@ import {
     initAgentRunner,
     isAgentGenerationActive,
     onAgentGenerationStateChanged,
+    getPromptTransformHistoryForMessage,
     runAgentOnMessage,
     syncToolAgentRegistrations,
     undoPromptTransform,
     redoPromptTransform,
-    PROMPT_TRANSFORM_HISTORY_KEY,
 } from './agent-runner.js';
 import {
     AGENT_REGEX_PLACEMENT,
@@ -2364,7 +2364,7 @@ async function openPromptTransformHistoryPopup(messageIndex) {
     }
 
     const message = chat[Number(messageIndex)];
-    const history = message.extra?.[PROMPT_TRANSFORM_HISTORY_KEY];
+    const history = getPromptTransformHistoryForMessage(message);
     if (!Array.isArray(history) || history.length === 0) {
         toastr.info('No transform history available.');
         return;

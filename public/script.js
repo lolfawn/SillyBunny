@@ -423,6 +423,7 @@ const MESSAGE_SCREENSHOT_INPUT_IDS = Object.freeze({
     start: 'message_screenshot_start_id',
     end: 'message_screenshot_end_id',
 });
+const IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
 /** @type {ChatMessage[]} */
 export let chat = [];
 
@@ -2831,8 +2832,7 @@ function updateMessageMetaBadges(messageElement, message) {
         $messageElement.find('.group-dm-badge').remove();
     }
 
-    const hasTransformHistory = Array.isArray(message?.extra?.inChatAgentTransformHistory)
-        && message.extra.inChatAgentTransformHistory.length > 0;
+    const hasTransformHistory = hasPromptTransformHistoryForActiveSwipe(message);
     if (hasTransformHistory) {
         let transformBadge = $messageElement.find('.agent-transform-badge');
         if (!transformBadge.length) {
@@ -2845,6 +2845,28 @@ function updateMessageMetaBadges(messageElement, message) {
     }
 
     $messageElement.find('.mes_view_agent_changes').toggle(hasTransformHistory);
+}
+
+function hasPromptTransformHistoryForActiveSwipe(message) {
+    const storedHistory = getActiveSwipeExtraValue(message, IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY);
+    return Array.isArray(storedHistory) && storedHistory.some(entry => {
+        if (!entry || typeof entry !== 'object') {
+            return false;
+        }
+
+        return normalizeContentText(entry.afterText) === normalizeContentText(message?.mes);
+    });
+}
+
+function getActiveSwipeExtraValue(message, key) {
+    if (typeof message?.swipe_id === 'number' && Array.isArray(message?.swipe_info)) {
+        const swipeExtra = message.swipe_info[message.swipe_id]?.extra;
+        if (swipeExtra && Object.hasOwn(swipeExtra, key)) {
+            return swipeExtra[key];
+        }
+    }
+
+    return message?.extra?.[key];
 }
 
 /**
@@ -3827,6 +3849,9 @@ class StreamingProcessor {
             if (!chat[messageId].extra) {
                 chat[messageId].extra = {};
             }
+            if (this.type === 'swipe') {
+                delete chat[messageId].extra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
+            }
             chat[messageId].extra.time_to_first_token = this.timeToFirstToken;
             chat[messageId].extra.reasoning_tokens = this.reasoningTokens || 0;
 
@@ -3909,6 +3934,7 @@ class StreamingProcessor {
             delete swipeInfoExtra.token_count;
             delete swipeInfoExtra.reasoning;
             delete swipeInfoExtra.reasoning_duration;
+            delete swipeInfoExtra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
             const swipeInfo = {
                 send_date: message.send_date,
                 gen_started: message.gen_started,
@@ -7000,6 +7026,7 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
             lastMessage.extra.reasoning_duration = null;
             lastMessage.extra.reasoning_signature = reasoningSignature;
             lastMessage.extra.reasoning_tokens = reasoningTokens;
+            delete lastMessage.extra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
             await processImageAttachment(lastMessage, { imageUrls });
             if (power_user.message_token_count_enabled) {
                 const tokenCountText = (reasoning || '') + lastMessage.mes;
@@ -7133,6 +7160,7 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         delete swipeInfoExtra.token_count;
         delete swipeInfoExtra.reasoning;
         delete swipeInfoExtra.reasoning_duration;
+        delete swipeInfoExtra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
         const swipeInfo = {
             send_date: item.send_date,
             gen_started: item.gen_started,
@@ -11747,6 +11775,7 @@ export async function swipe(event, direction, { source, repeated, message = chat
             delete message.extra.negative;
             delete message.extra.title;
             delete message.extra.append_title;
+            delete message.extra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
         }
         delete message.gen_started;
         delete message.gen_finished;
