@@ -85,6 +85,7 @@ let manualAgentRunCancelRequested = false;
 let activeManualAgentRun = null;
 const promptTransformIdleResolvers = new Set();
 let generationStartChatLength = 0;
+let generationStartLastAssistantIndex = -1;
 let generationStartLastAssistantMessage = null;
 let generationStartLastAssistantRevision = '';
 let generationStartedAt = 0;
@@ -606,10 +607,7 @@ function isDeferredPostProcessingMessageCurrent(pendingMessage) {
         return true;
     }
 
-    return Boolean(
-        message === generationStartLastAssistantMessage &&
-        getMessageRevisionKey(message) !== generationStartLastAssistantRevision,
-    );
+    return isGenerationAssistantCandidate(pendingMessage.messageIndex, message);
 }
 
 function scheduleDeferredPostProcessingFlush(delayMs = 0) {
@@ -776,11 +774,7 @@ function hasRecoverableAssistantPostProcessingCandidate() {
     }
 
     const message = chat[messageIndex];
-    const isNewAssistantMessage = messageIndex >= generationStartChatLength;
-    const isUpdatedExistingAssistantMessage = message === generationStartLastAssistantMessage &&
-        getMessageRevisionKey(message) !== generationStartLastAssistantRevision;
-
-    if (!isNewAssistantMessage && !isUpdatedExistingAssistantMessage) {
+    if (!isGenerationAssistantCandidate(messageIndex, message)) {
         return false;
     }
 
@@ -968,6 +962,24 @@ function getLatestAssistantMessageIndex() {
     return -1;
 }
 
+function isGenerationAssistantCandidate(messageIndex, message) {
+    if (!message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    if (messageIndex >= generationStartChatLength) {
+        return true;
+    }
+
+    if (message === generationStartLastAssistantMessage) {
+        return getMessageRevisionKey(message) !== generationStartLastAssistantRevision;
+    }
+
+    return generationStartLastAssistantIndex >= 0 &&
+        messageIndex === generationStartLastAssistantIndex &&
+        messageIndex === chat.length - 1;
+}
+
 function queueLatestAssistantPostProcessingFromSnapshot() {
     if (!pendingGenerationSnapshot || generationStopRequested) {
         return { queued: false, retry: false };
@@ -984,11 +996,7 @@ function queueLatestAssistantPostProcessingFromSnapshot() {
     }
 
     const message = chat[messageIndex];
-    const isNewAssistantMessage = messageIndex >= generationStartChatLength;
-    const isUpdatedExistingAssistantMessage = message === generationStartLastAssistantMessage &&
-        getMessageRevisionKey(message) !== generationStartLastAssistantRevision;
-
-    if (!isNewAssistantMessage && !isUpdatedExistingAssistantMessage) {
+    if (!isGenerationAssistantCandidate(messageIndex, message)) {
         return { queued: false, retry: true };
     }
 
@@ -1240,6 +1248,14 @@ function syncPromptTransformMessageState(message, messageIndex) {
 
     if (message.extra?.display_text) {
         delete message.extra.display_text;
+    }
+
+    syncAssistantMessageStateToSwipe(message, messageIndex);
+}
+
+function syncAssistantMessageStateToSwipe(message, messageIndex) {
+    if (!message || message.is_user || message.is_system) {
+        return;
     }
 
     ensureSwipes(message);
@@ -1882,6 +1898,7 @@ function onGenerationStarted(generationType, _options, dryRun) {
     pendingGenerationSnapshot = buildActivationSnapshot(currentMainGenerationType);
     generationStartChatLength = chat.length;
     const latestAssistantMessageIndex = getLatestAssistantMessageIndex();
+    generationStartLastAssistantIndex = latestAssistantMessageIndex;
     generationStartLastAssistantMessage = latestAssistantMessageIndex >= 0 ? chat[latestAssistantMessageIndex] : null;
     generationStartLastAssistantRevision = getMessageRevisionKey(generationStartLastAssistantMessage);
 
@@ -2010,6 +2027,8 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
         return;
     }
 
+    syncAssistantMessageStateToSwipe(message, messageIndex);
+
     const resolvedActivationSnapshot = activationSnapshot
         ? cloneActivationSnapshot(activationSnapshot, generationType)
         : cloneActivationSnapshot(pendingGenerationSnapshot ?? buildActivationSnapshot(generationType), generationType);
@@ -2104,8 +2123,13 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
         chatStateChanged = true;
     }
 
+    let promptHistoryChanged = false;
     for (const run of promptRuns) {
-        updatePromptTransformHistory(message, run);
+        promptHistoryChanged = updatePromptTransformHistory(message, run) || promptHistoryChanged;
+    }
+
+    if (promptHistoryChanged) {
+        chatStateChanged = true;
     }
 
     for (const agent of utilityAgents) {
@@ -2152,6 +2176,7 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
     }
 
     if (chatStateChanged) {
+        syncAssistantMessageStateToSwipe(message, messageIndex);
         saveChatDebounced();
     }
 
@@ -2517,7 +2542,11 @@ async function executeManualAgentRun(agentId, messageIndex) {
         saveChatDebounced();
     }
 
-    updatePromptTransformHistory(message, result);
+    const historyChanged = updatePromptTransformHistory(message, result);
+    if (historyChanged) {
+        syncAssistantMessageStateToSwipe(message, messageIndex);
+        saveChatDebounced();
+    }
 
     if (result.changed) {
         scheduleMessageRefresh(messageIndex, message);

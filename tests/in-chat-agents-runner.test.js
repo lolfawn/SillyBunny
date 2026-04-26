@@ -123,6 +123,12 @@ describe('in-chat agent post-processing runner', () => {
             ensureSwipes: jest.fn((message) => {
                 message.swipes ??= [message.mes];
                 message.swipe_id ??= 0;
+                message.swipe_info ??= message.swipes.map(() => ({
+                    send_date: message.send_date,
+                    gen_started: message.gen_started,
+                    gen_finished: message.gen_finished,
+                    extra: {},
+                }));
             }),
             extension_prompt_roles: { SYSTEM: 0 },
             extension_prompt_types: { IN_PROMPT: 0, IN_CHAT: 1 },
@@ -136,7 +142,19 @@ describe('in-chat agent post-processing runner', () => {
             saveChatDebounced,
             stopGeneration: jest.fn(() => false),
             streamingProcessor,
-            syncMesToSwipe: jest.fn(),
+            syncMesToSwipe: jest.fn((messageIndex = null) => {
+                const targetMessage = chat[messageIndex ?? chat.length - 1];
+                if (!targetMessage?.swipe_info?.[targetMessage.swipe_id]) {
+                    return false;
+                }
+
+                targetMessage.swipes[targetMessage.swipe_id] = targetMessage.mes;
+                targetMessage.swipe_info[targetMessage.swipe_id].send_date = targetMessage.send_date;
+                targetMessage.swipe_info[targetMessage.swipe_id].gen_started = targetMessage.gen_started;
+                targetMessage.swipe_info[targetMessage.swipe_id].gen_finished = targetMessage.gen_finished;
+                targetMessage.swipe_info[targetMessage.swipe_id].extra = structuredClone(targetMessage.extra);
+                return true;
+            }),
         }));
 
         await jest.unstable_mockModule('../public/scripts/extensions.js', () => ({
@@ -619,6 +637,29 @@ describe('in-chat agent post-processing runner', () => {
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
     });
 
+    test('persists prompt-transform history into current swipe metadata', async () => {
+        usePromptTransformPostAgent();
+        generateQuietPrompt.mockResolvedValue('Swipe-safe rewrite');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Needs rewrite',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Swipe-safe rewrite');
+        expect(chat[0].extra.inChatAgentTransformHistory).toHaveLength(1);
+        expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory).toEqual(chat[0].extra.inChatAgentTransformHistory);
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
     test('applies mobile deferred post-processing once after the body generating flag clears', async () => {
         useAppendPostAgent();
 
@@ -716,6 +757,49 @@ describe('in-chat agent post-processing runner', () => {
         await new Promise(resolve => setTimeout(resolve, 75));
 
         expect(chat[0].mes).toBe('Late reply without after commands\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('recovers post-processing for regenerated assistant replacements', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push(
+            {
+                name: 'User',
+                mes: 'Try again',
+                is_user: true,
+                is_system: false,
+                extra: {},
+            },
+            {
+                name: 'Assistant',
+                mes: 'Old reply',
+                is_user: false,
+                is_system: false,
+                gen_finished: '2026-04-26T00:00:00.000Z',
+                extra: {},
+            },
+        );
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'regenerate', {}, false);
+        chat.pop();
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'regenerate', {}, false);
+        chat.push({
+            name: 'Assistant',
+            mes: 'Regenerated reply',
+            is_user: false,
+            is_system: false,
+            gen_finished: '2026-04-26T00:00:05.000Z',
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 5));
+
+        expect(chat[1].mes).toBe('Regenerated reply\n[post processed]');
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
     });
 

@@ -8,10 +8,12 @@ Changes:
 - Added an OpenRouter/NanoGPT-only `Unlocked Context Size` toggle in Chat Completion token budget settings.
 - Preserved SillyBunny's always-unlocked context behavior for other Chat Completion providers while allowing OpenRouter and NanoGPT to clamp context size to model-provided limits when the toggle is disabled.
 - Fixed in-chat agent regex scripts so they attach during streamed assistant replies and render immediately, matching the native Regex extension timing.
+- Fixed in-chat agent post-processing recovery for regenerated assistant replies and preserved prompt-transform diff/undo controls after chat reloads.
 
 Commits:
 - `feat(ui): expose context unlock for nanogpt and openrouter`
 - `fix(agents): apply regex scripts during streaming`
+- `fix(agents): recover regenerated post-processing history`
 
 ## v1.5.0
 
