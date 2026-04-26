@@ -1130,7 +1130,7 @@ export function initTextGenSettings() {
  * @returns void
  */
 function showSamplerControls(apiType = null) {
-    $('#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers]').each(function (idx, elem) {
+    $('#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers], #sb-sampling-textgenerationwebui [data-tg-samplers]').each(function (idx, elem) {
         const typeSpecificControlled = $(elem).data('tg-type') !== undefined;
 
         if (!typeSpecificControlled) $(this).show();
@@ -1143,7 +1143,7 @@ function showSamplerControls(apiType = null) {
 
     if (!samplersActivatedManually?.length || !prioritizeManualSamplerSelect) return;
 
-    $('#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers]').each(function () {
+    $('#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers], #sb-sampling-textgenerationwebui [data-tg-samplers]').each(function () {
         const tgSamplers = $(this).attr('data-tg-samplers').split(',').map(x => x.trim()).filter(str => str !== '');
 
         for (const tgSampler of tgSamplers) {

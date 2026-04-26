@@ -2302,7 +2302,7 @@ function groupOpenAISettingsIntoDrawers() {
         {
             id: 'sb-openai-budget',
             title: 'Token Budget',
-            description: 'Context, response limits, swipes, costs, seed',
+            description: 'Context, response limits, swipes, and costs',
             selectors: [
                 '#range_block_openai > .range-block:has(#openai_max_context)',
                 '#range_block_openai > .range-block:has(#openai_max_tokens)',
@@ -2311,13 +2311,12 @@ function groupOpenAISettingsIntoDrawers() {
                 '#range_block_openai > div:has(#openrouter_max_prompt_cost)',
                 '#range_block_openai > div:has(#electronhub_max_prompt_cost)',
                 '#range_block_openai > div:has(#chutes_max_prompt_cost)',
-                '#range_block_openai > .range-block:has(#seed_openai)',
             ],
         },
         {
             id: 'sb-openai-sampling',
             title: 'Sampling',
-            description: 'Temperature, penalties, and probability controls',
+            description: 'Temperature, penalties, probability controls, seed, and logit bias',
             selectors: [
                 '#range_block_openai > .range-block:has(#temp_openai)',
                 '#range_block_openai > .range-block:has(#claude_disable_temperature)',
@@ -2329,6 +2328,8 @@ function groupOpenAISettingsIntoDrawers() {
                 '#range_block_openai > .range-block:has(#repetition_penalty_openai)',
                 '#range_block_openai > .range-block:has(#min_p_openai)',
                 '#range_block_openai > .range-block:has(#top_a_openai)',
+                '#range_block_openai > .range-block:has(#seed_openai)',
+                '#openai_settings > .range-block:has(#openai_logit_bias_preset)',
             ],
         },
         {
@@ -2349,7 +2350,7 @@ function groupOpenAISettingsIntoDrawers() {
         {
             id: 'sb-openai-advanced',
             title: 'Advanced & Reasoning',
-            description: 'Tools, media, reasoning, bias, and server config',
+            description: 'Tools, media, reasoning, and server config',
             selectors: [
                 '#openai_settings > div > .range-block:has(#openai_enable_web_search)',
                 '#openai_settings > div > .range-block:has(#openai_function_calling)',
@@ -2362,7 +2363,6 @@ function groupOpenAISettingsIntoDrawers() {
                 '#openai_settings > div > .range-block:has(#openai_reasoning_tag_style)',
                 '#openai_settings > div > .flex-container:has(#openai_verbosity)',
                 '#openai_settings > div > .range-block:has(#claude_assistant_prefill)',
-                '#openai_settings > .range-block:has(#openai_logit_bias_preset)',
             ],
         },
         {
@@ -7890,6 +7890,16 @@ export function initOpenAI() {
     $('#top_p_openai').on('input', function () {
         oai_settings.top_p_openai = Number($(this).val());
         $('#top_p_counter_openai').val(Number($(this).val()).toFixed(2));
+        saveSettingsDebounced();
+    });
+
+    $('#claude_disable_temperature').on('input', function () {
+        oai_settings.claude_disable_temperature = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#claude_disable_top_p').on('input', function () {
+        oai_settings.claude_disable_top_p = !!$(this).prop('checked');
         saveSettingsDebounced();
     });
 

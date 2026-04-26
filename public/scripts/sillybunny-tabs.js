@@ -23,8 +23,8 @@ const SB_STORAGE_KEYS = Object.freeze({
 
 const SB_SHORTCUT_TARGETS = Object.freeze([
     { value: 'left:presets', label: 'Presets', icon: 'fa-sliders' },
+    { value: 'left:sampling', label: 'Sampling', icon: 'fa-wave-square' },
     { value: 'left:api', label: 'API', icon: 'fa-plug' },
-    { value: 'left:advanced-formatting', label: 'Adv. Formatting', icon: 'fa-font' },
     { value: 'left:world-info', label: 'World Info', icon: 'fa-book-atlas' },
     { value: 'left:agents', label: 'Agents', icon: 'fa-robot' },
     { value: 'action:search', label: 'Search', icon: 'fa-magnifying-glass' },
@@ -222,13 +222,6 @@ const SB_SHELLS = Object.freeze({
                 description: 'Connect providers, select models, and manage backend-specific options here.',
             },
             {
-                id: 'advanced-formatting',
-                drawerId: 'advanced-formatting-button',
-                label: 'Advanced Formatting',
-                icon: 'fa-font',
-                description: 'Fine-tune instruct templates, formatting rules, and prompt design for Text Completions here.',
-            },
-            {
                 id: 'world-info',
                 drawerId: 'WI-SP-button',
                 label: 'World Info',
@@ -237,6 +230,14 @@ const SB_SHELLS = Object.freeze({
             },
         ],
         customTabs: [
+            {
+                id: 'sampling',
+                label: 'Sampling',
+                icon: 'fa-wave-square',
+                description: 'Control model sampling, seeds, and banned logits/tokens here.',
+                searchPlaceholder: 'Search temperature, top p, repetition penalty, or backend samplers',
+                searchExamples: ['temperature', 'top p', 'repetition penalty'],
+            },
             {
                 id: 'agents',
                 label: 'Agents',
@@ -314,7 +315,7 @@ const SB_SHELLS = Object.freeze({
 const SB_DRAWER_ROUTES = Object.freeze({
     'user-settings-button': { shell: 'right', tab: 'settings' },
     'sys-settings-button': { shell: 'left', tab: 'api' },
-    'advanced-formatting-button': { shell: 'left', tab: 'advanced-formatting' },
+    'advanced-formatting-button': { shell: 'left', tab: 'presets' },
     'WI-SP-button': { shell: 'left', tab: 'world-info' },
     'extensions-settings-button': { shell: 'right', tab: 'extensions' },
     'persona-management-button': { shell: 'right', tab: 'persona' },
@@ -378,6 +379,10 @@ const sbState = {
         bindingRetryTimer: 0,
         boundEventSource: null,
         windowBindingsAttached: false,
+    },
+    presetAdvancedFormatting: {
+        bindingRetryTimer: 0,
+        boundEventSource: null,
     },
     shells: {},
     universalSearch: {
@@ -4195,8 +4200,8 @@ function moveChildrenIntoContainer(sourceElement, targetElement) {
     }
 }
 
-function prepareEmbeddedDrawer(drawerId) {
-    const drawer = document.getElementById(drawerId);
+function prepareEmbeddedDrawer(drawerId, root = document) {
+    const drawer = root.querySelector?.(`#${CSS.escape(drawerId)}`) ?? document.getElementById(drawerId);
     if (!(drawer instanceof HTMLElement)) {
         return null;
     }
@@ -4225,6 +4230,579 @@ function prepareEmbeddedDrawer(drawerId) {
     }
 
     return { drawer, drawerContent };
+}
+
+function updatePresetAdvancedFormattingVisibility() {
+    const advancedFormattingDrawer = document.getElementById('advanced-formatting-button');
+    if (!(advancedFormattingDrawer instanceof HTMLElement)) {
+        return;
+    }
+
+    advancedFormattingDrawer.hidden = getCurrentMainApiValue() !== 'textgenerationwebui';
+}
+
+function bindPresetAdvancedFormattingVisibilityEvents() {
+    const context = getSillyTavernContext();
+    const eventSource = context?.eventSource;
+    const eventTypes = context?.eventTypes;
+
+    if (!eventSource || !eventTypes) {
+        if (!sbState.presetAdvancedFormatting.bindingRetryTimer) {
+            sbState.presetAdvancedFormatting.bindingRetryTimer = window.setTimeout(() => {
+                sbState.presetAdvancedFormatting.bindingRetryTimer = 0;
+                bindPresetAdvancedFormattingVisibilityEvents();
+                updatePresetAdvancedFormattingVisibility();
+            }, SB_INIT_RETRY_DELAY_MS);
+        }
+        return;
+    }
+
+    window.clearTimeout(sbState.presetAdvancedFormatting.bindingRetryTimer);
+    sbState.presetAdvancedFormatting.bindingRetryTimer = 0;
+
+    if (sbState.presetAdvancedFormatting.boundEventSource === eventSource) {
+        return;
+    }
+
+    const events = [
+        eventTypes.APP_READY,
+        eventTypes.MAIN_API_CHANGED,
+    ].filter(Boolean);
+
+    for (const eventName of new Set(events)) {
+        eventSource.on(eventName, updatePresetAdvancedFormattingVisibility);
+    }
+
+    sbState.presetAdvancedFormatting.boundEventSource = eventSource;
+}
+
+function embedAdvancedFormattingInPresets(originalContent) {
+    if (!(originalContent instanceof HTMLElement)) {
+        return;
+    }
+
+    const prepared = prepareEmbeddedDrawer('advanced-formatting-button', originalContent);
+    if (!prepared) {
+        return;
+    }
+
+    prepared.drawer.classList.add('sb-presets-advanced-formatting');
+
+    const insertionTarget = originalContent.querySelector('#common-gen-settings-block');
+    if (insertionTarget?.parentNode) {
+        insertionTarget.insertAdjacentElement('afterend', prepared.drawer);
+    } else {
+        originalContent.appendChild(prepared.drawer);
+    }
+
+    updatePresetAdvancedFormattingVisibility();
+}
+
+const SB_SAMPLING_BACKENDS = Object.freeze([
+    {
+        id: 'openai',
+        apiIds: ['openai'],
+        title: 'Chat Completions',
+        description: 'Uses the active Chat Completions provider and its provider-specific sampler support.',
+        controls: [
+            '#seed_openai',
+            '#openai_logit_bias_preset',
+            '#temp_openai',
+            '#claude_disable_temperature',
+            '#top_p_openai',
+            '#claude_disable_top_p',
+            '#repetition_penalty_openai',
+            '#freq_pen_openai',
+            '#pres_pen_openai',
+            '#top_k_openai',
+            '#min_p_openai',
+            '#top_a_openai',
+        ],
+    },
+    {
+        id: 'textgenerationwebui',
+        apiIds: ['textgenerationwebui'],
+        title: 'Text Completions',
+        description: 'Uses the selected Text Completions backend and sampler visibility rules.',
+        controls: [
+            '#seed_textgenerationwebui',
+            '#n_textgenerationwebui',
+            '#samplerResetButton',
+            '#sampler_order_block_kcpp',
+            '#sampler_order_block_lcpp',
+            '#sampler_priority_block_ooba',
+            '#sampler_priority_block_aphrodite',
+            '#json_schema_block',
+            '#banned_tokens_block_ooba',
+            '#logit_bias_block_ooba',
+            '#temp_textgenerationwebui',
+            '#top_k_textgenerationwebui',
+            '#top_p_textgenerationwebui',
+            '#typical_p_textgenerationwebui',
+            '#min_p_textgenerationwebui',
+            '#top_a_textgenerationwebui',
+            '#tfs_textgenerationwebui',
+            '#epsilon_cutoff_textgenerationwebui',
+            '#nsigma_textgenerationwebui',
+            '#min_keep_textgenerationwebui',
+            '#eta_cutoff_textgenerationwebui',
+            '#rep_pen_textgenerationwebui',
+            '#rep_pen_range_textgenerationwebui',
+            '#rep_pen_slope_textgenerationwebui',
+            '#rep_pen_decay_textgenerationwebui',
+            '#encoder_rep_pen_textgenerationwebui',
+            '#freq_pen_textgenerationwebui',
+            '#presence_pen_textgenerationwebui',
+            '#no_repeat_ngram_size_textgenerationwebui',
+            '#skew_textgenerationwebui',
+            '#min_length_textgenerationwebui',
+            '#max_tokens_second_textgenerationwebui',
+            '#adaptive_p_block',
+            '#smoothingBlock',
+            '#xtc_block',
+            '#dryBlock',
+            '#dynatemp_block_ooba',
+            '#mirostat_block_ooba',
+            '#beamSearchBlock',
+            '#contrastiveSearchBlock',
+            '#do_sample_textgenerationwebui',
+            '#add_bos_token_textgenerationwebui',
+            '#ignore_eos_token_textgenerationwebui',
+            '#include_reasoning_textgenerationwebui',
+            '#temperature_last_textgenerationwebui',
+            '#speculative_ngram_textgenerationwebui',
+            '#spaces_between_special_tokens_textgenerationwebui',
+            '#cfg_block_ooba',
+            '#grammar_block_ooba',
+        ],
+    },
+    {
+        id: 'kobold',
+        apiIds: ['kobold', 'koboldhorde'],
+        title: 'Kobold / Horde',
+        description: 'Kobold Horde reuses Kobold sampler settings; Horde still requires a non-GUI preset.',
+        controls: ['#temp', '#top_p', '#rep_pen'],
+    },
+    {
+        id: 'novel',
+        apiIds: ['novel'],
+        title: 'NovelAI',
+        description: 'Uses NovelAI preset sampling fields without changing the backend request format.',
+        controls: ['#temp_novel', '#top_p_novel', '#rep_pen_novel'],
+    },
+]);
+
+const SB_LARGE_SAMPLING_CONTROLS = Object.freeze(new Set([
+    '#seed_openai',
+    '#openai_logit_bias_preset',
+    '#samplerResetButton',
+    '#n_textgenerationwebui',
+    '#seed_textgenerationwebui',
+    '#banned_tokens_block_ooba',
+    '#logit_bias_block_ooba',
+    '#json_schema_block',
+    '#sampler_order_block_kcpp',
+    '#sampler_order_block_lcpp',
+    '#sampler_priority_block_ooba',
+    '#sampler_priority_block_aphrodite',
+]));
+
+const SB_COMPACT_PRIORITY_SAMPLING_CONTROLS = Object.freeze(new Set([
+    '#samplerResetButton',
+    '#n_textgenerationwebui',
+    '#seed_textgenerationwebui',
+    '#json_schema_block',
+]));
+
+const SB_WIDE_PRIORITY_SAMPLING_CONTROLS = Object.freeze(new Set([
+    '#sampler_order_block_kcpp',
+    '#sampler_order_block_lcpp',
+    '#sampler_priority_block_ooba',
+    '#sampler_priority_block_aphrodite',
+]));
+
+const SB_AFTER_SAMPLER_CONTROLS = Object.freeze(new Set([
+    '#sampler_order_block_kcpp',
+    '#sampler_order_block_lcpp',
+    '#sampler_priority_block_ooba',
+    '#sampler_priority_block_aphrodite',
+    '#json_schema_block',
+]));
+
+const SB_BOTTOM_PRIORITY_SAMPLING_CONTROLS = Object.freeze(new Set([
+    '#banned_tokens_block_ooba',
+    '#logit_bias_block_ooba',
+]));
+
+const SB_MULTI_SAMPLING_CONTROLS = Object.freeze(new Set([
+    '#adaptive_p_block',
+    '#smoothingBlock',
+    '#xtc_block',
+    '#dryBlock',
+    '#dynatemp_block_ooba',
+    '#mirostat_block_ooba',
+    '#beamSearchBlock',
+    '#contrastiveSearchBlock',
+]));
+
+function getSamplingPriorityTier(selector) {
+    if (SB_AFTER_SAMPLER_CONTROLS.has(selector)) {
+        return 'after';
+    }
+
+    if (SB_BOTTOM_PRIORITY_SAMPLING_CONTROLS.has(selector)) {
+        return 'bottom';
+    }
+
+    if (SB_LARGE_SAMPLING_CONTROLS.has(selector)) {
+        return 'top';
+    }
+
+    return '';
+}
+
+function getSpecialTokenControlBlock() {
+    const controls = [
+        document.getElementById('ban_eos_token_textgenerationwebui')?.closest('.checkbox_label'),
+        document.getElementById('skip_special_tokens_textgenerationwebui')?.closest('.checkbox_label'),
+    ].filter(control => control instanceof HTMLElement);
+
+    if (!controls.length) {
+        return null;
+    }
+
+    const block = createElement('div', { className: 'sb-sampling-special-token-controls' });
+    controls.forEach(control => block.appendChild(control));
+    return block;
+}
+
+function getSamplerToolbarControlBlock() {
+    const toolbar = getSamplingControlBlock('#samplerResetButton');
+    if (!(toolbar instanceof HTMLElement)) {
+        return null;
+    }
+
+    const block = createElement('div', { className: 'sb-sampling-sampler-tools-card' });
+    block.appendChild(toolbar);
+
+    const specialTokenControls = getSpecialTokenControlBlock();
+    if (specialTokenControls) {
+        block.appendChild(specialTokenControls);
+    }
+
+    return block;
+}
+
+function neutralizeChatCompletionSamplers() {
+    const values = {
+        '#temp_openai': 1,
+        '#top_p_openai': 1,
+        '#top_k_openai': 0,
+        '#min_p_openai': 0,
+        '#top_a_openai': 0,
+        '#repetition_penalty_openai': 1,
+        '#freq_pen_openai': 0,
+        '#pres_pen_openai': 0,
+    };
+
+    for (const [selector, value] of Object.entries(values)) {
+        const input = document.querySelector(selector);
+        if (input instanceof HTMLInputElement) {
+            input.value = String(value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+
+    ['#claude_disable_temperature', '#claude_disable_top_p'].forEach(selector => {
+        const input = document.querySelector(selector);
+        if (input instanceof HTMLInputElement) {
+            input.checked = false;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
+}
+
+function decorateSamplingControlCard(card, selector) {
+    if (!(card instanceof HTMLElement)) {
+        return;
+    }
+
+    if (selector === '#seed_textgenerationwebui') {
+        const seedLabel = card.querySelector('label');
+        seedLabel?.classList.add('range-block-title', 'justifyLeft', 'sb-sampling-seed-title');
+        seedLabel?.insertAdjacentElement('afterend', createElement('small', {
+            className: 'sb-sampling-card-help',
+            text: 'Set to get deterministic results. Use -1 for a random seed.',
+        }));
+    }
+
+    if (selector === '#seed_openai') {
+        const row = createElement('small', { className: 'sb-chat-neutralize-row flex-container alignitemscenter' });
+        const button = createElement('button', {
+            className: 'menu_button menu_button_icon sb-neutralize-chat-samplers',
+            text: 'Neutralize Samplers',
+            attrs: { type: 'button' },
+        });
+        const info = createElement('div', {
+            className: 'fa-solid fa-circle-info opacity50p',
+            attrs: {
+                title: 'Set all samplers to their neutral/disabled state.',
+                'data-i18n': '[title]Set all samplers to their neutral/disabled state.',
+            },
+        });
+        button.addEventListener('click', neutralizeChatCompletionSamplers);
+        row.append(button, info);
+        card.appendChild(row);
+    }
+}
+
+function getSamplingControlBlock(selector) {
+    const input = document.querySelector(selector);
+    if (!(input instanceof HTMLElement)) {
+        return null;
+    }
+
+    if (input.id === 'samplerResetButton' || input.id === 'samplerSelectButton') {
+        return input.closest('.flex-container.justifyCenter') ?? input.parentElement;
+    }
+
+    return input.closest('.range-block')
+        ?? input.closest('[data-tg-samplers]')
+        ?? input.parentElement;
+}
+
+function buildSamplingControlCard(selector) {
+    const controlBlock = selector === '#samplerResetButton'
+        ? getSamplerToolbarControlBlock()
+        : getSamplingControlBlock(selector);
+    if (!(controlBlock instanceof HTMLElement)) {
+        return null;
+    }
+
+    const isTextGenSampler = controlBlock.hasAttribute('data-tg-samplers') || controlBlock.querySelector('[data-tg-samplers]');
+    const card = createElement('div', {
+        className: [
+            'sb-sampling-control-card',
+            isTextGenSampler ? 'sb-sampling-textgen-card' : '',
+            SB_LARGE_SAMPLING_CONTROLS.has(selector) ? 'sb-sampling-large-card' : '',
+            SB_COMPACT_PRIORITY_SAMPLING_CONTROLS.has(selector) ? 'sb-sampling-compact-priority-card' : '',
+            SB_WIDE_PRIORITY_SAMPLING_CONTROLS.has(selector) ? 'sb-sampling-wide-priority-card' : '',
+            SB_MULTI_SAMPLING_CONTROLS.has(selector) ? 'sb-sampling-multi-card' : '',
+            getSamplingPriorityTier(selector) ? `sb-sampling-priority-${getSamplingPriorityTier(selector)}` : '',
+        ].filter(Boolean).join(' '),
+    });
+    card.dataset.sbSamplingControl = selector;
+    for (const attributeName of ['data-source', 'data-source-mode']) {
+        if (controlBlock.hasAttribute(attributeName)) {
+            card.setAttribute(attributeName, controlBlock.getAttribute(attributeName));
+        }
+    }
+
+    card.appendChild(controlBlock);
+    decorateSamplingControlCard(card, selector);
+    return card;
+}
+
+function drawerHasControls(drawer) {
+    if (!(drawer instanceof HTMLElement)) {
+        return false;
+    }
+
+    const content = drawer.querySelector('.inline-drawer-content');
+    if (!(content instanceof HTMLElement)) {
+        return false;
+    }
+
+    return Boolean(content.querySelector([
+        '.range-block',
+        '[data-tg-samplers]',
+        'select',
+        'textarea',
+        'button',
+        '.menu_button',
+        'input:not([type="hidden"])',
+    ].join(',')));
+}
+
+function hideEmptyGroupedSettingsDrawers() {
+    document.querySelectorAll('#range_block_openai .sb-openai-settings-drawer, #textgenerationwebui_api-settings .sb-textgen-drawers > .inline-drawer').forEach(drawer => {
+        if (!(drawer instanceof HTMLElement)) {
+            return;
+        }
+
+        drawer.style.display = drawerHasControls(drawer) ? '' : 'none';
+    });
+}
+
+function updateSamplingCardVisibility(section) {
+    if (!(section instanceof HTMLElement)) {
+        return;
+    }
+
+    section.querySelectorAll('[data-sb-sampling-control]').forEach(card => {
+        if (!(card instanceof HTMLElement)) {
+            return;
+        }
+
+        const hasVisibleContent = Array.from(card.children).some(child => child instanceof HTMLElement && getComputedStyle(child).display !== 'none');
+        card.hidden = !hasVisibleContent;
+    });
+
+    section.querySelectorAll('.sb-sampling-priority-row').forEach(row => {
+        if (!(row instanceof HTMLElement)) {
+            return;
+        }
+
+        row.hidden = !Array.from(row.children).some(child => child instanceof HTMLElement && !child.hidden);
+    });
+
+    section.querySelectorAll('.sb-sampling-multi-grid').forEach(row => {
+        if (!(row instanceof HTMLElement)) {
+            return;
+        }
+
+        row.hidden = !Array.from(row.children).some(child => child instanceof HTMLElement && !child.hidden);
+    });
+}
+
+function syncSamplingPanelControls(root) {
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+
+    for (const backend of SB_SAMPLING_BACKENDS) {
+        const section = root.querySelector(`#sb-sampling-${backend.id}`);
+        const priorityRows = {
+            top: section?.querySelector('.sb-sampling-priority-row[data-sb-priority-tier="top"]'),
+            bottom: section?.querySelector('.sb-sampling-priority-row[data-sb-priority-tier="bottom"]'),
+            after: section?.querySelector('.sb-sampling-after-row[data-sb-priority-tier="after"]'),
+        };
+        const grid = section?.querySelector('.sb-sampling-grid');
+        const multiGrid = section?.querySelector('.sb-sampling-multi-grid');
+        if (!Object.values(priorityRows).every(row => row instanceof HTMLElement) || !(grid instanceof HTMLElement) || !(multiGrid instanceof HTMLElement)) {
+            continue;
+        }
+
+        section.querySelector('.sb-sampling-note')?.remove();
+
+        for (const selector of backend.controls) {
+            const tier = getSamplingPriorityTier(selector);
+            const target = tier ? priorityRows[tier] : (SB_MULTI_SAMPLING_CONTROLS.has(selector) ? multiGrid : grid);
+            const existingCard = Array.from(section.querySelectorAll('[data-sb-sampling-control]'))
+                .find(card => card instanceof HTMLElement && card.dataset.sbSamplingControl === selector);
+            if (existingCard instanceof HTMLElement && existingCard.children.length > 0) {
+                if (existingCard.parentElement !== target) {
+                    target.appendChild(existingCard);
+                }
+                continue;
+            }
+
+            existingCard?.remove();
+
+            const card = buildSamplingControlCard(selector);
+            if (card) {
+                target.appendChild(card);
+            }
+        }
+
+        if (!Object.values(priorityRows).some(row => row.children.length) && !grid.children.length && !multiGrid.children.length) {
+            grid.appendChild(createElement('p', {
+                className: 'sb-sampling-note',
+                text: 'Sampler controls are not ready yet. Reopen the Workspace menu after settings finish loading.',
+            }));
+        }
+
+        updateSamplingCardVisibility(section);
+    }
+
+    hideEmptyGroupedSettingsDrawers();
+}
+
+function updateSamplingPanelVisibility(root) {
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+
+    syncSamplingPanelControls(root);
+
+    const activeApi = getCurrentMainApiValue();
+    let activeSection = null;
+
+    for (const section of root.querySelectorAll('[data-sb-sampling-apis]')) {
+        if (!(section instanceof HTMLElement)) {
+            continue;
+        }
+
+        const apiIds = String(section.dataset.sbSamplingApis ?? '').split(',');
+        const isActive = apiIds.includes(activeApi);
+        section.hidden = !isActive;
+
+        if (isActive) {
+            activeSection = section;
+        }
+    }
+
+    const empty = root.querySelector('#sb-sampling-empty');
+    if (empty instanceof HTMLElement) {
+        empty.hidden = Boolean(activeSection);
+    }
+}
+
+function buildSamplingPanel() {
+    const { panel, scroller } = createShellPanel({ id: 'sampling' });
+    const column = createElement('div', { className: 'sb-shell-column sb-sampling-panel' });
+
+    const sections = createElement('div', { className: 'sb-sampling-sections' });
+
+    for (const backend of SB_SAMPLING_BACKENDS) {
+        const section = createElement('section', {
+            id: `sb-sampling-${backend.id}`,
+            className: 'sb-sampling-section',
+            attrs: {
+                'data-sb-sampling-apis': backend.apiIds.join(','),
+            },
+        });
+        const header = createElement('div', { className: 'sb-sampling-section-header' });
+        const titleRow = createElement('div', { className: 'sb-sampling-title-row' });
+        const title = createElement('strong', { text: 'Sampling Backend' });
+        const mode = createElement('span', { className: 'sb-sampling-mode-pill', text: backend.title });
+        const description = createElement('p', { text: `Active backend samplers are shown here. ${backend.description}` });
+        const priorityStack = createElement('div', { className: 'sb-sampling-priority-stack' });
+        const priorityTop = createElement('div', { className: 'sb-sampling-priority-row sb-sampling-priority-row-top', attrs: { 'data-sb-priority-tier': 'top' } });
+        const priorityBottom = createElement('div', { className: 'sb-sampling-priority-row sb-sampling-priority-row-bottom', attrs: { 'data-sb-priority-tier': 'bottom' } });
+        const grid = createElement('div', { className: 'sb-sampling-grid' });
+        const multiGrid = createElement('div', { className: 'sb-sampling-multi-grid' });
+        const afterRow = createElement('div', { className: 'sb-sampling-priority-row sb-sampling-after-row', attrs: { 'data-sb-priority-tier': 'after' } });
+
+        titleRow.append(title, mode);
+        header.append(titleRow, description);
+
+        priorityStack.append(priorityTop, priorityBottom);
+        section.append(header, priorityStack, grid, multiGrid, afterRow);
+        sections.appendChild(section);
+    }
+
+    const empty = createElement('div', {
+        id: 'sb-sampling-empty',
+        className: 'sb-sampling-empty sb-shell-callout',
+        html: '<strong>No unified samplers for this backend yet</strong><p>This POC currently supports Chat Completions, Text Completions, Kobold/Kobold Horde, and NovelAI.</p>',
+    });
+
+    column.append(sections, empty);
+    scroller.appendChild(column);
+
+    $('#main_api').on('change.sbSamplingPanel', () => updateSamplingPanelVisibility(column));
+    window.requestAnimationFrame(() => updateSamplingPanelVisibility(column));
+    window.setTimeout(() => updateSamplingPanelVisibility(column), 250);
+    window.setTimeout(() => updateSamplingPanelVisibility(column), 1000);
+
+    return {
+        id: 'sampling',
+        panel,
+        button: null,
+        searchRoot: column,
+        onActivate: () => updateSamplingPanelVisibility(column),
+    };
 }
 
 function buildInChatAgentsPanel() {
@@ -7204,11 +7782,20 @@ function buildShell(shellKey) {
     }).observe(shellRoot, { attributes: true, attributeFilter: ['class'] });
 
     const basePanel = createShellPanel(shellConfig.baseTab);
+    if (shellKey === 'left') {
+        embedAdvancedFormattingInPresets(originalContent);
+    }
     basePanel.scroller.appendChild(originalContent);
     registerShellTab(shellKey, shellConfig.baseTab, basePanel);
 
+    const samplingTab = shellConfig.customTabs.find(tab => tab.id === 'sampling');
+    if (samplingTab) {
+        const samplingPanel = buildSamplingPanel();
+        registerShellTab(shellKey, samplingTab, samplingPanel, samplingPanel.searchRoot);
+    }
+
     for (const embeddedTab of shellConfig.embeddedTabs) {
-        const prepared = prepareEmbeddedDrawer(embeddedTab.drawerId);
+        const prepared = prepareEmbeddedDrawer(embeddedTab.drawerId, originalContent);
         if (!prepared) {
             continue;
         }
@@ -7219,6 +7806,10 @@ function buildShell(shellKey) {
     }
 
     for (const customTab of shellConfig.customTabs) {
+        if (customTab.id === 'sampling') {
+            continue;
+        }
+
         if (customTab.id === 'agents') {
             const agentPanel = buildInChatAgentsPanel();
             registerShellTab(shellKey, customTab, agentPanel, agentPanel.searchRoot);
@@ -7246,6 +7837,12 @@ function buildShell(shellKey) {
     if (shellKey === 'right') {
         injectThemePicker();
         injectSillyTavernImportCard();
+    }
+
+    if (shellKey === 'left') {
+        $('#main_api').on('change.sbPresetAdvancedFormatting', updatePresetAdvancedFormattingVisibility);
+        bindPresetAdvancedFormattingVisibilityEvents();
+        updatePresetAdvancedFormattingVisibility();
     }
 }
 
@@ -7469,8 +8066,8 @@ function buildMobileNav() {
             label: 'Quick Actions',
             items: [
                 { shell: 'left', tab: 'presets', icon: 'fa-sliders', label: 'Presets' },
+                { shell: 'left', tab: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
                 { shell: 'left', tab: 'api', icon: 'fa-plug', label: 'API' },
-                { shell: 'left', tab: 'advanced-formatting', icon: 'fa-font', label: 'Advanced Formatting' },
                 { shell: 'left', tab: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
                 { shell: 'left', tab: 'agents', icon: 'fa-robot', label: 'Agents' },
             ],
