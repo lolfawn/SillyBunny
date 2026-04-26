@@ -31,6 +31,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Added roomier editing tools, including a resizable first-message field, a desktop World Info pop-up editor, expanded context-size presets, Text Completions preset parity, and better advanced definitions editing.
 - Added an OpenRouter/NanoGPT-only `Unlocked Context Size` toggle in Chat Completion token budget settings, preserving SillyBunny's always-unlocked behavior for other providers.
 - Fixed preset and settings layout polish, including balanced prompt manager panes, aligned prompt preset controls, equalized Presets dropdown controls, and less-clipped preset action text.
+- Fixed Prompt Manager token attribution so the Main Prompt row shows the Main Prompt text itself instead of inheriting surrounding injected prompt totals.
 
 ### Chat History, Server Tools, And RAG
 - Added Chat History tools for LLM-assisted chat labels, old-chat cleanup, and backup cleanup with previews, confirmations, retention filters, and mobile-friendly controls.
@@ -92,6 +93,7 @@ Commits:
 - `fix(agents): recover regenerated post-processing history`
 - `fix(agents): scope transform history to active swipe`
 - `fix: stabilize token accounting and mobile agents`
+- `fix(ui): correct prompt manager token attribution`
 - `fix: stabilize responses streaming and agent swipes`
 - `chore(presets): refresh Geechan bundled presets`
 - `chore: remove redundant deprecated code`
