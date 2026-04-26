@@ -33,6 +33,8 @@ describe('in-chat agent post-processing runner', () => {
     let saveChatDebounced;
     let saveChat;
     let generateQuietPrompt;
+    let documentListeners;
+    let windowListeners;
 
     beforeEach(async () => {
         jest.resetModules();
@@ -62,12 +64,29 @@ describe('in-chat agent post-processing runner', () => {
         saveChatDebounced = jest.fn();
         saveChat = jest.fn();
         generateQuietPrompt = jest.fn(async () => 'quiet result');
+        documentListeners = new Map();
+        windowListeners = new Map();
+
+        const addListener = (listeners, event, handler) => {
+            const eventListeners = listeners.get(event) ?? [];
+            eventListeners.push(handler);
+            listeners.set(event, eventListeners);
+        };
+
+        const removeListener = (listeners, event, handler) => {
+            const eventListeners = listeners.get(event) ?? [];
+            listeners.set(event, eventListeners.filter(item => item !== handler));
+        };
 
         globalThis.document = {
             body: { dataset: {} },
             querySelector: jest.fn(() => null),
             getElementById: jest.fn(() => null),
+            addEventListener: jest.fn((event, handler) => addListener(documentListeners, event, handler)),
+            removeEventListener: jest.fn((event, handler) => removeListener(documentListeners, event, handler)),
         };
+        globalThis.addEventListener = jest.fn((event, handler) => addListener(windowListeners, event, handler));
+        globalThis.removeEventListener = jest.fn((event, handler) => removeListener(windowListeners, event, handler));
         globalThis.HTMLSelectElement = class HTMLSelectElement {};
         globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
         globalThis.toastr = {
@@ -172,7 +191,10 @@ describe('in-chat agent post-processing runner', () => {
     });
 
     afterEach(() => {
+        jest.useRealTimers();
         delete globalThis.document;
+        delete globalThis.addEventListener;
+        delete globalThis.removeEventListener;
         delete globalThis.HTMLSelectElement;
         delete globalThis.requestAnimationFrame;
         delete globalThis.toastr;
@@ -270,6 +292,12 @@ describe('in-chat agent post-processing runner', () => {
             }
 
             await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    }
+
+    function emitDocumentEvent(eventName) {
+        for (const handler of documentListeners.get(eventName) ?? []) {
+            handler();
         }
     }
 
@@ -565,5 +593,44 @@ describe('in-chat agent post-processing runner', () => {
 
         expect(chat[0].mes).toBe('Late reply without after commands\n[post processed]');
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('recovers missed mobile post-processing after the fallback window expires', async () => {
+        jest.useFakeTimers();
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await jest.advanceTimersByTimeAsync(31000);
+
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Very late iOS reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        delete document.body.dataset.generating;
+        emitDocumentEvent('visibilitychange');
+        await jest.runOnlyPendingTimersAsync();
+        await jest.runOnlyPendingTimersAsync();
+
+        expect(chat[0].mes).toBe('Very late iOS reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        emitDocumentEvent('visibilitychange');
+        await jest.runOnlyPendingTimersAsync();
+        await jest.runOnlyPendingTimersAsync();
+
+        expect(chat[0].mes).toBe('Very late iOS reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+        jest.useRealTimers();
     });
 });

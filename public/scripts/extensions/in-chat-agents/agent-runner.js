@@ -59,7 +59,7 @@ const PREPEND_PROMPT_TRANSFORM_TAG_RE = /\[(?:SCENE|TIME)\|/;
 const ASSISTANT_RESPONSE_WRAPPER_RE = /^\s*<assistant_response>\s*([\s\S]*?)\s*<\/assistant_response>\s*$/i;
 const BODY_GENERATING_FLAG_GRACE_MS = 1500;
 const DEFERRED_POST_PROCESSING_RETRY_MS = 50;
-const LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS = 3000;
+const LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS = 30000;
 
 /** @type {{ generationType: string, activeAgentIds: string[] } | null} */
 let pendingGenerationSnapshot = null;
@@ -70,6 +70,9 @@ const deferredPostProcessingQueue = new Map();
 let deferredPostProcessingTimeout = null;
 let latestAssistantPostProcessingFallbackTimeout = null;
 let latestAssistantPostProcessingFallbackDeadline = 0;
+let postGenerationRecoveryTimeout = null;
+let postGenerationRecoveryHooksInitialized = false;
+let postGenerationRecoveryObserver = null;
 const activePromptTransformToasts = new Set();
 const agentGenerationStateListeners = new Set();
 const manualAgentRunQueue = [];
@@ -447,6 +450,15 @@ function clearLatestAssistantPostProcessingFallback() {
     latestAssistantPostProcessingFallbackDeadline = 0;
 }
 
+function clearPostGenerationRecoveryCheck() {
+    if (!postGenerationRecoveryTimeout) {
+        return;
+    }
+
+    clearTimeout(postGenerationRecoveryTimeout);
+    postGenerationRecoveryTimeout = null;
+}
+
 function cloneActivationSnapshot(snapshot, generationType) {
     const normalizedGenerationType = normalizeGenerationType(snapshot?.generationType ?? generationType);
 
@@ -538,6 +550,7 @@ function deferPostProcessing(messageIndex, generationType, activationSnapshot = 
 
     if (!isGenerationInProgress) {
         scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
+        schedulePostGenerationRecoveryCheck(DEFERRED_POST_PROCESSING_RETRY_MS);
     }
 }
 
@@ -663,6 +676,99 @@ function scheduleLatestAssistantPostProcessingFallback(delayMs = DEFERRED_POST_P
             latestAssistantPostProcessingFallbackDeadline = 0;
         }
     }, delayMs);
+}
+
+function hasPostGenerationRecoveryWork() {
+    return Boolean(
+        !generationStopRequested &&
+        (
+            deferredPostProcessingQueue.size > 0 ||
+            pendingGenerationSnapshot?.activeAgentIds?.length > 0
+        ),
+    );
+}
+
+function schedulePostGenerationRecoveryCheck(delayMs = 0) {
+    if (!hasPostGenerationRecoveryWork() || isGenerationInProgress) {
+        return;
+    }
+
+    if (postGenerationRecoveryTimeout) {
+        clearTimeout(postGenerationRecoveryTimeout);
+    }
+
+    postGenerationRecoveryTimeout = setTimeout(() => {
+        postGenerationRecoveryTimeout = null;
+
+        if (!hasPostGenerationRecoveryWork() || isGenerationInProgress) {
+            return;
+        }
+
+        queueLatestAssistantPostProcessingFromSnapshot();
+        scheduleDeferredPostProcessingFlush();
+
+        if (deferredPostProcessingQueue.size > 0 && !isBodyGenerationFlagBlocking()) {
+            scheduleDeferredPostProcessingFlush();
+        }
+    }, delayMs);
+}
+
+function observePostGenerationRecoveryTargets() {
+    if (!postGenerationRecoveryObserver) {
+        return;
+    }
+
+    try {
+        if (document.body) {
+            postGenerationRecoveryObserver.observe(document.body, {
+                attributes: true,
+                attributeFilter: ['data-generating'],
+            });
+        }
+
+        const chatElement = document.getElementById?.('chat') ?? document.querySelector?.('#chat');
+        if (chatElement) {
+            postGenerationRecoveryObserver.observe(chatElement, {
+                childList: true,
+                subtree: true,
+            });
+        }
+    } catch (error) {
+        console.warn('[InChatAgents] Could not start post-generation recovery observer:', error);
+    }
+}
+
+function initPostGenerationRecoveryHooks() {
+    if (postGenerationRecoveryHooksInitialized) {
+        return;
+    }
+
+    postGenerationRecoveryHooksInitialized = true;
+    const scheduleRecovery = () => schedulePostGenerationRecoveryCheck();
+    const observeAndScheduleRecovery = () => {
+        observePostGenerationRecoveryTargets();
+        scheduleRecovery();
+    };
+
+    if (typeof MutationObserver === 'function') {
+        try {
+            postGenerationRecoveryObserver = new MutationObserver(scheduleRecovery);
+            observePostGenerationRecoveryTargets();
+        } catch (error) {
+            console.warn('[InChatAgents] Could not start post-generation recovery observer:', error);
+        }
+    }
+
+    if (typeof document.addEventListener === 'function') {
+        document.addEventListener('visibilitychange', scheduleRecovery);
+        document.addEventListener('DOMContentLoaded', observeAndScheduleRecovery);
+    }
+
+    const windowTarget = globalThis.window ?? globalThis;
+    if (typeof windowTarget.addEventListener === 'function') {
+        windowTarget.addEventListener('pageshow', scheduleRecovery);
+        windowTarget.addEventListener('focus', scheduleRecovery);
+    }
 }
 
 /**
@@ -1557,6 +1663,7 @@ function onGenerationStarted(generationType, _options, dryRun) {
     generationStopRequested = false;
     lastMainGenerationEndedAt = 0;
     clearLatestAssistantPostProcessingFallback();
+    clearPostGenerationRecoveryCheck();
     clearAllPromptTransformRunningToasts();
     pendingGenerationSnapshot = buildActivationSnapshot(currentMainGenerationType);
     generationStartChatLength = chat.length;
@@ -1592,6 +1699,7 @@ function onGenerationEnded() {
     clearAllPromptTransformRunningToasts();
     queueLatestAssistantPostProcessingFromSnapshot();
     scheduleDeferredPostProcessingFlush();
+    schedulePostGenerationRecoveryCheck();
     latestAssistantPostProcessingFallbackDeadline = Date.now() + LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS;
     scheduleLatestAssistantPostProcessingFallback();
 }
@@ -1605,6 +1713,7 @@ function onGenerationStopped() {
     isGenerationInProgress = false;
     lastMainGenerationEndedAt = Date.now();
     clearLatestAssistantPostProcessingFallback();
+    clearPostGenerationRecoveryCheck();
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
 }
@@ -2099,6 +2208,8 @@ export function redoPromptTransform(messageIndex) {
  * Registers all event listeners for the agent runner.
  */
 export function initAgentRunner() {
+    initPostGenerationRecoveryHooks();
+
     eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
     eventSource.on(event_types.GENERATION_AFTER_COMMANDS, onGenerationAfterCommands);
     eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
