@@ -92,6 +92,7 @@ let generationStartLastAssistantRevision = '';
 let generationStartedAt = 0;
 let lastMainGenerationEndedAt = 0;
 let currentMainGenerationType = 'normal';
+let postProcessingGenerationRunId = 0;
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -610,6 +611,25 @@ function getPostProcessingRunKey(message, generationType, activationSnapshot = n
     ].join('|');
 }
 
+function getPostProcessingIndexRunKey(message, messageIndex, generationType, activationSnapshot = null) {
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return '';
+    }
+
+    const snapshotAgentIds = Array.isArray(activationSnapshot?.activeAgentIds)
+        ? activationSnapshot.activeAgentIds.join(',')
+        : '';
+
+    return [
+        postProcessingGenerationRunId,
+        numericMessageIndex,
+        Number.isInteger(Number(message?.swipe_id)) ? Number(message.swipe_id) : 0,
+        normalizeGenerationType(activationSnapshot?.generationType ?? generationType),
+        snapshotAgentIds,
+    ].join('|');
+}
+
 function getStoredPostProcessingRuns(message) {
     const storedRuns = getAgentExtraValue(message, POST_PROCESSING_RUNS_EXTRA_KEY);
     return Array.isArray(storedRuns)
@@ -628,7 +648,7 @@ function getMessageRevisionKey(message) {
     ].join('|');
 }
 
-function hasProcessedPostProcessingRun(message, runKey, messageIndex = null) {
+function hasProcessedPostProcessingRun(message, runKey, messageIndex = null, indexRunKey = '') {
     const numericMessageIndex = Number(messageIndex);
     const indexRuns = Number.isInteger(numericMessageIndex)
         ? processedPostProcessingRunsByIndex.get(numericMessageIndex)
@@ -639,12 +659,13 @@ function hasProcessedPostProcessingRun(message, runKey, messageIndex = null) {
         (
             processedPostProcessingRuns.get(message)?.has(runKey) ||
             getStoredPostProcessingRuns(message).includes(runKey) ||
-            indexRuns?.includes(runKey)
+            indexRuns?.includes(runKey) ||
+            (indexRunKey && indexRuns?.includes(indexRunKey))
         ),
     );
 }
 
-function markPostProcessingRunProcessed(message, runKey, messageIndex = null) {
+function markPostProcessingRunProcessed(message, runKey, messageIndex = null, indexRunKey = '') {
     if (!message || !runKey) {
         return false;
     }
@@ -663,8 +684,11 @@ function markPostProcessingRunProcessed(message, runKey, messageIndex = null) {
     const numericMessageIndex = Number(messageIndex);
     if (Number.isInteger(numericMessageIndex)) {
         const indexRuns = (processedPostProcessingRunsByIndex.get(numericMessageIndex) ?? [])
-            .filter(value => value !== runKey);
+            .filter(value => value !== runKey && value !== indexRunKey);
         indexRuns.push(runKey);
+        if (indexRunKey) {
+            indexRuns.push(indexRunKey);
+        }
         processedPostProcessingRunsByIndex.set(numericMessageIndex, indexRuns.slice(-MAX_TRANSFORM_HISTORY));
     }
 
@@ -902,7 +926,8 @@ function hasRecoverableAssistantPostProcessingCandidate() {
     }
 
     const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
-    return !hasProcessedPostProcessingRun(message, runKey, messageIndex);
+    const indexRunKey = getPostProcessingIndexRunKey(message, messageIndex, activationSnapshot.generationType, activationSnapshot);
+    return !hasProcessedPostProcessingRun(message, runKey, messageIndex, indexRunKey);
 }
 
 function hasActiveStreamingProcessorIgnoringGenerationFlag(messageIndex) {
@@ -1128,8 +1153,9 @@ function queueLatestAssistantPostProcessingFromSnapshot() {
     }
 
     const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
+    const indexRunKey = getPostProcessingIndexRunKey(message, messageIndex, activationSnapshot.generationType, activationSnapshot);
 
-    if (hasProcessedPostProcessingRun(message, runKey, messageIndex)) {
+    if (hasProcessedPostProcessingRun(message, runKey, messageIndex, indexRunKey)) {
         return { queued: false, retry: false };
     }
 
@@ -2095,6 +2121,7 @@ function onGenerationStarted(generationType, _options, dryRun) {
     generationStopRequested = false;
     generationStartedAt = Date.now();
     lastMainGenerationEndedAt = 0;
+    postProcessingGenerationRunId++;
     clearLatestAssistantPostProcessingFallback();
     clearPostGenerationRecoveryCheck();
     clearMissedGenerationEndRecoveryCheck();
@@ -2237,10 +2264,11 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
         ? cloneActivationSnapshot(activationSnapshot, generationType)
         : cloneActivationSnapshot(pendingGenerationSnapshot ?? buildActivationSnapshot(generationType), generationType);
     const runKey = getPostProcessingRunKey(message, generationType, resolvedActivationSnapshot);
-    if (hasProcessedPostProcessingRun(message, runKey, messageIndex)) {
+    const indexRunKey = getPostProcessingIndexRunKey(message, messageIndex, generationType, resolvedActivationSnapshot);
+    if (hasProcessedPostProcessingRun(message, runKey, messageIndex, indexRunKey)) {
         return;
     }
-    markPostProcessingRunProcessed(message, runKey, messageIndex);
+    markPostProcessingRunProcessed(message, runKey, messageIndex, indexRunKey);
 
     const activeAgents = getActiveAgentsForMessage(generationType, resolvedActivationSnapshot);
     const promptTransformAgents = getPromptTransformAgentsForMessage(activeAgents, generationType);

@@ -52,6 +52,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Scoped Prose Polisher and agent change history to the active swipe so the document icon only shows edits for the currently visible message.
 - Fixed dry-run prompt previews so active pre-generation in-chat agent prompts are included before generation starts, preventing token totals from jumping when the live request begins.
 - Prevented mobile render replacements from rerunning post-processing agents that already handled the same generated message.
+- Hardened mobile post-processing guards so delayed automatic render/receive events cannot rerun agents after generated timestamp metadata changes.
 - Fixed active-swipe regex metadata persistence through chat reloads and prevented Impersonate events from clearing it.
 - Added a separate Pathfinder memory summary UI with editable summary text and injection status.
 - Fixed Agents Quick Toggles overflow, Pathfinder control alignment, hidden idle cancel buttons, and Pathfinder log detail layout.
@@ -94,6 +95,7 @@ Commits:
 - `fix(agents): scope transform history to active swipe`
 - `fix: stabilize token accounting and mobile agents`
 - `fix(ui): correct prompt manager token attribution`
+- `fix(agents): harden mobile post-processing guards`
 - `fix: stabilize responses streaming and agent swipes`
 - `chore(presets): refresh Geechan bundled presets`
 - `chore: remove redundant deprecated code`
