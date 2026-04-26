@@ -1174,6 +1174,10 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     text-overflow: ellipsis;
 }
 
+#chat .mes .mesAvatarWrapper > :is(.mes_timer, .tokenCounterDisplay):empty {
+    display: none;
+}
+
 #chat .mes .mes_buttons,
 #chat .mes .extraMesButtons {
     align-items: center;
