@@ -241,6 +241,28 @@ describe('in-chat agent post-processing runner', () => {
         ];
     }
 
+    function usePromptTransformPostAgent() {
+        enabledAgents = [{
+            id: 'agent-post-transform',
+            name: 'Post Transform',
+            phase: 'post',
+            prompt: 'Rewrite the final reply.',
+            injection: { order: 100 },
+            postProcess: {
+                enabled: false,
+                promptTransformEnabled: true,
+                promptTransformMode: 'rewrite',
+                promptTransformMaxTokens: 8192,
+                promptTransformShowNotifications: false,
+            },
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        }];
+    }
+
     async function waitFor(condition) {
         for (let i = 0; i < 20; i++) {
             if (condition()) {
@@ -380,6 +402,71 @@ describe('in-chat agent post-processing runner', () => {
         expect(saveChatDebounced).toHaveBeenCalledTimes(2);
     });
 
+    test('handles non-stream mobile order where generation ends before the body flag clears', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Exact mobile order',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Exact mobile order');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        delete document.body.dataset.generating;
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Exact mobile order\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('runs prompt-transform post-processing after mobile generation flag clears', async () => {
+        usePromptTransformPostAgent();
+        generateQuietPrompt.mockResolvedValue('Mobile transform rewrite');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Needs rewrite',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(generateQuietPrompt).not.toHaveBeenCalled();
+
+        delete document.body.dataset.generating;
+        await waitFor(() => generateQuietPrompt.mock.calls.length === 1);
+        await waitFor(() => chat[0].mes === 'Mobile transform rewrite');
+
+        expect(chat[0].mes).toBe('Mobile transform rewrite');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
     test('applies mobile deferred post-processing once after the body generating flag clears', async () => {
         useAppendPostAgent();
 
@@ -452,6 +539,31 @@ describe('in-chat agent post-processing runner', () => {
         await new Promise(resolve => setTimeout(resolve, 75));
 
         expect(chat[0].mes).toBe('Late mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('polls missed mobile render events using the generation-start snapshot', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Late reply without after commands',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        delete document.body.dataset.generating;
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Late reply without after commands\n[post processed]');
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
     });
 });

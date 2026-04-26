@@ -81,6 +81,7 @@ let generationStartChatLength = 0;
 let generationStartLastAssistantMessage = null;
 let generationStartLastAssistantRevision = '';
 let lastMainGenerationEndedAt = 0;
+let currentMainGenerationType = 'normal';
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -1545,18 +1546,19 @@ function scheduleMessageRefresh(messageIndex, expectedMessage) {
 /**
  * Cleans up all in-chat agent extension prompts before a new generation.
  */
-function onGenerationStarted() {
-    if (internalPromptTransformDepth > 0) {
+function onGenerationStarted(generationType, _options, dryRun) {
+    if (dryRun || internalPromptTransformDepth > 0) {
         return;
     }
 
+    currentMainGenerationType = normalizeGenerationType(generationType);
     isGenerationInProgress = true;
     toolSyncDuringGeneration = true;
     generationStopRequested = false;
     lastMainGenerationEndedAt = 0;
     clearLatestAssistantPostProcessingFallback();
     clearAllPromptTransformRunningToasts();
-    pendingGenerationSnapshot = null;
+    pendingGenerationSnapshot = buildActivationSnapshot(currentMainGenerationType);
     generationStartChatLength = chat.length;
     const latestAssistantMessageIndex = getLatestAssistantMessageIndex();
     generationStartLastAssistantMessage = latestAssistantMessageIndex >= 0 ? chat[latestAssistantMessageIndex] : null;
@@ -1582,6 +1584,7 @@ function onGenerationEnded() {
         return;
     }
 
+    pendingGenerationSnapshot ??= buildActivationSnapshot(currentMainGenerationType);
     isGenerationInProgress = false;
     lastMainGenerationEndedAt = Date.now();
     toolSyncDuringGeneration = false;
@@ -1617,7 +1620,10 @@ async function onGenerationAfterCommands(generationType, _options, dryRun) {
         return;
     }
 
-    pendingGenerationSnapshot = buildActivationSnapshot(generationType);
+    const normalizedGenerationType = normalizeGenerationType(generationType);
+    pendingGenerationSnapshot = pendingGenerationSnapshot?.generationType === normalizedGenerationType
+        ? cloneActivationSnapshot(pendingGenerationSnapshot, normalizedGenerationType)
+        : buildActivationSnapshot(normalizedGenerationType);
     const activeAgents = getSnapshotAgents(pendingGenerationSnapshot);
     const pathfinderAgent = getPathfinderRuntimeAgent(activeAgents);
 
