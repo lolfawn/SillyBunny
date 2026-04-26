@@ -4,10 +4,10 @@
 
 Date: 2026-04-26
 
-This is the next main update after `v1.4.2`. It includes the new Group Chat system, the refreshed Workspace/Customize shell, the unified Sampling workspace, improved mobile behavior, token accounting fixes, OpenAI Responses streaming fixes, In-Chat Agent fixes, RAG enablement fixes, the Moonlit Echoes cleanup, and redundant deprecated-code cleanup.
+This is the next main update after `v1.4.2`. It includes the new Group Chat system, rewording some UI elements, a unified Sampling workspace, improved mobile behavior, token accounting fixes, OpenAI Responses streaming fixes, In-Chat Agent fixes, RAG enablement fixes, cleaning up unnecessary dependencies, and redundant deprecated-code cleanup.
 
 ### Group Chats
-Group Chats still work for normal group RP: you can pick a group, write as the user, choose who speaks next, and run the scene manually just like before. The new work adds optional tools for people who want the group to feel more like a living conversation, chatroom, party scene, or auto-RP setup without taking away the standard flow.
+Group Chats still work for normal group RP: you can pick a group, write as the user, choose who speaks next, and run the scene manually just like before. The new group chat system adds optional tools for people who want the group to feel more like a living conversation, chatroom, party scene, or auto-RP setup.
 
 - Added a bottom group-chat control bar with active speaker selection, Speak Now, manual DM mode, Auto Mode, Auto DM, unread DM badges, and compact mobile controls.
 - Added private per-character DM chats. DMs use participant-limited context, show unread badges on character avatars, can be opened with one tap, force DM mode while inside the private chat, and include Return to Group navigation.
@@ -24,9 +24,8 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Fixed private note persistence and injection for `Use character author's note` plus `Replace`, `Top`, and `Bottom` placement.
 
 ### Workspace, Sampling, And Presets
-- Added a unified Sampling workspace/menu for Chat Completions, Text Completions, Kobold/Kobold Horde, and NovelAI.
-- Added backend-aware sampler cards, mobile quick access, anchored documentation links, normalized numeric sampler fields, and a Neutralize Samplers action for Chat Completions.
-- Updated Geechan's bundled roleplay preset to `Geechan - Universal Roleplay (Chat Completions) (v5.1)` plus matching Text Completions context and system prompt variants, and automatically removes the old bundled v5.0 files from user data during content updates.
+- Added a unified Sampling menu in the Workspace menu for Chat Completions and Text Completions. This also migrates seed and logit bias information from Chat Completions to a more logical place, and includes a Neutralize Samplers button for Chat Completions.
+- Updated Geechan's bundled roleplay preset to `Geechan - Universal Roleplay (Chat Completions) (v5.1)` plus matching Text Completions context and system prompt variants.
 - Replaced `Geechan's Chatroom Prompt` with the overhauled `Geechan - Universal Online Chat (Chat Completions) (v1.0)` preset, plus matching Text Completions context and system prompt files.
 - Added roomier editing tools, including a resizable first-message field, a desktop World Info pop-up editor, expanded context-size presets, Text Completions preset parity, and better advanced definitions editing.
 - Added an OpenRouter/NanoGPT-only `Unlocked Context Size` toggle in Chat Completion token budget settings, preserving SillyBunny's always-unlocked behavior for other providers.
@@ -89,40 +88,3 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Cleaned up test lint references so nested test lint runs without warnings or undefined globals.
 - Kept `public/scripts/f-localStorage.js` in place for extension compatibility.
 - Bumped app-owned version strings to `1.5.0` without changing dependency versions.
-
-Commits:
-- `feat(ui): expose context unlock for nanogpt and openrouter`
-- `fix(agents): apply regex scripts during streaming`
-- `fix(agents): recover regenerated post-processing history`
-- `fix(agents): scope transform history to active swipe`
-- `fix: stabilize token accounting and mobile agents`
-- `fix(ui): correct prompt manager token attribution`
-- `fix(agents): harden mobile post-processing guards`
-- `fix(ui): align mobile quick actions menu`
-- `fix(auth): keep module assets loading after login`
-- `fix: stabilize responses streaming and agent swipes`
-- `chore(presets): refresh Geechan bundled presets`
-- `chore: remove redundant deprecated code`
-- `fix(ui): remove message number background`
-
-## v1.4.1
-
-Date: 2026-04-23
-
-Changes:
-- Restored World Info entry enable/disable behavior and tightened the World Info layout with smaller cards, narrower popup rows, and cleaner mobile/desktop spacing.
-- Added selectable multi-delete pickers for saved presets and connection profiles instead of delete-all-only flows.
-- Improved Pathfinder usability with clearer tool-mode diagnostics, persisted tool toggles like Update and Forget, and a detailed retrieval log showing selected lore entries, stage results, and injected Pathfinder context.
-- Kept List Only mode focused on recent chats by removing its extra shortcut row, while also cleaning up home-screen preset copy so only the bundled SillyBunny-tuned Director preset is promoted.
-- Polished shell/UI consistency by aligning the reasoning token badge, matching bottom-bar sizing to the top bar, and preserving transparency for cropped avatars and alpha-capable thumbnails.
-- Hardened self-update behavior so existing Node/npm installs no longer dirty `package-lock.json` during routine updates.
-- Bumped the app version strings and default-user settings version to `1.4.1`.
-
-- Fixed `NetworkError: failed to fetch resource` on zip import by ensuring the uploads directory is always created on startup before multer uses it as its destination.
-
-Commits:
-- `fix(ui): ship v1.4.1 lorebook and shell polish`
-- `fix(ui): tighten home and updater polish`
-- `fix(ui): refine pathfinder and selective deletes`
-- `fix(ui): add pathfinder retrieval logging`
-- `fix(server): ensure uploads dir exists before multer`
