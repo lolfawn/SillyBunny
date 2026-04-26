@@ -668,6 +668,99 @@ describe('in-chat agent post-processing runner', () => {
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
     });
 
+    test('recovers mobile post-processing when generation ended event is missed', async () => {
+        jest.useFakeTimers();
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Missed end mobile reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        delete document.body.dataset.generating;
+        await jest.advanceTimersByTimeAsync(250);
+        await jest.runOnlyPendingTimersAsync();
+
+        expect(chat[0].mes).toBe('Missed end mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+        jest.useRealTimers();
+    });
+
+    test('recovers mobile post-processing when generation flag stays stuck after final message', async () => {
+        jest.useFakeTimers();
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Stuck flag mobile reply',
+            is_user: false,
+            is_system: false,
+            gen_finished: '2026-04-26T00:00:00.000Z',
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await jest.advanceTimersByTimeAsync(250);
+        await jest.runOnlyPendingTimersAsync();
+
+        expect(document.body.dataset.generating).toBe('true');
+        expect(chat[0].mes).toBe('Stuck flag mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+        jest.useRealTimers();
+    });
+
+    test('keeps deferred mobile post-processing when render replaces the message object', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Replaced mobile reply',
+            is_user: false,
+            is_system: false,
+            gen_finished: '2026-04-26T00:00:00.000Z',
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        chat[0] = {
+            name: 'Assistant',
+            mes: 'Replaced mobile reply',
+            is_user: false,
+            is_system: false,
+            gen_finished: '2026-04-26T00:00:00.000Z',
+            extra: {},
+        };
+
+        delete document.body.dataset.generating;
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Replaced mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
     test('recovers missed mobile post-processing after the fallback window expires', async () => {
         jest.useFakeTimers();
         useAppendPostAgent();

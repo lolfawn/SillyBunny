@@ -23,6 +23,7 @@ Date: 2026-04-26
 - Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, bottom chat spacing, composer panel theming, and first-message top alignment.
 - Fixed group chat edge cases so unread DM avatars stay aligned, DM taps open the correct private chat, and Character Author's Note (Private) persists on the group chat.
 - Fixed In-Chat Agent behavior for separated Individual/Group enablement, queued manual runs, hidden idle cancel buttons, Pathfinder control alignment, recovered saved agent toggles missing from scoped state, and automatic post-generation runs on desktop and mobile, including late mobile render timing after the generation flag clears and delayed iOS Safari page wakeups.
+- Fixed In-Chat Agent mobile post-processing recovery when iOS Safari misses the generation-ended event, leaves the generation flag stuck, or replaces the rendered message object before queued agents flush.
 - Fixed In-Chat Agent regex scripts so regex-only agents attach their formatter scripts as soon as an assistant message is received instead of waiting for post-generation processing.
 - Fixed Vector Storage/RAG enablement so legacy saved flags migrate correctly and extensions can turn RAG on through live settings or the shared `SillyTavern.rag` API.
 - Fixed the refreshed mobile composer so the chat text box and bottom action bar stay compact on narrow screens.
@@ -36,6 +37,7 @@ Date: 2026-04-26
 - `fix(agents): recover saved post-generation toggles`
 - `fix(agents): recover delayed mobile post-processing`
 - `fix(agents): apply regex snapshots immediately`
+- `fix(agents): recover missed mobile generation end`
 - `fix(rag): allow extensions to enable vector storage`
 - `fix(ui): compact mobile chat composer`
 - `fix(ui): make Moonlit Echoes optional`

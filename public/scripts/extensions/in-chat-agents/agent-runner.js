@@ -46,6 +46,7 @@ import { markAutoSummaryComplete, shouldAutoSummarize } from './pathfinder/auto-
 
 const PROMPT_KEY_PREFIX = 'inchat_agent_';
 const MESSAGE_EXTRA_KEY = 'inChatAgents';
+const POST_PROCESSING_RUNS_EXTRA_KEY = 'inChatAgentPostRuns';
 export const PROMPT_RUNS_EXTRA_KEY = 'inChatAgentPromptRuns';
 export const PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
 const MAX_TRANSFORM_HISTORY = 10;
@@ -60,6 +61,7 @@ const ASSISTANT_RESPONSE_WRAPPER_RE = /^\s*<assistant_response>\s*([\s\S]*?)\s*<
 const BODY_GENERATING_FLAG_GRACE_MS = 1500;
 const DEFERRED_POST_PROCESSING_RETRY_MS = 50;
 const LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS = 30000;
+const MISSED_GENERATION_END_RECOVERY_MS = 200;
 
 /** @type {{ generationType: string, activeAgentIds: string[] } | null} */
 let pendingGenerationSnapshot = null;
@@ -71,6 +73,7 @@ let deferredPostProcessingTimeout = null;
 let latestAssistantPostProcessingFallbackTimeout = null;
 let latestAssistantPostProcessingFallbackDeadline = 0;
 let postGenerationRecoveryTimeout = null;
+let missedGenerationEndRecoveryTimeout = null;
 let postGenerationRecoveryHooksInitialized = false;
 let postGenerationRecoveryObserver = null;
 const activePromptTransformToasts = new Set();
@@ -83,6 +86,7 @@ const promptTransformIdleResolvers = new Set();
 let generationStartChatLength = 0;
 let generationStartLastAssistantMessage = null;
 let generationStartLastAssistantRevision = '';
+let generationStartedAt = 0;
 let lastMainGenerationEndedAt = 0;
 let currentMainGenerationType = 'normal';
 
@@ -165,6 +169,7 @@ export function cancelAgentGeneration() {
 
     clearLatestAssistantPostProcessingFallback();
     clearDeferredPostProcessing();
+    clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
 
     const stopped = internalPromptTransformDepth > 0 || activeManualAgentRun ? stopGeneration() : false;
@@ -459,6 +464,15 @@ function clearPostGenerationRecoveryCheck() {
     postGenerationRecoveryTimeout = null;
 }
 
+function clearMissedGenerationEndRecoveryCheck() {
+    if (!missedGenerationEndRecoveryTimeout) {
+        return;
+    }
+
+    clearTimeout(missedGenerationEndRecoveryTimeout);
+    missedGenerationEndRecoveryTimeout = null;
+}
+
 function cloneActivationSnapshot(snapshot, generationType) {
     const normalizedGenerationType = normalizeGenerationType(snapshot?.generationType ?? generationType);
 
@@ -497,6 +511,12 @@ function getPostProcessingRunKey(message, generationType, activationSnapshot = n
     ].join('|');
 }
 
+function getStoredPostProcessingRuns(message) {
+    return Array.isArray(message?.extra?.[POST_PROCESSING_RUNS_EXTRA_KEY])
+        ? message.extra[POST_PROCESSING_RUNS_EXTRA_KEY]
+        : [];
+}
+
 function getMessageRevisionKey(message) {
     return [
         normalizeMessageRunValue(message?.gen_started),
@@ -507,7 +527,13 @@ function getMessageRevisionKey(message) {
 }
 
 function hasProcessedPostProcessingRun(message, runKey) {
-    return Boolean(message && processedPostProcessingRuns.get(message)?.has(runKey));
+    return Boolean(
+        message &&
+        (
+            processedPostProcessingRuns.get(message)?.has(runKey) ||
+            getStoredPostProcessingRuns(message).includes(runKey)
+        ),
+    );
 }
 
 function markPostProcessingRunProcessed(message, runKey) {
@@ -522,6 +548,10 @@ function markPostProcessingRunProcessed(message, runKey) {
     }
 
     processedRuns.add(runKey);
+    message.extra ??= {};
+    const storedRuns = getStoredPostProcessingRuns(message).filter(value => value !== runKey);
+    storedRuns.push(runKey);
+    message.extra[POST_PROCESSING_RUNS_EXTRA_KEY] = storedRuns.slice(-MAX_TRANSFORM_HISTORY);
 }
 
 function getDeferredActivationSnapshot(generationType) {
@@ -551,17 +581,33 @@ function deferPostProcessing(messageIndex, generationType, activationSnapshot = 
     if (!isGenerationInProgress) {
         scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
         schedulePostGenerationRecoveryCheck(DEFERRED_POST_PROCESSING_RETRY_MS);
+    } else {
+        scheduleMissedGenerationEndRecoveryCheck();
     }
 }
 
 function isDeferredPostProcessingMessageCurrent(pendingMessage) {
     const message = chat[pendingMessage.messageIndex];
 
+    if (!message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    if (message === pendingMessage.message) {
+        return true;
+    }
+
+    if (pendingMessage.message && getMessageRevisionKey(message) === getMessageRevisionKey(pendingMessage.message)) {
+        return true;
+    }
+
+    if (pendingMessage.messageIndex >= generationStartChatLength) {
+        return true;
+    }
+
     return Boolean(
-        message &&
-        message === pendingMessage.message &&
-        !message.is_user &&
-        !message.is_system,
+        message === generationStartLastAssistantMessage &&
+        getMessageRevisionKey(message) !== generationStartLastAssistantRevision,
     );
 }
 
@@ -713,6 +759,111 @@ function schedulePostGenerationRecoveryCheck(delayMs = 0) {
     }, delayMs);
 }
 
+function hasRecoverableAssistantPostProcessingCandidate() {
+    if (!pendingGenerationSnapshot || generationStopRequested || internalPromptTransformDepth > 0) {
+        return false;
+    }
+
+    const activationSnapshot = cloneActivationSnapshot(pendingGenerationSnapshot, pendingGenerationSnapshot.generationType);
+    if (activationSnapshot.activeAgentIds.length === 0) {
+        return false;
+    }
+
+    const messageIndex = getLatestAssistantMessageIndex();
+    if (messageIndex < 0) {
+        return false;
+    }
+
+    const message = chat[messageIndex];
+    const isNewAssistantMessage = messageIndex >= generationStartChatLength;
+    const isUpdatedExistingAssistantMessage = message === generationStartLastAssistantMessage &&
+        getMessageRevisionKey(message) !== generationStartLastAssistantRevision;
+
+    if (!isNewAssistantMessage && !isUpdatedExistingAssistantMessage) {
+        return false;
+    }
+
+    const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
+    return !hasProcessedPostProcessingRun(message, runKey);
+}
+
+function hasActiveStreamingProcessorIgnoringGenerationFlag(messageIndex) {
+    const liveStreamingProcessor = getStreamingTarget(messageIndex);
+    if (!liveStreamingProcessor) {
+        return false;
+    }
+
+    return Boolean(
+        !liveStreamingProcessor.isFinished &&
+        !liveStreamingProcessor.isStopped &&
+        !liveStreamingProcessor.abortController?.signal?.aborted,
+    );
+}
+
+function canRecoverMissedGenerationEnd() {
+    if (!isGenerationInProgress || !hasRecoverableAssistantPostProcessingCandidate()) {
+        return false;
+    }
+
+    const messageIndex = getLatestAssistantMessageIndex();
+    const message = chat[messageIndex];
+
+    if (hasActiveStreamingProcessorIgnoringGenerationFlag(messageIndex)) {
+        return false;
+    }
+
+    if (message?.gen_finished) {
+        return true;
+    }
+
+    if (document.body?.dataset?.generating !== 'true') {
+        return true;
+    }
+
+    return Date.now() - generationStartedAt > BODY_GENERATING_FLAG_GRACE_MS;
+}
+
+function recoverMissedGenerationEnd(reason = 'fallback') {
+    if (!canRecoverMissedGenerationEnd()) {
+        return false;
+    }
+
+    console.warn(`[InChatAgents] Recovering missed generation end via ${reason}; flushing queued post-processing.`);
+    isGenerationInProgress = false;
+    lastMainGenerationEndedAt = Date.now() - BODY_GENERATING_FLAG_GRACE_MS;
+    toolSyncDuringGeneration = false;
+    generationStopRequested = false;
+    clearMissedGenerationEndRecoveryCheck();
+    queueLatestAssistantPostProcessingFromSnapshot();
+    scheduleDeferredPostProcessingFlush();
+    schedulePostGenerationRecoveryCheck();
+    latestAssistantPostProcessingFallbackDeadline = Date.now() + LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS;
+    scheduleLatestAssistantPostProcessingFallback();
+    return true;
+}
+
+function scheduleMissedGenerationEndRecoveryCheck(delayMs = MISSED_GENERATION_END_RECOVERY_MS) {
+    if (!isGenerationInProgress || generationStopRequested) {
+        return;
+    }
+
+    if (missedGenerationEndRecoveryTimeout) {
+        clearTimeout(missedGenerationEndRecoveryTimeout);
+    }
+
+    missedGenerationEndRecoveryTimeout = setTimeout(() => {
+        missedGenerationEndRecoveryTimeout = null;
+
+        if (recoverMissedGenerationEnd('watchdog')) {
+            return;
+        }
+
+        if (isGenerationInProgress && hasRecoverableAssistantPostProcessingCandidate()) {
+            scheduleMissedGenerationEndRecoveryCheck();
+        }
+    }, delayMs);
+}
+
 function observePostGenerationRecoveryTargets() {
     if (!postGenerationRecoveryObserver) {
         return;
@@ -744,7 +895,12 @@ function initPostGenerationRecoveryHooks() {
     }
 
     postGenerationRecoveryHooksInitialized = true;
-    const scheduleRecovery = () => schedulePostGenerationRecoveryCheck();
+    const scheduleRecovery = () => {
+        if (!recoverMissedGenerationEnd('event')) {
+            scheduleMissedGenerationEndRecoveryCheck();
+        }
+        schedulePostGenerationRecoveryCheck();
+    };
     const observeAndScheduleRecovery = () => {
         observePostGenerationRecoveryTargets();
         scheduleRecovery();
@@ -1701,9 +1857,11 @@ function onGenerationStarted(generationType, _options, dryRun) {
     isGenerationInProgress = true;
     toolSyncDuringGeneration = true;
     generationStopRequested = false;
+    generationStartedAt = Date.now();
     lastMainGenerationEndedAt = 0;
     clearLatestAssistantPostProcessingFallback();
     clearPostGenerationRecoveryCheck();
+    clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
     pendingGenerationSnapshot = buildActivationSnapshot(currentMainGenerationType);
     generationStartChatLength = chat.length;
@@ -1736,6 +1894,7 @@ function onGenerationEnded() {
     lastMainGenerationEndedAt = Date.now();
     toolSyncDuringGeneration = false;
     generationStopRequested = false;
+    clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
     queueLatestAssistantPostProcessingFromSnapshot();
     scheduleDeferredPostProcessingFlush();
@@ -1754,6 +1913,7 @@ function onGenerationStopped() {
     lastMainGenerationEndedAt = Date.now();
     clearLatestAssistantPostProcessingFallback();
     clearPostGenerationRecoveryCheck();
+    clearMissedGenerationEndRecoveryCheck();
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
 }
