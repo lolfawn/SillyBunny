@@ -50,6 +50,7 @@ describe('in-chat agent post-processing runner', () => {
             GENERATION_STOPPED: 'generation_stopped',
             MESSAGE_RECEIVED: 'message_received',
             MESSAGE_EDITED: 'message_edited',
+            CHARACTER_MESSAGE_RENDERED: 'character_message_rendered',
             IMPERSONATE_READY: 'impersonate_ready',
             MESSAGE_SWIPED: 'message_swiped',
             CHAT_COMPLETION_SETTINGS_READY: 'chat_completion_settings_ready',
@@ -377,5 +378,45 @@ describe('in-chat agent post-processing runner', () => {
         expect(chat[0].mes).toBe('First speaker\n[post processed]');
         expect(chat[1].mes).toBe('Second speaker\n[post processed]');
         expect(saveChatDebounced).toHaveBeenCalledTimes(2);
+    });
+
+    test('applies mobile deferred post-processing once after the body generating flag clears', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Mobile reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await new Promise(resolve => setTimeout(resolve, 5));
+
+        expect(chat[0].mes).toBe('Mobile reply');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        delete document.body.dataset.generating;
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
     });
 });

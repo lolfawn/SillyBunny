@@ -67,6 +67,7 @@ let isGenerationInProgress = false;
 let generationStopRequested = false;
 const deferredPostProcessingQueue = new Map();
 let deferredPostProcessingTimeout = null;
+let latestAssistantPostProcessingFallbackTimeout = null;
 const activePromptTransformToasts = new Set();
 const agentGenerationStateListeners = new Set();
 const manualAgentRunQueue = [];
@@ -156,6 +157,7 @@ export function cancelAgentGeneration() {
         generationStopRequested = true;
     }
 
+    clearLatestAssistantPostProcessingFallback();
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
 
@@ -431,6 +433,15 @@ function clearDeferredPostProcessing(messageIndex = null) {
     }
 }
 
+function clearLatestAssistantPostProcessingFallback() {
+    if (!latestAssistantPostProcessingFallbackTimeout) {
+        return;
+    }
+
+    clearTimeout(latestAssistantPostProcessingFallbackTimeout);
+    latestAssistantPostProcessingFallbackTimeout = null;
+}
+
 function cloneActivationSnapshot(snapshot, generationType) {
     const normalizedGenerationType = normalizeGenerationType(snapshot?.generationType ?? generationType);
 
@@ -519,6 +530,10 @@ function deferPostProcessing(messageIndex, generationType, activationSnapshot = 
         message: chat[numericMessageIndex] ?? null,
         activationSnapshot: snapshot,
     });
+
+    if (!isGenerationInProgress) {
+        scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
+    }
 }
 
 function isDeferredPostProcessingMessageCurrent(pendingMessage) {
@@ -598,6 +613,26 @@ function scheduleDeferredPostProcessingFlush(delayMs = 0) {
         if (deferredPostProcessingQueue.size > 0) {
             scheduleDeferredPostProcessingFlush();
         }
+    }, delayMs);
+}
+
+function scheduleLatestAssistantPostProcessingFallback(delayMs = DEFERRED_POST_PROCESSING_RETRY_MS) {
+    clearLatestAssistantPostProcessingFallback();
+
+    latestAssistantPostProcessingFallbackTimeout = setTimeout(() => {
+        latestAssistantPostProcessingFallbackTimeout = null;
+
+        if (!pendingGenerationSnapshot || generationStopRequested || isGenerationInProgress) {
+            return;
+        }
+
+        if (internalPromptTransformDepth > 0 || isBodyGenerationFlagBlocking()) {
+            scheduleLatestAssistantPostProcessingFallback(DEFERRED_POST_PROCESSING_RETRY_MS);
+            return;
+        }
+
+        queueLatestAssistantPostProcessingFromSnapshot();
+        scheduleDeferredPostProcessingFlush();
     }, delayMs);
 }
 
@@ -1490,6 +1525,7 @@ function onGenerationStarted() {
     toolSyncDuringGeneration = true;
     generationStopRequested = false;
     lastMainGenerationEndedAt = 0;
+    clearLatestAssistantPostProcessingFallback();
     clearAllPromptTransformRunningToasts();
     pendingGenerationSnapshot = null;
     generationStartChatLength = chat.length;
@@ -1524,6 +1560,7 @@ function onGenerationEnded() {
     clearAllPromptTransformRunningToasts();
     queueLatestAssistantPostProcessingFromSnapshot();
     scheduleDeferredPostProcessingFlush();
+    scheduleLatestAssistantPostProcessingFallback();
 }
 
 function onGenerationStopped() {
@@ -1534,6 +1571,7 @@ function onGenerationStopped() {
     generationStopRequested = true;
     isGenerationInProgress = false;
     lastMainGenerationEndedAt = Date.now();
+    clearLatestAssistantPostProcessingFallback();
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
 }

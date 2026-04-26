@@ -5,26 +5,31 @@
 Date: 2026-04-26
 
 ### Added
-- Added built-in Echo, Whisper, Hush, Ripple, and Tide chat styles plus a persistent compact mode so the core UI no longer depends on Moonlit Echoes.
+- Added a persistent compact mode for the refreshed SillyBunny UI.
 - Added Chat History tools for LLM-assisted chat labels, old-chat cleanup, and backup cleanup with previews, confirmations, retention filters, and mobile-friendly controls.
 - Added Customize > Server thumbnail controls for format, quality, dimensions, sharp defaults, and per-user cache clearing; sharp PNG thumbnails are now the default.
 - Added roomier editing tools, including a resizable first-message field, a desktop World Info pop-up editor, expanded context-size presets, and Text Completions preset parity.
 
 ### Changed
 - Reworked the default desktop and mobile UI for more consistent spacing, square icon buttons, aligned drawers, normalized dropdowns, readable highlighted text, and a less cramped composer.
-- Made Moonlit Echoes optional by removing core UI assumptions about its drawers, search copy, and chat-style ownership while keeping compatibility when the extension is enabled.
+- Kept core chat style validation to Flat, Bubbles, and Document; old saved Moonlit style values now reset to Flat and clear legacy body classes.
 - Renamed Navigate to Workspace, shortened the primary character shortcut labels to `FAV.` and `ADV.`, and removed deprecated visible Extras wording.
 - Cleaned up launcher installs so routine starts are quieter, preserve ESLint dependencies, and avoid unnecessary dependency work when runtime inputs have not changed.
+
+### Removed
+- Removed the bundled Moonlit Echoes extension, built-in Moonlit chat stylesheet, and Echo, Whisper, Hush, Ripple, and Tide options from core Appearance.
 
 ### Fixed
 - Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, bottom chat spacing, composer panel theming, and first-message top alignment.
 - Fixed group chat edge cases so unread DM avatars stay aligned, DM taps open the correct private chat, and Character Author's Note (Private) persists on the group chat.
-- Fixed In-Chat Agent behavior for separated Individual/Group enablement, queued manual runs, hidden idle cancel buttons, Pathfinder control alignment, and automatic post-generation runs on desktop and mobile.
+- Fixed In-Chat Agent behavior for separated Individual/Group enablement, queued manual runs, hidden idle cancel buttons, Pathfinder control alignment, and automatic post-generation runs on desktop and mobile, including mobile render timing while the generation flag clears.
 - Fixed duplicate extension settings drawers so repeated extension activation does not create doubled panels.
 - Fixed Moonlit Echoes fork styling so enabled Moonlit chat thumbnails and the mobile composer remain usable.
 - Fixed lint coverage by including `scripts/**/*.js` in the standard ESLint target and resolving the existing lint failures.
 
 ### Commits
+- `chore(ui): remove bundled moonlit echoes`
+- `fix(agents): restore mobile post-generation auto-apply`
 - `fix(ui): make Moonlit Echoes optional`
 - `fix(tooling): keep eslint stable after launcher installs`
 - `fix(ui): improve default chat surface readability`
