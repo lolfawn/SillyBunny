@@ -2550,6 +2550,41 @@ input[type='range']::-moz-range-thumb {
     min-width: 0;
 }
 
+#openai_settings {
+    --sb-openai-inline-select-width: clamp(260px, 40%, 320px);
+}
+
+#openai_settings .oneline-dropdown {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(240px, var(--sb-openai-inline-select-width));
+    align-items: center;
+    justify-content: stretch;
+    column-gap: 16px;
+    row-gap: 8px;
+    width: 100%;
+}
+
+#openai_settings .oneline-dropdown > label,
+#openai_settings .oneline-dropdown.sb-setting-inline-center > .sb-setting-inline-copy {
+    grid-column: 1;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+    text-align: left;
+}
+
+#openai_settings .oneline-dropdown > select:not(.select2-hidden-accessible) {
+    grid-column: 2;
+    justify-self: end;
+    width: 100% !important;
+    min-width: 0;
+    max-width: none;
+}
+
+#openai_settings .oneline-dropdown > :is(.toggle-description, strong.toggle-description) {
+    grid-column: 1 / -1;
+}
+
 #openai_api-presets .title_restorable,
 #openai_api-presets .margin0.title_restorable.standoutHeader {
     flex-wrap: wrap;
@@ -2638,8 +2673,15 @@ input[type='range']::-moz-range-thumb {
     #openai_api .oneline-dropdown,
     #openai_settings .oneline-dropdown,
     #range_block_openai .oneline-dropdown {
+        grid-template-columns: 1fr;
         align-items: stretch;
         gap: 8px;
+    }
+
+    #openai_settings .oneline-dropdown > label,
+    #openai_settings .oneline-dropdown > select:not(.select2-hidden-accessible),
+    #openai_settings .oneline-dropdown.sb-setting-inline-center > .sb-setting-inline-copy {
+        grid-column: 1;
     }
 
     #openai_api .oneline-dropdown label,
