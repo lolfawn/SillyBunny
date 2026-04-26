@@ -2958,6 +2958,15 @@
                                 <option value="zai">Z.AI (GLM)</option>
                             </optgroup>
                         </select>
+                        <div id="oai_max_context_unlocked_block" class="range-block" data-source="openrouter,nanogpt">
+                            <label class="checkbox_label" for="oai_max_context_unlocked">
+                                <input id="oai_max_context_unlocked" type="checkbox">
+                                <span data-i18n="Unlocked Context Size">Unlocked Context Size</span>
+                            </label>
+                            <div class="toggle-description justifyLeft" data-i18n="Allow context sizes above the model-provided limit.">
+                                Allow context sizes above the model-provided limit.
+                            </div>
+                        </div>
                         <div class="inline-drawer wide100p" data-source="openai,claude,mistralai,makersuite,vertexai,deepseek,xai,zai,moonshot">
                             <div class="inline-drawer-toggle inline-drawer-header">
                                 <b data-i18n="Reverse Proxy">Reverse Proxy</b>

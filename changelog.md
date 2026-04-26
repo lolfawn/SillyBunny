@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+Date: 2026-04-26
+
+Changes:
+- Added an OpenRouter/NanoGPT-only `Unlocked Context Size` toggle in Chat Completion token budget settings.
+- Preserved SillyBunny's always-unlocked context behavior for other Chat Completion providers while allowing OpenRouter and NanoGPT to clamp context size to model-provided limits when the toggle is disabled.
+
+Commits:
+- `feat(ui): expose context unlock for nanogpt and openrouter`
+
 ## v1.5.0
 
 Date: 2026-04-26
