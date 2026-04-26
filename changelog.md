@@ -22,7 +22,8 @@ Date: 2026-04-26
 ### Fixed
 - Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, bottom chat spacing, composer panel theming, and first-message top alignment.
 - Fixed group chat edge cases so unread DM avatars stay aligned, DM taps open the correct private chat, and Character Author's Note (Private) persists on the group chat.
-- Fixed In-Chat Agent behavior for separated Individual/Group enablement, queued manual runs, hidden idle cancel buttons, Pathfinder control alignment, and automatic post-generation runs on desktop and mobile, including mobile render timing while the generation flag clears.
+- Fixed In-Chat Agent behavior for separated Individual/Group enablement, queued manual runs, hidden idle cancel buttons, Pathfinder control alignment, recovered saved agent toggles missing from scoped state, and automatic post-generation runs on desktop and mobile, including late mobile render timing after the generation flag clears.
+- Fixed the refreshed mobile composer so the chat text box and bottom action bar stay compact on narrow screens.
 - Fixed duplicate extension settings drawers so repeated extension activation does not create doubled panels.
 - Fixed Moonlit Echoes fork styling so enabled Moonlit chat thumbnails and the mobile composer remain usable.
 - Fixed lint coverage by including `scripts/**/*.js` in the standard ESLint target and resolving the existing lint failures.
@@ -30,6 +31,8 @@ Date: 2026-04-26
 ### Commits
 - `chore(ui): remove bundled moonlit echoes`
 - `fix(agents): restore mobile post-generation auto-apply`
+- `fix(agents): recover saved post-generation toggles`
+- `fix(ui): compact mobile chat composer`
 - `fix(ui): make Moonlit Echoes optional`
 - `fix(tooling): keep eslint stable after launcher installs`
 - `fix(ui): improve default chat surface readability`

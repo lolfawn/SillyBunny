@@ -2995,6 +2995,30 @@ body.sb-shell-resizing * {
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 10%, transparent);
 }
 
+@media screen and (max-width: 768px) {
+    #sb-bottom-chat-bar {
+        gap: 6px;
+        margin-block-end: 6px;
+        padding: 4px 8px;
+        min-height: 38px;
+        border-radius: 16px;
+    }
+
+    #sb-bottom-chat-select {
+        height: 30px;
+        min-height: 30px;
+        padding: 0 10px;
+        font-size: calc(var(--mainFontSize) * 0.82);
+        border-radius: 12px;
+    }
+
+    .sb-bottom-chat-btn {
+        min-height: 30px;
+        padding: 3px 6px;
+        font-size: calc(var(--mainFontSize) * 0.86);
+    }
+}
+
 /* Persona quick-access bubble */
 #sb-persona-bubble {
     width: 32px;
@@ -3015,6 +3039,15 @@ body.sb-shell-resizing * {
 #sb-persona-bubble:hover {
     border-color: var(--color-primary, var(--sb-accent));
     transform: scale(1.08);
+}
+
+@media screen and (max-width: 768px) {
+    #sb-persona-bubble {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+    }
 }
 
 #sb-persona-picker {

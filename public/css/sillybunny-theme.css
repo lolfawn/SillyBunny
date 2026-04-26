@@ -1056,13 +1056,13 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 
 @media screen and (max-width: 760px) {
     #send_form {
-        padding: 6px 8px 8px;
+        padding: 4px 6px 6px;
     }
 
     #nonQRFormItems {
         align-items: flex-end;
-        gap: 8px;
-        padding: 4px 6px 2px;
+        gap: 6px;
+        padding: 3px 5px 2px;
     }
 
     #leftSendForm,
@@ -1105,9 +1105,9 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     }
 
     #send_textarea {
-        min-height: 72px;
-        padding: 12px 14px 16px;
-        font-size: calc(var(--mainFontSize) * 1.02);
+        min-height: 46px;
+        padding: 8px 10px;
+        font-size: var(--mainFontSize);
     }
 }
 .popup {
