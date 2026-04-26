@@ -26,7 +26,8 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 ### Workspace, Sampling, And Presets
 - Added a unified Sampling workspace/menu for Chat Completions, Text Completions, Kobold/Kobold Horde, and NovelAI.
 - Added backend-aware sampler cards, mobile quick access, anchored documentation links, normalized numeric sampler fields, and a Neutralize Samplers action for Chat Completions.
-- Added bundled Chat Completions presets for `Geechan - Universal Roleplay (Chat Completions) (v5.0)` and `Geechan's Chatroom Prompt`, with `Geechan's Chatroom Prompt` defaulting to a 256k context window.
+- Updated Geechan's bundled roleplay preset to `Geechan - Universal Roleplay (Chat Completions) (v5.1)` plus matching Text Completions context and system prompt variants, and automatically removes the old bundled v5.0 files from user data during content updates.
+- Replaced `Geechan's Chatroom Prompt` with the overhauled `Geechan - Universal Online Chat (Chat Completions) (v1.0)` preset, plus matching Text Completions context and system prompt files.
 - Added roomier editing tools, including a resizable first-message field, a desktop World Info pop-up editor, expanded context-size presets, Text Completions preset parity, and better advanced definitions editing.
 - Added an OpenRouter/NanoGPT-only `Unlocked Context Size` toggle in Chat Completion token budget settings, preserving SillyBunny's always-unlocked behavior for other providers.
 - Fixed preset and settings layout polish, including balanced prompt manager panes, aligned prompt preset controls, equalized Presets dropdown controls, and less-clipped preset action text.
@@ -66,13 +67,13 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Cleaned up launcher installs so routine starts are quieter, preserve ESLint dependencies, and avoid unnecessary dependency work when runtime inputs have not changed.
 - Fixed lint coverage by including `scripts/**/*.js` in the standard ESLint target and resolving the existing lint failures.
 - Fixed frontend cache clearing after updater reloads.
-- Updated `Geechan's Chatroom Prompt` emoji guidance to use normal emojis.
 - Bumped app-owned version strings to `1.5.0` without changing dependency versions.
 
 Commits:
 - `feat(ui): expose context unlock for nanogpt and openrouter`
 - `fix(agents): apply regex scripts during streaming`
 - `fix(agents): recover regenerated post-processing history`
+- `chore(presets): refresh Geechan bundled presets`
 
 ## v1.4.1
 
