@@ -25,6 +25,7 @@ import {
     normalizeAgentCategory,
     getAgentChatScopeLabel,
     getPromptTransformMode,
+    reconcileScopedEnabledAgentIdsFromLegacyFlags,
     resolveConnectionProfile,
     setAgentEnabledForCurrentScope,
     setGlobalSettings,
@@ -2840,8 +2841,12 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         toastr.success(`Removed ${removedDuplicateCount} redundant bundled agent duplicate(s).`);
     }
 
-    if (getGlobalSettings().separateRecentChats && initializeScopedAgentEnableState()) {
-        persistExtensionState();
+    if (getGlobalSettings().separateRecentChats) {
+        const initializedScopedAgentState = initializeScopedAgentEnableState();
+        const reconciledScopedAgentState = reconcileScopedEnabledAgentIdsFromLegacyFlags();
+        if (initializedScopedAgentState || reconciledScopedAgentState) {
+            persistExtensionState();
+        }
     }
 
     // Initialize the pipeline runner
@@ -3001,6 +3006,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         setGlobalSettings({ separateRecentChats: separated });
         if (separated) {
             initializeScopedAgentEnableState();
+            reconcileScopedEnabledAgentIdsFromLegacyFlags();
         }
         persistExtensionState();
         renderAgentList();

@@ -59,6 +59,7 @@ const PREPEND_PROMPT_TRANSFORM_TAG_RE = /\[(?:SCENE|TIME)\|/;
 const ASSISTANT_RESPONSE_WRAPPER_RE = /^\s*<assistant_response>\s*([\s\S]*?)\s*<\/assistant_response>\s*$/i;
 const BODY_GENERATING_FLAG_GRACE_MS = 1500;
 const DEFERRED_POST_PROCESSING_RETRY_MS = 50;
+const LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS = 3000;
 
 /** @type {{ generationType: string, activeAgentIds: string[] } | null} */
 let pendingGenerationSnapshot = null;
@@ -68,6 +69,7 @@ let generationStopRequested = false;
 const deferredPostProcessingQueue = new Map();
 let deferredPostProcessingTimeout = null;
 let latestAssistantPostProcessingFallbackTimeout = null;
+let latestAssistantPostProcessingFallbackDeadline = 0;
 const activePromptTransformToasts = new Set();
 const agentGenerationStateListeners = new Set();
 const manualAgentRunQueue = [];
@@ -435,11 +437,13 @@ function clearDeferredPostProcessing(messageIndex = null) {
 
 function clearLatestAssistantPostProcessingFallback() {
     if (!latestAssistantPostProcessingFallbackTimeout) {
+        latestAssistantPostProcessingFallbackDeadline = 0;
         return;
     }
 
     clearTimeout(latestAssistantPostProcessingFallbackTimeout);
     latestAssistantPostProcessingFallbackTimeout = null;
+    latestAssistantPostProcessingFallbackDeadline = 0;
 }
 
 function cloneActivationSnapshot(snapshot, generationType) {
@@ -616,23 +620,47 @@ function scheduleDeferredPostProcessingFlush(delayMs = 0) {
     }, delayMs);
 }
 
+function clearLatestAssistantPostProcessingFallbackTimer() {
+    if (!latestAssistantPostProcessingFallbackTimeout) {
+        return;
+    }
+
+    clearTimeout(latestAssistantPostProcessingFallbackTimeout);
+    latestAssistantPostProcessingFallbackTimeout = null;
+}
+
 function scheduleLatestAssistantPostProcessingFallback(delayMs = DEFERRED_POST_PROCESSING_RETRY_MS) {
-    clearLatestAssistantPostProcessingFallback();
+    clearLatestAssistantPostProcessingFallbackTimer();
+
+    if (!latestAssistantPostProcessingFallbackDeadline) {
+        latestAssistantPostProcessingFallbackDeadline = Date.now() + LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS;
+    }
 
     latestAssistantPostProcessingFallbackTimeout = setTimeout(() => {
         latestAssistantPostProcessingFallbackTimeout = null;
 
         if (!pendingGenerationSnapshot || generationStopRequested || isGenerationInProgress) {
+            latestAssistantPostProcessingFallbackDeadline = 0;
             return;
         }
 
         if (internalPromptTransformDepth > 0 || isBodyGenerationFlagBlocking()) {
-            scheduleLatestAssistantPostProcessingFallback(DEFERRED_POST_PROCESSING_RETRY_MS);
+            if (Date.now() < latestAssistantPostProcessingFallbackDeadline) {
+                scheduleLatestAssistantPostProcessingFallback(DEFERRED_POST_PROCESSING_RETRY_MS);
+            } else {
+                latestAssistantPostProcessingFallbackDeadline = 0;
+            }
             return;
         }
 
-        queueLatestAssistantPostProcessingFromSnapshot();
+        const queueResult = queueLatestAssistantPostProcessingFromSnapshot();
         scheduleDeferredPostProcessingFlush();
+
+        if (queueResult.retry && Date.now() < latestAssistantPostProcessingFallbackDeadline) {
+            scheduleLatestAssistantPostProcessingFallback(DEFERRED_POST_PROCESSING_RETRY_MS);
+        } else {
+            latestAssistantPostProcessingFallbackDeadline = 0;
+        }
     }, delayMs);
 }
 
@@ -677,18 +705,18 @@ function getLatestAssistantMessageIndex() {
 }
 
 function queueLatestAssistantPostProcessingFromSnapshot() {
-    if (!pendingGenerationSnapshot || deferredPostProcessingQueue.size > 0 || generationStopRequested) {
-        return;
+    if (!pendingGenerationSnapshot || generationStopRequested) {
+        return { queued: false, retry: false };
     }
 
     const activationSnapshot = cloneActivationSnapshot(pendingGenerationSnapshot, pendingGenerationSnapshot.generationType);
     if (activationSnapshot.activeAgentIds.length === 0) {
-        return;
+        return { queued: false, retry: false };
     }
 
     const messageIndex = getLatestAssistantMessageIndex();
     if (messageIndex < 0) {
-        return;
+        return { queued: false, retry: true };
     }
 
     const message = chat[messageIndex];
@@ -697,16 +725,17 @@ function queueLatestAssistantPostProcessingFromSnapshot() {
         getMessageRevisionKey(message) !== generationStartLastAssistantRevision;
 
     if (!isNewAssistantMessage && !isUpdatedExistingAssistantMessage) {
-        return;
+        return { queued: false, retry: true };
     }
 
     const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
 
     if (hasProcessedPostProcessingRun(message, runKey)) {
-        return;
+        return { queued: false, retry: false };
     }
 
     deferPostProcessing(messageIndex, activationSnapshot.generationType, activationSnapshot);
+    return { queued: true, retry: false };
 }
 
 function buildActivationSnapshot(generationType) {
@@ -1560,6 +1589,7 @@ function onGenerationEnded() {
     clearAllPromptTransformRunningToasts();
     queueLatestAssistantPostProcessingFromSnapshot();
     scheduleDeferredPostProcessingFlush();
+    latestAssistantPostProcessingFallbackDeadline = Date.now() + LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS;
     scheduleLatestAssistantPostProcessingFallback();
 }
 

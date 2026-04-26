@@ -195,6 +195,15 @@ function getScopedEnabledAgentIdSet(scope = getActiveAgentChatScope()) {
     return new Set(scopedEnabledAgentIds[normalizeAgentChatScope(scope)]);
 }
 
+function isAgentIdEnabledInAnyScope(agentId, scopedEnabledAgentIds = ensureScopedEnabledAgentIds()) {
+    const normalizedAgentId = String(agentId ?? '').trim();
+    if (!normalizedAgentId) {
+        return false;
+    }
+
+    return AGENT_CHAT_SCOPE_KEYS.some(scope => scopedEnabledAgentIds[scope].includes(normalizedAgentId));
+}
+
 export function isAgentEnabledForScope(agent, scope = getActiveAgentChatScope()) {
     if (!areAgentTogglesScopedByChatType() || !globalSettings.scopedEnabledAgentIdsInitialized) {
         return Boolean(agent?.enabled);
@@ -222,8 +231,7 @@ export function isAgentEnabledForAnyScope(agent) {
         return false;
     }
 
-    const scopedEnabledAgentIds = ensureScopedEnabledAgentIds();
-    return AGENT_CHAT_SCOPE_KEYS.some(scope => scopedEnabledAgentIds[scope].includes(agentId));
+    return isAgentIdEnabledInAnyScope(agentId);
 }
 
 export function setAgentEnabledForScope(agent, enabled, scope = getActiveAgentChatScope()) {
@@ -290,6 +298,39 @@ export function initializeScopedAgentEnableState(scope = getActiveAgentChatScope
     globalSettings.enabledAgentIdsByChatType = createDefaultScopedEnabledAgentIds();
     globalSettings.enabledAgentIdsByChatType[normalizedScope] = enabledAgentIds;
     globalSettings.scopedEnabledAgentIdsInitialized = true;
+    syncLegacyAgentEnabledFlagsFromScopes();
+    return true;
+}
+
+export function reconcileScopedEnabledAgentIdsFromLegacyFlags(scope = getActiveAgentChatScope()) {
+    if (!areAgentTogglesScopedByChatType() || !globalSettings.scopedEnabledAgentIdsInitialized) {
+        return false;
+    }
+
+    const normalizedScope = normalizeAgentChatScope(scope);
+    const scopedEnabledAgentIds = ensureScopedEnabledAgentIds();
+    const enabledIds = new Set(scopedEnabledAgentIds[normalizedScope]);
+    let changed = false;
+
+    for (const agent of agents) {
+        if (!agent?.enabled) {
+            continue;
+        }
+
+        const agentId = String(agent.id ?? '').trim();
+        if (!agentId || isAgentIdEnabledInAnyScope(agentId, scopedEnabledAgentIds)) {
+            continue;
+        }
+
+        enabledIds.add(agentId);
+        changed = true;
+    }
+
+    if (!changed) {
+        return false;
+    }
+
+    scopedEnabledAgentIds[normalizedScope] = [...enabledIds];
     syncLegacyAgentEnabledFlagsFromScopes();
     return true;
 }

@@ -419,4 +419,39 @@ describe('in-chat agent post-processing runner', () => {
         expect(chat[0].mes).toBe('Mobile reply\n[post processed]');
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
     });
+
+    test('polls the final assistant message after generation end when mobile render events are missed', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Late mobile reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        delete document.body.dataset.generating;
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Late mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Late mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
 });

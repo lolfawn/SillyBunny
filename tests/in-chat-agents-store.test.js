@@ -93,4 +93,48 @@ describe('in-chat agent scoped enabled state', () => {
         });
         expect(saveSettingsDebounced).toHaveBeenCalledTimes(1);
     });
+
+    test('recovers legacy enabled agents missing from initialized scoped settings', async () => {
+        const store = await importStore();
+        store.setGlobalSettings({
+            separateRecentChats: true,
+            scopedEnabledAgentIdsInitialized: true,
+            enabledAgentIdsByChatType: {
+                individual: ['agent-individual'],
+                group: [],
+            },
+        });
+        store.loadAgents([
+            {
+                id: 'agent-individual',
+                name: 'Individual Agent',
+                enabled: true,
+                category: 'custom',
+                injection: { order: 10 },
+            },
+            {
+                id: 'agent-post',
+                name: 'Saved Post Agent',
+                enabled: true,
+                category: 'content',
+                injection: { order: 20 },
+                phase: 'post',
+            },
+            {
+                id: 'agent-disabled',
+                name: 'Disabled Agent',
+                enabled: false,
+                category: 'custom',
+                injection: { order: 30 },
+            },
+        ]);
+
+        expect(store.getEnabledAgents().map(agent => agent.id)).toEqual(['agent-individual']);
+        expect(store.reconcileScopedEnabledAgentIdsFromLegacyFlags()).toBe(true);
+        expect(store.getEnabledAgents().map(agent => agent.id)).toEqual(['agent-individual', 'agent-post']);
+        expect(store.getGlobalSettings().enabledAgentIdsByChatType).toEqual({
+            individual: ['agent-individual', 'agent-post'],
+            group: [],
+        });
+    });
 });
