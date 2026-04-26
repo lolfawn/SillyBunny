@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, describe, expect, test } from '@jest/globals';
+import { beforeAll, afterAll, describe, expect, jest, test } from '@jest/globals';
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 
@@ -114,5 +114,82 @@ describe('OpenAI Responses integration', () => {
                 total_tokens: 17,
             },
         });
+    });
+
+    test('streams Responses API chunks as Chat Completions SSE', async () => {
+        const response = await fetch('http://127.0.0.1:3010/api/backends/chat-completions/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_completion_source: CHAT_COMPLETION_SOURCES.OPENAI_RESPONSES,
+                reverse_proxy: 'http://127.0.0.1:3001/v1/',
+                proxy_password: 'test-key',
+                model: 'gpt-5.4',
+                stream: true,
+                temperature: 1,
+                max_tokens: 32,
+                top_p: 1,
+                messages: [
+                    { role: 'user', content: 'Stream from Responses.' },
+                ],
+            }),
+        });
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get('content-type')).toContain('text/event-stream');
+
+        const text = await response.text();
+        expect(text).toContain('data: [DONE]');
+        const payloads = text
+            .split('\n')
+            .filter(line => line.startsWith('data: ') && line !== 'data: [DONE]')
+            .map(line => JSON.parse(line.slice(6)));
+
+        expect(payloads).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                object: 'chat.completion.chunk',
+                choices: [expect.objectContaining({ delta: { reasoning_content: 'gpt-5.4 stream' } })],
+            }),
+            expect.objectContaining({
+                object: 'chat.completion.chunk',
+                choices: [expect.objectContaining({ delta: { content: 'Hello from Responses.' } })],
+            }),
+        ]));
+    });
+
+    test('does not log expected Responses stream aborts as errors', async () => {
+        const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        const controller = new AbortController();
+
+        const response = await fetch('http://127.0.0.1:3010/api/backends/chat-completions/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+                chat_completion_source: CHAT_COMPLETION_SOURCES.OPENAI_RESPONSES,
+                reverse_proxy: 'http://127.0.0.1:3001/v1/',
+                proxy_password: 'test-key',
+                model: 'gpt-5.4-slow',
+                stream: true,
+                temperature: 1,
+                max_tokens: 32,
+                top_p: 1,
+                messages: [
+                    { role: 'user', content: 'Abort this stream.' },
+                ],
+            }),
+        });
+
+        expect(response.status).toBe(200);
+        controller.abort();
+        await response.text().catch(() => {});
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        expect(errorSpy).not.toHaveBeenCalledWith(
+            'Responses API stream error:',
+            expect.anything(),
+        );
+
+        errorSpy.mockRestore();
     });
 });

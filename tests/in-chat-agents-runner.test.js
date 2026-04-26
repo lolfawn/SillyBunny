@@ -346,6 +346,30 @@ describe('in-chat agent post-processing runner', () => {
         }];
     }
 
+    function useImpersonateTransformAgent() {
+        enabledAgents = [{
+            id: 'agent-impersonate-transform',
+            name: 'Impersonate Transform',
+            phase: 'post',
+            prompt: 'Rewrite impersonate output.',
+            injection: { order: 100 },
+            postProcess: {
+                enabled: true,
+                type: 'append',
+                appendText: '\n[should not run]',
+                promptTransformEnabled: true,
+                promptTransformMode: 'rewrite',
+                promptTransformMaxTokens: 8192,
+                promptTransformShowNotifications: false,
+            },
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['impersonate'],
+            },
+        }];
+    }
+
     async function waitFor(condition) {
         for (let i = 0; i < 20; i++) {
             if (condition()) {
@@ -360,6 +384,23 @@ describe('in-chat agent post-processing runner', () => {
         for (const handler of documentListeners.get(eventName) ?? []) {
             handler();
         }
+    }
+
+    function switchToSwipe(message, swipeId) {
+        message.swipe_id = swipeId;
+        message.mes = message.swipes[swipeId];
+        message.send_date = message.swipe_info[swipeId].send_date;
+        message.gen_started = message.swipe_info[swipeId].gen_started;
+        message.gen_finished = message.swipe_info[swipeId].gen_finished;
+        message.extra = structuredClone(message.swipe_info[swipeId].extra);
+    }
+
+    function saveVisibleMessageToSwipe(message) {
+        message.swipes[message.swipe_id] = message.mes;
+        message.swipe_info[message.swipe_id].send_date = message.send_date;
+        message.swipe_info[message.swipe_id].gen_started = message.gen_started;
+        message.swipe_info[message.swipe_id].gen_finished = message.gen_finished;
+        message.swipe_info[message.swipe_id].extra = structuredClone(message.extra);
     }
 
     test('does not mark normal chat generation as active agent generation', async () => {
@@ -658,6 +699,139 @@ describe('in-chat agent post-processing runner', () => {
         expect(chat[0].extra.inChatAgentTransformHistory).toHaveLength(1);
         expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory).toEqual(chat[0].extra.inChatAgentTransformHistory);
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('keeps prompt-transform storage separate for each swipe', async () => {
+        usePromptTransformPostAgent();
+        generateQuietPrompt
+            .mockResolvedValueOnce('First swipe rewrite')
+            .mockResolvedValueOnce('Second swipe rewrite');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'First swipe original',
+            is_user: false,
+            is_system: false,
+            send_date: '2026-04-26T00:00:00.000Z',
+            gen_started: '2026-04-26T00:00:00.000Z',
+            gen_finished: '2026-04-26T00:00:01.000Z',
+            swipe_id: 0,
+            swipes: ['First swipe original', 'Second swipe original'],
+            swipe_info: [
+                {
+                    send_date: '2026-04-26T00:00:00.000Z',
+                    gen_started: '2026-04-26T00:00:00.000Z',
+                    gen_finished: '2026-04-26T00:00:01.000Z',
+                    extra: {},
+                },
+                {
+                    send_date: '2026-04-26T00:00:10.000Z',
+                    gen_started: '2026-04-26T00:00:10.000Z',
+                    gen_finished: '2026-04-26T00:00:11.000Z',
+                    extra: {},
+                },
+            ],
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('First swipe rewrite');
+        expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory[0].afterText).toBe('First swipe rewrite');
+        expect(chat[0].swipe_info[1].extra.inChatAgentTransformHistory).toBeUndefined();
+
+        saveVisibleMessageToSwipe(chat[0]);
+        switchToSwipe(chat[0], 1);
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Second swipe rewrite');
+        expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory[0].afterText).toBe('First swipe rewrite');
+        expect(chat[0].swipe_info[1].extra.inChatAgentTransformHistory[0].afterText).toBe('Second swipe rewrite');
+        expect(chat[0].swipe_info[0].extra.inChatAgentPromptRuns[0].nextMessageText).toBe('First swipe rewrite');
+        expect(chat[0].swipe_info[1].extra.inChatAgentPromptRuns[0].nextMessageText).toBe('Second swipe rewrite');
+        expect(chat[0].swipe_info[0].extra.inChatAgentPromptRuns[0].outputText).toBeUndefined();
+
+        saveVisibleMessageToSwipe(chat[0]);
+        switchToSwipe(chat[0], 0);
+
+        expect(chat[0].mes).toBe('First swipe rewrite');
+        expect(chat[0].extra.inChatAgentTransformHistory[0].afterText).toBe('First swipe rewrite');
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(2);
+        expect(saveChatDebounced).toHaveBeenCalledTimes(2);
+    });
+
+    test('keeps in-chat regex metadata in active swipe storage for chat reloads', async () => {
+        useRegexOnlyAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: '[STATUS|ready]',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].swipe_info[0].extra.inChatAgents.regexScripts).toEqual(enabledAgents[0].regexScripts);
+
+        chat[0].extra = {};
+        switchToSwipe(chat[0], 0);
+
+        expect(chat[0].extra.inChatAgents.regexScripts).toEqual(enabledAgents[0].regexScripts);
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        expect(chat[0].extra.inChatAgents.regexScripts).toEqual(enabledAgents[0].regexScripts);
+    });
+
+    test('ignores impersonate post-processing without clearing existing regex metadata', async () => {
+        useImpersonateTransformAgent();
+        generateQuietPrompt.mockResolvedValue('Should not apply');
+
+        const existingSnapshot = {
+            activeAgentIds: ['agent-regex-only'],
+            generationType: 'normal',
+            regexScripts: [{ id: 'regex-script-1', findRegex: '/ready/g', replaceString: 'done' }],
+            edited: false,
+        };
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: '[STATUS|ready]',
+            is_user: false,
+            is_system: false,
+            swipe_id: 0,
+            swipes: ['[STATUS|ready]'],
+            swipe_info: [{
+                send_date: '2026-04-26T00:00:00.000Z',
+                gen_started: '2026-04-26T00:00:00.000Z',
+                gen_finished: '2026-04-26T00:00:01.000Z',
+                extra: { inChatAgents: structuredClone(existingSnapshot) },
+            }],
+            extra: { inChatAgents: structuredClone(existingSnapshot) },
+        });
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'impersonate', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'impersonate', {}, false);
+        await eventSource.emit(eventTypes.IMPERSONATE_READY);
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'impersonate');
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'impersonate');
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('[STATUS|ready]');
+        expect(chat[0].extra.inChatAgents).toEqual(existingSnapshot);
+        expect(chat[0].swipe_info[0].extra.inChatAgents).toEqual(existingSnapshot);
+        expect(generateQuietPrompt).not.toHaveBeenCalled();
+        expect(saveChatDebounced).not.toHaveBeenCalled();
     });
 
     test('applies mobile deferred post-processing once after the body generating flag clears', async () => {

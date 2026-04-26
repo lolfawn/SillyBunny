@@ -1,5 +1,26 @@
 # Changelog
 
+## Staging Bug Fixes - 2026-04-26
+
+Changes:
+- Fixed OpenAI Responses streaming so expected client disconnects and aborts stop cleanly without noisy `Responses API stream error` logs, while preserving error logging for real upstream stream failures.
+- Added Responses API stream coverage for Chat Completions SSE conversion, reasoning deltas, output deltas, and abort suppression.
+- Restored compact one-line mobile Prompt Manager rows on very narrow screens by keeping prompt names, controls, and token counts aligned in a single row.
+- Fixed In-Chat Agents so Impersonate is treated as user-side generation and no longer runs post-processing, fallback recovery, or regex snapshot mutation against the previous assistant message.
+- Fixed In-Chat Agent prompt-transform runs, transform history, processed-run keys, and regex snapshots to use active swipe metadata instead of leaking shared message metadata across swipes.
+- Fixed In-Chat Agent regex persistence so active swipe regex metadata survives chat reloads and is not cleared after Impersonate events.
+- Updated prompt-transform undo/redo to read active swipe history.
+
+Verification:
+- `npm run test:unit --prefix tests -- tests/in-chat-agents-runner.test.js`
+- `npm run test:unit --prefix tests -- tests/openai-responses.test.js`
+- `npm run lint`
+- `git diff --check`
+- `npm run test:unit --prefix tests`
+
+Commits:
+- `fix: stabilize responses streaming and agent swipes`
+
 ## v1.5.0
 
 Date: 2026-04-26

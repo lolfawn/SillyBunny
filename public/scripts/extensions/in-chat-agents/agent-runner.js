@@ -53,6 +53,7 @@ const MAX_TRANSFORM_HISTORY = 10;
 const pendingRefreshTimeouts = new Map();
 const pendingRegexSnapshotSaves = new WeakSet();
 const GREETING_GENERATION_TYPE = 'first_message';
+const IMPERSONATE_GENERATION_TYPE = 'impersonate';
 const PREPEND_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
     'tpl-scene-tracker',
     'tpl-time-tracker',
@@ -368,6 +369,10 @@ function isGreetingGenerationType(generationType) {
     return String(generationType ?? '').trim().toLowerCase() === GREETING_GENERATION_TYPE;
 }
 
+function isImpersonateGenerationType(generationType) {
+    return normalizeGenerationType(generationType) === IMPERSONATE_GENERATION_TYPE;
+}
+
 function getStreamingTarget(messageIndex) {
     if (!Number.isInteger(Number(messageIndex))) {
         return null;
@@ -498,32 +503,126 @@ function normalizeMessageRunValue(value) {
     return String(value);
 }
 
+function getActiveSwipeInfo(message, { create = false } = {}) {
+    if (!message || message.is_user || message.is_system) {
+        return null;
+    }
+
+    if (create) {
+        ensureSwipes(message);
+    }
+
+    if (typeof message.swipe_id !== 'number' || !Array.isArray(message.swipe_info)) {
+        return null;
+    }
+
+    const swipeInfo = message.swipe_info[message.swipe_id];
+    if (!swipeInfo || typeof swipeInfo !== 'object') {
+        return null;
+    }
+
+    if (create && (!swipeInfo.extra || typeof swipeInfo.extra !== 'object')) {
+        swipeInfo.extra = {};
+    }
+
+    return swipeInfo;
+}
+
+function cloneAgentExtraValue(value) {
+    return value === undefined ? undefined : structuredClone(value);
+}
+
+function getAgentExtraValue(message, key) {
+    const swipeInfo = getActiveSwipeInfo(message);
+    if (swipeInfo?.extra) {
+        return swipeInfo.extra[key];
+    }
+
+    return message?.extra?.[key];
+}
+
+function setAgentExtraValue(message, key, value) {
+    if (!message) {
+        return;
+    }
+
+    message.extra ??= {};
+    message.extra[key] = value;
+
+    const swipeInfo = getActiveSwipeInfo(message, { create: true });
+    if (swipeInfo?.extra) {
+        swipeInfo.extra[key] = cloneAgentExtraValue(value);
+    }
+}
+
+function deleteAgentExtraValue(message, key) {
+    if (!message) {
+        return;
+    }
+
+    if (message.extra && Object.hasOwn(message.extra, key)) {
+        delete message.extra[key];
+    }
+
+    const swipeInfo = getActiveSwipeInfo(message);
+    if (swipeInfo?.extra && Object.hasOwn(swipeInfo.extra, key)) {
+        delete swipeInfo.extra[key];
+    }
+}
+
+function hasAgentExtraValue(message, key) {
+    const swipeInfo = getActiveSwipeInfo(message);
+    if (swipeInfo?.extra) {
+        return Object.hasOwn(swipeInfo.extra, key);
+    }
+
+    return Boolean(
+        (message?.extra && Object.hasOwn(message.extra, key)),
+    );
+}
+
+function syncAssistantMessageTextToSwipe(message) {
+    if (!message || message.is_user || message.is_system) {
+        return;
+    }
+
+    ensureSwipes(message);
+
+    if (typeof message.swipe_id === 'number' && Array.isArray(message.swipes) && typeof message.swipes[message.swipe_id] === 'string') {
+        message.swipes[message.swipe_id] = message.mes;
+    }
+}
+
 function getPostProcessingRunKey(message, generationType, activationSnapshot = null) {
     const snapshotAgentIds = Array.isArray(activationSnapshot?.activeAgentIds)
         ? activationSnapshot.activeAgentIds.join(',')
         : '';
+    const swipeInfo = getActiveSwipeInfo(message);
 
     return [
         normalizeGenerationType(activationSnapshot?.generationType ?? generationType),
-        normalizeMessageRunValue(message?.gen_started),
-        normalizeMessageRunValue(message?.gen_finished),
-        normalizeMessageRunValue(message?.send_date),
+        normalizeMessageRunValue(swipeInfo?.gen_started ?? message?.gen_started),
+        normalizeMessageRunValue(swipeInfo?.gen_finished ?? message?.gen_finished),
+        normalizeMessageRunValue(swipeInfo?.send_date ?? message?.send_date),
         normalizeMessageRunValue(message?.swipe_id),
         snapshotAgentIds,
     ].join('|');
 }
 
 function getStoredPostProcessingRuns(message) {
-    return Array.isArray(message?.extra?.[POST_PROCESSING_RUNS_EXTRA_KEY])
-        ? message.extra[POST_PROCESSING_RUNS_EXTRA_KEY]
+    const storedRuns = getAgentExtraValue(message, POST_PROCESSING_RUNS_EXTRA_KEY);
+    return Array.isArray(storedRuns)
+        ? storedRuns
         : [];
 }
 
 function getMessageRevisionKey(message) {
+    const swipeInfo = getActiveSwipeInfo(message);
+
     return [
-        normalizeMessageRunValue(message?.gen_started),
-        normalizeMessageRunValue(message?.gen_finished),
-        normalizeMessageRunValue(message?.send_date),
+        normalizeMessageRunValue(swipeInfo?.gen_started ?? message?.gen_started),
+        normalizeMessageRunValue(swipeInfo?.gen_finished ?? message?.gen_finished),
+        normalizeMessageRunValue(swipeInfo?.send_date ?? message?.send_date),
         normalizeMessageRunValue(message?.swipe_id),
     ].join('|');
 }
@@ -540,7 +639,7 @@ function hasProcessedPostProcessingRun(message, runKey) {
 
 function markPostProcessingRunProcessed(message, runKey) {
     if (!message || !runKey) {
-        return;
+        return false;
     }
 
     let processedRuns = processedPostProcessingRuns.get(message);
@@ -550,10 +649,10 @@ function markPostProcessingRunProcessed(message, runKey) {
     }
 
     processedRuns.add(runKey);
-    message.extra ??= {};
     const storedRuns = getStoredPostProcessingRuns(message).filter(value => value !== runKey);
     storedRuns.push(runKey);
-    message.extra[POST_PROCESSING_RUNS_EXTRA_KEY] = storedRuns.slice(-MAX_TRANSFORM_HISTORY);
+    setAgentExtraValue(message, POST_PROCESSING_RUNS_EXTRA_KEY, storedRuns.slice(-MAX_TRANSFORM_HISTORY));
+    return true;
 }
 
 function getDeferredActivationSnapshot(generationType) {
@@ -561,6 +660,10 @@ function getDeferredActivationSnapshot(generationType) {
         pendingGenerationSnapshot ?? buildActivationSnapshot(generationType),
         generationType,
     );
+}
+
+function isAssistantPostProcessingGenerationType(generationType) {
+    return !isImpersonateGenerationType(generationType);
 }
 
 function deferPostProcessing(messageIndex, generationType, activationSnapshot = null) {
@@ -764,6 +867,10 @@ function hasRecoverableAssistantPostProcessingCandidate() {
     }
 
     const activationSnapshot = cloneActivationSnapshot(pendingGenerationSnapshot, pendingGenerationSnapshot.generationType);
+    if (!isAssistantPostProcessingGenerationType(activationSnapshot.generationType)) {
+        return false;
+    }
+
     if (activationSnapshot.activeAgentIds.length === 0) {
         return false;
     }
@@ -986,6 +1093,10 @@ function queueLatestAssistantPostProcessingFromSnapshot() {
     }
 
     const activationSnapshot = cloneActivationSnapshot(pendingGenerationSnapshot, pendingGenerationSnapshot.generationType);
+    if (!isAssistantPostProcessingGenerationType(activationSnapshot.generationType)) {
+        return { queued: false, retry: false };
+    }
+
     if (activationSnapshot.activeAgentIds.length === 0) {
         return { queued: false, retry: false };
     }
@@ -1066,15 +1177,15 @@ function updateMessageRegexSnapshot(message, activeAgents, generationType) {
     const regexScripts = activeAgents.flatMap(agent => getAgentRegexScripts(agent));
 
     if (regexScripts.length === 0) {
-        if (message.extra[MESSAGE_EXTRA_KEY]) {
-            delete message.extra[MESSAGE_EXTRA_KEY];
+        if (hasAgentExtraValue(message, MESSAGE_EXTRA_KEY)) {
+            deleteAgentExtraValue(message, MESSAGE_EXTRA_KEY);
             return true;
         }
 
         return false;
     }
 
-    const previousSnapshot = message.extra[MESSAGE_EXTRA_KEY];
+    const previousSnapshot = getAgentExtraValue(message, MESSAGE_EXTRA_KEY);
     const nextSnapshot = {
         activeAgentIds: activeAgents.map(agent => agent.id),
         generationType: normalizeGenerationType(generationType),
@@ -1095,12 +1206,16 @@ function updateMessageRegexSnapshot(message, activeAgents, generationType) {
         return false;
     }
 
-    message.extra[MESSAGE_EXTRA_KEY] = nextSnapshot;
+    setAgentExtraValue(message, MESSAGE_EXTRA_KEY, nextSnapshot);
     return true;
 }
 
 function ensureMessageRegexSnapshot(messageIndex, generationType, activationSnapshot = null, options = {}) {
     const { refresh = true, save = true } = options;
+    if (!isAssistantPostProcessingGenerationType(activationSnapshot?.generationType ?? generationType)) {
+        return false;
+    }
+
     const numericMessageIndex = Number(messageIndex);
     if (!Number.isInteger(numericMessageIndex)) {
         return false;
@@ -1154,6 +1269,10 @@ function getPromptTransformAgents(activeAgents) {
 function getPromptTransformAgentsForMessage(activeAgents, generationType) {
     if (isGreetingGenerationType(generationType)) {
         // Greeting messages should remain untouched by prompt-based rewrites/appends.
+        return [];
+    }
+
+    if (isImpersonateGenerationType(generationType)) {
         return [];
     }
 
@@ -1250,7 +1369,7 @@ function syncPromptTransformMessageState(message, messageIndex) {
         delete message.extra.display_text;
     }
 
-    syncAssistantMessageStateToSwipe(message, messageIndex);
+    syncAssistantMessageTextToSwipe(message);
 }
 
 function syncAssistantMessageStateToSwipe(message, messageIndex) {
@@ -1308,15 +1427,15 @@ function updatePromptTransformRuns(message, runs) {
     message.extra ??= {};
 
     if (!Array.isArray(runs) || runs.length === 0) {
-        if (Object.hasOwn(message.extra, PROMPT_RUNS_EXTRA_KEY)) {
-            delete message.extra[PROMPT_RUNS_EXTRA_KEY];
+        if (hasAgentExtraValue(message, PROMPT_RUNS_EXTRA_KEY)) {
+            deleteAgentExtraValue(message, PROMPT_RUNS_EXTRA_KEY);
             return true;
         }
 
         return false;
     }
 
-    message.extra[PROMPT_RUNS_EXTRA_KEY] = runs.map(result => sanitizePromptTransformRunForStorage(result));
+    setAgentExtraValue(message, PROMPT_RUNS_EXTRA_KEY, runs.map(result => sanitizePromptTransformRunForStorage(result)));
     return true;
 }
 
@@ -1325,9 +1444,9 @@ function updatePromptTransformHistory(message, run) {
         return false;
     }
 
-    message.extra ??= {};
-    const history = Array.isArray(message.extra[PROMPT_TRANSFORM_HISTORY_KEY])
-        ? message.extra[PROMPT_TRANSFORM_HISTORY_KEY]
+    const storedHistory = getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY);
+    const history = Array.isArray(storedHistory)
+        ? storedHistory
         : [];
 
     history.push({
@@ -1343,7 +1462,7 @@ function updatePromptTransformHistory(message, run) {
         history.shift();
     }
 
-    message.extra[PROMPT_TRANSFORM_HISTORY_KEY] = history;
+    setAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY, history);
     return true;
 }
 
@@ -2027,7 +2146,11 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
         return;
     }
 
-    syncAssistantMessageStateToSwipe(message, messageIndex);
+    if (!isAssistantPostProcessingGenerationType(activationSnapshot?.generationType ?? generationType)) {
+        return;
+    }
+
+    syncAssistantMessageTextToSwipe(message);
 
     const resolvedActivationSnapshot = activationSnapshot
         ? cloneActivationSnapshot(activationSnapshot, generationType)
@@ -2040,15 +2163,17 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
 
     const activeAgents = getActiveAgentsForMessage(generationType, resolvedActivationSnapshot);
     const promptTransformAgents = getPromptTransformAgentsForMessage(activeAgents, generationType);
-    const utilityAgents = activeAgents.filter(agent =>
-        agent.postProcess?.enabled &&
-        agent.postProcess.type !== 'regex' &&
-        (
-            agent.phase === 'post' ||
-            agent.phase === 'both' ||
-            agent.postProcess.type === 'extract'
-        ),
-    );
+    const utilityAgents = isImpersonateGenerationType(generationType)
+        ? []
+        : activeAgents.filter(agent =>
+            agent.postProcess?.enabled &&
+            agent.postProcess.type !== 'regex' &&
+            (
+                agent.phase === 'post' ||
+                agent.phase === 'both' ||
+                agent.postProcess.type === 'extract'
+            ),
+        );
 
     let chatStateChanged = false;
     let messageDisplayChanged = false;
@@ -2190,6 +2315,10 @@ async function onMessageReceived(messageIndex, generationType) {
         return;
     }
 
+    if (!isAssistantPostProcessingGenerationType(generationType)) {
+        return;
+    }
+
     const numericMessageIndex = Number(messageIndex);
     const message = chat[numericMessageIndex];
     if (!message || message.is_user || message.is_system) {
@@ -2255,11 +2384,13 @@ function onMessageEdited(messageIndex) {
     }
 
     const message = chat[messageIndex];
-    if (!message || !message.extra?.[MESSAGE_EXTRA_KEY]) {
+    const snapshot = getAgentExtraValue(message, MESSAGE_EXTRA_KEY);
+    if (!message || !snapshot) {
         return;
     }
 
-    message.extra[MESSAGE_EXTRA_KEY].edited = true;
+    snapshot.edited = true;
+    setAgentExtraValue(message, MESSAGE_EXTRA_KEY, snapshot);
     saveChatDebounced();
 }
 
@@ -2268,37 +2399,7 @@ async function onImpersonateReady() {
         return;
     }
 
-    if (!pendingGenerationSnapshot) {
-        return;
-    }
-
-    const messageIndex = chat.length - 1;
-    const message = chat[messageIndex];
-    if (!message || message.is_user || message.is_system) {
-        return;
-    }
-
-    const generationType = pendingGenerationSnapshot.generationType ?? 'impersonate';
-    ensureMessageRegexSnapshot(messageIndex, generationType);
-
-    if (isStreamingMessageStillActive(messageIndex)) {
-        deferPostProcessing(messageIndex, generationType);
-        return;
-    }
-
-    if (wasStreamingMessageStopped(messageIndex)) {
-        clearDeferredPostProcessing(messageIndex);
-        return;
-    }
-
-    if (isMainGenerationStillActive()) {
-        deferPostProcessing(messageIndex, generationType);
-        return;
-    }
-
-    clearDeferredPostProcessing(messageIndex);
-
-    await processReceivedMessage(messageIndex, generationType);
+    // Impersonate produces user-side text; this event must not mutate the last assistant swipe.
 }
 
 async function onMessageSwiped(data) {
@@ -2437,8 +2538,9 @@ export function undoPromptTransform(messageIndex) {
         return false;
     }
 
-    const history = Array.isArray(message.extra?.[PROMPT_TRANSFORM_HISTORY_KEY])
-        ? message.extra[PROMPT_TRANSFORM_HISTORY_KEY]
+    const storedHistory = getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY);
+    const history = Array.isArray(storedHistory)
+        ? storedHistory
         : [];
 
     if (history.length === 0) {
@@ -2459,8 +2561,9 @@ export function redoPromptTransform(messageIndex) {
         return false;
     }
 
-    const history = Array.isArray(message.extra?.[PROMPT_TRANSFORM_HISTORY_KEY])
-        ? message.extra[PROMPT_TRANSFORM_HISTORY_KEY]
+    const storedHistory = getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY);
+    const history = Array.isArray(storedHistory)
+        ? storedHistory
         : [];
 
     if (history.length === 0) {

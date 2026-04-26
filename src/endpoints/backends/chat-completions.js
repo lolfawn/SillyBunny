@@ -2200,6 +2200,19 @@ function transformResponsesApiResponse(data) {
     };
 }
 
+function isExpectedStreamAbort(error) {
+    const name = String(error?.name ?? '');
+    const type = String(error?.type ?? '');
+    const code = String(error?.code ?? '');
+    const message = String(error?.message ?? '').toLowerCase();
+
+    return name === 'AbortError' ||
+        type === 'aborted' ||
+        code === 'ABORT_ERR' ||
+        message.includes('operation was aborted') ||
+        message.includes('aborted');
+}
+
 /**
  * Transforms a Responses API SSE stream into Chat Completions SSE format.
  * @param {import('node-fetch').Response} fetchResponse The upstream Responses API response
@@ -2284,6 +2297,15 @@ function forwardResponsesApiStream(fetchResponse, expressResponse) {
     });
 
     fetchResponse.body.on('error', (err) => {
+        if (done || isExpectedStreamAbort(err) || expressResponse.destroyed) {
+            done = true;
+            if (!expressResponse.destroyed && !expressResponse.writableEnded) {
+                expressResponse.end();
+            }
+            return;
+        }
+
+        done = true;
         console.error('Responses API stream error:', err);
         if (!expressResponse.writableEnded) {
             expressResponse.end();
@@ -2291,6 +2313,11 @@ function forwardResponsesApiStream(fetchResponse, expressResponse) {
     });
 
     expressResponse.on('close', () => {
+        if (done) {
+            return;
+        }
+
+        done = true;
         if (fetchResponse.body && typeof fetchResponse.body.destroy === 'function') {
             fetchResponse.body.destroy();
         }
@@ -2443,6 +2470,13 @@ async function sendOpenAIResponsesRequest(request, response) {
             }
         }
     } catch (error) {
+        if (isExpectedStreamAbort(error)) {
+            if (!response.headersSent && !response.destroyed) {
+                response.end();
+            }
+            return;
+        }
+
         console.error('Error communicating with OpenAI Responses API: ', error);
         if (!response.headersSent) {
             response.send({ error: true });
