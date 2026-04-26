@@ -285,6 +285,7 @@ import { event_types, eventSource } from './scripts/events.js';
 import { initAccessibility } from './scripts/a11y.js';
 import { initQuickContextSizeEnhancer } from './scripts/quick-context-size-enhancer.js';
 import { applyStreamFadeIn } from './scripts/util/stream-fadein.js';
+import { getPositiveTokenCount, updateReasoningTokenAccounting } from './scripts/reasoning-token-accounting.js';
 import { initDomHandlers } from './scripts/dom-handlers.js';
 import { SimpleMutex } from './scripts/util/SimpleMutex.js';
 import { AudioPlayer } from './scripts/audio-player.js';
@@ -2870,6 +2871,34 @@ function getActiveSwipeExtraValue(message, key) {
 }
 
 /**
+ * Stores output and reasoning token counts separately for message metadata.
+ * @param {ChatMessage} message Message to update.
+ * @param {object} [options] Token accounting options.
+ * @param {string} [options.reasoning] Reasoning text to count separately.
+ * @param {number} [options.reasoningTokens] Provider-reported reasoning token count, if available.
+ * @param {boolean} [options.countOutput] Whether to refresh the visible output token count.
+ * @param {boolean} [options.countReasoning] Whether to estimate reasoning tokens when the provider did not report them.
+ * @returns {Promise<{outputTokens: number, reasoningTokens: number}>}
+ */
+export async function updateMessageTokenAccounting(
+    message,
+    {
+        reasoning = message?.extra?.reasoning ?? '',
+        reasoningTokens = message?.extra?.reasoning_tokens ?? 0,
+        countOutput = power_user.message_token_count_enabled,
+        countReasoning = countOutput,
+    } = {},
+) {
+    return updateReasoningTokenAccounting(message, {
+        countTokens: text => getTokenCountAsync(text, 0),
+        reasoning,
+        reasoningTokens,
+        countOutput,
+        countReasoning,
+    });
+}
+
+/**
  * Returns the URL of the avatar for the given character Id.
  * @param {number|string} characterId Character Id
  * @returns {string} Avatar URL
@@ -3746,6 +3775,8 @@ class StreamingProcessor {
         this.images = [];
         /** @type {string?} */
         this.reasoningSignature = null;
+        /** @type {number} */
+        this.reasoningTokens = 0;
     }
 
     /**
@@ -3853,17 +3884,20 @@ class StreamingProcessor {
                 delete chat[messageId].extra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
             }
             chat[messageId].extra.time_to_first_token = this.timeToFirstToken;
-            chat[messageId].extra.reasoning_tokens = this.reasoningTokens || 0;
 
             // Update reasoning
             await this.reasoningHandler.process(messageId, mesChanged, this.promptReasoning);
             processedText = chat[messageId].mes;
 
             // Token count update.
-            const tokenCountText = this.reasoningHandler.reasoning + processedText;
-            const currentTokenCount = isFinal && power_user.message_token_count_enabled ? await getTokenCountAsync(tokenCountText, 0) : 0;
-            if (currentTokenCount) {
-                chat[messageId].extra.token_count = currentTokenCount;
+            const shouldRefreshTokenCount = isFinal && power_user.message_token_count_enabled;
+            const { outputTokens: currentTokenCount } = await updateMessageTokenAccounting(chat[messageId], {
+                reasoning: this.reasoningHandler.reasoning,
+                reasoningTokens: Math.max(getPositiveTokenCount(this.reasoningTokens), getPositiveTokenCount(chat[messageId].extra.reasoning_tokens)),
+                countOutput: shouldRefreshTokenCount,
+                countReasoning: shouldRefreshTokenCount,
+            });
+            if (shouldRefreshTokenCount) {
                 if (this.messageTokenCounterDom instanceof HTMLElement) {
                     this.messageTokenCounterDom.textContent = `${currentTokenCount}t`;
                 }
@@ -3934,6 +3968,7 @@ class StreamingProcessor {
             delete swipeInfoExtra.token_count;
             delete swipeInfoExtra.reasoning;
             delete swipeInfoExtra.reasoning_duration;
+            delete swipeInfoExtra.reasoning_tokens;
             delete swipeInfoExtra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
             const swipeInfo = {
                 send_date: message.send_date,
@@ -7025,13 +7060,9 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
             lastMessage.extra.reasoning = reasoning;
             lastMessage.extra.reasoning_duration = null;
             lastMessage.extra.reasoning_signature = reasoningSignature;
-            lastMessage.extra.reasoning_tokens = reasoningTokens;
             delete lastMessage.extra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
             await processImageAttachment(lastMessage, { imageUrls });
-            if (power_user.message_token_count_enabled) {
-                const tokenCountText = (reasoning || '') + lastMessage.mes;
-                lastMessage.extra.token_count = await getTokenCountAsync(tokenCountText, 0);
-            }
+            await updateMessageTokenAccounting(lastMessage, { reasoning, reasoningTokens });
             const chat_id = (chat.length - 1);
             !fromStreaming && await eventSource.emit(event_types.MESSAGE_RECEIVED, chat_id, type);
             addOneMessage(chat[chat_id], { type: 'swipe' });
@@ -7053,10 +7084,7 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         lastMessage.extra.reasoning_duration = null;
         lastMessage.extra.reasoning_signature = reasoningSignature;
         await processImageAttachment(lastMessage, { imageUrls });
-        if (power_user.message_token_count_enabled) {
-            const tokenCountText = (reasoning || '') + lastMessage.mes;
-            lastMessage.extra.token_count = await getTokenCountAsync(tokenCountText, 0);
-        }
+        await updateMessageTokenAccounting(lastMessage, { reasoning, reasoningTokens });
         const chat_id = (chat.length - 1);
         !fromStreaming && await eventSource.emit(event_types.MESSAGE_RECEIVED, chat_id, type);
         addOneMessage(chat[chat_id], { type: 'swipe' });
@@ -7075,10 +7103,10 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         lastMessage.extra.reasoning_signature = reasoningSignature;
         await processImageAttachment(lastMessage, { imageUrls });
         // We don't know if the reasoning duration extended, so we don't update it here on purpose.
-        if (power_user.message_token_count_enabled) {
-            const tokenCountText = (reasoning || '') + lastMessage.mes;
-            lastMessage.extra.token_count = await getTokenCountAsync(tokenCountText, 0);
-        }
+        await updateMessageTokenAccounting(lastMessage, {
+            reasoning: lastMessage.extra.reasoning,
+            reasoningTokens: Math.max(getPositiveTokenCount(lastMessage.extra.reasoning_tokens), getPositiveTokenCount(reasoningTokens)),
+        });
         const chat_id = (chat.length - 1);
         !fromStreaming && await eventSource.emit(event_types.MESSAGE_RECEIVED, chat_id, type);
         addOneMessage(chat[chat_id], { type: 'swipe' });
@@ -7096,7 +7124,6 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         newMessage.extra.reasoning = reasoning;
         newMessage.extra.reasoning_duration = null;
         newMessage.extra.reasoning_signature = reasoningSignature;
-        newMessage.extra.reasoning_tokens = reasoningTokens;
         if (power_user.trim_spaces) {
             getMessage = getMessage.trim();
         }
@@ -7105,10 +7132,7 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         newMessage.gen_started = generation_started;
         newMessage.gen_finished = generationFinished;
 
-        if (power_user.message_token_count_enabled) {
-            const tokenCountText = (reasoning || '') + newMessage.mes;
-            newMessage.extra.token_count = await getTokenCountAsync(tokenCountText, 0);
-        }
+        await updateMessageTokenAccounting(newMessage, { reasoning, reasoningTokens });
 
         if (selected_group) {
             consumePendingGeneratedMessageExtra(newMessage);
@@ -7160,6 +7184,7 @@ export async function saveReply({ type, getMessage, fromStreaming = false, title
         delete swipeInfoExtra.token_count;
         delete swipeInfoExtra.reasoning;
         delete swipeInfoExtra.reasoning_duration;
+        delete swipeInfoExtra.reasoning_tokens;
         delete swipeInfoExtra[IN_CHAT_AGENT_TRANSFORM_HISTORY_KEY];
         const swipeInfo = {
             send_date: item.send_date,
@@ -11945,10 +11970,8 @@ export async function swipe(event, direction, { source, repeated, message = chat
                     chat[mesId].extra = {};
                 }
 
-                const tokenCountText = (chat[mesId]?.extra?.reasoning || '') + chat[mesId].mes;
-                const tokenCount = await getTokenCountAsync(tokenCountText, 0);
-                chat[mesId].extra.token_count = tokenCount;
-                thisMesDiv.find('.tokenCounterDisplay').text(`${tokenCount}t`);
+                const { outputTokens } = await updateMessageTokenAccounting(chat[mesId]);
+                thisMesDiv.find('.tokenCounterDisplay').text(`${outputTokens}t`);
             }
         }
 
@@ -12652,8 +12675,7 @@ function addDebugFunctions() {
                 message.extra = {};
             }
 
-            const tokenCountText = (message?.extra?.reasoning || '') + message.mes;
-            message.extra.token_count = await getTokenCountAsync(tokenCountText, 0);
+            await updateMessageTokenAccounting(message);
         }
 
         await saveChatConditional();

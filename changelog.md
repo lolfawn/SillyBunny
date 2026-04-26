@@ -4,7 +4,7 @@
 
 Date: 2026-04-26
 
-This is the next main update after `v1.4.2`. It includes the new Group Chat system, the refreshed Workspace/Customize shell, the unified Sampling workspace, improved mobile behavior, OpenAI Responses streaming fixes, In-Chat Agent fixes, RAG enablement fixes, the Moonlit Echoes cleanup, and redundant deprecated-code cleanup.
+This is the next main update after `v1.4.2`. It includes the new Group Chat system, the refreshed Workspace/Customize shell, the unified Sampling workspace, improved mobile behavior, token accounting fixes, OpenAI Responses streaming fixes, In-Chat Agent fixes, RAG enablement fixes, the Moonlit Echoes cleanup, and redundant deprecated-code cleanup.
 
 ### Group Chats
 Group Chats still work for normal group RP: you can pick a group, write as the user, choose who speaks next, and run the scene manually just like before. The new work adds optional tools for people who want the group to feel more like a living conversation, chatroom, party scene, or auto-RP setup without taking away the standard flow.
@@ -49,6 +49,8 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Fixed Impersonate handling so it is treated as user-side generation and no longer runs post-processing, fallback recovery, or regex snapshot mutation against the previous assistant message.
 - Fixed prompt-transform runs, transform history, processed-run keys, regex snapshots, and undo/redo controls to use active swipe metadata instead of leaking shared message metadata across swipes.
 - Scoped Prose Polisher and agent change history to the active swipe so the document icon only shows edits for the currently visible message.
+- Fixed dry-run prompt previews so active pre-generation in-chat agent prompts are included before generation starts, preventing token totals from jumping when the live request begins.
+- Prevented mobile render replacements from rerunning post-processing agents that already handled the same generated message.
 - Fixed active-swipe regex metadata persistence through chat reloads and prevented Impersonate events from clearing it.
 - Added a separate Pathfinder memory summary UI with editable summary text and injection status.
 - Fixed Agents Quick Toggles overflow, Pathfinder control alignment, hidden idle cancel buttons, and Pathfinder log detail layout.
@@ -62,6 +64,8 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Fixed the refreshed mobile composer so the chat text box and bottom action bar stay compact on narrow screens.
 - Restored compact one-line mobile Prompt Manager rows on very narrow screens by keeping prompt names, controls, and token counts aligned in a single row.
 - Removed the pill-shaped background from chat message numbers while keeping timer and token metadata spacing intact.
+- Fixed reasoning token accounting so locally parsed `<think>`, `<thinking>`, and `<thought>` blocks count as thought tokens while visible message token counts stay scoped to output text.
+- Enlarged quick context-size preset labels on mobile and narrow panels so values such as `128 K` and `1 M` fit their buttons cleanly.
 
 ### Extensions And Moonlit Echoes
 - Removed the bundled Moonlit Echoes extension, built-in Moonlit chat stylesheet, and Echo, Whisper, Hush, Ripple, and Tide options from core Appearance.
@@ -87,6 +91,7 @@ Commits:
 - `fix(agents): apply regex scripts during streaming`
 - `fix(agents): recover regenerated post-processing history`
 - `fix(agents): scope transform history to active swipe`
+- `fix: stabilize token accounting and mobile agents`
 - `fix: stabilize responses streaming and agent swipes`
 - `chore(presets): refresh Geechan bundled presets`
 - `chore: remove redundant deprecated code`

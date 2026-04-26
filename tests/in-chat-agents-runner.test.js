@@ -249,6 +249,30 @@ describe('in-chat agent post-processing runner', () => {
         }];
     }
 
+    function usePrePromptAgent() {
+        enabledAgents = [{
+            id: 'agent-pre-prompt',
+            name: 'Pre Prompt',
+            phase: 'pre',
+            prompt: 'Use the current scene style.',
+            injection: {
+                position: 0,
+                depth: 4,
+                scan: false,
+                role: 0,
+            },
+            postProcess: {
+                enabled: false,
+                promptTransformEnabled: false,
+            },
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        }];
+    }
+
     function useManualTransformAgents() {
         enabledAgents = [
             {
@@ -416,6 +440,19 @@ describe('in-chat agent post-processing runner', () => {
         await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
 
         expect(isAgentGenerationActive()).toBe(false);
+    });
+
+    test('includes pre-generation agent prompts during dry-run prompt previews', async () => {
+        usePrePromptAgent();
+        extensionPrompts.inchat_agent_stale = { value: 'stale preview prompt' };
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, true);
+
+        expect(extensionPrompts.inchat_agent_stale).toBeUndefined();
+        expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
     });
 
     test('queues manual agent runs while another manual agent is active', async () => {
@@ -951,6 +988,58 @@ describe('in-chat agent post-processing runner', () => {
         await new Promise(resolve => setTimeout(resolve, 75));
 
         expect(chat[0].mes).toBe('Mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not rerun mobile post-processing after render replaces a processed message object', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        chat.push({
+            name: 'Assistant',
+            mes: 'Mobile processed once',
+            is_user: false,
+            is_system: false,
+            swipe_id: 0,
+            swipes: ['Mobile processed once'],
+            swipe_info: [{ extra: {} }],
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await new Promise(resolve => setTimeout(resolve, 5));
+
+        expect(chat[0].mes).toBe('Mobile processed once');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        delete document.body.dataset.generating;
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Mobile processed once\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        chat[0] = {
+            name: 'Assistant',
+            mes: 'Mobile processed once\n[post processed]',
+            is_user: false,
+            is_system: false,
+            swipe_id: 0,
+            swipes: ['Mobile processed once\n[post processed]'],
+            swipe_info: [{ extra: {} }],
+            extra: {},
+        };
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Mobile processed once\n[post processed]');
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
     });
 

@@ -104,6 +104,7 @@ let toolRecursionDepth = 0;
 
 /** Tracks automatic post-processing per generated message revision so fallback events cannot double-apply agents. */
 const processedPostProcessingRuns = new WeakMap();
+const processedPostProcessingRunsByIndex = new Map();
 
 export function isAgentGenerationActive() {
     return internalPromptTransformDepth > 0 || manualAgentRunQueueProcessing || manualAgentRunQueue.length > 0;
@@ -627,17 +628,23 @@ function getMessageRevisionKey(message) {
     ].join('|');
 }
 
-function hasProcessedPostProcessingRun(message, runKey) {
+function hasProcessedPostProcessingRun(message, runKey, messageIndex = null) {
+    const numericMessageIndex = Number(messageIndex);
+    const indexRuns = Number.isInteger(numericMessageIndex)
+        ? processedPostProcessingRunsByIndex.get(numericMessageIndex)
+        : null;
+
     return Boolean(
-        message &&
+        runKey &&
         (
             processedPostProcessingRuns.get(message)?.has(runKey) ||
-            getStoredPostProcessingRuns(message).includes(runKey)
+            getStoredPostProcessingRuns(message).includes(runKey) ||
+            indexRuns?.includes(runKey)
         ),
     );
 }
 
-function markPostProcessingRunProcessed(message, runKey) {
+function markPostProcessingRunProcessed(message, runKey, messageIndex = null) {
     if (!message || !runKey) {
         return false;
     }
@@ -652,6 +659,15 @@ function markPostProcessingRunProcessed(message, runKey) {
     const storedRuns = getStoredPostProcessingRuns(message).filter(value => value !== runKey);
     storedRuns.push(runKey);
     setAgentExtraValue(message, POST_PROCESSING_RUNS_EXTRA_KEY, storedRuns.slice(-MAX_TRANSFORM_HISTORY));
+
+    const numericMessageIndex = Number(messageIndex);
+    if (Number.isInteger(numericMessageIndex)) {
+        const indexRuns = (processedPostProcessingRunsByIndex.get(numericMessageIndex) ?? [])
+            .filter(value => value !== runKey);
+        indexRuns.push(runKey);
+        processedPostProcessingRunsByIndex.set(numericMessageIndex, indexRuns.slice(-MAX_TRANSFORM_HISTORY));
+    }
+
     return true;
 }
 
@@ -886,7 +902,7 @@ function hasRecoverableAssistantPostProcessingCandidate() {
     }
 
     const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
-    return !hasProcessedPostProcessingRun(message, runKey);
+    return !hasProcessedPostProcessingRun(message, runKey, messageIndex);
 }
 
 function hasActiveStreamingProcessorIgnoringGenerationFlag(messageIndex) {
@@ -1113,7 +1129,7 @@ function queueLatestAssistantPostProcessingFromSnapshot() {
 
     const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
 
-    if (hasProcessedPostProcessingRun(message, runKey)) {
+    if (hasProcessedPostProcessingRun(message, runKey, messageIndex)) {
         return { queued: false, retry: false };
     }
 
@@ -2030,6 +2046,41 @@ function scheduleMessageRefresh(messageIndex, expectedMessage) {
     pendingRefreshTimeouts.set(messageIndex, timeoutId);
 }
 
+function clearInChatAgentExtensionPrompts() {
+    for (const key of Object.keys(extension_prompts)) {
+        if (key.startsWith(PROMPT_KEY_PREFIX) || PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(key)) {
+            delete extension_prompts[key];
+        }
+    }
+}
+
+function injectPreGenerationAgentPrompts(activeAgents, generationType) {
+    const promptAgents = activeAgents.filter(agent => agent.phase === 'pre' || agent.phase === 'both');
+
+    for (const agent of promptAgents) {
+        if (isToolAgent(agent)) {
+            continue;
+        }
+
+        const expandedPrompt = substituteParams(agent.prompt, {
+            dynamicMacros: buildPromptDynamicMacros('', null, agent, generationType),
+        });
+        if (!expandedPrompt.trim()) {
+            continue;
+        }
+
+        const key = PROMPT_KEY_PREFIX + agent.id;
+        setExtensionPrompt(
+            key,
+            expandedPrompt,
+            agent.injection.position,
+            agent.injection.depth,
+            agent.injection.scan,
+            agent.injection.role,
+        );
+    }
+}
+
 /**
  * Cleans up all in-chat agent extension prompts before a new generation.
  */
@@ -2054,6 +2105,7 @@ function onGenerationStarted(generationType, _options, dryRun) {
     generationStartLastAssistantIndex = latestAssistantMessageIndex;
     generationStartLastAssistantMessage = latestAssistantMessageIndex >= 0 ? chat[latestAssistantMessageIndex] : null;
     generationStartLastAssistantRevision = getMessageRevisionKey(generationStartLastAssistantMessage);
+    processedPostProcessingRunsByIndex.clear();
 
     const lastMsg = chat[chat.length - 1];
     const isRecursiveToolPass = lastMsg?.extra?.tool_invocations != null;
@@ -2063,11 +2115,7 @@ function onGenerationStarted(generationType, _options, dryRun) {
         toolRecursionDepth = 0;
     }
 
-    for (const key of Object.keys(extension_prompts)) {
-        if (key.startsWith(PROMPT_KEY_PREFIX) || PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(key)) {
-            delete extension_prompts[key];
-        }
-    }
+    clearInChatAgentExtensionPrompts();
 }
 
 function onGenerationEnded() {
@@ -2111,18 +2159,38 @@ function onGenerationStopped() {
  * @param {boolean} dryRun
  */
 async function onGenerationAfterCommands(generationType, _options, dryRun) {
-    if (dryRun || internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
+    if (internalPromptTransformDepth > 0) {
         return;
     }
 
     const normalizedGenerationType = normalizeGenerationType(generationType);
-    pendingGenerationSnapshot = pendingGenerationSnapshot?.generationType === normalizedGenerationType
-        ? cloneActivationSnapshot(pendingGenerationSnapshot, normalizedGenerationType)
-        : buildActivationSnapshot(normalizedGenerationType);
-    const activeAgents = getSnapshotAgents(pendingGenerationSnapshot);
+
+    if (dryRun && isGenerationInProgress) {
+        return;
+    }
+
+    if (dryRun) {
+        clearInChatAgentExtensionPrompts();
+    }
+
+    if (!areAgentsGloballyEnabled()) {
+        return;
+    }
+
+    const activationSnapshot = dryRun
+        ? buildActivationSnapshot(normalizedGenerationType)
+        : pendingGenerationSnapshot?.generationType === normalizedGenerationType
+            ? cloneActivationSnapshot(pendingGenerationSnapshot, normalizedGenerationType)
+            : buildActivationSnapshot(normalizedGenerationType);
+
+    if (!dryRun) {
+        pendingGenerationSnapshot = activationSnapshot;
+    }
+
+    const activeAgents = getSnapshotAgents(activationSnapshot);
     const pathfinderAgent = getPathfinderRuntimeAgent(activeAgents);
 
-    if (pathfinderAgent) {
+    if (!dryRun && pathfinderAgent) {
         syncPathfinderRuntimeSettings(pathfinderAgent);
         await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles);
 
@@ -2140,32 +2208,11 @@ async function onGenerationAfterCommands(generationType, _options, dryRun) {
         }
     }
 
-    const promptAgents = activeAgents.filter(agent => agent.phase === 'pre' || agent.phase === 'both');
+    injectPreGenerationAgentPrompts(activeAgents, generationType);
 
-    for (const agent of promptAgents) {
-        if (isToolAgent(agent)) {
-            continue;
-        }
-
-        const expandedPrompt = substituteParams(agent.prompt, {
-            dynamicMacros: buildPromptDynamicMacros('', null, agent, generationType),
-        });
-        if (!expandedPrompt.trim()) {
-            continue;
-        }
-
-        const key = PROMPT_KEY_PREFIX + agent.id;
-        setExtensionPrompt(
-            key,
-            expandedPrompt,
-            agent.injection.position,
-            agent.injection.depth,
-            agent.injection.scan,
-            agent.injection.role,
-        );
+    if (!dryRun) {
+        syncToolAgentRegistrations();
     }
-
-    syncToolAgentRegistrations();
 }
 
 /**
@@ -2190,10 +2237,10 @@ async function processReceivedMessage(messageIndex, generationType, activationSn
         ? cloneActivationSnapshot(activationSnapshot, generationType)
         : cloneActivationSnapshot(pendingGenerationSnapshot ?? buildActivationSnapshot(generationType), generationType);
     const runKey = getPostProcessingRunKey(message, generationType, resolvedActivationSnapshot);
-    if (hasProcessedPostProcessingRun(message, runKey)) {
+    if (hasProcessedPostProcessingRun(message, runKey, messageIndex)) {
         return;
     }
-    markPostProcessingRunProcessed(message, runKey);
+    markPostProcessingRunProcessed(message, runKey, messageIndex);
 
     const activeAgents = getActiveAgentsForMessage(generationType, resolvedActivationSnapshot);
     const promptTransformAgents = getPromptTransformAgentsForMessage(activeAgents, generationType);
