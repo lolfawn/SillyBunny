@@ -342,41 +342,6 @@ body.chrome-macos #sb-chatbar-layer {
     will-change: auto !important;
 }
 
-/*
- * Optional extension chat styles can keep the legacy top-settings stack above
- * the managed SillyBunny top bar and add their own header blur treatment. On
- * some browser/GPU combinations that legacy layer can mispaint as opaque black
- * blocks over the centered brand. Keep the managed header above it, flatten the
- * legacy header surface, and avoid extra containment in the top-bar stack.
- */
-body.echostyle #top-bar,
-body.hushstyle #top-bar {
-    background:
-        linear-gradient(180deg, color-mix(in srgb, var(--sb-shell-header-glow) 74%, transparent), transparent 112%),
-        color-mix(in srgb, var(--customTopBarColor, var(--SmartThemeBlurTintColor)) 94%, black 6%) !important;
-    background-color: color-mix(in srgb, var(--customTopBarColor, var(--SmartThemeBlurTintColor)) 94%, black 6%) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    z-index: 9010 !important;
-}
-
-body.echostyle #top-bar::before,
-body.hushstyle #top-bar::before {
-    display: none !important;
-}
-
-body.echostyle #sb-topbar-stack,
-body.echostyle #sb-chatbar-layer,
-body.hushstyle #sb-topbar-stack,
-body.hushstyle #sb-chatbar-layer {
-    contain: none !important;
-}
-
-body.echostyle #sb-chatbar-layer,
-body.hushstyle #sb-chatbar-layer {
-    will-change: auto !important;
-}
-
 hr {
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--sb-shell-border) 92%, transparent), transparent);
 }

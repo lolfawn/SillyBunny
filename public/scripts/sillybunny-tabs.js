@@ -186,11 +186,6 @@ const SB_MESSAGE_STYLES = Object.freeze([
     { id: '0', label: 'Flat', icon: 'fa-grip-lines' },
     { id: '1', label: 'Bubbles', icon: 'fa-comment-dots' },
     { id: '2', label: 'Document', icon: 'fa-file-lines' },
-    { id: '3', label: 'Echo', icon: 'fa-wave-square' },
-    { id: '4', label: 'Whisper', icon: 'fa-comment' },
-    { id: '5', label: 'Hush', icon: 'fa-volume-xmark' },
-    { id: '6', label: 'Ripple', icon: 'fa-water' },
-    { id: '7', label: 'Tide', icon: 'fa-water' },
 ]);
 
 const SB_SHELLS = Object.freeze({
@@ -9141,4 +9136,3 @@ if (ctx?.eventSource && ctx?.event_types) {
         }
     });
 }
-
