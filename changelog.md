@@ -68,6 +68,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Removed the pill-shaped background from chat message numbers while keeping timer and token metadata spacing intact.
 - Fixed reasoning token accounting so locally parsed `<think>`, `<thinking>`, and `<thought>` blocks count as thought tokens while visible message token counts stay scoped to output text.
 - Enlarged quick context-size preset labels on mobile and narrow panels so values such as `128 K` and `1 M` fit their buttons cleanly.
+- Aligned the mobile Quick Actions menu with fixed icon and label columns so every row starts and justifies consistently.
 
 ### Extensions And Moonlit Echoes
 - Removed the bundled Moonlit Echoes extension, built-in Moonlit chat stylesheet, and Echo, Whisper, Hush, Ripple, and Tide options from core Appearance.
@@ -96,6 +97,7 @@ Commits:
 - `fix: stabilize token accounting and mobile agents`
 - `fix(ui): correct prompt manager token attribution`
 - `fix(agents): harden mobile post-processing guards`
+- `fix(ui): align mobile quick actions menu`
 - `fix: stabilize responses streaming and agent swipes`
 - `chore(presets): refresh Geechan bundled presets`
 - `chore: remove redundant deprecated code`
