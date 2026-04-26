@@ -1,124 +1,66 @@
 # Changelog
 
-## Unreleased
+## v1.4.5
 
 Date: 2026-04-26
 
-### Added
-- Added a persistent compact mode for the refreshed SillyBunny UI.
-- Added Chat History tools for LLM-assisted chat labels, old-chat cleanup, and backup cleanup with previews, confirmations, retention filters, and mobile-friendly controls.
-- Added Customize > Server thumbnail controls for format, quality, dimensions, sharp defaults, and per-user cache clearing; sharp PNG thumbnails are now the default.
-- Added roomier editing tools, including a resizable first-message field, a desktop World Info pop-up editor, expanded context-size presets, and Text Completions preset parity.
-- Added a unified Sampling workspace/menu for Chat Completions, Text Completions, Kobold/Kobold Horde, and NovelAI, with backend-aware sampler cards, mobile quick access, and a Neutralize Samplers action for Chat Completions.
-
-### Changed
-- Reworked the default desktop and mobile UI for more consistent spacing, square icon buttons, aligned drawers, normalized dropdowns, readable highlighted text, and a less cramped composer.
-- Kept core chat style validation to Flat, Bubbles, and Document; old saved Moonlit style values now reset to Flat and clear legacy body classes.
-- Renamed Navigate to Workspace, shortened the primary character shortcut labels to `FAV.` and `ADV.`, and removed deprecated visible Extras wording.
-- Cleaned up launcher installs so routine starts are quieter, preserve ESLint dependencies, and avoid unnecessary dependency work when runtime inputs have not changed.
-
-### Removed
-- Removed the bundled Moonlit Echoes extension, built-in Moonlit chat stylesheet, and Echo, Whisper, Hush, Ripple, and Tide options from core Appearance.
-
-### Fixed
-- Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, bottom chat spacing, composer panel theming, and first-message top alignment.
-- Fixed Sampling menu polish around anchored documentation links, normalized numeric sampler fields, backend-specific sampler visibility, and less-clipped preset action text.
-- Fixed group chat edge cases so unread DM avatars stay aligned, DM taps open the correct private chat, and Character Author's Note (Private) persists on the group chat.
-- Fixed In-Chat Agent behavior for separated Individual/Group enablement, queued manual runs, hidden idle cancel buttons, Pathfinder control alignment, recovered saved agent toggles missing from scoped state, and automatic post-generation runs on desktop and mobile, including late mobile render timing after the generation flag clears and delayed iOS Safari page wakeups.
-- Fixed In-Chat Agent mobile post-processing recovery when iOS Safari misses the generation-ended event, leaves the generation flag stuck, or replaces the rendered message object before queued agents flush.
-- Fixed In-Chat Agent regex scripts so regex-only agents attach their formatter scripts as soon as an assistant message is received instead of waiting for post-generation processing.
-- Fixed Vector Storage/RAG enablement so legacy saved flags migrate correctly and extensions can turn RAG on through live settings or the shared `SillyTavern.rag` API.
-- Fixed the refreshed mobile composer so the chat text box and bottom action bar stay compact on narrow screens.
-- Fixed duplicate extension settings drawers so repeated extension activation does not create doubled panels.
-- Fixed Moonlit Echoes fork styling so enabled Moonlit chat thumbnails and the mobile composer remain usable.
-- Fixed lint coverage by including `scripts/**/*.js` in the standard ESLint target and resolving the existing lint failures.
-
-### Commits
-- `chore(ui): remove bundled moonlit echoes`
-- `fix(agents): restore mobile post-generation auto-apply`
-- `fix(agents): recover saved post-generation toggles`
-- `fix(agents): recover delayed mobile post-processing`
-- `fix(agents): apply regex snapshots immediately`
-- `fix(agents): recover missed mobile generation end`
-- `fix(rag): allow extensions to enable vector storage`
-- `fix(ui): compact mobile chat composer`
-- `feat(ui): add unified sampling workspace`
-- `fix(ui): make Moonlit Echoes optional`
-- `fix(tooling): keep eslint stable after launcher installs`
-- `fix(ui): improve default chat surface readability`
-- `fix(ui): restore zoomed chat avatars`
-- `fix(ui): align chat icon controls`
-- `fix(ui): restore individual recent chats`
-- `fix(extension): contain moonlit chat avatars`
-- `feat(server): add thumbnail quality controls`
-- `fix(extension): prevent duplicate settings drawers`
-- `fix(ui): improve mobile composer readability`
-- `feat(ui): add built-in chat styles and compact mode`
-- `fix(ui): stabilize group DM avatar actions`
-- `fix(ui): polish default theme alignment`
-- `fix(ui): align mobile prompt controls`
-- `fix(ui): normalize responsive alignment`
-- `fix(group): persist private author notes in group chats`
-- `fix(agents): apply post-processing after generation`
-- `fix(ui): contain chat thumbnails`
-- `fix(server): sharpen default thumbnails`
-- `fix(ui): equalize thumbnail settings layout`
-- `fix(ui): improve highlighted button contrast`
-- `fix(ui): pad settings section headers`
-- `fix(ui): remove deprecated extras labels`
-- `fix(ui): normalize dropdown sizing`
-- `fix(ui): equalize settings drawer headers`
-- `fix(ui): balance prompt manager panes`
-- `fix(ui): add world info editor popout`
-- `fix(ui): shorten character shortcut labels`
-- `fix(ui): allow resizing first message editor`
-- `fix(ui): center top bar label options`
-- `fix(ui): anchor sampling docs link`
-- `fix(agents): separate enabled agents by chat type`
-- `fix(ui): align pathfinder diagnostics button`
-- `fix(ui): keep pathfinder log detail inline`
-- `fix(agents): queue manual agent runs`
-- `fix(ui): rename navigate button to workspace`
-- `fix(ui): align prompt preset controls`
-- `fix(ui): normalize context size presets`
-- `fix(ui): normalize sampling number fields`
-- `fix(ui): improve advanced definitions editing`
-- `fix(ui): align group character list rows`
-- `feat(chat): add auto-label and cleanup tools`
-- `feat(chat): add backup cleanup controls`
-- `fix(ui): stabilize persona and ripple mobile layout`
-- `fix(ui): tighten chat bottom spacing`
-- `fix(extension): prevent moonlit mobile composer stretching`
-- `fix(ui): keep mobile stop button aligned`
-- `fix(agents): run automatic post agents on mobile`
-- `fix(ui): show one message visibility icon`
-- `docs(changelog): condense unreleased notes`
-- `fix(ui): theme rounded chat composer`
-- `fix(ui): remove first message top gap`
-
-## v1.4.5
-
-Date: 2026-04-24
+This is the next main update after `v1.4.2`. It includes the new Group Chat system, the refreshed Workspace/Customize shell, the unified Sampling workspace, improved mobile behavior, In-Chat Agent fixes, RAG enablement fixes, and the Moonlit Echoes cleanup.
 
 ### Group Chats
-- Added a full group-chat control bar with speaker selection, Speak Now, manual DM mode, Auto Mode, Auto DM, unread DM badges, and compact mobile controls.
-- Added private per-character DM chats with participant-limited context, one-tap unread DM opening, forced DM mode inside DM chats, and Return to Group navigation.
-- Added context-aware replies for direct name calls and group-wide prompts, plus anti-loop limits for autonomous character replies.
-- Added AI-generated 24-hour schedules with time awareness, generation toasts, downtime catch-up, optional auto-messaging, and separate Auto DM cooldowns.
-- Fixed group chat saving, branching, Recent Chats registration, empty new chats, custom-name reuse, Auto Mode persistence, draft preservation, and rapid-fire DM auto-replies.
-- Removed redundant group modes and controls, including Narrator Merge, One at a time, and the old Narrate Turn flow.
+Group Chats still work for normal group RP: you can pick a group, write as the user, choose who speaks next, and run the scene manually just like before. The new work adds optional tools for people who want the group to feel more like a living conversation, chatroom, party scene, or auto-RP setup without taking away the standard flow.
+
+- Added a bottom group-chat control bar with active speaker selection, Speak Now, manual DM mode, Auto Mode, Auto DM, unread DM badges, and compact mobile controls.
+- Added private per-character DM chats. DMs use participant-limited context, show unread badges on character avatars, can be opened with one tap, force DM mode while inside the private chat, and include Return to Group navigation.
+- Added Auto Mode for scheduled or autonomous group replies, with per-group persistence, configurable delay, context-aware direct-name replies, group-wide prompts, and anti-loop limits so characters do not rapid-fire forever.
+- Added Auto DM for private scheduled messages, including a separate cooldown so background DMs can happen without flooding the user.
+- Added AI-generated 24-hour group schedules. SillyBunny can ask the model to create a full-day routine for the group, keep track of local time, catch up after downtime, and optionally let scheduled characters message when their entry is due.
+- Improved inter-character conversation prompts so characters can answer, interrupt, agree, disagree, ask questions, or react to other participants instead of only responding to the user.
+- Added an active-speaker typing indicator and clearer mobile group controls.
+- Fixed group chat saving, branching, Recent Chats registration, empty new chats, custom-name reuse, Auto Mode persistence, draft preservation, unread DM alignment, DM tap targeting, and rapid-fire DM auto-replies.
+- Removed redundant old group modes and controls, including Narrator Merge, One at a time, and the old Narrate Turn flow.
 
 ### Character Notes
 - Made Character Author's Note (Private) editable in group chats and separated group-specific notes from individual chat notes.
 - Fixed private note persistence and injection for `Use character author's note` plus `Replace`, `Top`, and `Bottom` placement.
 
-### UI And Mobile
-- Fixed mobile bottom chat controls, send/stop sizing, group avatar spacing, typing indicator alignment, toggle visibility, unread DM badge visibility, and avatar refresh flicker.
-- Fixed Agents Quick Toggles overflow and added clearer agent enable/disable and chat-separation controls.
-
-### Presets And Maintenance
+### Workspace, Sampling, And Presets
+- Added a unified Sampling workspace/menu for Chat Completions, Text Completions, Kobold/Kobold Horde, and NovelAI.
+- Added backend-aware sampler cards, mobile quick access, anchored documentation links, normalized numeric sampler fields, and a Neutralize Samplers action for Chat Completions.
 - Added bundled Chat Completions presets for `Geechan - Universal Roleplay (Chat Completions) (v5.0)` and `Geechan's Chatroom Prompt`, with `Geechan's Chatroom Prompt` defaulting to a 256k context window.
+- Added roomier editing tools, including a resizable first-message field, a desktop World Info pop-up editor, expanded context-size presets, Text Completions preset parity, and better advanced definitions editing.
+- Fixed preset and settings layout polish, including balanced prompt manager panes, aligned prompt preset controls, equalized Presets dropdown controls, and less-clipped preset action text.
+
+### Chat History, Server Tools, And RAG
+- Added Chat History tools for LLM-assisted chat labels, old-chat cleanup, and backup cleanup with previews, confirmations, retention filters, and mobile-friendly controls.
+- Added Customize > Server thumbnail controls for format, quality, dimensions, sharp defaults, and per-user cache clearing; sharp PNG thumbnails are now the default.
+- Fixed Vector Storage/RAG enablement so legacy saved flags migrate correctly and extensions can turn RAG on through live settings or the shared `SillyTavern.rag` API.
+
+### In-Chat Agents
+- Fixed separated Individual/Group enablement, recovered saved toggles that were missing from scoped state, and made manual agent runs queue instead of disappearing.
+- Fixed automatic post-generation runs on desktop and mobile, including late mobile render timing after the generation flag clears and delayed iOS Safari page wakeups.
+- Fixed mobile post-processing recovery when iOS Safari misses the generation-ended event, leaves the generation flag stuck, or replaces the rendered message object before queued agents flush.
+- Fixed regex-only agents so their formatter scripts attach as soon as an assistant message is received instead of waiting for post-generation processing.
 - Added a separate Pathfinder memory summary UI with editable summary text and injection status.
+- Fixed Agents Quick Toggles overflow, Pathfinder control alignment, hidden idle cancel buttons, and Pathfinder log detail layout.
+
+### UI And Mobile
+- Added a persistent compact mode for the refreshed SillyBunny UI.
+- Reworked the default desktop and mobile UI for more consistent spacing, square icon buttons, aligned drawers, normalized dropdowns, readable highlighted text, and a less cramped composer.
+- Renamed Navigate to Workspace, shortened the primary character shortcut labels to `FAV.` and `ADV.`, and removed deprecated visible Extras wording.
+- Fixed mobile bottom chat controls, send/stop sizing, group avatar spacing, typing indicator alignment, toggle visibility, unread DM badge visibility, avatar refresh flicker, and mobile prompt control alignment.
+- Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, bottom chat spacing, composer panel theming, and first-message top alignment.
+- Fixed the refreshed mobile composer so the chat text box and bottom action bar stay compact on narrow screens.
+
+### Extensions And Moonlit Echoes
+- Removed the bundled Moonlit Echoes extension, built-in Moonlit chat stylesheet, and Echo, Whisper, Hush, Ripple, and Tide options from core Appearance.
+- Kept core chat style validation to Flat, Bubbles, and Document; old saved Moonlit style values now reset to Flat and clear legacy body classes.
+- Added the SillyBunny-specific Moonlit Echoes fork to Launchpad optional installs.
+- Fixed duplicate extension settings drawers so repeated extension activation does not create doubled panels.
+- Fixed Moonlit Echoes fork styling so enabled Moonlit chat thumbnails and the mobile composer remain usable.
+
+### Maintenance
+- Cleaned up launcher installs so routine starts are quieter, preserve ESLint dependencies, and avoid unnecessary dependency work when runtime inputs have not changed.
+- Fixed lint coverage by including `scripts/**/*.js` in the standard ESLint target and resolving the existing lint failures.
 - Fixed frontend cache clearing after updater reloads.
 - Updated `Geechan's Chatroom Prompt` emoji guidance to use normal emojis.
 - Bumped app-owned version strings to `1.4.5` without changing dependency versions.
