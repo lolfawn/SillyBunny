@@ -78,6 +78,10 @@ const STARTER_PACK_EXTENSIONS = Object.freeze({
         id: 'third-party/SillyBunny-CssSnippets',
         repoUrl: 'https://github.com/platberlitz/SillyBunny-CssSnippets',
     }),
+    moonlitEchoes: Object.freeze({
+        id: 'third-party/SillyBunny-MoonlitEchoesTheme',
+        repoUrl: 'https://github.com/platberlitz/SillyBunny-MoonlitEchoesTheme',
+    }),
     promptInspector: Object.freeze({
         id: 'third-party/Extension-PromptInspector',
         repoUrl: 'https://github.com/SillyTavern/Extension-PromptInspector',
@@ -845,6 +849,13 @@ function buildStarterPackItems() {
                 icon: 'fa-palette',
                 chips: ['Extension', 'Styling', 'Opt-in'],
                 extensionName: STARTER_PACK_EXTENSIONS.cssSnippets.id,
+            }),
+            buildExtensionStarterPackItem({
+                title: 'Moonlit Echoes Theme',
+                body: 'A SillyBunny-specific fork of Moonlit Echoes that keeps its theme CSS, mobile layout fixes, and Moonlit chat styles isolated from SillyBunny core.',
+                icon: 'fa-moon',
+                chips: ['Extension', 'Theme', 'SillyBunny fork'],
+                extensionName: STARTER_PACK_EXTENSIONS.moonlitEchoes.id,
             }),
             buildExtensionStarterPackItem({
                 title: 'Prompt Inspector',
