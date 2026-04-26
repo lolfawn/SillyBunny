@@ -33,6 +33,7 @@ describe('in-chat agent post-processing runner', () => {
     let saveChatDebounced;
     let saveChat;
     let generateQuietPrompt;
+    let streamingProcessor;
     let documentListeners;
     let windowListeners;
 
@@ -50,6 +51,7 @@ describe('in-chat agent post-processing runner', () => {
             GENERATION_AFTER_COMMANDS: 'generation_after_commands',
             GENERATION_ENDED: 'generation_ended',
             GENERATION_STOPPED: 'generation_stopped',
+            STREAM_TOKEN_RECEIVED: 'stream_token_received',
             MESSAGE_RECEIVED: 'message_received',
             MESSAGE_EDITED: 'message_edited',
             CHARACTER_MESSAGE_RENDERED: 'character_message_rendered',
@@ -64,6 +66,13 @@ describe('in-chat agent post-processing runner', () => {
         saveChatDebounced = jest.fn();
         saveChat = jest.fn();
         generateQuietPrompt = jest.fn(async () => 'quiet result');
+        streamingProcessor = {
+            messageId: -1,
+            type: 'normal',
+            isFinished: true,
+            isStopped: false,
+            abortController: { signal: { aborted: false } },
+        };
         documentListeners = new Map();
         windowListeners = new Map();
 
@@ -126,7 +135,7 @@ describe('in-chat agent post-processing runner', () => {
             normalizeContentText: jest.fn(value => String(value ?? '')),
             saveChatDebounced,
             stopGeneration: jest.fn(() => false),
-            streamingProcessor: null,
+            streamingProcessor,
             syncMesToSwipe: jest.fn(),
         }));
 
@@ -461,6 +470,48 @@ describe('in-chat agent post-processing runner', () => {
 
         expect(chat[0].extra.inChatAgents.regexScripts).toEqual(enabledAgents[0].regexScripts);
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('snapshots regex-only agents on streamed tokens before final message events', async () => {
+        useRegexOnlyAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        chat.push({
+            name: 'Assistant',
+            mes: '',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        Object.assign(streamingProcessor, {
+            messageId: 0,
+            type: 'normal',
+            isFinished: false,
+            isStopped: false,
+            abortController: { signal: { aborted: false } },
+        });
+
+        await eventSource.emit(eventTypes.STREAM_TOKEN_RECEIVED, '[STATUS|ready]');
+
+        expect(chat[0].extra.inChatAgents).toEqual({
+            activeAgentIds: ['agent-regex-only'],
+            generationType: 'normal',
+            regexScripts: enabledAgents[0].regexScripts,
+            edited: false,
+        });
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+        await new Promise(resolve => setTimeout(resolve, 5));
+        expect(saveChat).not.toHaveBeenCalled();
+
+        Object.assign(streamingProcessor, {
+            messageId: -1,
+            isFinished: true,
+        });
+        await eventSource.emit(eventTypes.GENERATION_STOPPED);
     });
 
     test('keeps deferred group-style post-processing when another generation starts first', async () => {

@@ -51,6 +51,7 @@ export const PROMPT_RUNS_EXTRA_KEY = 'inChatAgentPromptRuns';
 export const PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
 const MAX_TRANSFORM_HISTORY = 10;
 const pendingRefreshTimeouts = new Map();
+const pendingRegexSnapshotSaves = new WeakSet();
 const GREETING_GENERATION_TYPE = 'first_message';
 const PREPEND_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
     'tpl-scene-tracker',
@@ -1090,7 +1091,8 @@ function updateMessageRegexSnapshot(message, activeAgents, generationType) {
     return true;
 }
 
-function ensureMessageRegexSnapshot(messageIndex, generationType, activationSnapshot = null) {
+function ensureMessageRegexSnapshot(messageIndex, generationType, activationSnapshot = null, options = {}) {
+    const { refresh = true, save = true } = options;
     const numericMessageIndex = Number(messageIndex);
     if (!Number.isInteger(numericMessageIndex)) {
         return false;
@@ -1107,11 +1109,25 @@ function ensureMessageRegexSnapshot(messageIndex, generationType, activationSnap
     const activeAgents = getActiveAgentsForMessage(generationType, resolvedActivationSnapshot);
 
     if (!updateMessageRegexSnapshot(message, activeAgents, generationType)) {
+        if (save && pendingRegexSnapshotSaves.has(message)) {
+            pendingRegexSnapshotSaves.delete(message);
+            saveChatDebounced();
+        }
+
         return false;
     }
 
-    saveChatDebounced();
-    scheduleMessageRefresh(numericMessageIndex, message);
+    if (save) {
+        pendingRegexSnapshotSaves.delete(message);
+        saveChatDebounced();
+    } else {
+        pendingRegexSnapshotSaves.add(message);
+    }
+
+    if (refresh) {
+        scheduleMessageRefresh(numericMessageIndex, message);
+    }
+
     return true;
 }
 
@@ -2177,6 +2193,33 @@ async function onMessageReceived(messageIndex, generationType) {
     await processReceivedMessage(numericMessageIndex, generationType);
 }
 
+function onStreamTokenReceived() {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
+        return;
+    }
+
+    const liveStreamingProcessor = streamingProcessor;
+    if (!liveStreamingProcessor || liveStreamingProcessor.type === 'impersonate') {
+        return;
+    }
+
+    const numericMessageIndex = Number(liveStreamingProcessor.messageId);
+    if (!Number.isInteger(numericMessageIndex) || numericMessageIndex < 0) {
+        return;
+    }
+
+    const generationType = pendingGenerationSnapshot?.generationType
+        ?? currentMainGenerationType
+        ?? liveStreamingProcessor.type;
+
+    ensureMessageRegexSnapshot(
+        numericMessageIndex,
+        generationType,
+        pendingGenerationSnapshot,
+        { refresh: false, save: false },
+    );
+}
+
 async function onCharacterMessageRendered(messageIndex, generationType) {
     await onMessageReceived(messageIndex, generationType);
 }
@@ -2419,6 +2462,10 @@ export function initAgentRunner() {
     eventSource.on(event_types.GENERATION_STOPPED, onGenerationStopped);
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
     eventSource.on(event_types.MESSAGE_EDITED, onMessageEdited);
+
+    if (event_types.STREAM_TOKEN_RECEIVED) {
+        eventSource.on(event_types.STREAM_TOKEN_RECEIVED, onStreamTokenReceived);
+    }
 
     if (event_types.CHARACTER_MESSAGE_RENDERED) {
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onCharacterMessageRendered);
