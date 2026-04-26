@@ -1462,3 +1462,106 @@ body.ripplestyle #chat .mes:not(.smallSysMes) .mes_block .ch_name::after {
         padding-inline: 8px;
     }
 }
+
+/* Mobile WebKit guardrails for Moonlit chat layouts. These stay flat and late so
+   iOS Safari does not keep desktop sticky/translated avatar geometry. */
+@media screen and (max-width: 768px) {
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
+        align-content: flex-start;
+        align-items: center;
+        gap: 4px 6px;
+        min-height: 0;
+        overflow: visible;
+        padding-bottom: 0 !important;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .last_mes:not(.smallSysMes) .mesAvatarWrapper {
+        padding-bottom: 0 !important;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes:not(.smallSysMes) .mes_block,
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .lastInContext .mes_block {
+        margin-top: 0 !important;
+        transform: none !important;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .tidestyle) #chat .mes .mesAvatarWrapper > :is(.mesIDDisplay, .mes_timer, .tokenCounterDisplay) {
+        line-height: 1.15;
+        margin: 0;
+        max-width: 100%;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        transform: none !important;
+        white-space: normal;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipeRightBlock {
+        align-items: center;
+        bottom: 8px !important;
+        display: flex;
+        gap: 4px;
+        inline-size: auto !important;
+        justify-content: flex-end;
+        left: auto !important;
+        max-inline-size: calc(100% - 16px);
+        min-inline-size: 0;
+        right: 8px !important;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipe_left {
+        bottom: 8px !important;
+        left: auto !important;
+        right: 58px !important;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes :is(.swipe_left, .swipe_right) {
+        transform: none !important;
+    }
+
+    body:is(.echostyle, .whisperstyle, .hushstyle, .ripplestyle, .tidestyle) #chat .last_mes .swipes-counter {
+        letter-spacing: 0;
+        margin: 0 4px 0 0;
+        max-width: 48px;
+        min-width: 32px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: auto !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) {
+        align-items: start;
+        grid-template-columns: minmax(0, var(--customRippleAvatarMobileWidth)) minmax(0, 1fr) !important;
+        overflow: hidden;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper {
+        align-content: start;
+        align-self: start !important;
+        height: auto !important;
+        margin: 0 !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        position: relative !important;
+        top: auto !important;
+    }
+
+    body.ripplestyle #chat .last_mes:not(.smallSysMes) .mesAvatarWrapper {
+        padding-bottom: 0 !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar,
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mesAvatarWrapper .avatar > img {
+        height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+        max-height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+        max-width: var(--customRippleAvatarMobileWidth) !important;
+        min-height: calc(var(--customRippleAvatarMobileWidth) * var(--customRippleAvatarRatio)) !important;
+        min-width: var(--customRippleAvatarMobileWidth) !important;
+        width: var(--customRippleAvatarMobileWidth) !important;
+    }
+
+    body.ripplestyle #chat .mes:not(.smallSysMes) .mes_block {
+        min-width: 0;
+        padding: 12px 10px 10px !important;
+    }
+}

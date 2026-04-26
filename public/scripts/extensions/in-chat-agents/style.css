@@ -813,14 +813,17 @@
 }
 
 .ica--editor .checkbox_label {
-    align-items: flex-start;
+    align-items: center;
     column-gap: 8px;
     font-size: calc(var(--mainFontSize) * 0.88);
+    line-height: 1.25;
 }
 
-.ica--editor .checkbox_label > input[type="checkbox"] {
+.ica--editor .checkbox_label > input[type="checkbox"],
+.ica--editor .checkbox_label > input[type="radio"] {
+    align-self: center;
     flex: 0 0 auto;
-    margin-top: 0.2em;
+    margin: 0;
 }
 
 .ica--regex-note {

@@ -57,6 +57,8 @@ const PREPEND_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
 ]);
 const PREPEND_PROMPT_TRANSFORM_TAG_RE = /\[(?:SCENE|TIME)\|/;
 const ASSISTANT_RESPONSE_WRAPPER_RE = /^\s*<assistant_response>\s*([\s\S]*?)\s*<\/assistant_response>\s*$/i;
+const BODY_GENERATING_FLAG_GRACE_MS = 1500;
+const DEFERRED_POST_PROCESSING_RETRY_MS = 50;
 
 /** @type {{ generationType: string, activeAgentIds: string[] } | null} */
 let pendingGenerationSnapshot = null;
@@ -75,6 +77,7 @@ const promptTransformIdleResolvers = new Set();
 let generationStartChatLength = 0;
 let generationStartLastAssistantMessage = null;
 let generationStartLastAssistantRevision = '';
+let lastMainGenerationEndedAt = 0;
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -372,14 +375,30 @@ function isStreamingMessageStillActive(messageIndex) {
     return Boolean(
         !liveStreamingProcessor.isFinished ||
         isGenerationInProgress ||
-        document.body?.dataset?.generating === 'true',
+        isBodyGenerationFlagBlocking(),
     );
+}
+
+function isBodyGenerationFlagBlocking() {
+    if (document.body?.dataset?.generating !== 'true') {
+        return false;
+    }
+
+    if (isGenerationInProgress) {
+        return true;
+    }
+
+    if (!lastMainGenerationEndedAt) {
+        return false;
+    }
+
+    return Date.now() - lastMainGenerationEndedAt < BODY_GENERATING_FLAG_GRACE_MS;
 }
 
 function isMainGenerationStillActive() {
     return Boolean(
         isGenerationInProgress ||
-        document.body?.dataset?.generating === 'true',
+        isBodyGenerationFlagBlocking(),
     );
 }
 
@@ -513,7 +532,7 @@ function isDeferredPostProcessingMessageCurrent(pendingMessage) {
     );
 }
 
-function scheduleDeferredPostProcessingFlush() {
+function scheduleDeferredPostProcessingFlush(delayMs = 0) {
     if (deferredPostProcessingTimeout) {
         clearTimeout(deferredPostProcessingTimeout);
     }
@@ -534,8 +553,8 @@ function scheduleDeferredPostProcessingFlush() {
             return;
         }
 
-        if (document.body?.dataset?.generating === 'true') {
-            scheduleDeferredPostProcessingFlush();
+        if (isBodyGenerationFlagBlocking()) {
+            scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
             return;
         }
 
@@ -553,7 +572,7 @@ function scheduleDeferredPostProcessingFlush() {
             }
 
             if (isStreamingMessageStillActive(pendingMessage.messageIndex)) {
-                scheduleDeferredPostProcessingFlush();
+                scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
                 return;
             }
 
@@ -571,7 +590,7 @@ function scheduleDeferredPostProcessingFlush() {
             }
 
             if (isMainGenerationStillActive()) {
-                scheduleDeferredPostProcessingFlush();
+                scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
                 return;
             }
         }
@@ -579,7 +598,7 @@ function scheduleDeferredPostProcessingFlush() {
         if (deferredPostProcessingQueue.size > 0) {
             scheduleDeferredPostProcessingFlush();
         }
-    }, 0);
+    }, delayMs);
 }
 
 /**
@@ -1470,6 +1489,7 @@ function onGenerationStarted() {
     isGenerationInProgress = true;
     toolSyncDuringGeneration = true;
     generationStopRequested = false;
+    lastMainGenerationEndedAt = 0;
     clearAllPromptTransformRunningToasts();
     pendingGenerationSnapshot = null;
     generationStartChatLength = chat.length;
@@ -1498,6 +1518,7 @@ function onGenerationEnded() {
     }
 
     isGenerationInProgress = false;
+    lastMainGenerationEndedAt = Date.now();
     toolSyncDuringGeneration = false;
     generationStopRequested = false;
     clearAllPromptTransformRunningToasts();
@@ -1512,6 +1533,7 @@ function onGenerationStopped() {
 
     generationStopRequested = true;
     isGenerationInProgress = false;
+    lastMainGenerationEndedAt = Date.now();
     clearDeferredPostProcessing();
     clearAllPromptTransformRunningToasts();
 }
