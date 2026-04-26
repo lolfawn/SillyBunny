@@ -158,21 +158,6 @@ if (isSessionAuthEnabled()) {
     });
 }
 
-if (cliArgs.listen && cliArgs.basicAuthMode) {
-    app.use(basicAuthMiddleware);
-}
-
-if (cliArgs.whitelistMode) {
-    const whitelistMiddleware = await getWhitelistMiddleware();
-    app.use(whitelistMiddleware);
-}
-
-app.use(hostWhitelistMiddleware);
-
-if (cliArgs.listen) {
-    app.use(accessLoggerMiddleware());
-}
-
 app.use(cookieSession({
     name: getCookieSessionName(),
     sameSite: 'lax',
@@ -189,6 +174,21 @@ if (isBunRuntime()) {
         delete req.sessionOptions.maxAge;
         next();
     });
+}
+
+if (cliArgs.listen && cliArgs.basicAuthMode) {
+    app.use(basicAuthMiddleware);
+}
+
+if (cliArgs.whitelistMode) {
+    const whitelistMiddleware = await getWhitelistMiddleware();
+    app.use(whitelistMiddleware);
+}
+
+app.use(hostWhitelistMiddleware);
+
+if (cliArgs.listen) {
+    app.use(accessLoggerMiddleware());
 }
 
 app.use(setUserDataMiddleware);

@@ -80,6 +80,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 
 ### Maintenance
 - Cleaned up launcher installs so routine starts are quieter, preserve ESLint dependencies, and avoid unnecessary dependency work when runtime inputs have not changed.
+- Fixed Basic auth plus account-login sessions so module assets such as `/lib.js` keep loading after login on mobile browsers, and made unauthorized auth pages non-cacheable.
 - Fixed lint coverage by including `scripts/**/*.js` in the standard ESLint target and resolving the existing lint failures.
 - Fixed frontend cache clearing after updater reloads.
 - Removed unused deprecated server utilities for mutable config writes and direct HTTP/2 requests, including the now-unused `node:http2` import.
@@ -98,6 +99,7 @@ Commits:
 - `fix(ui): correct prompt manager token attribution`
 - `fix(agents): harden mobile post-processing guards`
 - `fix(ui): align mobile quick actions menu`
+- `fix(auth): keep module assets loading after login`
 - `fix: stabilize responses streaming and agent swipes`
 - `chore(presets): refresh Geechan bundled presets`
 - `chore: remove redundant deprecated code`
