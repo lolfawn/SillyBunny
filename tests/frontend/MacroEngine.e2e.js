@@ -697,10 +697,10 @@ test.describe('MacroEngine', () => {
             // Sanity check: both picks should resolve to one of the provided options
             const match = output1.match(/Choices: ([^,]+), ([^.]+)\./);
             expect(match).not.toBeNull();
-            if (!match) return;
+            const pickMatch = /** @type {RegExpMatchArray} */ (match);
 
-            const first = match[1].trim();
-            const second = match[2].trim();
+            const first = pickMatch[1].trim();
+            const second = pickMatch[2].trim();
             const options = ['red', 'green', 'blue'];
 
             expect(options.includes(first)).toBeTruthy();

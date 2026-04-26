@@ -1,6 +1,5 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import http2 from 'node:http2';
 import process from 'node:process';
 import { Readable } from 'node:stream';
 import { createRequire } from 'node:module';
@@ -107,16 +106,6 @@ export function getConfigValue(key, defaultValue = null, typeConverter = null) {
         default:
             return value;
     }
-}
-
-/**
- * THIS FUNCTION IS DEPRECATED AND ONLY EXISTS FOR BACKWARDS COMPATIBILITY. DON'T USE IT.
- * @param {any} _key Unused
- * @param {any} _value Unused
- * @deprecated Configs are read-only. Use environment variables instead.
- */
-export function setConfigValue(_key, _value) {
-    console.trace(color.yellow('setConfigValue is deprecated and should not be used.'));
 }
 
 /**
@@ -741,63 +730,6 @@ export function forwardFetchResponse(from, to) {
     } else {
         to.end();
     }
-}
-
-/**
- * Makes an HTTP/2 request to the specified endpoint.
- *
- * @deprecated Use `node-fetch` if possible.
- * @param {string} endpoint URL to make the request to
- * @param {string} method HTTP method to use
- * @param {string} body Request body
- * @param {object} headers Request headers
- * @returns {Promise<string>} Response body
- */
-export function makeHttp2Request(endpoint, method, body, headers) {
-    return new Promise((resolve, reject) => {
-        try {
-            const url = new URL(endpoint);
-            const client = http2.connect(url.origin);
-
-            const req = client.request({
-                ':method': method,
-                ':path': url.pathname,
-                ...headers,
-            });
-            req.setEncoding('utf8');
-
-            req.on('response', (headers) => {
-                const status = Number(headers[':status']);
-
-                if (status < 200 || status >= 300) {
-                    reject(new Error(`Request failed with status ${status}`));
-                }
-
-                let data = '';
-
-                req.on('data', (chunk) => {
-                    data += chunk;
-                });
-
-                req.on('end', () => {
-                    console.debug(data);
-                    resolve(data);
-                });
-            });
-
-            req.on('error', (err) => {
-                reject(err);
-            });
-
-            if (body) {
-                req.write(body);
-            }
-
-            req.end();
-        } catch (e) {
-            reject(e);
-        }
-    });
 }
 
 /**

@@ -441,7 +441,7 @@ describe('in-chat agent post-processing runner', () => {
         await waitFor(() => quietResolvers.length === 1);
 
         expect(generateQuietPrompt).toHaveBeenCalledTimes(1);
-        expect(toastr.info).toHaveBeenCalledWith('Queued agent run.');
+        expect(globalThis.toastr.info).toHaveBeenCalledWith('Queued agent run.');
 
         quietResolvers.shift()('First rewrite');
         const firstResult = await firstRun;
@@ -459,7 +459,7 @@ describe('in-chat agent post-processing runner', () => {
 
         expect(secondResult.status).toBe('changed');
         expect(chat[0].mes).toBe('Second rewrite');
-        expect(toastr.warning).not.toHaveBeenCalledWith('Cannot run an agent while another is in progress.');
+        expect(globalThis.toastr.warning).not.toHaveBeenCalledWith('Cannot run an agent while another is in progress.');
         expect(isAgentGenerationActive()).toBe(false);
     });
 

@@ -1,11 +1,5 @@
 import ipaddr from 'ipaddr.js';
 
-const noopMiddleware = (_req, _res, next) => next();
-/** @deprecated Do not use. A global middleware is provided at the application level. */
-export const jsonParser = noopMiddleware;
-/** @deprecated Do not use. A global middleware is provided at the application level. */
-export const urlencodedParser = noopMiddleware;
-
 /**
  * Gets the IP address of the client from the request object.
  * @param {import('express').Request} req Request object

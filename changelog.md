@@ -1,5 +1,24 @@
 # Changelog
 
+## Staging Cleanup - 2026-04-26
+
+Changes:
+- Removed unused deprecated server utilities for mutable config writes and direct HTTP/2 requests, including the now-unused `node:http2` import.
+- Removed unused deprecated Express parser aliases that were superseded by application-level middleware.
+- Removed redundant root package metadata and unused direct root dev dependencies for test-only ESLint plugins and transitive Chevrotain types.
+- Declared the Jest and Playwright ESLint plugins in the nested `tests` package where the test lint config uses them.
+- Cleaned up test lint references so the nested test lint command runs without warnings or undefined globals.
+- Kept `public/scripts/f-localStorage.js` in place for extension compatibility.
+
+Verification:
+- `npm run lint`
+- `npm run lint --prefix tests`
+- `npm run test:unit --prefix tests`
+- `git diff --check`
+
+Commits:
+- `chore: remove redundant deprecated code`
+
 ## Staging Bug Fixes - 2026-04-26
 
 Changes:
