@@ -722,8 +722,22 @@
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 6px;
     align-items: center;
+}
+
+.ica--bulk-bar-actions > .menu_button.menu_button_icon,
+.ica--bulk-edit-popup-actions > .menu_button.menu_button_icon {
+    width: auto;
+    inline-size: auto;
+    min-width: max-content;
+    min-inline-size: max-content;
+    max-width: 100%;
+    max-inline-size: 100%;
+    flex: 0 0 auto;
+    padding-inline: 12px !important;
+    aspect-ratio: auto;
+    white-space: nowrap;
 }
 
 /* Footer */

@@ -3121,6 +3121,19 @@ body.sb-shell-resizing * {
     font-family: 'Public Sans', sans-serif;
 }
 
+.char-button-group-primary .menu_button[data-label] {
+    width: auto;
+    inline-size: auto;
+    min-width: max(var(--sb-control-icon-physical-size, 40px), 4.5rem);
+    min-inline-size: max(var(--sb-control-icon-physical-size, 40px), 4.5rem);
+    max-width: 100%;
+    max-inline-size: 100%;
+    flex-basis: auto;
+    padding-inline: 10px !important;
+    aspect-ratio: auto;
+    white-space: nowrap;
+}
+
 @media screen and (max-width: 768px) {
     .sb-desktop-setting {
         display: none !important;
