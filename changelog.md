@@ -60,6 +60,7 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Fixed chat and character UI regressions around zoomed avatars, overflowing thumbnails, individual recent chats, group-row alignment, prompt visibility eye buttons, WebKit Ripple rendering, bottom chat spacing, composer panel theming, and first-message top alignment.
 - Fixed the refreshed mobile composer so the chat text box and bottom action bar stay compact on narrow screens.
 - Restored compact one-line mobile Prompt Manager rows on very narrow screens by keeping prompt names, controls, and token counts aligned in a single row.
+- Removed the pill-shaped background from chat message numbers while keeping timer and token metadata spacing intact.
 
 ### Extensions And Moonlit Echoes
 - Removed the bundled Moonlit Echoes extension, built-in Moonlit chat stylesheet, and Echo, Whisper, Hush, Ripple, and Tide options from core Appearance.
@@ -87,6 +88,7 @@ Commits:
 - `fix: stabilize responses streaming and agent swipes`
 - `chore(presets): refresh Geechan bundled presets`
 - `chore: remove redundant deprecated code`
+- `fix(ui): remove message number background`
 
 ## v1.4.1
 
