@@ -154,7 +154,7 @@ describe('in-chat agent post-processing runner', () => {
             DEFAULT_AGENT_MAX_TOKENS: 8192,
             areAgentsGloballyEnabled: jest.fn(() => true),
             getAgentById: jest.fn(id => enabledAgents.find(agent => agent.id === id)),
-            getAgentRegexScripts: jest.fn(() => []),
+            getAgentRegexScripts: jest.fn(agent => Array.isArray(agent?.regexScripts) ? agent.regexScripts : []),
             getEnabledAgents: jest.fn(() => [...enabledAgents]),
             getEnabledToolAgents: jest.fn(() => []),
             getGlobalSettings: jest.fn(() => ({
@@ -285,6 +285,40 @@ describe('in-chat agent post-processing runner', () => {
         }];
     }
 
+    function useRegexOnlyAgent() {
+        enabledAgents = [{
+            id: 'agent-regex-only',
+            name: 'Regex Only',
+            phase: 'pre',
+            prompt: '',
+            injection: { order: 100 },
+            postProcess: {
+                enabled: false,
+                promptTransformEnabled: false,
+            },
+            regexScripts: [{
+                id: 'regex-script-1',
+                scriptName: 'Status Card',
+                findRegex: '/\\[STATUS\\|([^\\]]+)\\]/g',
+                replaceString: '<div class="status">$1</div>',
+                trimStrings: [],
+                placement: [2],
+                disabled: false,
+                markdownOnly: true,
+                promptOnly: false,
+                runOnEdit: true,
+                substituteRegex: 0,
+                minDepth: null,
+                maxDepth: null,
+            }],
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        }];
+    }
+
     async function waitFor(condition) {
         for (let i = 0; i < 20; i++) {
             if (condition()) {
@@ -387,6 +421,45 @@ describe('in-chat agent post-processing runner', () => {
         await new Promise(resolve => setTimeout(resolve, 5));
 
         expect(chat[0].mes).toBe('Fresh reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('snapshots regex-only agents as soon as the assistant message is received', async () => {
+        useRegexOnlyAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: '[STATUS|ready]',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('[STATUS|ready]');
+        expect(chat[0].extra.inChatAgents).toEqual({
+            activeAgentIds: ['agent-regex-only'],
+            generationType: 'normal',
+            regexScripts: enabledAgents[0].regexScripts,
+            edited: false,
+        });
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        delete document.body.dataset.generating;
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].extra.inChatAgents.regexScripts).toEqual(enabledAgents[0].regexScripts);
         expect(saveChatDebounced).toHaveBeenCalledTimes(1);
     });
 

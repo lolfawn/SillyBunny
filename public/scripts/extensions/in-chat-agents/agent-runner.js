@@ -909,13 +909,53 @@ function updateMessageRegexSnapshot(message, activeAgents, generationType) {
         return false;
     }
 
-    message.extra[MESSAGE_EXTRA_KEY] = {
+    const previousSnapshot = message.extra[MESSAGE_EXTRA_KEY];
+    const nextSnapshot = {
         activeAgentIds: activeAgents.map(agent => agent.id),
         generationType: normalizeGenerationType(generationType),
         regexScripts: structuredClone(regexScripts),
-        edited: Boolean(message.extra[MESSAGE_EXTRA_KEY]?.edited),
+        edited: Boolean(previousSnapshot?.edited),
     };
 
+    const previousComparable = previousSnapshot
+        ? {
+            activeAgentIds: previousSnapshot.activeAgentIds,
+            generationType: previousSnapshot.generationType,
+            regexScripts: previousSnapshot.regexScripts,
+            edited: Boolean(previousSnapshot.edited),
+        }
+        : null;
+
+    if (JSON.stringify(previousComparable) === JSON.stringify(nextSnapshot)) {
+        return false;
+    }
+
+    message.extra[MESSAGE_EXTRA_KEY] = nextSnapshot;
+    return true;
+}
+
+function ensureMessageRegexSnapshot(messageIndex, generationType, activationSnapshot = null) {
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return false;
+    }
+
+    const message = chat[numericMessageIndex];
+    if (!message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    const resolvedActivationSnapshot = activationSnapshot
+        ? cloneActivationSnapshot(activationSnapshot, generationType)
+        : getDeferredActivationSnapshot(generationType);
+    const activeAgents = getActiveAgentsForMessage(generationType, resolvedActivationSnapshot);
+
+    if (!updateMessageRegexSnapshot(message, activeAgents, generationType)) {
+        return false;
+    }
+
+    saveChatDebounced();
+    scheduleMessageRefresh(numericMessageIndex, message);
     return true;
 }
 
@@ -1955,6 +1995,8 @@ async function onMessageReceived(messageIndex, generationType) {
         return;
     }
 
+    ensureMessageRegexSnapshot(numericMessageIndex, generationType);
+
     if (isStreamingMessageStillActive(numericMessageIndex)) {
         deferPostProcessing(numericMessageIndex, generationType);
         return;
@@ -2009,6 +2051,7 @@ async function onImpersonateReady() {
     }
 
     const generationType = pendingGenerationSnapshot.generationType ?? 'impersonate';
+    ensureMessageRegexSnapshot(messageIndex, generationType);
 
     if (isStreamingMessageStillActive(messageIndex)) {
         deferPostProcessing(messageIndex, generationType);
