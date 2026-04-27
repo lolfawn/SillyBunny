@@ -73,6 +73,9 @@ const extensionLoadErrors = new Set();
 const extensionSettingsHostIds = ['extensions_settings', 'extensions_settings2'];
 const ignoredExtensionSettingsSelectors = [];
 const ignoredExtensionSettingsSelector = ignoredExtensionSettingsSelectors.join(', ');
+const LEGACY_MOONLIT_ECHOES_SETTINGS_KEY = 'SillyTavernMoonlitEchoesTheme';
+const SILLYBUNNY_MOONLIT_ECHOES_EXTENSION_NAME = 'third-party/SillyBunny-MoonlitEchoesTheme';
+const MOONLIT_ECHOES_NOTICE_STORAGE_KEY = 'moonlit_echoes_moved_notice_v1';
 const genericExtensionSettingsClasses = new Set([
     'alignitemscenter',
     'alignitemsbaseline',
@@ -301,6 +304,25 @@ function applyBundledOptInDefaults() {
 
     extension_settings.bundledOptInDefaultsApplied = true;
     return changed;
+}
+
+function maybeShowMoonlitEchoesMovedNotice() {
+    const moonlitSettings = extension_settings[LEGACY_MOONLIT_ECHOES_SETTINGS_KEY];
+    if (!moonlitSettings || typeof moonlitSettings !== 'object' || moonlitSettings.enabled !== true) {
+        return;
+    }
+
+    const forkExtension = findExtension(SILLYBUNNY_MOONLIT_ECHOES_EXTENSION_NAME);
+    if (forkExtension?.enabled || accountStorage.getItem(MOONLIT_ECHOES_NOTICE_STORAGE_KEY) === 'true') {
+        return;
+    }
+
+    const message = forkExtension
+        ? t`Moonlit Echoes moved out of SillyBunny core. Your settings were left unchanged; enable the SillyBunny Moonlit Echoes Theme extension to keep Moonlit styles active.`
+        : t`Moonlit Echoes moved out of SillyBunny core. Your settings were left unchanged; install the SillyBunny Moonlit Echoes Theme from Launchpad optional installs to keep Moonlit styles active.`;
+
+    toastr.warning(message, t`Moonlit Echoes moved`, { timeOut: 15000, extendedTimeOut: 10000 });
+    accountStorage.setItem(MOONLIT_ECHOES_NOTICE_STORAGE_KEY, 'true');
 }
 
 function showHideExtensionsMenu() {
@@ -1909,6 +1931,8 @@ export async function loadExtensionSettings(settings, versionChanged, enableAuto
     } else if (removedCount > 0) {
         saveSettingsDebounced();
     }
+
+    maybeShowMoonlitEchoesMovedNotice();
 
     if (versionChanged && enableAutoUpdate) {
         await autoUpdateExtensions(false);
