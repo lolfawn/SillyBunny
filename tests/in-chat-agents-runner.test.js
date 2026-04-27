@@ -1,0 +1,1283 @@
+/* global document, globalThis */
+import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
+
+function createEventSource() {
+    const handlers = new Map();
+
+    return {
+        on: jest.fn((event, handler) => {
+            const eventHandlers = handlers.get(event) ?? [];
+            eventHandlers.push(handler);
+            handlers.set(event, eventHandlers);
+        }),
+        emit: jest.fn(async (event, ...args) => {
+            const eventHandlers = [...(handlers.get(event) ?? [])];
+            for (const handler of eventHandlers) {
+                await handler(...args);
+            }
+        }),
+        removeListener: jest.fn((event, handler) => {
+            const eventHandlers = handlers.get(event) ?? [];
+            handlers.set(event, eventHandlers.filter(item => item !== handler));
+        }),
+    };
+}
+
+describe('in-chat agent post-processing runner', () => {
+    let chat;
+    let chatMetadata;
+    let extensionPrompts;
+    let enabledAgents;
+    let eventSource;
+    let eventTypes;
+    let saveChatDebounced;
+    let saveChat;
+    let generateQuietPrompt;
+    let streamingProcessor;
+    let documentListeners;
+    let windowListeners;
+
+    beforeEach(async () => {
+        jest.resetModules();
+        jest.useRealTimers();
+
+        chat = [];
+        chatMetadata = {};
+        extensionPrompts = {};
+        enabledAgents = [];
+        eventSource = createEventSource();
+        eventTypes = {
+            GENERATION_STARTED: 'generation_started',
+            GENERATION_AFTER_COMMANDS: 'generation_after_commands',
+            GENERATION_ENDED: 'generation_ended',
+            GENERATION_STOPPED: 'generation_stopped',
+            STREAM_TOKEN_RECEIVED: 'stream_token_received',
+            MESSAGE_RECEIVED: 'message_received',
+            MESSAGE_EDITED: 'message_edited',
+            CHARACTER_MESSAGE_RENDERED: 'character_message_rendered',
+            IMPERSONATE_READY: 'impersonate_ready',
+            MESSAGE_SWIPED: 'message_swiped',
+            CHAT_COMPLETION_SETTINGS_READY: 'chat_completion_settings_ready',
+            WORLDINFO_ENTRIES_LOADED: 'worldinfo_entries_loaded',
+            CHAT_CHANGED: 'chat_changed',
+            WORLDINFO_UPDATED: 'worldinfo_updated',
+            MESSAGE_UPDATED: 'message_updated',
+        };
+        saveChatDebounced = jest.fn();
+        saveChat = jest.fn();
+        generateQuietPrompt = jest.fn(async () => 'quiet result');
+        streamingProcessor = {
+            messageId: -1,
+            type: 'normal',
+            isFinished: true,
+            isStopped: false,
+            abortController: { signal: { aborted: false } },
+        };
+        documentListeners = new Map();
+        windowListeners = new Map();
+
+        const addListener = (listeners, event, handler) => {
+            const eventListeners = listeners.get(event) ?? [];
+            eventListeners.push(handler);
+            listeners.set(event, eventListeners);
+        };
+
+        const removeListener = (listeners, event, handler) => {
+            const eventListeners = listeners.get(event) ?? [];
+            listeners.set(event, eventListeners.filter(item => item !== handler));
+        };
+
+        globalThis.document = {
+            body: { dataset: {} },
+            querySelector: jest.fn(() => null),
+            getElementById: jest.fn(() => null),
+            addEventListener: jest.fn((event, handler) => addListener(documentListeners, event, handler)),
+            removeEventListener: jest.fn((event, handler) => removeListener(documentListeners, event, handler)),
+        };
+        globalThis.addEventListener = jest.fn((event, handler) => addListener(windowListeners, event, handler));
+        globalThis.removeEventListener = jest.fn((event, handler) => removeListener(windowListeners, event, handler));
+        globalThis.HTMLSelectElement = class HTMLSelectElement {};
+        globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+        globalThis.toastr = {
+            clear: jest.fn(),
+            error: jest.fn(),
+            info: jest.fn(),
+            success: jest.fn(),
+            warning: jest.fn(),
+        };
+        const createJqueryMock = () => ({
+            each: jest.fn(),
+            filter: jest.fn(() => createJqueryMock()),
+            find: jest.fn(() => createJqueryMock()),
+            first: jest.fn(() => createJqueryMock()),
+            length: 0,
+            text: jest.fn(() => ''),
+            trigger: jest.fn(),
+            trim: jest.fn(() => ''),
+        });
+        globalThis.$ = jest.fn(() => createJqueryMock());
+
+        await jest.unstable_mockModule('../public/script.js', () => ({
+            chat,
+            chat_metadata: chatMetadata,
+            ensureSwipes: jest.fn((message) => {
+                message.swipes ??= [message.mes];
+                message.swipe_id ??= 0;
+                message.swipe_info ??= message.swipes.map(() => ({
+                    send_date: message.send_date,
+                    gen_started: message.gen_started,
+                    gen_finished: message.gen_finished,
+                    extra: {},
+                }));
+            }),
+            extension_prompt_roles: { SYSTEM: 0 },
+            extension_prompt_types: { IN_PROMPT: 0, IN_CHAT: 1 },
+            extension_prompts: extensionPrompts,
+            setExtensionPrompt: jest.fn((key, value) => {
+                extensionPrompts[key] = { value };
+            }),
+            substituteParams: jest.fn(value => String(value ?? '')),
+            generateQuietPrompt,
+            normalizeContentText: jest.fn(value => String(value ?? '')),
+            saveChatDebounced,
+            stopGeneration: jest.fn(() => false),
+            streamingProcessor,
+            syncMesToSwipe: jest.fn((messageIndex = null) => {
+                const targetMessage = chat[messageIndex ?? chat.length - 1];
+                if (!targetMessage?.swipe_info?.[targetMessage.swipe_id]) {
+                    return false;
+                }
+
+                targetMessage.swipes[targetMessage.swipe_id] = targetMessage.mes;
+                targetMessage.swipe_info[targetMessage.swipe_id].send_date = targetMessage.send_date;
+                targetMessage.swipe_info[targetMessage.swipe_id].gen_started = targetMessage.gen_started;
+                targetMessage.swipe_info[targetMessage.swipe_id].gen_finished = targetMessage.gen_finished;
+                targetMessage.swipe_info[targetMessage.swipe_id].extra = structuredClone(targetMessage.extra);
+                return true;
+            }),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions.js', () => ({
+            getContext: jest.fn(() => ({ saveChat })),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/events.js', () => ({
+            eventSource,
+            event_types: eventTypes,
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/tool-calling.js', () => ({
+            ToolManager: {
+                RECURSE_LIMIT: 5,
+                canPerformToolCalls: jest.fn(() => false),
+                hasToolCalls: jest.fn(() => false),
+                isToolCallingSupported: jest.fn(() => false),
+                registerFunctionTool: jest.fn(),
+                unregisterFunctionTool: jest.fn(),
+            },
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/agent-store.js', () => ({
+            DEFAULT_AGENT_MAX_TOKENS: 8192,
+            areAgentsGloballyEnabled: jest.fn(() => true),
+            getAgentById: jest.fn(id => enabledAgents.find(agent => agent.id === id)),
+            getAgentRegexScripts: jest.fn(agent => Array.isArray(agent?.regexScripts) ? agent.regexScripts : []),
+            getEnabledAgents: jest.fn(() => [...enabledAgents]),
+            getEnabledToolAgents: jest.fn(() => []),
+            getGlobalSettings: jest.fn(() => ({
+                enabled: true,
+                promptTransformShowNotifications: false,
+            })),
+            getPromptTransformMode: jest.fn(agent => agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite'),
+            isToolAgent: jest.fn(() => false),
+            normalizePromptTransformMaxTokens: jest.fn(value => Number.isFinite(Number(value)) ? Math.max(16, Math.min(16000, Number(value))) : 8192),
+            resolveConnectionProfile: jest.fn(value => value ?? ''),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/tool-action-registry.js', () => ({
+            getToolAction: jest.fn(() => null),
+            getToolFormatter: jest.fn(() => null),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/tree-store.js', () => ({
+            getAllEntryUids: jest.fn(() => []),
+            getSettings: jest.fn(() => ({ pipelinePrompts: {}, pipelines: [] })),
+            getTree: jest.fn(() => null),
+            setSettings: jest.fn(),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/sidecar-retrieval.js', () => ({
+            PATHFINDER_RETRIEVAL_PROMPT_KEYS: [],
+            runSidecarRetrieval: jest.fn(),
+        }));
+
+        await jest.unstable_mockModule('../public/scripts/extensions/in-chat-agents/pathfinder/auto-summary.js', () => ({
+            markAutoSummaryComplete: jest.fn(),
+            shouldAutoSummarize: jest.fn(() => false),
+        }));
+    });
+
+    afterEach(() => {
+        jest.useRealTimers();
+        delete globalThis.document;
+        delete globalThis.addEventListener;
+        delete globalThis.removeEventListener;
+        delete globalThis.HTMLSelectElement;
+        delete globalThis.requestAnimationFrame;
+        delete globalThis.toastr;
+        delete globalThis.$;
+    });
+
+    function useAppendPostAgent() {
+        enabledAgents = [{
+            id: 'agent-post-append',
+            name: 'Post Append',
+            phase: 'post',
+            prompt: '',
+            injection: { order: 100 },
+            postProcess: {
+                enabled: true,
+                type: 'append',
+                appendText: '\n[post processed]',
+                promptTransformEnabled: false,
+            },
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        }];
+    }
+
+    function usePrePromptAgent() {
+        enabledAgents = [{
+            id: 'agent-pre-prompt',
+            name: 'Pre Prompt',
+            phase: 'pre',
+            prompt: 'Use the current scene style.',
+            injection: {
+                position: 0,
+                depth: 4,
+                scan: false,
+                role: 0,
+            },
+            postProcess: {
+                enabled: false,
+                promptTransformEnabled: false,
+            },
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        }];
+    }
+
+    function useManualTransformAgents() {
+        enabledAgents = [
+            {
+                id: 'agent-manual-a',
+                name: 'Manual A',
+                phase: 'post',
+                prompt: 'Rewrite as A',
+                injection: { order: 100 },
+                postProcess: {
+                    enabled: false,
+                    promptTransformEnabled: true,
+                    promptTransformMode: 'rewrite',
+                    promptTransformMaxTokens: 8192,
+                },
+                conditions: {
+                    triggerKeywords: [],
+                    triggerProbability: 100,
+                    generationTypes: ['normal'],
+                },
+            },
+            {
+                id: 'agent-manual-b',
+                name: 'Manual B',
+                phase: 'post',
+                prompt: 'Rewrite as B',
+                injection: { order: 110 },
+                postProcess: {
+                    enabled: false,
+                    promptTransformEnabled: true,
+                    promptTransformMode: 'rewrite',
+                    promptTransformMaxTokens: 8192,
+                },
+                conditions: {
+                    triggerKeywords: [],
+                    triggerProbability: 100,
+                    generationTypes: ['normal'],
+                },
+            },
+        ];
+    }
+
+    function usePromptTransformPostAgent() {
+        enabledAgents = [{
+            id: 'agent-post-transform',
+            name: 'Post Transform',
+            phase: 'post',
+            prompt: 'Rewrite the final reply.',
+            injection: { order: 100 },
+            postProcess: {
+                enabled: false,
+                promptTransformEnabled: true,
+                promptTransformMode: 'rewrite',
+                promptTransformMaxTokens: 8192,
+                promptTransformShowNotifications: false,
+            },
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        }];
+    }
+
+    function useRegexOnlyAgent() {
+        enabledAgents = [{
+            id: 'agent-regex-only',
+            name: 'Regex Only',
+            phase: 'pre',
+            prompt: '',
+            injection: { order: 100 },
+            postProcess: {
+                enabled: false,
+                promptTransformEnabled: false,
+            },
+            regexScripts: [{
+                id: 'regex-script-1',
+                scriptName: 'Status Card',
+                findRegex: '/\\[STATUS\\|([^\\]]+)\\]/g',
+                replaceString: '<div class="status">$1</div>',
+                trimStrings: [],
+                placement: [2],
+                disabled: false,
+                markdownOnly: true,
+                promptOnly: false,
+                runOnEdit: true,
+                substituteRegex: 0,
+                minDepth: null,
+                maxDepth: null,
+            }],
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['normal'],
+            },
+        }];
+    }
+
+    function useImpersonateTransformAgent() {
+        enabledAgents = [{
+            id: 'agent-impersonate-transform',
+            name: 'Impersonate Transform',
+            phase: 'post',
+            prompt: 'Rewrite impersonate output.',
+            injection: { order: 100 },
+            postProcess: {
+                enabled: true,
+                type: 'append',
+                appendText: '\n[should not run]',
+                promptTransformEnabled: true,
+                promptTransformMode: 'rewrite',
+                promptTransformMaxTokens: 8192,
+                promptTransformShowNotifications: false,
+            },
+            conditions: {
+                triggerKeywords: [],
+                triggerProbability: 100,
+                generationTypes: ['impersonate'],
+            },
+        }];
+    }
+
+    async function waitFor(condition) {
+        for (let i = 0; i < 20; i++) {
+            if (condition()) {
+                return;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    }
+
+    function emitDocumentEvent(eventName) {
+        for (const handler of documentListeners.get(eventName) ?? []) {
+            handler();
+        }
+    }
+
+    function switchToSwipe(message, swipeId) {
+        message.swipe_id = swipeId;
+        message.mes = message.swipes[swipeId];
+        message.send_date = message.swipe_info[swipeId].send_date;
+        message.gen_started = message.swipe_info[swipeId].gen_started;
+        message.gen_finished = message.swipe_info[swipeId].gen_finished;
+        message.extra = structuredClone(message.swipe_info[swipeId].extra);
+    }
+
+    function saveVisibleMessageToSwipe(message) {
+        message.swipes[message.swipe_id] = message.mes;
+        message.swipe_info[message.swipe_id].send_date = message.send_date;
+        message.swipe_info[message.swipe_id].gen_started = message.gen_started;
+        message.swipe_info[message.swipe_id].gen_finished = message.gen_finished;
+        message.swipe_info[message.swipe_id].extra = structuredClone(message.extra);
+    }
+
+    test('does not mark normal chat generation as active agent generation', async () => {
+        const { initAgentRunner, isAgentGenerationActive } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        expect(isAgentGenerationActive()).toBe(false);
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+
+        expect(isAgentGenerationActive()).toBe(false);
+
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+
+        expect(isAgentGenerationActive()).toBe(false);
+    });
+
+    test('includes pre-generation agent prompts during dry-run prompt previews', async () => {
+        usePrePromptAgent();
+        extensionPrompts.inchat_agent_stale = { value: 'stale preview prompt' };
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, true);
+
+        expect(extensionPrompts.inchat_agent_stale).toBeUndefined();
+        expect(extensionPrompts['inchat_agent_agent-pre-prompt']).toEqual({ value: 'Use the current scene style.' });
+    });
+
+    test('queues manual agent runs while another manual agent is active', async () => {
+        useManualTransformAgents();
+        const quietResolvers = [];
+        generateQuietPrompt.mockImplementation(async () => await new Promise(resolve => quietResolvers.push(resolve)));
+        chat.push({
+            name: 'Assistant',
+            mes: 'Original reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        const { isAgentGenerationActive, runAgentOnMessage } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+
+        const firstRun = runAgentOnMessage('agent-manual-a', 0);
+        await waitFor(() => generateQuietPrompt.mock.calls.length === 1);
+
+        expect(isAgentGenerationActive()).toBe(true);
+
+        const secondRun = runAgentOnMessage('agent-manual-b', 0);
+        await waitFor(() => quietResolvers.length === 1);
+
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(1);
+        expect(globalThis.toastr.info).toHaveBeenCalledWith('Queued agent run.');
+
+        quietResolvers.shift()('First rewrite');
+        const firstResult = await firstRun;
+
+        expect(firstResult.status).toBe('changed');
+        expect(chat[0].mes).toBe('First rewrite');
+
+        await waitFor(() => generateQuietPrompt.mock.calls.length === 2);
+
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(2);
+        expect(isAgentGenerationActive()).toBe(true);
+
+        quietResolvers.shift()('Second rewrite');
+        const secondResult = await secondRun;
+
+        expect(secondResult.status).toBe('changed');
+        expect(chat[0].mes).toBe('Second rewrite');
+        expect(globalThis.toastr.warning).not.toHaveBeenCalledWith('Cannot run an agent while another is in progress.');
+        expect(isAgentGenerationActive()).toBe(false);
+    });
+
+    test('defers enabled post-processing agents until the main generation is idle', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Fresh reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Fresh reply');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        delete document.body.dataset.generating;
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 5));
+
+        expect(chat[0].mes).toBe('Fresh reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('snapshots regex-only agents as soon as the assistant message is received', async () => {
+        useRegexOnlyAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: '[STATUS|ready]',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('[STATUS|ready]');
+        expect(chat[0].extra.inChatAgents).toEqual({
+            activeAgentIds: ['agent-regex-only'],
+            generationType: 'normal',
+            regexScripts: enabledAgents[0].regexScripts,
+            edited: false,
+        });
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        delete document.body.dataset.generating;
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].extra.inChatAgents.regexScripts).toEqual(enabledAgents[0].regexScripts);
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('snapshots regex-only agents on streamed tokens before final message events', async () => {
+        useRegexOnlyAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        chat.push({
+            name: 'Assistant',
+            mes: '',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        Object.assign(streamingProcessor, {
+            messageId: 0,
+            type: 'normal',
+            isFinished: false,
+            isStopped: false,
+            abortController: { signal: { aborted: false } },
+        });
+
+        await eventSource.emit(eventTypes.STREAM_TOKEN_RECEIVED, '[STATUS|ready]');
+
+        expect(chat[0].extra.inChatAgents).toEqual({
+            activeAgentIds: ['agent-regex-only'],
+            generationType: 'normal',
+            regexScripts: enabledAgents[0].regexScripts,
+            edited: false,
+        });
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+        await new Promise(resolve => setTimeout(resolve, 5));
+        expect(saveChat).not.toHaveBeenCalled();
+
+        Object.assign(streamingProcessor, {
+            messageId: -1,
+            isFinished: true,
+        });
+        await eventSource.emit(eventTypes.GENERATION_STOPPED);
+    });
+
+    test('keeps deferred group-style post-processing when another generation starts first', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant One',
+            mes: 'First speaker',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        delete document.body.dataset.generating;
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant Two',
+            mes: 'Second speaker',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 1, 'normal');
+
+        delete document.body.dataset.generating;
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 5));
+
+        expect(chat[0].mes).toBe('First speaker\n[post processed]');
+        expect(chat[1].mes).toBe('Second speaker\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(2);
+    });
+
+    test('handles non-stream mobile order where generation ends before the body flag clears', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Exact mobile order',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Exact mobile order');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        delete document.body.dataset.generating;
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Exact mobile order\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('runs prompt-transform post-processing after mobile generation flag clears', async () => {
+        usePromptTransformPostAgent();
+        generateQuietPrompt.mockResolvedValue('Mobile transform rewrite');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Needs rewrite',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(generateQuietPrompt).not.toHaveBeenCalled();
+
+        delete document.body.dataset.generating;
+        await waitFor(() => generateQuietPrompt.mock.calls.length === 1);
+        await waitFor(() => chat[0].mes === 'Mobile transform rewrite');
+
+        expect(chat[0].mes).toBe('Mobile transform rewrite');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('persists prompt-transform history into current swipe metadata', async () => {
+        usePromptTransformPostAgent();
+        generateQuietPrompt.mockResolvedValue('Swipe-safe rewrite');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Needs rewrite',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Swipe-safe rewrite');
+        expect(chat[0].extra.inChatAgentTransformHistory).toHaveLength(1);
+        expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory).toEqual(chat[0].extra.inChatAgentTransformHistory);
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('keeps prompt-transform storage separate for each swipe', async () => {
+        usePromptTransformPostAgent();
+        generateQuietPrompt
+            .mockResolvedValueOnce('First swipe rewrite')
+            .mockResolvedValueOnce('Second swipe rewrite');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'First swipe original',
+            is_user: false,
+            is_system: false,
+            send_date: '2026-04-26T00:00:00.000Z',
+            gen_started: '2026-04-26T00:00:00.000Z',
+            gen_finished: '2026-04-26T00:00:01.000Z',
+            swipe_id: 0,
+            swipes: ['First swipe original', 'Second swipe original'],
+            swipe_info: [
+                {
+                    send_date: '2026-04-26T00:00:00.000Z',
+                    gen_started: '2026-04-26T00:00:00.000Z',
+                    gen_finished: '2026-04-26T00:00:01.000Z',
+                    extra: {},
+                },
+                {
+                    send_date: '2026-04-26T00:00:10.000Z',
+                    gen_started: '2026-04-26T00:00:10.000Z',
+                    gen_finished: '2026-04-26T00:00:11.000Z',
+                    extra: {},
+                },
+            ],
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('First swipe rewrite');
+        expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory[0].afterText).toBe('First swipe rewrite');
+        expect(chat[0].swipe_info[1].extra.inChatAgentTransformHistory).toBeUndefined();
+
+        saveVisibleMessageToSwipe(chat[0]);
+        switchToSwipe(chat[0], 1);
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Second swipe rewrite');
+        expect(chat[0].swipe_info[0].extra.inChatAgentTransformHistory[0].afterText).toBe('First swipe rewrite');
+        expect(chat[0].swipe_info[1].extra.inChatAgentTransformHistory[0].afterText).toBe('Second swipe rewrite');
+        expect(chat[0].swipe_info[0].extra.inChatAgentPromptRuns[0].nextMessageText).toBe('First swipe rewrite');
+        expect(chat[0].swipe_info[1].extra.inChatAgentPromptRuns[0].nextMessageText).toBe('Second swipe rewrite');
+        expect(chat[0].swipe_info[0].extra.inChatAgentPromptRuns[0].outputText).toBeUndefined();
+
+        saveVisibleMessageToSwipe(chat[0]);
+        switchToSwipe(chat[0], 0);
+
+        expect(chat[0].mes).toBe('First swipe rewrite');
+        expect(chat[0].extra.inChatAgentTransformHistory[0].afterText).toBe('First swipe rewrite');
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(2);
+        expect(saveChatDebounced).toHaveBeenCalledTimes(2);
+    });
+
+    test('scopes inherited transform history to the active swipe text', async () => {
+        usePromptTransformPostAgent();
+        generateQuietPrompt.mockResolvedValueOnce('Second swipe rewrite');
+
+        const { initAgentRunner, getPromptTransformHistoryForMessage } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Second swipe original',
+            is_user: false,
+            is_system: false,
+            send_date: '2026-04-26T00:00:10.000Z',
+            gen_started: '2026-04-26T00:00:10.000Z',
+            gen_finished: '2026-04-26T00:00:11.000Z',
+            swipe_id: 1,
+            swipes: ['First swipe rewrite', 'Second swipe original'],
+            swipe_info: [
+                {
+                    send_date: '2026-04-26T00:00:00.000Z',
+                    gen_started: '2026-04-26T00:00:00.000Z',
+                    gen_finished: '2026-04-26T00:00:01.000Z',
+                    extra: {
+                        inChatAgentTransformHistory: [{
+                            agentId: 'agent-post-transform',
+                            agentName: 'Post Transform',
+                            mode: 'rewrite',
+                            beforeText: 'First swipe original',
+                            afterText: 'First swipe rewrite',
+                            timestamp: '2026-04-26T00:00:02.000Z',
+                        }],
+                    },
+                },
+                {
+                    send_date: '2026-04-26T00:00:10.000Z',
+                    gen_started: '2026-04-26T00:00:10.000Z',
+                    gen_finished: '2026-04-26T00:00:11.000Z',
+                    extra: {
+                        inChatAgentTransformHistory: [{
+                            agentId: 'agent-post-transform',
+                            agentName: 'Post Transform',
+                            mode: 'rewrite',
+                            beforeText: 'First swipe original',
+                            afterText: 'First swipe rewrite',
+                            timestamp: '2026-04-26T00:00:02.000Z',
+                        }],
+                    },
+                },
+            ],
+            extra: {
+                inChatAgentTransformHistory: [{
+                    agentId: 'agent-post-transform',
+                    agentName: 'Post Transform',
+                    mode: 'rewrite',
+                    beforeText: 'First swipe original',
+                    afterText: 'First swipe rewrite',
+                    timestamp: '2026-04-26T00:00:02.000Z',
+                }],
+            },
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Second swipe rewrite');
+        expect(chat[0].extra.inChatAgentTransformHistory).toEqual([expect.objectContaining({
+            beforeText: 'Second swipe original',
+            afterText: 'Second swipe rewrite',
+        })]);
+        expect(chat[0].swipe_info[1].extra.inChatAgentTransformHistory).toEqual(chat[0].extra.inChatAgentTransformHistory);
+        expect(getPromptTransformHistoryForMessage(chat[0])).toEqual(chat[0].extra.inChatAgentTransformHistory);
+
+        saveVisibleMessageToSwipe(chat[0]);
+        switchToSwipe(chat[0], 0);
+
+        expect(getPromptTransformHistoryForMessage(chat[0])).toEqual([expect.objectContaining({
+            beforeText: 'First swipe original',
+            afterText: 'First swipe rewrite',
+        })]);
+    });
+
+    test('keeps in-chat regex metadata in active swipe storage for chat reloads', async () => {
+        useRegexOnlyAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: '[STATUS|ready]',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].swipe_info[0].extra.inChatAgents.regexScripts).toEqual(enabledAgents[0].regexScripts);
+
+        chat[0].extra = {};
+        switchToSwipe(chat[0], 0);
+
+        expect(chat[0].extra.inChatAgents.regexScripts).toEqual(enabledAgents[0].regexScripts);
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        expect(chat[0].extra.inChatAgents.regexScripts).toEqual(enabledAgents[0].regexScripts);
+    });
+
+    test('ignores impersonate post-processing without clearing existing regex metadata', async () => {
+        useImpersonateTransformAgent();
+        generateQuietPrompt.mockResolvedValue('Should not apply');
+
+        const existingSnapshot = {
+            activeAgentIds: ['agent-regex-only'],
+            generationType: 'normal',
+            regexScripts: [{ id: 'regex-script-1', findRegex: '/ready/g', replaceString: 'done' }],
+            edited: false,
+        };
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push({
+            name: 'Assistant',
+            mes: '[STATUS|ready]',
+            is_user: false,
+            is_system: false,
+            swipe_id: 0,
+            swipes: ['[STATUS|ready]'],
+            swipe_info: [{
+                send_date: '2026-04-26T00:00:00.000Z',
+                gen_started: '2026-04-26T00:00:00.000Z',
+                gen_finished: '2026-04-26T00:00:01.000Z',
+                extra: { inChatAgents: structuredClone(existingSnapshot) },
+            }],
+            extra: { inChatAgents: structuredClone(existingSnapshot) },
+        });
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'impersonate', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'impersonate', {}, false);
+        await eventSource.emit(eventTypes.IMPERSONATE_READY);
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'impersonate');
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'impersonate');
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('[STATUS|ready]');
+        expect(chat[0].extra.inChatAgents).toEqual(existingSnapshot);
+        expect(chat[0].swipe_info[0].extra.inChatAgents).toEqual(existingSnapshot);
+        expect(generateQuietPrompt).not.toHaveBeenCalled();
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+    });
+
+    test('applies mobile deferred post-processing once after the body generating flag clears', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Mobile reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await new Promise(resolve => setTimeout(resolve, 5));
+
+        expect(chat[0].mes).toBe('Mobile reply');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        delete document.body.dataset.generating;
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not rerun mobile post-processing after render replaces a processed message object', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        chat.push({
+            name: 'Assistant',
+            mes: 'Mobile processed once',
+            is_user: false,
+            is_system: false,
+            send_date: '2026-04-26T00:00:00.000Z',
+            gen_started: '2026-04-26T00:00:01.000Z',
+            gen_finished: '2026-04-26T00:00:02.000Z',
+            swipe_id: 0,
+            swipes: ['Mobile processed once'],
+            swipe_info: [{ extra: {} }],
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await new Promise(resolve => setTimeout(resolve, 5));
+
+        expect(chat[0].mes).toBe('Mobile processed once');
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        delete document.body.dataset.generating;
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Mobile processed once\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        chat[0] = {
+            name: 'Assistant',
+            mes: 'Mobile processed once\n[post processed]',
+            is_user: false,
+            is_system: false,
+            swipe_id: 0,
+            swipes: ['Mobile processed once\n[post processed]'],
+            swipe_info: [{ extra: {} }],
+            extra: {},
+        };
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+
+        expect(chat[0].mes).toBe('Mobile processed once\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('polls the final assistant message after generation end when mobile render events are missed', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Late mobile reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        delete document.body.dataset.generating;
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Late mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'normal');
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Late mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('polls missed mobile render events using the generation-start snapshot', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Late reply without after commands',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        delete document.body.dataset.generating;
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Late reply without after commands\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('recovers post-processing for regenerated assistant replacements', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        chat.push(
+            {
+                name: 'User',
+                mes: 'Try again',
+                is_user: true,
+                is_system: false,
+                extra: {},
+            },
+            {
+                name: 'Assistant',
+                mes: 'Old reply',
+                is_user: false,
+                is_system: false,
+                gen_finished: '2026-04-26T00:00:00.000Z',
+                extra: {},
+            },
+        );
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'regenerate', {}, false);
+        chat.pop();
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'regenerate', {}, false);
+        chat.push({
+            name: 'Assistant',
+            mes: 'Regenerated reply',
+            is_user: false,
+            is_system: false,
+            gen_finished: '2026-04-26T00:00:05.000Z',
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 5));
+
+        expect(chat[1].mes).toBe('Regenerated reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('recovers mobile post-processing when generation ended event is missed', async () => {
+        jest.useFakeTimers();
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Missed end mobile reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        delete document.body.dataset.generating;
+        await jest.advanceTimersByTimeAsync(250);
+        await jest.runOnlyPendingTimersAsync();
+
+        expect(chat[0].mes).toBe('Missed end mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+        jest.useRealTimers();
+    });
+
+    test('recovers mobile post-processing when generation flag stays stuck after final message', async () => {
+        jest.useFakeTimers();
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Stuck flag mobile reply',
+            is_user: false,
+            is_system: false,
+            gen_finished: '2026-04-26T00:00:00.000Z',
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        await jest.advanceTimersByTimeAsync(250);
+        await jest.runOnlyPendingTimersAsync();
+
+        expect(document.body.dataset.generating).toBe('true');
+        expect(chat[0].mes).toBe('Stuck flag mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+        jest.useRealTimers();
+    });
+
+    test('keeps deferred mobile post-processing when render replaces the message object', async () => {
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        chat.push({
+            name: 'Assistant',
+            mes: 'Replaced mobile reply',
+            is_user: false,
+            is_system: false,
+            gen_finished: '2026-04-26T00:00:00.000Z',
+            extra: {},
+        });
+
+        await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'normal');
+        chat[0] = {
+            name: 'Assistant',
+            mes: 'Replaced mobile reply',
+            is_user: false,
+            is_system: false,
+            gen_finished: '2026-04-26T00:00:00.000Z',
+            extra: {},
+        };
+
+        delete document.body.dataset.generating;
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await new Promise(resolve => setTimeout(resolve, 75));
+
+        expect(chat[0].mes).toBe('Replaced mobile reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+    });
+
+    test('recovers missed mobile post-processing after the fallback window expires', async () => {
+        jest.useFakeTimers();
+        useAppendPostAgent();
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'normal', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+        document.body.dataset.generating = 'true';
+        await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
+        await jest.advanceTimersByTimeAsync(31000);
+
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+
+        chat.push({
+            name: 'Assistant',
+            mes: 'Very late iOS reply',
+            is_user: false,
+            is_system: false,
+            extra: {},
+        });
+        delete document.body.dataset.generating;
+        emitDocumentEvent('visibilitychange');
+        await jest.runOnlyPendingTimersAsync();
+        await jest.runOnlyPendingTimersAsync();
+
+        expect(chat[0].mes).toBe('Very late iOS reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+
+        emitDocumentEvent('visibilitychange');
+        await jest.runOnlyPendingTimersAsync();
+        await jest.runOnlyPendingTimersAsync();
+
+        expect(chat[0].mes).toBe('Very late iOS reply\n[post processed]');
+        expect(saveChatDebounced).toHaveBeenCalledTimes(1);
+        jest.useRealTimers();
+    });
+});

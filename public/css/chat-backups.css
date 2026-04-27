@@ -31,6 +31,70 @@
     background: var(--black30a);
 }
 
+.chatBackupsCleanupTools {
+    display: grid;
+    grid-template-columns: max-content minmax(4.5rem, 5.5rem) minmax(6rem, 7rem) max-content minmax(4.5rem, 5.5rem) max-content max-content;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 8px 12px;
+    border-bottom: 1px solid var(--SmartThemeBorderColor);
+}
+
+.chatBackupsCleanupField {
+    display: contents;
+}
+
+.chatBackupsCleanupField span {
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.chatBackupsCleanupField input,
+.chatBackupsCleanupTools select {
+    width: 100%;
+    height: 34px;
+    min-height: 34px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.chatBackupsCleanupTools .menu_button {
+    min-height: 34px;
+    margin: 0;
+    padding-inline: 10px;
+}
+
+.chatBackupsCleanupStatus {
+    grid-column: 1 / -1;
+    font-size: calc(var(--mainFontSize) - 0.15rem);
+    opacity: 0.78;
+    text-align: center;
+}
+
+.chatBackupsEmptyMessage {
+    padding: 10px;
+    text-align: center;
+    opacity: 0.75;
+}
+
+.chatBackupsCleanupPreview {
+    display: grid;
+    gap: 4px;
+    max-height: min(45vh, 24rem);
+    overflow: auto;
+    padding-inline-start: 1.4rem;
+    text-align: left;
+}
+
+.chatBackupsCleanupPreview li {
+    line-height: 1.35;
+}
+
+.chatBackupsCleanupPreview code {
+    overflow-wrap: anywhere;
+}
+
 .chatBackupsListItemName {
     opacity: 0.75;
     flex-grow: 1;
@@ -51,4 +115,42 @@
 
 .chatBackupsListItemActions .right_menu_button {
     font-size: var(--mainFontSize);
+}
+
+@media screen and (max-width: 700px) {
+    .chatBackupsCleanupTools {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding: 8px;
+    }
+
+    .chatBackupsCleanupField {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(3.75rem, 4.5rem);
+        align-items: center;
+        gap: 6px;
+    }
+
+    .chatBackupsCleanupTools select {
+        grid-column: auto;
+    }
+
+    .chatBackupsCleanupKeepField {
+        grid-column: 1 / -1;
+    }
+
+    .chatBackupsCleanupTools .menu_button {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+@media screen and (max-width: 360px) {
+    .chatBackupsCleanupField {
+        grid-column: 1 / -1;
+        grid-template-columns: minmax(0, 1fr) minmax(4.5rem, 5.5rem);
+    }
+
+    .chatBackupsCleanupTools select {
+        grid-column: 1 / -1;
+    }
 }

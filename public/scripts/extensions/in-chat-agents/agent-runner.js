@@ -18,15 +18,19 @@ import { getContext } from '../../extensions.js';
 import { eventSource, event_types } from '../../events.js';
 import { ToolManager } from '../../tool-calling.js';
 import {
-    DEFAULT_AGENT_MAX_TOKENS,
+    areAgentsGloballyEnabled,
     getAgentById,
     getAgentRegexScripts,
     getEnabledAgents,
     getEnabledToolAgents,
     getGlobalSettings,
+    getPromptTransformMode,
     isToolAgent,
+    normalizePromptTransformMaxTokens,
     resolveConnectionProfile,
 } from './agent-store.js';
+import { buildFallbackPromptText, extractProfileResponseText } from './llm-utils.js';
+import { getConnectionProfileDisplayName } from './profile-utils.js';
 import {
     getToolAction,
     getToolFormatter,
@@ -38,30 +42,57 @@ import {
     setSettings as setPathfinderRuntimeSettings,
 } from './pathfinder/tree-store.js';
 import { PATHFINDER_RETRIEVAL_PROMPT_KEYS, runSidecarRetrieval } from './pathfinder/sidecar-retrieval.js';
+import { markAutoSummaryComplete, shouldAutoSummarize } from './pathfinder/auto-summary.js';
 
 const PROMPT_KEY_PREFIX = 'inchat_agent_';
 const MESSAGE_EXTRA_KEY = 'inChatAgents';
+const POST_PROCESSING_RUNS_EXTRA_KEY = 'inChatAgentPostRuns';
 export const PROMPT_RUNS_EXTRA_KEY = 'inChatAgentPromptRuns';
 export const PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
 const MAX_TRANSFORM_HISTORY = 10;
 const pendingRefreshTimeouts = new Map();
-const DEFAULT_PROMPT_TRANSFORM_MAX_TOKENS = DEFAULT_AGENT_MAX_TOKENS;
+const pendingRegexSnapshotSaves = new WeakSet();
 const GREETING_GENERATION_TYPE = 'first_message';
+const IMPERSONATE_GENERATION_TYPE = 'impersonate';
 const PREPEND_PROMPT_TRANSFORM_TEMPLATE_IDS = new Set([
     'tpl-scene-tracker',
     'tpl-time-tracker',
 ]);
 const PREPEND_PROMPT_TRANSFORM_TAG_RE = /\[(?:SCENE|TIME)\|/;
 const ASSISTANT_RESPONSE_WRAPPER_RE = /^\s*<assistant_response>\s*([\s\S]*?)\s*<\/assistant_response>\s*$/i;
+const BODY_GENERATING_FLAG_GRACE_MS = 1500;
+const DEFERRED_POST_PROCESSING_RETRY_MS = 50;
+const LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS = 30000;
+const MISSED_GENERATION_END_RECOVERY_MS = 200;
 
 /** @type {{ generationType: string, activeAgentIds: string[] } | null} */
 let pendingGenerationSnapshot = null;
 let internalPromptTransformDepth = 0;
 let isGenerationInProgress = false;
 let generationStopRequested = false;
-let deferredPostProcessing = null;
+const deferredPostProcessingQueue = new Map();
 let deferredPostProcessingTimeout = null;
+let latestAssistantPostProcessingFallbackTimeout = null;
+let latestAssistantPostProcessingFallbackDeadline = 0;
+let postGenerationRecoveryTimeout = null;
+let missedGenerationEndRecoveryTimeout = null;
+let postGenerationRecoveryHooksInitialized = false;
+let postGenerationRecoveryObserver = null;
 const activePromptTransformToasts = new Set();
+const agentGenerationStateListeners = new Set();
+const manualAgentRunQueue = [];
+let manualAgentRunQueueProcessing = false;
+let manualAgentRunCancelRequested = false;
+let activeManualAgentRun = null;
+const promptTransformIdleResolvers = new Set();
+let generationStartChatLength = 0;
+let generationStartLastAssistantIndex = -1;
+let generationStartLastAssistantMessage = null;
+let generationStartLastAssistantRevision = '';
+let generationStartedAt = 0;
+let lastMainGenerationEndedAt = 0;
+let currentMainGenerationType = 'normal';
+let postProcessingGenerationRunId = 0;
 
 /** Track which tool names were registered by the agent system so we can cleanly unregister only our own. */
 const agentRegisteredToolNames = new Set();
@@ -72,24 +103,157 @@ let toolSyncDuringGeneration = false;
 /** Recursion depth tracker for tool-call passes. */
 let toolRecursionDepth = 0;
 
+/** Tracks automatic post-processing per generated message revision so fallback events cannot double-apply agents. */
+const processedPostProcessingRuns = new WeakMap();
+const processedPostProcessingRunsByIndex = new Map();
+
 export function isAgentGenerationActive() {
-    return internalPromptTransformDepth > 0 || isGenerationInProgress;
+    return internalPromptTransformDepth > 0 || manualAgentRunQueueProcessing || manualAgentRunQueue.length > 0;
+}
+
+export function onAgentGenerationStateChanged(listener) {
+    if (typeof listener !== 'function') {
+        return () => {};
+    }
+
+    agentGenerationStateListeners.add(listener);
+    return () => agentGenerationStateListeners.delete(listener);
+}
+
+function notifyAgentGenerationStateChanged() {
+    const active = isAgentGenerationActive();
+
+    for (const listener of agentGenerationStateListeners) {
+        try {
+            listener(active);
+        } catch (error) {
+            console.warn('[InChatAgents] Agent generation state listener failed:', error);
+        }
+    }
+}
+
+function notifyPromptTransformIdle() {
+    if (internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    const resolvers = [...promptTransformIdleResolvers];
+    promptTransformIdleResolvers.clear();
+
+    for (const resolve of resolvers) {
+        resolve();
+    }
+}
+
+function waitForPromptTransformIdle() {
+    if (internalPromptTransformDepth === 0) {
+        return Promise.resolve();
+    }
+
+    return new Promise(resolve => promptTransformIdleResolvers.add(resolve));
+}
+
+function clearManualAgentRunQueue() {
+    const queuedRuns = manualAgentRunQueue.splice(0);
+
+    for (const queuedRun of queuedRuns) {
+        queuedRun.resolve(null);
+    }
+
+    return queuedRuns.length;
 }
 
 export function cancelAgentGeneration() {
-    const wasActive = isAgentGenerationActive() || Boolean(streamingProcessor);
-    generationStopRequested = true;
+    const wasActive = isAgentGenerationActive();
+    const queuedCount = clearManualAgentRunQueue();
+    manualAgentRunCancelRequested = wasActive;
+
+    if (internalPromptTransformDepth > 0) {
+        generationStopRequested = true;
+    }
+
+    clearLatestAssistantPostProcessingFallback();
     clearDeferredPostProcessing();
+    clearMissedGenerationEndRecoveryCheck();
     clearAllPromptTransformRunningToasts();
 
-    const stopped = stopGeneration();
-    if (stopped || wasActive) {
-        toastr.info('Stopping agent generation...');
+    const stopped = internalPromptTransformDepth > 0 || activeManualAgentRun ? stopGeneration() : false;
+    notifyAgentGenerationStateChanged();
+
+    if (stopped || wasActive || queuedCount > 0) {
+        toastr.info(queuedCount > 0 ? `Stopping agent generation and clearing ${queuedCount} queued run${queuedCount === 1 ? '' : 's'}...` : 'Stopping agent generation...');
         return true;
     }
 
     toastr.info('No agent generation is currently running.');
     return false;
+}
+
+async function processManualAgentRunQueue() {
+    if (manualAgentRunQueueProcessing) {
+        return;
+    }
+
+    manualAgentRunQueueProcessing = true;
+    notifyAgentGenerationStateChanged();
+
+    try {
+        while (manualAgentRunQueue.length > 0) {
+            if (manualAgentRunCancelRequested) {
+                break;
+            }
+
+            await waitForPromptTransformIdle();
+
+            if (manualAgentRunCancelRequested) {
+                break;
+            }
+
+            const queuedRun = manualAgentRunQueue.shift();
+            if (!queuedRun) {
+                continue;
+            }
+
+            activeManualAgentRun = queuedRun;
+            notifyAgentGenerationStateChanged();
+
+            try {
+                const result = await executeManualAgentRun(queuedRun.agentId, queuedRun.messageIndex);
+                queuedRun.resolve(result);
+            } catch (error) {
+                queuedRun.reject(error);
+            } finally {
+                activeManualAgentRun = null;
+                notifyAgentGenerationStateChanged();
+            }
+        }
+    } finally {
+        clearManualAgentRunQueue();
+        manualAgentRunCancelRequested = false;
+        manualAgentRunQueueProcessing = false;
+        activeManualAgentRun = null;
+        notifyAgentGenerationStateChanged();
+    }
+}
+
+function enqueueManualAgentRun(agentId, messageIndex) {
+    const wasAlreadyActive = isAgentGenerationActive();
+
+    return new Promise((resolve, reject) => {
+        manualAgentRunQueue.push({
+            agentId,
+            messageIndex,
+            resolve,
+            reject,
+        });
+
+        if (wasAlreadyActive) {
+            toastr.info('Queued agent run.');
+        }
+
+        notifyAgentGenerationStateChanged();
+        void processManualAgentRunQueue();
+    });
 }
 
 function isPathfinderToolAgent(agent) {
@@ -119,11 +283,13 @@ function syncPathfinderRuntimeSettings(agent = getPathfinderRuntimeAgent()) {
 }
 
 function getRegisterableAgentTools(agent) {
-    if (isPathfinderToolAgent(agent) && !agent?.settings?.sidecarEnabled) {
-        return [];
+    const enabledTools = (agent.tools ?? []).filter(tool => tool.enabled !== false);
+
+    if (!isPathfinderToolAgent(agent) || agent?.settings?.sidecarEnabled) {
+        return enabledTools;
     }
 
-    return (agent.tools ?? []).filter(tool => tool.enabled !== false);
+    return enabledTools.filter(tool => tool.name === 'Pathfinder_Summarize');
 }
 
 /**
@@ -136,7 +302,7 @@ export function syncToolAgentRegistrations() {
     }
 
     const desiredTools = new Set();
-    const enabledToolAgents = getEnabledToolAgents();
+    const enabledToolAgents = areAgentsGloballyEnabled() ? getEnabledToolAgents() : [];
     syncPathfinderRuntimeSettings(getPathfinderRuntimeAgent(enabledToolAgents));
 
     for (const agent of enabledToolAgents) {
@@ -205,6 +371,10 @@ function isGreetingGenerationType(generationType) {
     return String(generationType ?? '').trim().toLowerCase() === GREETING_GENERATION_TYPE;
 }
 
+function isImpersonateGenerationType(generationType) {
+    return normalizeGenerationType(generationType) === IMPERSONATE_GENERATION_TYPE;
+}
+
 function getStreamingTarget(messageIndex) {
     if (!Number.isInteger(Number(messageIndex))) {
         return null;
@@ -227,7 +397,30 @@ function isStreamingMessageStillActive(messageIndex) {
     return Boolean(
         !liveStreamingProcessor.isFinished ||
         isGenerationInProgress ||
-        document.body?.dataset?.generating === 'true',
+        isBodyGenerationFlagBlocking(),
+    );
+}
+
+function isBodyGenerationFlagBlocking() {
+    if (document.body?.dataset?.generating !== 'true') {
+        return false;
+    }
+
+    if (isGenerationInProgress) {
+        return true;
+    }
+
+    if (!lastMainGenerationEndedAt) {
+        return false;
+    }
+
+    return Date.now() - lastMainGenerationEndedAt < BODY_GENERATING_FLAG_GRACE_MS;
+}
+
+function isMainGenerationStillActive() {
+    return Boolean(
+        isGenerationInProgress ||
+        isBodyGenerationFlagBlocking(),
     );
 }
 
@@ -244,23 +437,323 @@ function wasStreamingMessageStopped(messageIndex) {
     );
 }
 
-function clearDeferredPostProcessing() {
-    if (deferredPostProcessingTimeout) {
+function clearDeferredPostProcessing(messageIndex = null) {
+    if (messageIndex !== null && messageIndex !== undefined) {
+        const numericMessageIndex = Number(messageIndex);
+        if (Number.isInteger(numericMessageIndex)) {
+            deferredPostProcessingQueue.delete(numericMessageIndex);
+        }
+    } else {
+        deferredPostProcessingQueue.clear();
+    }
+
+    if (deferredPostProcessingQueue.size === 0 && deferredPostProcessingTimeout) {
         clearTimeout(deferredPostProcessingTimeout);
         deferredPostProcessingTimeout = null;
     }
-
-    deferredPostProcessing = null;
 }
 
-function deferPostProcessing(messageIndex, generationType) {
-    deferredPostProcessing = {
-        messageIndex: Number(messageIndex),
-        generationType: normalizeGenerationType(generationType),
+function clearLatestAssistantPostProcessingFallback() {
+    if (!latestAssistantPostProcessingFallbackTimeout) {
+        latestAssistantPostProcessingFallbackDeadline = 0;
+        return;
+    }
+
+    clearTimeout(latestAssistantPostProcessingFallbackTimeout);
+    latestAssistantPostProcessingFallbackTimeout = null;
+    latestAssistantPostProcessingFallbackDeadline = 0;
+}
+
+function clearPostGenerationRecoveryCheck() {
+    if (!postGenerationRecoveryTimeout) {
+        return;
+    }
+
+    clearTimeout(postGenerationRecoveryTimeout);
+    postGenerationRecoveryTimeout = null;
+}
+
+function clearMissedGenerationEndRecoveryCheck() {
+    if (!missedGenerationEndRecoveryTimeout) {
+        return;
+    }
+
+    clearTimeout(missedGenerationEndRecoveryTimeout);
+    missedGenerationEndRecoveryTimeout = null;
+}
+
+function cloneActivationSnapshot(snapshot, generationType) {
+    const normalizedGenerationType = normalizeGenerationType(snapshot?.generationType ?? generationType);
+
+    return {
+        generationType: normalizedGenerationType,
+        activeAgentIds: Array.isArray(snapshot?.activeAgentIds)
+            ? [...snapshot.activeAgentIds]
+            : [],
     };
 }
 
-function scheduleDeferredPostProcessingFlush() {
+function normalizeMessageRunValue(value) {
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    if (value === null || value === undefined) {
+        return '';
+    }
+
+    return String(value);
+}
+
+function getActiveSwipeInfo(message, { create = false } = {}) {
+    if (!message || message.is_user || message.is_system) {
+        return null;
+    }
+
+    if (create) {
+        ensureSwipes(message);
+    }
+
+    if (typeof message.swipe_id !== 'number' || !Array.isArray(message.swipe_info)) {
+        return null;
+    }
+
+    const swipeInfo = message.swipe_info[message.swipe_id];
+    if (!swipeInfo || typeof swipeInfo !== 'object') {
+        return null;
+    }
+
+    if (create && (!swipeInfo.extra || typeof swipeInfo.extra !== 'object')) {
+        swipeInfo.extra = {};
+    }
+
+    return swipeInfo;
+}
+
+function cloneAgentExtraValue(value) {
+    return value === undefined ? undefined : structuredClone(value);
+}
+
+function getAgentExtraValue(message, key) {
+    const swipeInfo = getActiveSwipeInfo(message);
+    if (swipeInfo?.extra) {
+        return swipeInfo.extra[key];
+    }
+
+    return message?.extra?.[key];
+}
+
+function setAgentExtraValue(message, key, value) {
+    if (!message) {
+        return;
+    }
+
+    message.extra ??= {};
+    message.extra[key] = value;
+
+    const swipeInfo = getActiveSwipeInfo(message, { create: true });
+    if (swipeInfo?.extra) {
+        swipeInfo.extra[key] = cloneAgentExtraValue(value);
+    }
+}
+
+function deleteAgentExtraValue(message, key) {
+    if (!message) {
+        return;
+    }
+
+    if (message.extra && Object.hasOwn(message.extra, key)) {
+        delete message.extra[key];
+    }
+
+    const swipeInfo = getActiveSwipeInfo(message);
+    if (swipeInfo?.extra && Object.hasOwn(swipeInfo.extra, key)) {
+        delete swipeInfo.extra[key];
+    }
+}
+
+function hasAgentExtraValue(message, key) {
+    const swipeInfo = getActiveSwipeInfo(message);
+    if (swipeInfo?.extra) {
+        return Object.hasOwn(swipeInfo.extra, key);
+    }
+
+    return Boolean(
+        (message?.extra && Object.hasOwn(message.extra, key)),
+    );
+}
+
+function syncAssistantMessageTextToSwipe(message) {
+    if (!message || message.is_user || message.is_system) {
+        return;
+    }
+
+    ensureSwipes(message);
+
+    if (typeof message.swipe_id === 'number' && Array.isArray(message.swipes) && typeof message.swipes[message.swipe_id] === 'string') {
+        message.swipes[message.swipe_id] = message.mes;
+    }
+}
+
+function getPostProcessingRunKey(message, generationType, activationSnapshot = null) {
+    const snapshotAgentIds = Array.isArray(activationSnapshot?.activeAgentIds)
+        ? activationSnapshot.activeAgentIds.join(',')
+        : '';
+    const swipeInfo = getActiveSwipeInfo(message);
+
+    return [
+        normalizeGenerationType(activationSnapshot?.generationType ?? generationType),
+        normalizeMessageRunValue(swipeInfo?.gen_started ?? message?.gen_started),
+        normalizeMessageRunValue(swipeInfo?.gen_finished ?? message?.gen_finished),
+        normalizeMessageRunValue(swipeInfo?.send_date ?? message?.send_date),
+        normalizeMessageRunValue(message?.swipe_id),
+        snapshotAgentIds,
+    ].join('|');
+}
+
+function getPostProcessingIndexRunKey(message, messageIndex, generationType, activationSnapshot = null) {
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return '';
+    }
+
+    const snapshotAgentIds = Array.isArray(activationSnapshot?.activeAgentIds)
+        ? activationSnapshot.activeAgentIds.join(',')
+        : '';
+
+    return [
+        postProcessingGenerationRunId,
+        numericMessageIndex,
+        Number.isInteger(Number(message?.swipe_id)) ? Number(message.swipe_id) : 0,
+        normalizeGenerationType(activationSnapshot?.generationType ?? generationType),
+        snapshotAgentIds,
+    ].join('|');
+}
+
+function getStoredPostProcessingRuns(message) {
+    const storedRuns = getAgentExtraValue(message, POST_PROCESSING_RUNS_EXTRA_KEY);
+    return Array.isArray(storedRuns)
+        ? storedRuns
+        : [];
+}
+
+function getMessageRevisionKey(message) {
+    const swipeInfo = getActiveSwipeInfo(message);
+
+    return [
+        normalizeMessageRunValue(swipeInfo?.gen_started ?? message?.gen_started),
+        normalizeMessageRunValue(swipeInfo?.gen_finished ?? message?.gen_finished),
+        normalizeMessageRunValue(swipeInfo?.send_date ?? message?.send_date),
+        normalizeMessageRunValue(message?.swipe_id),
+    ].join('|');
+}
+
+function hasProcessedPostProcessingRun(message, runKey, messageIndex = null, indexRunKey = '') {
+    const numericMessageIndex = Number(messageIndex);
+    const indexRuns = Number.isInteger(numericMessageIndex)
+        ? processedPostProcessingRunsByIndex.get(numericMessageIndex)
+        : null;
+
+    return Boolean(
+        runKey &&
+        (
+            processedPostProcessingRuns.get(message)?.has(runKey) ||
+            getStoredPostProcessingRuns(message).includes(runKey) ||
+            indexRuns?.includes(runKey) ||
+            (indexRunKey && indexRuns?.includes(indexRunKey))
+        ),
+    );
+}
+
+function markPostProcessingRunProcessed(message, runKey, messageIndex = null, indexRunKey = '') {
+    if (!message || !runKey) {
+        return false;
+    }
+
+    let processedRuns = processedPostProcessingRuns.get(message);
+    if (!processedRuns) {
+        processedRuns = new Set();
+        processedPostProcessingRuns.set(message, processedRuns);
+    }
+
+    processedRuns.add(runKey);
+    const storedRuns = getStoredPostProcessingRuns(message).filter(value => value !== runKey);
+    storedRuns.push(runKey);
+    setAgentExtraValue(message, POST_PROCESSING_RUNS_EXTRA_KEY, storedRuns.slice(-MAX_TRANSFORM_HISTORY));
+
+    const numericMessageIndex = Number(messageIndex);
+    if (Number.isInteger(numericMessageIndex)) {
+        const indexRuns = (processedPostProcessingRunsByIndex.get(numericMessageIndex) ?? [])
+            .filter(value => value !== runKey && value !== indexRunKey);
+        indexRuns.push(runKey);
+        if (indexRunKey) {
+            indexRuns.push(indexRunKey);
+        }
+        processedPostProcessingRunsByIndex.set(numericMessageIndex, indexRuns.slice(-MAX_TRANSFORM_HISTORY));
+    }
+
+    return true;
+}
+
+function getDeferredActivationSnapshot(generationType) {
+    return cloneActivationSnapshot(
+        pendingGenerationSnapshot ?? buildActivationSnapshot(generationType),
+        generationType,
+    );
+}
+
+function isAssistantPostProcessingGenerationType(generationType) {
+    return !isImpersonateGenerationType(generationType);
+}
+
+function deferPostProcessing(messageIndex, generationType, activationSnapshot = null) {
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return;
+    }
+
+    const snapshot = activationSnapshot
+        ? cloneActivationSnapshot(activationSnapshot, generationType)
+        : getDeferredActivationSnapshot(generationType);
+
+    deferredPostProcessingQueue.set(numericMessageIndex, {
+        messageIndex: numericMessageIndex,
+        generationType: snapshot.generationType,
+        message: chat[numericMessageIndex] ?? null,
+        activationSnapshot: snapshot,
+    });
+
+    if (!isGenerationInProgress) {
+        scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
+        schedulePostGenerationRecoveryCheck(DEFERRED_POST_PROCESSING_RETRY_MS);
+    } else {
+        scheduleMissedGenerationEndRecoveryCheck();
+    }
+}
+
+function isDeferredPostProcessingMessageCurrent(pendingMessage) {
+    const message = chat[pendingMessage.messageIndex];
+
+    if (!message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    if (message === pendingMessage.message) {
+        return true;
+    }
+
+    if (pendingMessage.message && getMessageRevisionKey(message) === getMessageRevisionKey(pendingMessage.message)) {
+        return true;
+    }
+
+    if (pendingMessage.messageIndex >= generationStartChatLength) {
+        return true;
+    }
+
+    return isGenerationAssistantCandidate(pendingMessage.messageIndex, message);
+}
+
+function scheduleDeferredPostProcessingFlush(delayMs = 0) {
     if (deferredPostProcessingTimeout) {
         clearTimeout(deferredPostProcessingTimeout);
     }
@@ -268,25 +761,313 @@ function scheduleDeferredPostProcessingFlush() {
     deferredPostProcessingTimeout = setTimeout(async () => {
         deferredPostProcessingTimeout = null;
 
-        if (!deferredPostProcessing || isGenerationInProgress || generationStopRequested) {
+        if (deferredPostProcessingQueue.size === 0 || generationStopRequested) {
             return;
         }
 
-        const pendingMessage = deferredPostProcessing;
+        if (isGenerationInProgress) {
+            return;
+        }
 
-        if (isStreamingMessageStillActive(pendingMessage.messageIndex)) {
+        if (internalPromptTransformDepth > 0) {
             scheduleDeferredPostProcessingFlush();
             return;
         }
 
-        if (wasStreamingMessageStopped(pendingMessage.messageIndex)) {
-            deferredPostProcessing = null;
+        if (isBodyGenerationFlagBlocking()) {
+            scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
             return;
         }
 
-        deferredPostProcessing = null;
-        await processReceivedMessage(pendingMessage.messageIndex, pendingMessage.generationType);
-    }, 0);
+        const pendingMessages = [...deferredPostProcessingQueue.values()]
+            .sort((a, b) => a.messageIndex - b.messageIndex);
+
+        for (const pendingMessage of pendingMessages) {
+            if (!deferredPostProcessingQueue.has(pendingMessage.messageIndex)) {
+                continue;
+            }
+
+            if (!isDeferredPostProcessingMessageCurrent(pendingMessage)) {
+                deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
+                continue;
+            }
+
+            if (isStreamingMessageStillActive(pendingMessage.messageIndex)) {
+                scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
+                return;
+            }
+
+            if (wasStreamingMessageStopped(pendingMessage.messageIndex)) {
+                deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
+                continue;
+            }
+
+            deferredPostProcessingQueue.delete(pendingMessage.messageIndex);
+            await processReceivedMessage(pendingMessage.messageIndex, pendingMessage.generationType, pendingMessage.activationSnapshot);
+
+            if (generationStopRequested) {
+                clearDeferredPostProcessing();
+                return;
+            }
+
+            if (isMainGenerationStillActive()) {
+                scheduleDeferredPostProcessingFlush(DEFERRED_POST_PROCESSING_RETRY_MS);
+                return;
+            }
+        }
+
+        if (deferredPostProcessingQueue.size > 0) {
+            scheduleDeferredPostProcessingFlush();
+        }
+    }, delayMs);
+}
+
+function clearLatestAssistantPostProcessingFallbackTimer() {
+    if (!latestAssistantPostProcessingFallbackTimeout) {
+        return;
+    }
+
+    clearTimeout(latestAssistantPostProcessingFallbackTimeout);
+    latestAssistantPostProcessingFallbackTimeout = null;
+}
+
+function scheduleLatestAssistantPostProcessingFallback(delayMs = DEFERRED_POST_PROCESSING_RETRY_MS) {
+    clearLatestAssistantPostProcessingFallbackTimer();
+
+    if (!latestAssistantPostProcessingFallbackDeadline) {
+        latestAssistantPostProcessingFallbackDeadline = Date.now() + LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS;
+    }
+
+    latestAssistantPostProcessingFallbackTimeout = setTimeout(() => {
+        latestAssistantPostProcessingFallbackTimeout = null;
+
+        if (!pendingGenerationSnapshot || generationStopRequested || isGenerationInProgress) {
+            latestAssistantPostProcessingFallbackDeadline = 0;
+            return;
+        }
+
+        if (internalPromptTransformDepth > 0 || isBodyGenerationFlagBlocking()) {
+            if (Date.now() < latestAssistantPostProcessingFallbackDeadline) {
+                scheduleLatestAssistantPostProcessingFallback(DEFERRED_POST_PROCESSING_RETRY_MS);
+            } else {
+                latestAssistantPostProcessingFallbackDeadline = 0;
+            }
+            return;
+        }
+
+        const queueResult = queueLatestAssistantPostProcessingFromSnapshot();
+        scheduleDeferredPostProcessingFlush();
+
+        if (queueResult.retry && Date.now() < latestAssistantPostProcessingFallbackDeadline) {
+            scheduleLatestAssistantPostProcessingFallback(DEFERRED_POST_PROCESSING_RETRY_MS);
+        } else {
+            latestAssistantPostProcessingFallbackDeadline = 0;
+        }
+    }, delayMs);
+}
+
+function hasPostGenerationRecoveryWork() {
+    return Boolean(
+        !generationStopRequested &&
+        (
+            deferredPostProcessingQueue.size > 0 ||
+            pendingGenerationSnapshot?.activeAgentIds?.length > 0
+        ),
+    );
+}
+
+function schedulePostGenerationRecoveryCheck(delayMs = 0) {
+    if (!hasPostGenerationRecoveryWork() || isGenerationInProgress) {
+        return;
+    }
+
+    if (postGenerationRecoveryTimeout) {
+        clearTimeout(postGenerationRecoveryTimeout);
+    }
+
+    postGenerationRecoveryTimeout = setTimeout(() => {
+        postGenerationRecoveryTimeout = null;
+
+        if (!hasPostGenerationRecoveryWork() || isGenerationInProgress) {
+            return;
+        }
+
+        queueLatestAssistantPostProcessingFromSnapshot();
+        scheduleDeferredPostProcessingFlush();
+
+        if (deferredPostProcessingQueue.size > 0 && !isBodyGenerationFlagBlocking()) {
+            scheduleDeferredPostProcessingFlush();
+        }
+    }, delayMs);
+}
+
+function hasRecoverableAssistantPostProcessingCandidate() {
+    if (!pendingGenerationSnapshot || generationStopRequested || internalPromptTransformDepth > 0) {
+        return false;
+    }
+
+    const activationSnapshot = cloneActivationSnapshot(pendingGenerationSnapshot, pendingGenerationSnapshot.generationType);
+    if (!isAssistantPostProcessingGenerationType(activationSnapshot.generationType)) {
+        return false;
+    }
+
+    if (activationSnapshot.activeAgentIds.length === 0) {
+        return false;
+    }
+
+    const messageIndex = getLatestAssistantMessageIndex();
+    if (messageIndex < 0) {
+        return false;
+    }
+
+    const message = chat[messageIndex];
+    if (!isGenerationAssistantCandidate(messageIndex, message)) {
+        return false;
+    }
+
+    const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
+    const indexRunKey = getPostProcessingIndexRunKey(message, messageIndex, activationSnapshot.generationType, activationSnapshot);
+    return !hasProcessedPostProcessingRun(message, runKey, messageIndex, indexRunKey);
+}
+
+function hasActiveStreamingProcessorIgnoringGenerationFlag(messageIndex) {
+    const liveStreamingProcessor = getStreamingTarget(messageIndex);
+    if (!liveStreamingProcessor) {
+        return false;
+    }
+
+    return Boolean(
+        !liveStreamingProcessor.isFinished &&
+        !liveStreamingProcessor.isStopped &&
+        !liveStreamingProcessor.abortController?.signal?.aborted,
+    );
+}
+
+function canRecoverMissedGenerationEnd() {
+    if (!isGenerationInProgress || !hasRecoverableAssistantPostProcessingCandidate()) {
+        return false;
+    }
+
+    const messageIndex = getLatestAssistantMessageIndex();
+    const message = chat[messageIndex];
+
+    if (hasActiveStreamingProcessorIgnoringGenerationFlag(messageIndex)) {
+        return false;
+    }
+
+    if (message?.gen_finished) {
+        return true;
+    }
+
+    if (document.body?.dataset?.generating !== 'true') {
+        return true;
+    }
+
+    return Date.now() - generationStartedAt > BODY_GENERATING_FLAG_GRACE_MS;
+}
+
+function recoverMissedGenerationEnd(reason = 'fallback') {
+    if (!canRecoverMissedGenerationEnd()) {
+        return false;
+    }
+
+    console.warn(`[InChatAgents] Recovering missed generation end via ${reason}; flushing queued post-processing.`);
+    isGenerationInProgress = false;
+    lastMainGenerationEndedAt = Date.now() - BODY_GENERATING_FLAG_GRACE_MS;
+    toolSyncDuringGeneration = false;
+    generationStopRequested = false;
+    clearMissedGenerationEndRecoveryCheck();
+    queueLatestAssistantPostProcessingFromSnapshot();
+    scheduleDeferredPostProcessingFlush();
+    schedulePostGenerationRecoveryCheck();
+    latestAssistantPostProcessingFallbackDeadline = Date.now() + LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS;
+    scheduleLatestAssistantPostProcessingFallback();
+    return true;
+}
+
+function scheduleMissedGenerationEndRecoveryCheck(delayMs = MISSED_GENERATION_END_RECOVERY_MS) {
+    if (!isGenerationInProgress || generationStopRequested) {
+        return;
+    }
+
+    if (missedGenerationEndRecoveryTimeout) {
+        clearTimeout(missedGenerationEndRecoveryTimeout);
+    }
+
+    missedGenerationEndRecoveryTimeout = setTimeout(() => {
+        missedGenerationEndRecoveryTimeout = null;
+
+        if (recoverMissedGenerationEnd('watchdog')) {
+            return;
+        }
+
+        if (isGenerationInProgress && hasRecoverableAssistantPostProcessingCandidate()) {
+            scheduleMissedGenerationEndRecoveryCheck();
+        }
+    }, delayMs);
+}
+
+function observePostGenerationRecoveryTargets() {
+    if (!postGenerationRecoveryObserver) {
+        return;
+    }
+
+    try {
+        if (document.body) {
+            postGenerationRecoveryObserver.observe(document.body, {
+                attributes: true,
+                attributeFilter: ['data-generating'],
+            });
+        }
+
+        const chatElement = document.getElementById?.('chat') ?? document.querySelector?.('#chat');
+        if (chatElement) {
+            postGenerationRecoveryObserver.observe(chatElement, {
+                childList: true,
+                subtree: true,
+            });
+        }
+    } catch (error) {
+        console.warn('[InChatAgents] Could not start post-generation recovery observer:', error);
+    }
+}
+
+function initPostGenerationRecoveryHooks() {
+    if (postGenerationRecoveryHooksInitialized) {
+        return;
+    }
+
+    postGenerationRecoveryHooksInitialized = true;
+    const scheduleRecovery = () => {
+        if (!recoverMissedGenerationEnd('event')) {
+            scheduleMissedGenerationEndRecoveryCheck();
+        }
+        schedulePostGenerationRecoveryCheck();
+    };
+    const observeAndScheduleRecovery = () => {
+        observePostGenerationRecoveryTargets();
+        scheduleRecovery();
+    };
+
+    if (typeof MutationObserver === 'function') {
+        try {
+            postGenerationRecoveryObserver = new MutationObserver(scheduleRecovery);
+            observePostGenerationRecoveryTargets();
+        } catch (error) {
+            console.warn('[InChatAgents] Could not start post-generation recovery observer:', error);
+        }
+    }
+
+    if (typeof document.addEventListener === 'function') {
+        document.addEventListener('visibilitychange', scheduleRecovery);
+        document.addEventListener('DOMContentLoaded', observeAndScheduleRecovery);
+    }
+
+    const windowTarget = globalThis.window ?? globalThis;
+    if (typeof windowTarget.addEventListener === 'function') {
+        windowTarget.addEventListener('pageshow', scheduleRecovery);
+        windowTarget.addEventListener('focus', scheduleRecovery);
+    }
 }
 
 /**
@@ -318,8 +1099,79 @@ function shouldActivate(agent, generationType) {
     return true;
 }
 
+function getLatestAssistantMessageIndex() {
+    for (let index = chat.length - 1; index >= 0; index--) {
+        const message = chat[index];
+        if (message && !message.is_user && !message.is_system) {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+function isGenerationAssistantCandidate(messageIndex, message) {
+    if (!message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    if (messageIndex >= generationStartChatLength) {
+        return true;
+    }
+
+    if (message === generationStartLastAssistantMessage) {
+        return getMessageRevisionKey(message) !== generationStartLastAssistantRevision;
+    }
+
+    return generationStartLastAssistantIndex >= 0 &&
+        messageIndex === generationStartLastAssistantIndex &&
+        messageIndex === chat.length - 1;
+}
+
+function queueLatestAssistantPostProcessingFromSnapshot() {
+    if (!pendingGenerationSnapshot || generationStopRequested) {
+        return { queued: false, retry: false };
+    }
+
+    const activationSnapshot = cloneActivationSnapshot(pendingGenerationSnapshot, pendingGenerationSnapshot.generationType);
+    if (!isAssistantPostProcessingGenerationType(activationSnapshot.generationType)) {
+        return { queued: false, retry: false };
+    }
+
+    if (activationSnapshot.activeAgentIds.length === 0) {
+        return { queued: false, retry: false };
+    }
+
+    const messageIndex = getLatestAssistantMessageIndex();
+    if (messageIndex < 0) {
+        return { queued: false, retry: true };
+    }
+
+    const message = chat[messageIndex];
+    if (!isGenerationAssistantCandidate(messageIndex, message)) {
+        return { queued: false, retry: true };
+    }
+
+    const runKey = getPostProcessingRunKey(message, activationSnapshot.generationType, activationSnapshot);
+    const indexRunKey = getPostProcessingIndexRunKey(message, messageIndex, activationSnapshot.generationType, activationSnapshot);
+
+    if (hasProcessedPostProcessingRun(message, runKey, messageIndex, indexRunKey)) {
+        return { queued: false, retry: false };
+    }
+
+    deferPostProcessing(messageIndex, activationSnapshot.generationType, activationSnapshot);
+    return { queued: true, retry: false };
+}
+
 function buildActivationSnapshot(generationType) {
     const normalizedGenerationType = normalizeGenerationType(generationType);
+    if (!areAgentsGloballyEnabled()) {
+        return {
+            generationType: normalizedGenerationType,
+            activeAgentIds: [],
+        };
+    }
+
     const activeAgents = getEnabledAgents().filter(agent => shouldActivate(agent, normalizedGenerationType));
 
     return {
@@ -338,8 +1190,8 @@ function getSnapshotAgents(snapshot) {
         .filter(Boolean);
 }
 
-function getActiveAgentsForMessage(generationType) {
-    const snapshot = pendingGenerationSnapshot ?? buildActivationSnapshot(generationType);
+function getActiveAgentsForMessage(generationType, activationSnapshot = null) {
+    const snapshot = activationSnapshot ?? pendingGenerationSnapshot ?? buildActivationSnapshot(generationType);
     return getSnapshotAgents(snapshot);
 }
 
@@ -367,30 +1219,81 @@ function updateMessageRegexSnapshot(message, activeAgents, generationType) {
     const regexScripts = activeAgents.flatMap(agent => getAgentRegexScripts(agent));
 
     if (regexScripts.length === 0) {
-        if (message.extra[MESSAGE_EXTRA_KEY]) {
-            delete message.extra[MESSAGE_EXTRA_KEY];
+        if (hasAgentExtraValue(message, MESSAGE_EXTRA_KEY)) {
+            deleteAgentExtraValue(message, MESSAGE_EXTRA_KEY);
             return true;
         }
 
         return false;
     }
 
-    message.extra[MESSAGE_EXTRA_KEY] = {
+    const previousSnapshot = getAgentExtraValue(message, MESSAGE_EXTRA_KEY);
+    const nextSnapshot = {
         activeAgentIds: activeAgents.map(agent => agent.id),
         generationType: normalizeGenerationType(generationType),
         regexScripts: structuredClone(regexScripts),
-        edited: Boolean(message.extra[MESSAGE_EXTRA_KEY]?.edited),
+        edited: Boolean(previousSnapshot?.edited),
     };
 
+    const previousComparable = previousSnapshot
+        ? {
+            activeAgentIds: previousSnapshot.activeAgentIds,
+            generationType: previousSnapshot.generationType,
+            regexScripts: previousSnapshot.regexScripts,
+            edited: Boolean(previousSnapshot.edited),
+        }
+        : null;
+
+    if (JSON.stringify(previousComparable) === JSON.stringify(nextSnapshot)) {
+        return false;
+    }
+
+    setAgentExtraValue(message, MESSAGE_EXTRA_KEY, nextSnapshot);
     return true;
 }
 
-function normalizePromptTransformMaxTokens(value) {
-    if (!Number.isFinite(Number(value))) {
-        return DEFAULT_PROMPT_TRANSFORM_MAX_TOKENS;
+function ensureMessageRegexSnapshot(messageIndex, generationType, activationSnapshot = null, options = {}) {
+    const { refresh = true, save = true } = options;
+    if (!isAssistantPostProcessingGenerationType(activationSnapshot?.generationType ?? generationType)) {
+        return false;
     }
 
-    return Math.max(16, Math.min(16000, Number(value)));
+    const numericMessageIndex = Number(messageIndex);
+    if (!Number.isInteger(numericMessageIndex)) {
+        return false;
+    }
+
+    const message = chat[numericMessageIndex];
+    if (!message || message.is_user || message.is_system) {
+        return false;
+    }
+
+    const resolvedActivationSnapshot = activationSnapshot
+        ? cloneActivationSnapshot(activationSnapshot, generationType)
+        : getDeferredActivationSnapshot(generationType);
+    const activeAgents = getActiveAgentsForMessage(generationType, resolvedActivationSnapshot);
+
+    if (!updateMessageRegexSnapshot(message, activeAgents, generationType)) {
+        if (save && pendingRegexSnapshotSaves.has(message)) {
+            pendingRegexSnapshotSaves.delete(message);
+            saveChatDebounced();
+        }
+
+        return false;
+    }
+
+    if (save) {
+        pendingRegexSnapshotSaves.delete(message);
+        saveChatDebounced();
+    } else {
+        pendingRegexSnapshotSaves.add(message);
+    }
+
+    if (refresh) {
+        scheduleMessageRefresh(numericMessageIndex, message);
+    }
+
+    return true;
 }
 
 function resolveAgentConnectionProfile(agent) {
@@ -411,11 +1314,11 @@ function getPromptTransformAgentsForMessage(activeAgents, generationType) {
         return [];
     }
 
-    return getPromptTransformAgents(activeAgents);
-}
+    if (isImpersonateGenerationType(generationType)) {
+        return [];
+    }
 
-function getPromptTransformMode(agent) {
-    return agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite';
+    return getPromptTransformAgents(activeAgents);
 }
 
 function describePromptTransformMode(mode) {
@@ -428,39 +1331,6 @@ function shouldShowPromptTransformNotifications(agent) {
         agent?.postProcess?.promptTransformEnabled &&
         agent?.postProcess?.promptTransformShowNotifications,
     );
-}
-
-function getConnectionProfileDisplayName(profileId = '') {
-    const normalizedProfileId = String(profileId ?? '').trim();
-    if (!normalizedProfileId) {
-        return '';
-    }
-
-    const connectionProfilesSelect = document.getElementById('connection_profiles');
-    if (connectionProfilesSelect instanceof HTMLSelectElement) {
-        const matchingOption = Array.from(connectionProfilesSelect.options)
-            .find(option => String(option.value ?? '').trim() === normalizedProfileId);
-        const optionLabel = String(matchingOption?.textContent ?? '').trim();
-        if (optionLabel) {
-            return optionLabel;
-        }
-    }
-
-    const context = getContext();
-    const CMRS = context?.ConnectionManagerRequestService;
-    if (CMRS && typeof CMRS.getProfile === 'function') {
-        try {
-            const profile = CMRS.getProfile(normalizedProfileId);
-            const profileName = String(profile?.name ?? '').trim();
-            if (profileName) {
-                return profileName;
-            }
-        } catch {
-            // Fall back to the raw profile id when the profile no longer exists.
-        }
-    }
-
-    return normalizedProfileId;
 }
 
 function describePromptTransformTarget(profileId = '', runner = '') {
@@ -541,6 +1411,14 @@ function syncPromptTransformMessageState(message, messageIndex) {
         delete message.extra.display_text;
     }
 
+    syncAssistantMessageTextToSwipe(message);
+}
+
+function syncAssistantMessageStateToSwipe(message, messageIndex) {
+    if (!message || message.is_user || message.is_system) {
+        return;
+    }
+
     ensureSwipes(message);
 
     if (typeof message.swipe_id === 'number' && Array.isArray(message.swipes) && typeof message.swipes[message.swipe_id] === 'string') {
@@ -591,15 +1469,15 @@ function updatePromptTransformRuns(message, runs) {
     message.extra ??= {};
 
     if (!Array.isArray(runs) || runs.length === 0) {
-        if (Object.hasOwn(message.extra, PROMPT_RUNS_EXTRA_KEY)) {
-            delete message.extra[PROMPT_RUNS_EXTRA_KEY];
+        if (hasAgentExtraValue(message, PROMPT_RUNS_EXTRA_KEY)) {
+            deleteAgentExtraValue(message, PROMPT_RUNS_EXTRA_KEY);
             return true;
         }
 
         return false;
     }
 
-    message.extra[PROMPT_RUNS_EXTRA_KEY] = runs.map(result => sanitizePromptTransformRunForStorage(result));
+    setAgentExtraValue(message, PROMPT_RUNS_EXTRA_KEY, runs.map(result => sanitizePromptTransformRunForStorage(result)));
     return true;
 }
 
@@ -608,26 +1486,60 @@ function updatePromptTransformHistory(message, run) {
         return false;
     }
 
-    message.extra ??= {};
-    const history = Array.isArray(message.extra[PROMPT_TRANSFORM_HISTORY_KEY])
-        ? message.extra[PROMPT_TRANSFORM_HISTORY_KEY]
-        : [];
-
-    history.push({
+    const storedHistory = getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY);
+    const history = getPromptTransformHistoryForText(storedHistory, run.beforeText);
+    const nextEntry = {
         agentId: run.agentId,
         agentName: run.agentName,
         mode: run.mode,
         beforeText: normalizeContentText(run.beforeText),
         afterText: normalizeContentText(run.nextMessageText),
         timestamp: run.timestamp,
-    });
+    };
 
-    while (history.length > MAX_TRANSFORM_HISTORY) {
-        history.shift();
+    history.push(nextEntry);
+
+    const scopedHistory = getPromptTransformHistoryForText(history, run.nextMessageText);
+    if (!scopedHistory.includes(nextEntry)) {
+        scopedHistory.length = 0;
+        scopedHistory.push(nextEntry);
     }
 
-    message.extra[PROMPT_TRANSFORM_HISTORY_KEY] = history;
+    while (scopedHistory.length > MAX_TRANSFORM_HISTORY) {
+        scopedHistory.shift();
+    }
+
+    setAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY, scopedHistory);
     return true;
+}
+
+function getPromptTransformHistoryForText(history, currentText) {
+    const entries = Array.isArray(history) ? history : [];
+    const scopedHistory = [];
+    let expectedAfterText = normalizeContentText(currentText);
+
+    // Keep only the contiguous edit chain that produced the active message text.
+    for (let i = entries.length - 1; i >= 0; i--) {
+        const entry = entries[i];
+        if (!entry || typeof entry !== 'object') {
+            continue;
+        }
+
+        const afterText = normalizeContentText(entry.afterText);
+        if (afterText !== expectedAfterText) {
+            continue;
+        }
+
+        scopedHistory.unshift(entry);
+        expectedAfterText = normalizeContentText(entry.beforeText);
+    }
+
+    return scopedHistory;
+}
+
+export function getPromptTransformHistoryForMessage(message) {
+    const storedHistory = getAgentExtraValue(message, PROMPT_TRANSFORM_HISTORY_KEY);
+    return getPromptTransformHistoryForText(storedHistory, message?.mes);
 }
 
 function unwrapAssistantResponseWrapper(value) {
@@ -772,25 +1684,6 @@ function consolidateAppendPromptTransformOutputs(baseText, agents, results) {
     };
 }
 
-function extractProfileResponseText(response) {
-    return normalizeContentText(response?.content)
-        || normalizeContentText(response?.choices?.[0]?.message?.content)
-        || normalizeContentText(response?.candidates?.[0]?.content?.parts)
-        || normalizeContentText(response?.candidates?.[0]?.output?.parts)
-        || normalizeContentText(response?.text)
-        || normalizeContentText(response?.output)
-        || normalizeContentText(response?.message?.content)
-        || normalizeContentText(response?.message?.tool_plan)
-        || normalizeContentText(response?.message)
-        || '';
-}
-
-function buildFallbackPromptText(promptMessages) {
-    return promptMessages
-        .map(message => `${String(message?.role ?? 'user').toUpperCase()}:\n${normalizeContentText(message?.content)}`)
-        .join('\n\n');
-}
-
 async function requestProfilePromptTransform(CMRS, profileId, promptMessages, maxTokens, modelOverride = '') {
     const requestOptions = {
         extractData: true,
@@ -857,10 +1750,13 @@ async function requestPromptTransform(agent, promptMessages, maxTokens) {
     const CMRS = context?.ConnectionManagerRequestService;
     const runAsInternalPromptTransform = async (requestFn) => {
         internalPromptTransformDepth++;
+        notifyAgentGenerationStateChanged();
         try {
             return await requestFn();
         } finally {
             internalPromptTransformDepth = Math.max(0, internalPromptTransformDepth - 1);
+            notifyPromptTransformIdle();
+            notifyAgentGenerationStateChanged();
         }
     };
 
@@ -1176,29 +2072,7 @@ function scheduleMessageRefresh(messageIndex, expectedMessage) {
     pendingRefreshTimeouts.set(messageIndex, timeoutId);
 }
 
-/**
- * Cleans up all in-chat agent extension prompts before a new generation.
- */
-function onGenerationStarted() {
-    if (internalPromptTransformDepth > 0) {
-        return;
-    }
-
-    isGenerationInProgress = true;
-    toolSyncDuringGeneration = true;
-    generationStopRequested = false;
-    clearDeferredPostProcessing();
-    clearAllPromptTransformRunningToasts();
-    pendingGenerationSnapshot = null;
-
-    const lastMsg = chat[chat.length - 1];
-    const isRecursiveToolPass = lastMsg?.extra?.tool_invocations != null;
-    if (isRecursiveToolPass) {
-        toolRecursionDepth++;
-    } else {
-        toolRecursionDepth = 0;
-    }
-
+function clearInChatAgentExtensionPrompts() {
     for (const key of Object.keys(extension_prompts)) {
         if (key.startsWith(PROMPT_KEY_PREFIX) || PATHFINDER_RETRIEVAL_PROMPT_KEYS.includes(key)) {
             delete extension_prompts[key];
@@ -1206,49 +2080,7 @@ function onGenerationStarted() {
     }
 }
 
-function onGenerationEnded() {
-    if (internalPromptTransformDepth > 0) {
-        return;
-    }
-
-    isGenerationInProgress = false;
-    toolSyncDuringGeneration = false;
-    generationStopRequested = false;
-    clearAllPromptTransformRunningToasts();
-    scheduleDeferredPostProcessingFlush();
-}
-
-function onGenerationStopped() {
-    if (internalPromptTransformDepth > 0) {
-        return;
-    }
-
-    generationStopRequested = true;
-    isGenerationInProgress = false;
-    clearDeferredPostProcessing();
-    clearAllPromptTransformRunningToasts();
-}
-
-/**
- * Injects pre-generation agent prompts.
- * @param {string} generationType
- * @param {object} _options
- * @param {boolean} dryRun
- */
-async function onGenerationAfterCommands(generationType, _options, dryRun) {
-    if (dryRun || internalPromptTransformDepth > 0) {
-        return;
-    }
-
-    pendingGenerationSnapshot = buildActivationSnapshot(generationType);
-    const activeAgents = getSnapshotAgents(pendingGenerationSnapshot);
-    const pathfinderAgent = getPathfinderRuntimeAgent(activeAgents);
-
-    if (pathfinderAgent) {
-        syncPathfinderRuntimeSettings(pathfinderAgent);
-        await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles);
-    }
-
+function injectPreGenerationAgentPrompts(activeAgents, generationType) {
     const promptAgents = activeAgents.filter(agent => agent.phase === 'pre' || agent.phase === 'both');
 
     for (const agent of promptAgents) {
@@ -1273,32 +2105,184 @@ async function onGenerationAfterCommands(generationType, _options, dryRun) {
             agent.injection.role,
         );
     }
+}
 
-    syncToolAgentRegistrations();
+/**
+ * Cleans up all in-chat agent extension prompts before a new generation.
+ */
+function onGenerationStarted(generationType, _options, dryRun) {
+    if (dryRun || internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    currentMainGenerationType = normalizeGenerationType(generationType);
+    isGenerationInProgress = true;
+    toolSyncDuringGeneration = true;
+    generationStopRequested = false;
+    generationStartedAt = Date.now();
+    lastMainGenerationEndedAt = 0;
+    postProcessingGenerationRunId++;
+    clearLatestAssistantPostProcessingFallback();
+    clearPostGenerationRecoveryCheck();
+    clearMissedGenerationEndRecoveryCheck();
+    clearAllPromptTransformRunningToasts();
+    pendingGenerationSnapshot = buildActivationSnapshot(currentMainGenerationType);
+    generationStartChatLength = chat.length;
+    const latestAssistantMessageIndex = getLatestAssistantMessageIndex();
+    generationStartLastAssistantIndex = latestAssistantMessageIndex;
+    generationStartLastAssistantMessage = latestAssistantMessageIndex >= 0 ? chat[latestAssistantMessageIndex] : null;
+    generationStartLastAssistantRevision = getMessageRevisionKey(generationStartLastAssistantMessage);
+    processedPostProcessingRunsByIndex.clear();
+
+    const lastMsg = chat[chat.length - 1];
+    const isRecursiveToolPass = lastMsg?.extra?.tool_invocations != null;
+    if (isRecursiveToolPass) {
+        toolRecursionDepth++;
+    } else {
+        toolRecursionDepth = 0;
+    }
+
+    clearInChatAgentExtensionPrompts();
+}
+
+function onGenerationEnded() {
+    if (internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    pendingGenerationSnapshot ??= buildActivationSnapshot(currentMainGenerationType);
+    isGenerationInProgress = false;
+    lastMainGenerationEndedAt = Date.now();
+    toolSyncDuringGeneration = false;
+    generationStopRequested = false;
+    clearMissedGenerationEndRecoveryCheck();
+    clearAllPromptTransformRunningToasts();
+    queueLatestAssistantPostProcessingFromSnapshot();
+    scheduleDeferredPostProcessingFlush();
+    schedulePostGenerationRecoveryCheck();
+    latestAssistantPostProcessingFallbackDeadline = Date.now() + LATEST_ASSISTANT_POST_PROCESSING_FALLBACK_WINDOW_MS;
+    scheduleLatestAssistantPostProcessingFallback();
+}
+
+function onGenerationStopped() {
+    if (internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    generationStopRequested = true;
+    isGenerationInProgress = false;
+    lastMainGenerationEndedAt = Date.now();
+    clearLatestAssistantPostProcessingFallback();
+    clearPostGenerationRecoveryCheck();
+    clearMissedGenerationEndRecoveryCheck();
+    clearDeferredPostProcessing();
+    clearAllPromptTransformRunningToasts();
+}
+
+/**
+ * Injects pre-generation agent prompts.
+ * @param {string} generationType
+ * @param {object} _options
+ * @param {boolean} dryRun
+ */
+async function onGenerationAfterCommands(generationType, _options, dryRun) {
+    if (internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    const normalizedGenerationType = normalizeGenerationType(generationType);
+
+    if (dryRun && isGenerationInProgress) {
+        return;
+    }
+
+    if (dryRun) {
+        clearInChatAgentExtensionPrompts();
+    }
+
+    if (!areAgentsGloballyEnabled()) {
+        return;
+    }
+
+    const activationSnapshot = dryRun
+        ? buildActivationSnapshot(normalizedGenerationType)
+        : pendingGenerationSnapshot?.generationType === normalizedGenerationType
+            ? cloneActivationSnapshot(pendingGenerationSnapshot, normalizedGenerationType)
+            : buildActivationSnapshot(normalizedGenerationType);
+
+    if (!dryRun) {
+        pendingGenerationSnapshot = activationSnapshot;
+    }
+
+    const activeAgents = getSnapshotAgents(activationSnapshot);
+    const pathfinderAgent = getPathfinderRuntimeAgent(activeAgents);
+
+    if (!dryRun && pathfinderAgent) {
+        syncPathfinderRuntimeSettings(pathfinderAgent);
+        await runSidecarRetrieval(setExtensionPrompt, extension_prompt_types, extension_prompt_roles);
+
+        if (shouldAutoSummarize()) {
+            const key = PROMPT_KEY_PREFIX + 'pathfinder_auto_summary';
+            setExtensionPrompt(
+                key,
+                'Pathfinder memory summary is due. If the recent conversation contains a meaningful scene, event, state change, or resolved arc, call Pathfinder_Summarize with a concise title, useful content, significance, and arc when applicable. If nothing important happened, do not call it.',
+                extension_prompt_types.IN_PROMPT,
+                4,
+                false,
+                extension_prompt_roles.SYSTEM,
+            );
+            markAutoSummaryComplete();
+        }
+    }
+
+    injectPreGenerationAgentPrompts(activeAgents, generationType);
+
+    if (!dryRun) {
+        syncToolAgentRegistrations();
+    }
 }
 
 /**
  * Runs post-generation utilities on the received message and snapshots active regex scripts.
  * @param {number} messageIndex
  * @param {string} generationType
+ * @param {{ generationType: string, activeAgentIds: string[] } | null} activationSnapshot
  */
-async function processReceivedMessage(messageIndex, generationType) {
+async function processReceivedMessage(messageIndex, generationType, activationSnapshot = null) {
     const message = chat[messageIndex];
     if (!message || message.is_user || message.is_system) {
         return;
     }
 
-    const activeAgents = getActiveAgentsForMessage(generationType);
+    if (!isAssistantPostProcessingGenerationType(activationSnapshot?.generationType ?? generationType)) {
+        return;
+    }
+
+    syncAssistantMessageTextToSwipe(message);
+
+    const resolvedActivationSnapshot = activationSnapshot
+        ? cloneActivationSnapshot(activationSnapshot, generationType)
+        : cloneActivationSnapshot(pendingGenerationSnapshot ?? buildActivationSnapshot(generationType), generationType);
+    const runKey = getPostProcessingRunKey(message, generationType, resolvedActivationSnapshot);
+    const indexRunKey = getPostProcessingIndexRunKey(message, messageIndex, generationType, resolvedActivationSnapshot);
+    if (hasProcessedPostProcessingRun(message, runKey, messageIndex, indexRunKey)) {
+        return;
+    }
+    markPostProcessingRunProcessed(message, runKey, messageIndex, indexRunKey);
+
+    const activeAgents = getActiveAgentsForMessage(generationType, resolvedActivationSnapshot);
     const promptTransformAgents = getPromptTransformAgentsForMessage(activeAgents, generationType);
-    const utilityAgents = activeAgents.filter(agent =>
-        agent.postProcess?.enabled &&
-        agent.postProcess.type !== 'regex' &&
-        (
-            agent.phase === 'post' ||
-            agent.phase === 'both' ||
-            agent.postProcess.type === 'extract'
-        ),
-    );
+    const utilityAgents = isImpersonateGenerationType(generationType)
+        ? []
+        : activeAgents.filter(agent =>
+            agent.postProcess?.enabled &&
+            agent.postProcess.type !== 'regex' &&
+            (
+                agent.phase === 'post' ||
+                agent.phase === 'both' ||
+                agent.postProcess.type === 'extract'
+            ),
+        );
 
     let chatStateChanged = false;
     let messageDisplayChanged = false;
@@ -1373,8 +2357,13 @@ async function processReceivedMessage(messageIndex, generationType) {
         chatStateChanged = true;
     }
 
+    let promptHistoryChanged = false;
     for (const run of promptRuns) {
-        updatePromptTransformHistory(message, run);
+        promptHistoryChanged = updatePromptTransformHistory(message, run) || promptHistoryChanged;
+    }
+
+    if (promptHistoryChanged) {
+        chatStateChanged = true;
     }
 
     for (const agent of utilityAgents) {
@@ -1421,6 +2410,7 @@ async function processReceivedMessage(messageIndex, generationType) {
     }
 
     if (chatStateChanged) {
+        syncAssistantMessageStateToSwipe(message, messageIndex);
         saveChatDebounced();
     }
 
@@ -1430,7 +2420,11 @@ async function processReceivedMessage(messageIndex, generationType) {
 }
 
 async function onMessageReceived(messageIndex, generationType) {
-    if (internalPromptTransformDepth > 0) {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
+        return;
+    }
+
+    if (!isAssistantPostProcessingGenerationType(generationType)) {
         return;
     }
 
@@ -1440,69 +2434,81 @@ async function onMessageReceived(messageIndex, generationType) {
         return;
     }
 
+    ensureMessageRegexSnapshot(numericMessageIndex, generationType);
+
     if (isStreamingMessageStillActive(numericMessageIndex)) {
         deferPostProcessing(numericMessageIndex, generationType);
         return;
     }
 
     if (wasStreamingMessageStopped(numericMessageIndex)) {
-        if (deferredPostProcessing?.messageIndex === numericMessageIndex) {
-            clearDeferredPostProcessing();
-        }
+        clearDeferredPostProcessing(numericMessageIndex);
         return;
     }
 
-    if (deferredPostProcessing?.messageIndex === numericMessageIndex) {
-        clearDeferredPostProcessing();
+    if (isMainGenerationStillActive()) {
+        deferPostProcessing(numericMessageIndex, generationType);
+        return;
     }
+
+    clearDeferredPostProcessing(numericMessageIndex);
 
     await processReceivedMessage(numericMessageIndex, generationType);
 }
 
-function onMessageEdited(messageIndex) {
-    const message = chat[messageIndex];
-    if (!message || !message.extra?.[MESSAGE_EXTRA_KEY]) {
+function onStreamTokenReceived() {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
         return;
     }
 
-    message.extra[MESSAGE_EXTRA_KEY].edited = true;
+    const liveStreamingProcessor = streamingProcessor;
+    if (!liveStreamingProcessor || liveStreamingProcessor.type === 'impersonate') {
+        return;
+    }
+
+    const numericMessageIndex = Number(liveStreamingProcessor.messageId);
+    if (!Number.isInteger(numericMessageIndex) || numericMessageIndex < 0) {
+        return;
+    }
+
+    const generationType = pendingGenerationSnapshot?.generationType
+        ?? currentMainGenerationType
+        ?? liveStreamingProcessor.type;
+
+    ensureMessageRegexSnapshot(
+        numericMessageIndex,
+        generationType,
+        pendingGenerationSnapshot,
+        { refresh: false, save: false },
+    );
+}
+
+async function onCharacterMessageRendered(messageIndex, generationType) {
+    await onMessageReceived(messageIndex, generationType);
+}
+
+function onMessageEdited(messageIndex) {
+    if (!areAgentsGloballyEnabled()) {
+        return;
+    }
+
+    const message = chat[messageIndex];
+    const snapshot = getAgentExtraValue(message, MESSAGE_EXTRA_KEY);
+    if (!message || !snapshot) {
+        return;
+    }
+
+    snapshot.edited = true;
+    setAgentExtraValue(message, MESSAGE_EXTRA_KEY, snapshot);
     saveChatDebounced();
 }
 
 async function onImpersonateReady() {
-    if (internalPromptTransformDepth > 0) {
+    if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
         return;
     }
 
-    if (!pendingGenerationSnapshot) {
-        return;
-    }
-
-    const messageIndex = chat.length - 1;
-    const message = chat[messageIndex];
-    if (!message || message.is_user || message.is_system) {
-        return;
-    }
-
-    const generationType = pendingGenerationSnapshot.generationType ?? 'impersonate';
-
-    if (isStreamingMessageStillActive(messageIndex)) {
-        deferPostProcessing(messageIndex, generationType);
-        return;
-    }
-
-    if (wasStreamingMessageStopped(messageIndex)) {
-        if (deferredPostProcessing?.messageIndex === messageIndex) {
-            clearDeferredPostProcessing();
-        }
-        return;
-    }
-
-    if (deferredPostProcessing?.messageIndex === messageIndex) {
-        clearDeferredPostProcessing();
-    }
-
-    await processReceivedMessage(messageIndex, generationType);
+    // Impersonate produces user-side text; this event must not mutate the last assistant swipe.
 }
 
 async function onMessageSwiped(data) {
@@ -1524,7 +2530,7 @@ async function onMessageSwiped(data) {
  * @param {object} data Generation data being prepared for the API call
  */
 function onChatCompletionSettingsReady(data) {
-    if (agentRegisteredToolNames.size === 0) {
+    if (!areAgentsGloballyEnabled() || agentRegisteredToolNames.size === 0) {
         return;
     }
 
@@ -1569,6 +2575,10 @@ function onChatCompletionSettingsReady(data) {
  * @param {object} data World info data with globalLore, characterLore, etc.
  */
 function onWorldInfoEntriesLoaded(data) {
+    if (!areAgentsGloballyEnabled()) {
+        return;
+    }
+
     const enabledToolAgents = getEnabledToolAgents();
     if (enabledToolAgents.length === 0) return;
 
@@ -1602,6 +2612,11 @@ function getPfManagedEntryUids(toolAgents) {
 let _onChatChangedToolSync = false;
 
 function onChatChangedToolSync() {
+    if (!areAgentsGloballyEnabled()) {
+        syncToolAgentRegistrations();
+        return;
+    }
+
     if (_onChatChangedToolSync) {
         return;
     }
@@ -1615,6 +2630,11 @@ function onChatChangedToolSync() {
 }
 
 function onWorldInfoUpdatedToolSync() {
+    if (!areAgentsGloballyEnabled()) {
+        syncToolAgentRegistrations();
+        return;
+    }
+
     if (toolSyncDuringGeneration || isGenerationInProgress) {
         return;
     }
@@ -1627,9 +2647,7 @@ export function undoPromptTransform(messageIndex) {
         return false;
     }
 
-    const history = Array.isArray(message.extra?.[PROMPT_TRANSFORM_HISTORY_KEY])
-        ? message.extra[PROMPT_TRANSFORM_HISTORY_KEY]
-        : [];
+    const history = getPromptTransformHistoryForMessage(message);
 
     if (history.length === 0) {
         return false;
@@ -1649,9 +2667,7 @@ export function redoPromptTransform(messageIndex) {
         return false;
     }
 
-    const history = Array.isArray(message.extra?.[PROMPT_TRANSFORM_HISTORY_KEY])
-        ? message.extra[PROMPT_TRANSFORM_HISTORY_KEY]
-        : [];
+    const history = getPromptTransformHistoryForMessage(message);
 
     if (history.length === 0) {
         return false;
@@ -1669,12 +2685,22 @@ export function redoPromptTransform(messageIndex) {
  * Registers all event listeners for the agent runner.
  */
 export function initAgentRunner() {
+    initPostGenerationRecoveryHooks();
+
     eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
     eventSource.on(event_types.GENERATION_AFTER_COMMANDS, onGenerationAfterCommands);
     eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
     eventSource.on(event_types.GENERATION_STOPPED, onGenerationStopped);
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
     eventSource.on(event_types.MESSAGE_EDITED, onMessageEdited);
+
+    if (event_types.STREAM_TOKEN_RECEIVED) {
+        eventSource.on(event_types.STREAM_TOKEN_RECEIVED, onStreamTokenReceived);
+    }
+
+    if (event_types.CHARACTER_MESSAGE_RENDERED) {
+        eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onCharacterMessageRendered);
+    }
 
     if (event_types.IMPERSONATE_READY) {
         eventSource.on(event_types.IMPERSONATE_READY, onImpersonateReady);
@@ -1701,18 +2727,7 @@ export function initAgentRunner() {
     }
 }
 
-/**
- * Manually runs a single agent on a specific message (on-demand, not triggered by generation).
- * @param {string} agentId
- * @param {number} messageIndex
- * @returns {Promise<import('./agent-store.js').InChatAgent | null>}
- */
-export async function runAgentOnMessage(agentId, messageIndex) {
-    if (internalPromptTransformDepth > 0) {
-        toastr.warning('Cannot run an agent while another is in progress.');
-        return null;
-    }
-
+async function executeManualAgentRun(agentId, messageIndex) {
     await commitOpenEditorForMessage(messageIndex);
 
     const agent = getAgentById(agentId);
@@ -1733,11 +2748,31 @@ export async function runAgentOnMessage(agentId, messageIndex) {
         saveChatDebounced();
     }
 
-    updatePromptTransformHistory(message, result);
+    const historyChanged = updatePromptTransformHistory(message, result);
+    if (historyChanged) {
+        syncAssistantMessageStateToSwipe(message, messageIndex);
+        saveChatDebounced();
+    }
 
     if (result.changed) {
         scheduleMessageRefresh(messageIndex, message);
     }
 
     return result;
+}
+
+/**
+ * Manually runs a single agent on a specific message (on-demand, not triggered by generation).
+ * Requests are queued so repeated manual runs apply one at a time.
+ * @param {string} agentId
+ * @param {number} messageIndex
+ * @returns {Promise<import('./agent-store.js').InChatAgent | null>}
+ */
+export async function runAgentOnMessage(agentId, messageIndex) {
+    if (!areAgentsGloballyEnabled()) {
+        toastr.warning('In-Chat Agents are disabled.');
+        return null;
+    }
+
+    return await enqueueManualAgentRun(agentId, messageIndex);
 }

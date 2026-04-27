@@ -37,7 +37,7 @@ function logPathfinderPipeline(message, ...details) {
  * @param {number} [maxMessages=10] - Max messages to include in context
  * @returns {Promise<PipelineResult>}
  */
-export async function runPipeline(pipelineId, chatMessages, maxMessages = 10) {
+export async function runPipeline(pipelineId, chatMessages, maxMessages = 10, signal = null) {
     logPathfinderPipeline(`Starting predictive pipeline "${pipelineId}".`, {
         chatMessageCount: Array.isArray(chatMessages) ? chatMessages.length : 0,
         maxMessages,
@@ -130,6 +130,7 @@ export async function runPipeline(pipelineId, chatMessages, maxMessages = 10) {
                 prompt.systemPrompt,
                 profileId,
                 prompt.settings?.maxTokens ?? 1024,
+                signal,
             );
 
             // Parse the output

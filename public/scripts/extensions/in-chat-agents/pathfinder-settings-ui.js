@@ -4,8 +4,9 @@
 
 import { renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { saveSettingsDebounced } from '../../../script.js';
+import { escapeHtml } from '../../utils.js';
 import { world_names, loadWorldInfo } from '../../world-info.js';
-import { saveAgent } from './agent-store.js';
+import { persistAgentGlobalSettings, saveAgent, setAgentEnabledForCurrentScope } from './agent-store.js';
 import {
     getPathfinderSettings,
     setPathfinderSettings,
@@ -20,12 +21,16 @@ import { syncToolAgentRegistrations } from './agent-runner.js';
 import { getPrompt, savePrompt } from './pathfinder/prompts/prompt-store.js';
 import { getDefaultPrompts } from './pathfinder/prompts/default-prompts.js';
 import { clearFeed, getFeedItems } from './pathfinder/activity-feed.js';
+import { getSummaryMemoryState, onSummaryMemoryChanged, saveSummaryMemoryContent } from './pathfinder/summary-memory-store.js';
 
 const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
+const PATHFINDER_LOG_MODE_KEY = 'pathfinder-retrieval-log-mode';
 
 let settingsEl = null;
 let currentAgent = null;
+let retrievalLogMode = localStorage.getItem(PATHFINDER_LOG_MODE_KEY) === 'detailed' ? 'detailed' : 'summary';
+let summaryMemoryUnsubscribe = null;
 
 function logPathfinder(message, ...details) {
     console.log(`${PATHFINDER_LOG_PREFIX} ${message}`, ...details);
@@ -144,14 +149,20 @@ export async function openPathfinderSettings(agent) {
     }
 
     settingsEl = $(html);
+    if (summaryMemoryUnsubscribe) {
+        summaryMemoryUnsubscribe();
+    }
+    summaryMemoryUnsubscribe = onSummaryMemoryChanged(renderSummaryMemoryEditor);
 
     // Initialize UI
     await refreshLorebookList();
     loadSettingsIntoUI();
     bindEvents();
+    settingsEl.find('#pf--log-mode').val(retrievalLogMode);
     updateStatusBanner();
     updateModeCardStates();
     renderRetrievalLog();
+    renderSummaryMemoryEditor();
 
     return settingsEl;
 }
@@ -305,6 +316,23 @@ async function refreshLorebookList() {
     }
 }
 
+
+function setPathfinderToolEnabled(toolName, enabled) {
+    if (!currentAgent?.tools) {
+        return;
+    }
+
+    const tool = currentAgent.tools.find(t => t.name === toolName);
+    if (tool) {
+        tool.enabled = enabled;
+    }
+}
+
+function isPathfinderToolEnabled(toolName) {
+    const tool = currentAgent?.tools?.find(t => t.name === toolName);
+    return tool?.enabled !== false;
+}
+
 /**
  * Load current settings into UI elements
  */
@@ -317,11 +345,16 @@ function loadSettingsIntoUI() {
     settingsEl.find('#pf--content-mode').val(s.entryContentMode || 'full');
     settingsEl.find('#pf--truncate-length').val(s.truncateLength || 500);
     settingsEl.find('#pf--max-candidates').val(s.maxCandidates || 20);
+    settingsEl.find('#pf--retrieval-timeout').val(s.retrievalTimeoutSeconds || 8);
 
     // Tool settings
     settingsEl.find('#pf--enable-tools').prop('checked', s.sidecarEnabled || false);
     settingsEl.find('#pf--mandatory-tools').prop('checked', s.mandatoryTools || false);
     settingsEl.find('#pf--auto-use-attached').prop('checked', s.autoUseAttachedLorebook || false);
+    settingsEl.find('#pf--auto-summary').prop('checked', s.autoSummary || false);
+    settingsEl.find('#pf--auto-summary-interval').val(s.autoSummaryInterval || 20);
+
+    settingsEl.find('#pf--enable-summarize-tool').prop('checked', isPathfinderToolEnabled('Pathfinder_Summarize'));
 
     // Populate connection profiles
     populateConnectionProfiles();
@@ -357,6 +390,54 @@ function populateConnectionProfiles() {
         count: profiles.length,
         selectedProfile: s.connectionProfile || 'main-model',
     });
+}
+
+
+function formatSummaryTimestamp(timestamp) {
+    if (!timestamp) {
+        return '';
+    }
+
+    return new Date(timestamp).toLocaleString();
+}
+
+function renderSummaryMemoryEditor() {
+    if (!settingsEl) {
+        return;
+    }
+
+    const summary = getSummaryMemoryState();
+    const textarea = settingsEl.find('#pf--summary-content');
+    const indicator = settingsEl.find('#pf--summary-injection-indicator');
+    const meta = settingsEl.find('#pf--summary-meta');
+    const hasSummary = Boolean(summary.content || summary.uid);
+
+    if (document.activeElement !== textarea[0]) {
+        textarea.val(summary.content || '');
+    }
+
+    textarea.prop('disabled', !hasSummary);
+    settingsEl.find('#pf--summary-save').prop('disabled', !hasSummary);
+
+    indicator.removeClass('pf--summary-indicator-missing pf--summary-indicator-not-injected pf--summary-indicator-injected');
+    if (!hasSummary) {
+        indicator.addClass('pf--summary-indicator-missing').text('No summary');
+        meta.text('No Pathfinder summary has been created yet.');
+        return;
+    }
+
+    const isInjected = summary.injectedAt && summary.injectedAt >= summary.updatedAt;
+    if (isInjected) {
+        indicator.addClass('pf--summary-indicator-injected').text('Injected');
+    } else {
+        indicator.addClass('pf--summary-indicator-not-injected').text('Not injected');
+    }
+
+    const title = summary.title || 'Untitled summary';
+    const location = summary.bookName && summary.uid !== null ? `${summary.bookName} / UID ${summary.uid}` : 'not linked to a lorebook entry';
+    const updated = summary.updatedAt ? `Updated ${formatSummaryTimestamp(summary.updatedAt)}` : 'Not saved yet';
+    const injected = summary.injectedAt ? `Last injected ${formatSummaryTimestamp(summary.injectedAt)}${summary.injectedMode ? ` via ${summary.injectedMode}` : ''}` : 'Not injected by retrieval yet';
+    meta.text(`${title} — ${location}. ${updated}. ${injected}.`);
 }
 
 /**
@@ -442,12 +523,61 @@ function bindEvents() {
         updateAgentSettings();
     });
 
+    settingsEl.find('#pf--retrieval-timeout').on('change', function () {
+        const s = getPathfinderSettings();
+        s.retrievalTimeoutSeconds = Math.max(1, Math.min(60, parseInt($(this).val()) || 8));
+        setPathfinderSettings(s);
+        logPathfinder('Pipeline retrieval timeout changed.', { retrievalTimeoutSeconds: s.retrievalTimeoutSeconds });
+        updateAgentSettings();
+    });
+
     settingsEl.find('#pf--pipeline-profile').on('change', function () {
         const s = getPathfinderSettings();
         s.connectionProfile = $(this).val();
         setPathfinderSettings(s);
         logPathfinder('Pipeline connection profile changed.', { connectionProfile: s.connectionProfile || 'main-model' });
         updateAgentSettings();
+    });
+
+    // Memory summary settings
+    settingsEl.find('#pf--enable-summarize-tool').on('change', async function () {
+        const enabled = $(this).prop('checked');
+        setPathfinderToolEnabled('Pathfinder_Summarize', enabled);
+        logPathfinder(`Summary memory tool ${enabled ? 'enabled' : 'disabled'}.`);
+        await updateAgentSettings();
+        syncToolAgentRegistrations();
+    });
+
+    settingsEl.find('#pf--auto-summary').on('change', function () {
+        const s = getPathfinderSettings();
+        s.autoSummary = $(this).prop('checked');
+        if (s.autoSummary) {
+            setPathfinderToolEnabled('Pathfinder_Summarize', true);
+            settingsEl.find('#pf--enable-summarize-tool').prop('checked', true);
+        }
+        setPathfinderSettings(s);
+        logPathfinder(`Auto summary tracking ${s.autoSummary ? 'enabled' : 'disabled'}.`);
+        updateAgentSettings();
+        syncToolAgentRegistrations();
+    });
+
+    settingsEl.find('#pf--auto-summary-interval').on('change', function () {
+        const s = getPathfinderSettings();
+        s.autoSummaryInterval = Math.max(2, Math.min(200, parseInt($(this).val()) || 20));
+        setPathfinderSettings(s);
+        logPathfinder('Auto summary interval changed.', { autoSummaryInterval: s.autoSummaryInterval });
+        updateAgentSettings();
+    });
+
+    settingsEl.find('#pf--summary-save').on('click', async () => {
+        const status = settingsEl.find('#pf--summary-save-status');
+        try {
+            await saveSummaryMemoryContent(settingsEl.find('#pf--summary-content').val());
+            status.text('Saved!').removeClass('error').addClass('success');
+            setTimeout(() => status.text(''), 3000);
+        } catch (err) {
+            status.text(`Save failed: ${err.message}`).removeClass('success').addClass('error');
+        }
     });
 
     // Tool settings
@@ -531,6 +661,12 @@ function bindEvents() {
         logPathfinder('Pathfinder retrieval log refreshed.');
     });
 
+    settingsEl.find('#pf--log-mode').on('change', function () {
+        retrievalLogMode = String($(this).val()) === 'detailed' ? 'detailed' : 'summary';
+        localStorage.setItem(PATHFINDER_LOG_MODE_KEY, retrievalLogMode);
+        renderRetrievalLog();
+    });
+
     settingsEl.find('#pf--clear-log').on('click', () => {
         clearFeed();
         renderRetrievalLog();
@@ -589,12 +725,227 @@ function renderRetrievalLog() {
         return;
     }
 
-    const text = items.map(formatRetrievalLogItem).filter(Boolean).join('\n\n');
+    const text = formatRetrievalLog(items);
     output.text(text || 'No Pathfinder retrieval activity recorded yet.');
 }
 
+function formatTime(timestamp) {
+    return timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '--:--:--';
+}
+
+function compactText(value, maxLength = 220) {
+    const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+    return text.length > maxLength ? `${text.slice(0, maxLength - 1).trimEnd()}…` : text;
+}
+
+function formatCount(count, noun) {
+    const value = Number(count) || 0;
+    const plural = noun === 'entry' ? 'entries' : `${noun}s`;
+    return `${value} ${value === 1 ? noun : plural}`;
+}
+
+function prettyJson(value, fallback = '') {
+    if (value === undefined || value === null || value === '') {
+        return fallback;
+    }
+
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return String(value);
+    }
+}
+
+function formatRetrievalMode(mode) {
+    switch (mode) {
+        case 'pipeline': return 'Pipeline retrieval';
+        case 'tool-retrieval': return 'Tool/legacy retrieval';
+        default: return 'Pathfinder retrieval';
+    }
+}
+
+function formatStageLine(stage) {
+    const stageNumber = Number.isFinite(Number(stage.stageIndex)) ? Number(stage.stageIndex) + 1 : null;
+    const label = stage.promptName || stage.stageName || stage.promptId || (stageNumber ? `Stage ${stageNumber}` : 'Stage');
+    const status = stage.success === false ? 'failed' : (stage.skipped ? 'skipped' : 'completed');
+    const count = stage.entriesFound ?? stage.selectedEntries ?? 0;
+    const extras = [];
+
+    if (stage.reason) extras.push(stage.reason);
+    if (stage.error) extras.push(`Error: ${stage.error}`);
+    if (stage.reasoning) extras.push(`Reasoning: ${compactText(stage.reasoning, 180)}`);
+
+    return `  ${stageNumber ? `${stageNumber}. ` : '- '}${label}: ${status}, ${formatCount(count, 'entry')}${extras.length ? ` — ${extras.join('; ')}` : ''}`;
+}
+
+function formatRetrievalDetail(item, { detailed = false } = {}) {
+    const selectedEntries = Array.isArray(item.selectedEntries) ? item.selectedEntries : [];
+    const stageResults = Array.isArray(item.stageResults) ? item.stageResults : [];
+    const metadata = item.metadata || {};
+    const injectedPrompt = String(item.injectedPrompt || '');
+    const lines = [
+        `▸ ${formatRetrievalMode(item.mode)} at ${formatTime(item.timestamp)}`,
+        `  Lorebooks: ${(item.books || []).join(', ') || 'none'}`,
+        `  Result: ${formatCount(selectedEntries.length, 'entry')} selected${metadata.candidateCount !== undefined ? ` from ${formatCount(metadata.candidateCount, 'candidate')}` : ''}`,
+    ];
+
+    if (metadata.reason) {
+        lines.push(`  Note: ${metadata.reason.replace(/-/g, ' ')}`);
+    }
+
+    if (stageResults.length > 0) {
+        lines.push('', detailed ? '  Retrieval stages:' : '  Stages:');
+        lines.push(...stageResults.map(formatStageLine));
+    }
+
+    if (selectedEntries.length > 0) {
+        lines.push('', detailed ? '  Lorebook entries selected for injection:' : '  Selected lore:');
+        for (const entry of selectedEntries.slice(0, detailed ? 50 : 12)) {
+            const name = entry.name || 'Untitled entry';
+            const book = entry.bookName ? ` · ${entry.bookName}` : '';
+            const uid = entry.uid !== null && entry.uid !== undefined ? ` · uid ${entry.uid}` : '';
+            lines.push(`  - ${name}${book}${uid}`);
+            if (entry.preview) {
+                lines.push(`    ${detailed ? String(entry.preview).trim() : compactText(entry.preview, 180)}`);
+            }
+        }
+        if (!detailed && selectedEntries.length > 12) {
+            lines.push(`  - …and ${selectedEntries.length - 12} more`);
+        }
+    }
+
+    if (injectedPrompt) {
+        lines.push('', `  Injected context: ${formatCount(injectedPrompt.length, 'character')}`);
+        lines.push(detailed ? injectedPrompt : `  ${compactText(injectedPrompt, 300)}`);
+    } else {
+        lines.push('', '  Injected context: none');
+    }
+
+    if (detailed && Object.keys(metadata).length > 0) {
+        lines.push('', '  Retrieval metadata:');
+        lines.push(prettyJson(metadata));
+    }
+
+    if (metadata.error) {
+        lines.push('', `  Error: ${metadata.error}`);
+    }
+
+    return lines.join('\n');
+}
+
+function formatPipelineSummary(items) {
+    const pipelineEvents = items.filter(item => item.type?.startsWith?.('pipeline_'));
+    if (!pipelineEvents.length) {
+        return '';
+    }
+
+    const latestStart = pipelineEvents.find(item => item.type === 'pipeline_start');
+    const latestComplete = pipelineEvents.find(item => item.type === 'pipeline_complete');
+    const latestError = pipelineEvents.find(item => item.type === 'pipeline_error');
+    const startedStages = pipelineEvents.filter(item => item.type === 'pipeline_stage_start').length;
+    const completedStages = pipelineEvents.filter(item => item.type === 'pipeline_stage_complete').length;
+
+    const lines = ['Recent pipeline activity:'];
+    if (latestStart) lines.push(`  Started “${latestStart.pipelineName}” at ${formatTime(latestStart.timestamp)} (${formatCount(latestStart.stageCount, 'stage')}).`);
+    if (latestComplete) lines.push(`  Finished with ${formatCount(latestComplete.totalEntries, 'entry')} across ${formatCount(latestComplete.stageResults, 'stage result')}.`);
+    if (latestError) lines.push(`  Last error: ${latestError.stageName || latestError.pipelineName}: ${latestError.error}`);
+    if (!latestComplete && !latestError) lines.push(`  Progress: ${completedStages}/${startedStages || '?'} stages completed.`);
+
+    return lines.join('\n');
+}
+
+function formatToolActivity(items) {
+    const toolItems = items.filter(item => item.type?.startsWith?.('tool_call_')).slice(0, 8);
+    if (!toolItems.length) {
+        return '';
+    }
+
+    const lines = ['Recent tool activity:'];
+    for (const item of toolItems) {
+        if (item.type === 'tool_call_started') {
+            lines.push(`  - ${formatTime(item.timestamp)} ${item.toolName}: started`);
+        } else if (item.type === 'tool_call_completed') {
+            const result = typeof item.result === 'string' ? item.result : JSON.stringify(item.result);
+            lines.push(`  - ${formatTime(item.timestamp)} ${item.toolName}: completed — ${compactText(result, 180)}`);
+        } else if (item.type === 'tool_call_error') {
+            lines.push(`  - ${formatTime(item.timestamp)} ${item.toolName}: failed — ${item.error}`);
+        }
+    }
+    return lines.join('\n');
+}
+
+function formatDetailedToolActivity(items) {
+    const toolItems = items.filter(item => item.type?.startsWith?.('tool_call_')).slice(0, 30).reverse();
+    if (!toolItems.length) {
+        return '';
+    }
+
+    const lines = ['Tool calls and lorebook actions:'];
+    for (const item of toolItems) {
+        const toolName = item.toolName || 'Tool';
+        if (item.type === 'tool_call_started') {
+            lines.push(`\n- ${formatTime(item.timestamp)} ${toolName}: started${item.isSidecar ? ' (sidecar)' : ''}`);
+            if (item.args !== undefined) {
+                lines.push('  Arguments:');
+                lines.push(prettyJson(item.args).split('\n').map(line => `  ${line}`).join('\n'));
+            }
+        } else if (item.type === 'tool_call_completed') {
+            lines.push(`\n- ${formatTime(item.timestamp)} ${toolName}: completed${item.isSidecar ? ' (sidecar)' : ''}`);
+            if (item.result !== undefined) {
+                lines.push('  Result:');
+                lines.push(prettyJson(item.result).split('\n').map(line => `  ${line}`).join('\n'));
+            }
+        } else if (item.type === 'tool_call_error') {
+            lines.push(`\n- ${formatTime(item.timestamp)} ${toolName}: failed`);
+            lines.push(`  Error: ${item.error}`);
+        }
+    }
+    return lines.join('\n');
+}
+
+function formatRawEventTimeline(items) {
+    const lines = ['Event timeline:'];
+    for (const item of items.slice(0, 30).reverse()) {
+        lines.push(`  - ${formatTime(item.timestamp)} ${formatRetrievalLogItem(item).replace(/^\[[^\]]+\]\s*/, '').replace(/\n/g, '\n    ')}`);
+    }
+    return lines.join('\n');
+}
+
+function formatRetrievalLog(items) {
+    const latestDetail = items.find(item => item.type === 'pathfinder_retrieval_detail');
+    const sections = [];
+    const detailed = retrievalLogMode === 'detailed';
+
+    if (latestDetail) {
+        sections.push(formatRetrievalDetail(latestDetail, { detailed }));
+    } else {
+        sections.push('No completed retrieval summary yet. Refresh after Pathfinder runs, or check pipeline/tool activity below.');
+    }
+
+    const pipelineSummary = formatPipelineSummary(items);
+    if (pipelineSummary) sections.push(pipelineSummary);
+
+    const toolActivity = detailed ? formatDetailedToolActivity(items) : formatToolActivity(items);
+    if (toolActivity) sections.push(toolActivity);
+
+    if (detailed) {
+        sections.push(formatRawEventTimeline(items));
+    }
+
+    const legacyRetrieval = items.find(item => item.type === 'sidecar_retrieval');
+    if (legacyRetrieval && latestDetail?.mode !== 'tool-retrieval') {
+        sections.push(`Legacy retrieval: selected ${formatCount(legacyRetrieval.entryCount, 'entry')} from waypoint IDs ${(legacyRetrieval.nodeIds || []).join(', ') || 'none'}.`);
+    }
+
+    return sections.filter(Boolean).join('\n\n');
+}
+
 function formatRetrievalLogItem(item) {
-    const timestamp = item?.timestamp ? new Date(item.timestamp).toLocaleTimeString() : '--:--:--';
+    const timestamp = formatTime(item?.timestamp);
 
     switch (item.type) {
         case 'pathfinder_retrieval_detail': {
@@ -655,7 +1006,7 @@ function formatRetrievalLogItem(item) {
         case 'tool_call_started':
             return `[${timestamp}] Tool started: ${item.toolName}`;
         case 'tool_call_completed':
-            return `[${timestamp}] Tool completed: ${item.toolName} - ${item.result}`;
+            return `[${timestamp}] Tool completed: ${item.toolName} - ${typeof item.result === 'string' ? item.result : JSON.stringify(item.result, null, 2)}`;
         case 'tool_call_error':
             return `[${timestamp}] Tool error: ${item.toolName} - ${item.error}`;
         default:
@@ -704,16 +1055,20 @@ async function updateAgentSettings() {
     delete agentSettings.pipelinePrompts;
     delete agentSettings.pipelines;
     currentAgent.settings = { ...agentSettings };
-    currentAgent.enabled = (s.enabledLorebooks || []).length > 0 && (s.sidecarEnabled || s.pipelineEnabled);
+    const agentEnabled = (s.enabledLorebooks || []).length > 0 && (s.sidecarEnabled || s.pipelineEnabled || s.autoSummary || isPathfinderToolEnabled('Pathfinder_Summarize'));
+    setAgentEnabledForCurrentScope(currentAgent, agentEnabled);
     logPathfinder('Agent settings synchronized.', {
-        enabled: currentAgent.enabled,
+        enabled: agentEnabled,
         lorebooks: s.enabledLorebooks || [],
         toolMode: Boolean(s.sidecarEnabled),
         pipelineMode: Boolean(s.pipelineEnabled),
         autoUseAttachedLorebook: Boolean(s.autoUseAttachedLorebook),
+        autoSummary: Boolean(s.autoSummary),
+        summaryTool: isPathfinderToolEnabled('Pathfinder_Summarize'),
     });
 
     await saveAgent(currentAgent);
+    persistAgentGlobalSettings();
     saveSettingsDebounced();
 }
 
@@ -777,16 +1132,6 @@ function showPromptStatus(message, type) {
 
 function clearPromptStatus() {
     settingsEl.find('#pf--prompt-status').text('');
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
 }
 
 /**

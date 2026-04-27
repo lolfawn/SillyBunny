@@ -26,7 +26,7 @@ import {
     updateRemoteChatName,
 } from '../script.js';
 import { deleteGroupChatByName, getGroupAvatar, groups, is_group_generating, openGroupById, openGroupChat } from './group-chats.js';
-import { enableExtension, findExtension, installExtension } from './extensions.js';
+import { enableExtension, extension_settings, findExtension, installExtension } from './extensions.js';
 import { t } from './i18n.js';
 import { getPresetManager } from './preset-manager.js';
 import { callGenericPopup, POPUP_TYPE } from './popup.js';
@@ -46,12 +46,14 @@ const bundledAssistantNahidaAvatarKey = 'bundledAssistantNahidaAvatar';
 const DEFAULT_NEUTRAL_ASSISTANT_NAME = 'Assistant';
 
 const DEFAULT_DISPLAYED = 3;
-const MAX_DISPLAYED = 15;
+const MAX_RECENT_FETCH = 60;
+const AGENT_MESSAGE_EXTRA_KEY = 'inChatAgents';
+const AGENT_PROMPT_TRANSFORM_HISTORY_KEY = 'inChatAgentTransformHistory';
 const STARTER_PACK_PRESET_NAME_SILLYBUNNY = 'Pura\'s Director Preset (SillyBunny)';
 const STARTER_PACK_PRESET_TITLE = 'Pura\'s Director Preset';
 const STARTER_PACK_CREATOR_NAME = 'purachina';
 const STARTER_PACK_SITE_URL = 'https://platberlitz.github.io/';
-const GEECHAN_PRESET_NAME = 'Geechan - Universal Roleplay (Chat Completions) (v5.0)';
+const GEECHAN_PRESET_NAME = 'Geechan - Universal Roleplay (Chat Completions) (v5.1)';
 const GEECHAN_SITE_URL = 'https://rentry.org/geechan';
 const TLD_CHUB_URL = 'https://chub.ai/users/thelonelydevil';
 const TLD_DISCORD_PALS_URL = 'https://github.com/TheLonelyDevil9/discord-pals/';
@@ -75,6 +77,10 @@ const STARTER_PACK_EXTENSIONS = Object.freeze({
     cssSnippets: Object.freeze({
         id: 'third-party/SillyBunny-CssSnippets',
         repoUrl: 'https://github.com/platberlitz/SillyBunny-CssSnippets',
+    }),
+    moonlitEchoes: Object.freeze({
+        id: 'third-party/SillyBunny-MoonlitEchoesTheme',
+        repoUrl: 'https://github.com/platberlitz/SillyBunny-MoonlitEchoesTheme',
     }),
     promptInspector: Object.freeze({
         id: 'third-party/Extension-PromptInspector',
@@ -110,7 +116,7 @@ const WELCOME_TUTORIAL_STEPS = Object.freeze([
     },
     {
         title: 'Connect a model',
-        body: 'Clicking the API button will bring you to a screen to connect a provider and choose an LLM of your choice. You will need to connect a model before you can begin chatting.',
+        body: 'Clicking the API button will bring you to a screen to connect a provider, and choose an LLM of your choice. You will need to connect a model before you can begin chatting.',
         hint: 'Not sure what provider to use? OpenRouter is a good place to start. SillyBunny needs at least one working connection before you can chat.',
         chips: ['API', 'Providers', 'Models', 'Connection'],
         actionLabel: 'Open API',
@@ -119,16 +125,16 @@ const WELCOME_TUTORIAL_STEPS = Object.freeze([
     },
     {
         title: 'Choose a preset',
-        body: 'First, select a preset of your choice: this helps dictate model responses. Advanced Formatting controls templates and prompt structure, while World Info helps the model remember lore and setting details.',
-        hint: 'You only really need to start with a preset! We recommend our bundled Geechan or Director preset. Access the other tabs once you feel more comfortable.',
-        chips: ['Presets', 'Advanced Formatting', 'World Info', 'Context'],
+        body: 'First, select a preset of your choice: this helps dictate model responses. Chat and Text Completions formatting lives with the presets tab, and World Info helps the model remember lore and setting details.',
+        hint: 'You only really need to start with a preset! We recommend using our bundled Geechan or Director preset. Access the other workspace sections once you feel more comfortable.',
+        chips: ['Presets', 'Formatting', 'World Info', 'Context'],
         actionLabel: 'Open Presets',
         actionType: 'open-tab',
         actionValue: 'left:presets',
     },
     {
         title: 'Personalize your workspace',
-        body: 'The customize menu in the top bar handles your theming and customization needs. You can optionally enable extra extensions, manage personas.',
+        body: 'The Customize menu in the top bar handles your theming and customization needs. You can optionally enable extra extensions, manage personas.',
         hint: 'Customization and extensions are optional, but recommended. While we ship a starter pack, nothing turns itself on without your permission.',
         chips: ['Settings', 'Extensions', 'Persona', 'Background'],
         actionLabel: 'Open Extensions',
@@ -148,11 +154,11 @@ const WELCOME_TUTORIAL_STEPS = Object.freeze([
 
 const WELCOME_GUIDE_CARDS = Object.freeze([
     {
-        title: 'Navigate Menu',
-        body: 'Open the Navigate button in the top bar when you want to change how the AI behaves: connecting APIs, swapping presets, tuning formatting, or loading lore and agent helpers.',
-        chips: ['Presets', 'API', 'Advanced Formatting', 'World Info', 'Agents'],
+        title: 'Workspace Menu',
+        body: 'Open the Workspace button in the top bar when you want to change how the AI behaves: connecting APIs, swapping presets, tuning sampling or formatting, and loading lore and agent helpers.',
+        chips: ['Presets', 'API', 'Sampling', 'World Info', 'Agents'],
         icon: 'fa-compass-drafting',
-        actionLabel: 'Open the Navigate menu',
+        actionLabel: 'Open the Workspace menu',
         actionType: 'open-tab',
         actionValue: 'left:presets',
     },
@@ -274,7 +280,7 @@ const WELCOME_DECK_VIEWS = Object.freeze([
     {
         id: 'basics',
         title: 'Core Buttons',
-        summary: 'A plain-English guide on our UI shell.',
+        summary: 'A plain-English guide on our graphical shell.',
         icon: 'fa-compass-drafting',
     },
     {
@@ -675,7 +681,7 @@ function buildPresetStarterPackItem() {
     const hasBundledPreset = Boolean(sillyBunnyPreset);
     const chips = ['Chat Completions', 'Bundled', 'Agent-aware', STARTER_PACK_CREATOR_NAME];
     const chipColumnCount = Math.max(2, Math.min(chips.length, 4));
-    const body = `purachina's website contains his character cards, presets, and other projects. A SillyBunny-tuned version of his Director Preset ships included and is ready to use for Chat Completions.`;
+    const body = 'purachina\'s website contains his character cards, presets, and other projects. A SillyBunny-tuned version of his Director Preset ships included and is ready to use for Chat Completions.';
 
     if (!isOpenAiStyleApi) {
         return {
@@ -765,7 +771,7 @@ function buildGeechanStarterPackItem() {
     const presetManager = getPresetManager('openai');
     const isOpenAiStyleApi = main_api === 'openai';
     const isSelected = isOpenAiStyleApi && presetManager?.getSelectedPresetName() === GEECHAN_PRESET_NAME;
-    const body = 'Geechan\'s Rentry highlights his well-written character cards and guides alongside his prompts and presets. SillyBunny includes his Universal Roleplay v5.0 preset across Chat Completions, plus the matching Text Completions variant for context, system prompt, and instruct pieces. He also made our bundled Assistant Nahida card and Prose Polisher agent.';
+    const body = 'Geechan\'s Rentry highlights his well-written character cards and guides alongside his prompts and presets. SillyBunny includes his Universal Roleplay v5.1 preset across Chat Completions, plus the matching Text Completions variant for context, system prompt, and instruct pieces. He also made our bundled Assistant Nahida card and Prose Polisher agent.';
 
     return {
         title: 'Geechan',
@@ -845,6 +851,13 @@ function buildStarterPackItems() {
                 extensionName: STARTER_PACK_EXTENSIONS.cssSnippets.id,
             }),
             buildExtensionStarterPackItem({
+                title: 'Moonlit Echoes Theme',
+                body: 'A SillyBunny-specific fork of Moonlit Echoes that keeps its theme CSS, mobile layout fixes, and Moonlit chat styles isolated from SillyBunny core.',
+                icon: 'fa-moon',
+                chips: ['Extension', 'Theme', 'SillyBunny fork'],
+                extensionName: STARTER_PACK_EXTENSIONS.moonlitEchoes.id,
+            }),
+            buildExtensionStarterPackItem({
                 title: 'Prompt Inspector',
                 body: 'See the prompt stack more clearly when you need to understand what is being sent to the model, debug formatting, or compare how your setup changes the final payload.',
                 icon: 'fa-magnifying-glass',
@@ -892,13 +905,14 @@ function buildWelcomeTemplateData(chats) {
         chats,
         empty: !chats.length,
         version: displayVersion,
-        more: chats.some(chat => chat.hidden),
+        more: chats.length > DEFAULT_DISPLAYED,
         activeDeckView,
         deckCollapsed,
         welcomePanelMode,
         welcomePanelFull: welcomePanelMode === WELCOME_PANEL_MODES.full,
         welcomePanelCompact: welcomePanelMode === WELCOME_PANEL_MODES.compact,
         welcomePanelListOnly: welcomePanelMode === WELCOME_PANEL_MODES.list,
+        separateAgentRecentChats: shouldSeparateAgentRecentChats(),
         deckTabs: buildDeckTabs(activeDeckView),
         deckTourActive: activeDeckView === 'tour',
         deckBasicsActive: activeDeckView === 'basics',
@@ -911,6 +925,80 @@ function buildWelcomeTemplateData(chats) {
         bundledAssistants: buildBundledAssistantCards(),
         starterPackItems: buildStarterPackItems(),
     };
+}
+
+/**
+ * Gets the filter bucket used by the Recent Chats tabs.
+ * @param {RecentChat} chat Recent chat data
+ * @returns {'agent'|'group'|'individual'}
+ */
+function getRecentChatType(chat) {
+    if (chat.is_agent) {
+        return 'agent';
+    }
+
+    if (chat.is_group) {
+        return 'group';
+    }
+
+    return 'individual';
+}
+
+/**
+ * Gets the filter bucket for a rendered Recent Chat item.
+ * @param {Element} item Recent chat element
+ * @returns {'agent'|'group'|'individual'}
+ */
+function getRecentChatItemType(item) {
+    if (item instanceof HTMLElement && ['agent', 'group', 'individual'].includes(item.dataset.recentChatType || '')) {
+        return /** @type {'agent'|'group'|'individual'} */ (item.dataset.recentChatType);
+    }
+
+    if (item.classList.contains('agent')) {
+        return 'agent';
+    }
+
+    if (item.classList.contains('group')) {
+        return 'group';
+    }
+
+    return 'individual';
+}
+
+/**
+ * Applies the Recent Chats tab filter and per-filter collapsed state.
+ * @param {HTMLElement} root Welcome panel root
+ * @param {object} [options] Options
+ * @param {boolean} [options.expanded] Whether all chats in the active filter should be shown
+ */
+function updateRecentChatFilterView(root, { expanded = false } = {}) {
+    const filter = root.dataset.recentChatFilter || 'all';
+    const chatItems = Array.from(root.querySelectorAll('.recentChat'));
+    let matchingCount = 0;
+
+    chatItems.forEach((chatItem) => {
+        const chatType = getRecentChatItemType(chatItem);
+        const matchesFilter = filter === 'all' || chatType === filter;
+        const hiddenByLimit = matchesFilter && !expanded && matchingCount >= DEFAULT_DISPLAYED;
+
+        if (matchesFilter) {
+            matchingCount++;
+        }
+
+        chatItem.classList.toggle('recentChatFiltered', !matchesFilter);
+        chatItem.classList.toggle('hidden', hiddenByLimit);
+    });
+
+    root.querySelectorAll('[data-recent-chat-empty-state="filtered"]').forEach((emptyState) => {
+        emptyState.classList.toggle('displayNone', filter === 'all' || matchingCount > 0 || chatItems.length === 0);
+    });
+
+    root.querySelectorAll('button.showMoreChats').forEach((button) => {
+        const hasMoreChats = matchingCount > DEFAULT_DISPLAYED;
+        button.classList.toggle('displayNone', !hasMoreChats);
+        button.classList.toggle('rotated', expanded && hasMoreChats);
+        button.setAttribute('aria-expanded', String(expanded && hasMoreChats));
+    });
 }
 
 function openShellTab(route) {
@@ -928,7 +1016,6 @@ function openShellTab(route) {
     const fallbackSelector = {
         'left:presets': '#ai-config-button > .drawer-toggle',
         'left:api': '#sys-settings-button > .drawer-toggle',
-        'left:advanced-formatting': '#advanced-formatting-button > .drawer-toggle',
         'left:world-info': '#WI-SP-button > .drawer-toggle',
         'right:settings': '#user-settings-button > .drawer-toggle',
         'right:extensions': '#extensions-settings-button > .drawer-toggle',
@@ -1291,6 +1378,18 @@ async function sendWelcomePanel(chats, expand = false) {
                     setWelcomePanelMode(root, button.getAttribute('data-welcome-panel-mode-target') || WELCOME_PANEL_MODES.full);
                 });
             });
+            root.querySelectorAll('[data-recent-chat-filter]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const filter = button.getAttribute('data-recent-chat-filter') || 'all';
+                    root.dataset.recentChatFilter = filter;
+                    root.querySelectorAll('[data-recent-chat-filter]').forEach((tab) => {
+                        const active = tab === button;
+                        tab.classList.toggle('active', active);
+                        tab.setAttribute('aria-pressed', String(active));
+                    });
+                    updateRecentChatFilterView(root);
+                });
+            });
 
             const tutorialPanel = root.querySelector('.welcomeTourPanel');
             setWelcomePanelMode(root, root.dataset.homePanelMode || getWelcomePanelMode(), { persist: false });
@@ -1360,7 +1459,6 @@ async function sendWelcomePanel(chats, expand = false) {
                 }
             });
         });
-        const hiddenChats = fragment.querySelectorAll('.recentChat.hidden');
         fragment.querySelectorAll('button.showMoreChats').forEach((button) => {
             const showRecentChatsTitle = t`Show more recent chats`;
             const hideRecentChatsTitle = t`Show less recent chats`;
@@ -1368,10 +1466,10 @@ async function sendWelcomePanel(chats, expand = false) {
             button.setAttribute('title', showRecentChatsTitle);
             button.addEventListener('click', () => {
                 const rotate = button.classList.contains('rotated');
-                hiddenChats.forEach((chatItem) => {
-                    chatItem.classList.toggle('hidden', rotate);
-                });
-                button.classList.toggle('rotated', !rotate);
+                const root = button.closest('.welcomePanel');
+                if (root instanceof HTMLElement) {
+                    updateRecentChatFilterView(root, { expanded: !rotate });
+                }
                 button.setAttribute('title', rotate ? showRecentChatsTitle : hideRecentChatsTitle);
             });
         });
@@ -1457,6 +1555,11 @@ async function sendWelcomePanel(chats, expand = false) {
         } else if (nextPanel) {
             chatElement.append(nextPanel);
         }
+        chatElement.querySelectorAll('.welcomePanel').forEach((root) => {
+            if (root instanceof HTMLElement) {
+                updateRecentChatFilterView(root);
+            }
+        });
         if (expand) {
             chatElement.querySelectorAll('button.showMoreChats').forEach((button) => {
                 if (button instanceof HTMLButtonElement) {
@@ -1703,12 +1806,30 @@ async function refreshWelcomeScreen({ flashChat = null } = {}) {
  * @property {boolean} is_group Indicates if the chat is a group chat
  * @property {boolean} hidden Chat will be hidden by default
  * @property {boolean} pinned Indicates if the chat is pinned
+ * @property {boolean} is_agent Indicates if the chat contains Agent-authored edits or transform history
  */
+function shouldSeparateAgentRecentChats() {
+    return Boolean(extension_settings?.inChatAgents?.globalSettings?.separateRecentChats);
+}
+
+function isAgentRecentChat(chatData) {
+    const metadata = chatData?.chat_metadata;
+    if (metadata?.inChatAgents || metadata?.agentChat || metadata?.isAgentChat) {
+        return true;
+    }
+
+    const messages = Array.isArray(chatData?.preview_messages) ? chatData.preview_messages : [];
+    return messages.some(message => Boolean(
+        message?.extra?.[AGENT_MESSAGE_EXTRA_KEY] ||
+        message?.extra?.[AGENT_PROMPT_TRANSFORM_HISTORY_KEY],
+    ));
+}
+
 async function getRecentChats() {
     const response = await fetch('/api/chats/recent', {
         method: 'POST',
         headers: getRequestHeaders(),
-        body: JSON.stringify({ max: MAX_DISPLAYED, pinned: PinnedChatsManager.getAll() }),
+        body: JSON.stringify({ max: MAX_RECENT_FETCH, pinned: PinnedChatsManager.getAll(), metadata: shouldSeparateAgentRecentChats(), previewMessages: shouldSeparateAgentRecentChats() ? 8 : 0 }),
         cache: 'no-cache',
     });
 
@@ -1754,6 +1875,8 @@ async function getRecentChats() {
         chat.avatar = chat.avatar || '';
         chat.group = chat.group || '';
         chat.pinned = PinnedChatsManager.isPinned(chat);
+        chat.is_agent = shouldSeparateAgentRecentChats() && isAgentRecentChat(chat);
+        chat.recent_chat_type = getRecentChatType(chat);
     });
 
     return dataWithEntities.map(t => t.chat);

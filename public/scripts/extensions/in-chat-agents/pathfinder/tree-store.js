@@ -1,3 +1,5 @@
+import { listConnectionProfiles as listSupportedConnectionProfiles } from '../profile-utils.js';
+
 export const generateNodeId = () => 'node_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
 export const createTreeNode = (name = '', description = '', entries = [], children = []) => ({
@@ -32,6 +34,7 @@ export const SETTING_DEFAULTS = {
     maxCandidates: 20,
     entryContentMode: 'full',  // 'full' | 'truncated'
     truncateLength: 500,
+    retrievalTimeoutSeconds: 8,
     // Per-prompt storage (managed by prompt-store.js)
     pipelinePrompts: {},
     pipelines: {},
@@ -226,35 +229,13 @@ export function setConnectionProfileId(id) {
     getSettings().connectionProfile = id ?? '';
 }
 
-function getConnectionProfilesFromService() {
-    const context = window?.SillyTavern?.getContext?.();
-    if (!context) return [];
-
-    const cm = context.ConnectionManagerRequestService;
-    if (!cm) return [];
-
-    try {
-        if (typeof cm.getSupportedProfiles === 'function') {
-            return cm.getSupportedProfiles() ?? [];
-        }
-
-        if (typeof cm.getProfiles === 'function') {
-            return cm.getProfiles() ?? [];
-        }
-    } catch {
-        return [];
-    }
-
-    return [];
-}
-
 export function findConnectionProfile(profileId) {
-    const profiles = getConnectionProfilesFromService();
+    const profiles = listSupportedConnectionProfiles();
     return profiles.find(p => p.id === profileId) ?? null;
 }
 
 export function listConnectionProfiles() {
-    return getConnectionProfilesFromService();
+    return listSupportedConnectionProfiles();
 }
 
 export function getBookPermission(bookName, permission) {

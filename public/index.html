@@ -39,12 +39,12 @@
     <link rel="stylesheet" type="text/css" href="css/rm-groups.css">
     <link rel="stylesheet" type="text/css" href="css/group-avatars.css">
     <link rel="stylesheet" type="text/css" href="css/toggle-dependent.css">
-    <link rel="stylesheet" type="text/css" href="css/world-info.css">
-    <link rel="stylesheet" type="text/css" href="css/extensions-panel.css">
+    <link rel="stylesheet" type="text/css" href="css/world-info.css?v=20260425b">
+    <link rel="stylesheet" type="text/css" href="css/extensions-panel.css?v=20260425a">
     <link rel="stylesheet" type="text/css" href="css/select2-overrides.css">
-    <link rel="stylesheet" type="text/css" href="css/mobile-styles.css">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260416a">
-    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260408b">
+    <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260426a">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260426f">
+    <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260426b">
     <link rel="stylesheet" type="text/css" href="css/macros.css">
     <link rel="stylesheet" type="text/css" href="css/user.css">
     <link rel="icon" type="image/png" href="img/sillybunny-pixel-logo.png">
@@ -83,9 +83,6 @@
                     </label>
                 </div>
                 <div id="labModeWarning" class="redWarningBG textAlignCenter displayNone" data-i18n="MAD LAB MODE ON">MAD LAB MODE ON</div>
-                <a class="topRightInset" href="https://docs.sillytavern.app/usage/common-settings/" target="_blank" title="Documentation on sampling parameters." data-i18n="[title]Documentation on sampling parameters">
-                    <span name="samplerHelpButton" class="note-link-span fa-solid fa-circle-question"></span>
-                </a>
                 <div class="scrollableInner">
                     <div class="flex-container flexNoGap" id="ai_response_configuration">
                         <div id="respective-presets-block" class="width100p">
@@ -694,7 +691,8 @@
                                 </div>
                                 <div class="range-block" data-source="openai,claude,aimlapi,openrouter,ai21,makersuite,vertexai,mistralai,custom,cohere,perplexity,groq,siliconflow,electronhub,chutes,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,zai">
                                     <div class="range-block-title" data-i18n="Temperature">
-                                        Temperature
+                                        <span data-i18n="Temperature">Temperature</span>
+                                        <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Temperature controls the randomness in token selection" title="Temperature controls the randomness in token selection:&#13;- low temperature (<1.0) leads to more predictable text, favoring higher probability tokens.&#13;- high temperature (>1.0) increases creativity and diversity in the output by giving lower probability tokens a better chance.&#13;Set to 1.0 for the original probabilities."></div>
                                     </div>
                                     <div class="range-block-range-and-counter">
                                         <div class="range-block-range">
@@ -703,6 +701,15 @@
                                         <div class="range-block-counter">
                                             <input type="number" min="0" max="2.0" step="0.01" data-for="temp_openai" id="temp_counter_openai">
                                         </div>
+                                    </div>
+                                </div>
+                                <div class="range-block" data-source="claude">
+                                    <label for="claude_disable_temperature" class="checkbox_label widthFreeExpand" title="Omit temperature from Claude requests." data-i18n="[title]Omit temperature from Claude requests.">
+                                        <input id="claude_disable_temperature" type="checkbox" />
+                                        <span data-i18n="Disable temperature">Disable temperature</span>
+                                    </label>
+                                    <div class="toggle-description justifyLeft">
+                                        <span data-i18n="When enabled, Claude requests leave temperature unset instead of sending a numeric value.">When enabled, Claude requests leave temperature unset instead of sending a numeric value.</span>
                                     </div>
                                 </div>
                                 <div class="range-block" data-source="openai,aimlapi,openrouter,custom,cohere,perplexity,groq,siliconflow,mistralai,electronhub,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,chutes">
@@ -733,7 +740,8 @@
                                 </div>
                                 <div class="range-block" data-source="claude,aimlapi,openrouter,makersuite,vertexai,cohere,perplexity,electronhub,chutes,nanogpt">
                                     <div class="range-block-title" data-i18n="Top K">
-                                        Top K
+                                        <span data-i18n="Top K">Top K</span>
+                                        <div class="fa-solid fa-circle-info opacity50p" title="Top K sets a maximum amount of top tokens that can be chosen from.&#13;E.g Top K is 20, this means only the 20 highest ranking tokens will be kept (regardless of their probabilities being diverse or limited).&#13;Set to 0 (or -1, depending on your backend) to disable." data-i18n="[title]Top_K_desc"></div>
                                     </div>
                                     <div class="range-block-range-and-counter">
                                         <div class="range-block-range">
@@ -746,7 +754,8 @@
                                 </div>
                                 <div class="range-block" data-source="openai,claude,aimlapi,openrouter,ai21,makersuite,vertexai,mistralai,custom,cohere,perplexity,groq,siliconflow,electronhub,chutes,nanogpt,deepseek,xai,pollinations,moonshot,fireworks,cometapi,azure_openai,zai">
                                     <div class="range-block-title" data-i18n="Top P">
-                                        Top P
+                                        <span data-i18n="Top P">Top P</span>
+                                        <div class="fa-solid fa-circle-info opacity50p" title="Top P (a.k.a. nucleus sampling) adds up all the top tokens required to add up to the target percentage.&#13;E.g If the Top 2 tokens are both 25%, and Top P is 0.50, only the Top 2 tokens are considered.&#13;Set to 1.0 to disable." data-i18n="[title]Top_P_desc"></div>
                                     </div>
                                     <div class="range-block-range-and-counter">
                                         <div class="range-block-range">
@@ -755,6 +764,15 @@
                                         <div class="range-block-counter">
                                             <input type="number" min="0" max="1" step="0.01" data-for="top_p_openai" id="top_p_counter_openai">
                                         </div>
+                                    </div>
+                                </div>
+                                <div class="range-block" data-source="claude">
+                                    <label for="claude_disable_top_p" class="checkbox_label widthFreeExpand" title="Omit top_p from Claude requests." data-i18n="[title]Omit top_p from Claude requests.">
+                                        <input id="claude_disable_top_p" type="checkbox" />
+                                        <span data-i18n="Disable top_p">Disable top_p</span>
+                                    </label>
+                                    <div class="toggle-description justifyLeft">
+                                        <span data-i18n="When enabled, Claude requests leave top_p unset instead of sending a numeric value.">When enabled, Claude requests leave top_p unset instead of sending a numeric value.</span>
                                     </div>
                                 </div>
                                 <div class="range-block" data-source="openrouter,nanogpt,chutes">
@@ -772,7 +790,8 @@
                                 </div>
                                 <div class="range-block" data-source="openrouter,nanogpt,chutes">
                                     <div class="range-block-title" data-i18n="Min P">
-                                        Min P
+                                        <span data-i18n="Min P">Min P</span>
+                                        <div class="fa-solid fa-circle-info opacity50p" data-i18n="[title]Min_P_desc" title="Min P sets a base minimum probability. This is scaled according to the top token's probability.&#13;E.g If Top token is 80% probability, and Min P is 0.1, only tokens higher than 8% would be considered.&#13;Set to 0 to disable."></div>
                                     </div>
                                     <div class="range-block-range-and-counter">
                                         <div class="range-block-range">
@@ -785,7 +804,8 @@
                                 </div>
                                 <div class="range-block" data-source="openrouter,nanogpt">
                                     <div class="range-block-title" data-i18n="Top A">
-                                        Top A
+                                        <span data-i18n="Top A">Top A</span>
+                                        <div class="fa-solid fa-circle-info opacity50p" title="Top A sets a threshold for token selection based on the square of the highest token probability.&#13;E.g if the Top-A value is 0.2 and the top token's probability is 50%, tokens with probabilities below 5% (0.2 * 0.5^2) are excluded.&#13;Set to 0 to disable." data-i18n="[title]Top_A_desc"></div>
                                     </div>
                                     <div class="range-block-range-and-counter">
                                         <div class="range-block-range">
@@ -894,8 +914,8 @@
                                                 </div>
                                             </div>
                                             <div class="toggle-description justifyLeft">
-                                                <span data-i18n="Sent at the end of the group chat history to force reply from a specific character.">
-                                                    Sent at the end of the group chat history to force reply from a specific character.
+                                                <span data-i18n="Sent at the end of the group chat history to guide the selected speaker. Supports {{char}}, {{user}}, {{group}}, and {{notChar}}.">
+                                                    Sent at the end of the group chat history to guide the selected speaker. Supports <code>{{char}}</code>, <code>{{user}}</code>, <code>{{group}}</code>, and <code>{{notChar}}</code>.
                                                 </span>
                                             </div>
                                             <div class="wide100p">
@@ -1185,7 +1205,7 @@
                                     </div>
                                     <div id="novel_order" class="prompt_order">
                                         <div data-id="0">
-                                            <span data-i18n="Temperature">Temperature</span>
+                                            <span data-i18n="Temperature Sampling">Temperature Sampling</span>
                                             <small>0</small>
                                             <div class="toggle_button right_menu_button"></div>
                                         </div>
@@ -2144,7 +2164,7 @@
                                         <div class="toggle-description justifyLeft marginBot5">
                                             Ask models that hide their reasoning to place visible thinking inside XML tags before the final answer.
                                         </div>
-                                        <div class="flex-container oneline-dropdown marginTop5">
+                                        <div class="flex-container oneline-dropdown marginTop5 reasoning-tag-style-row">
                                             <label for="openai_reasoning_tag_style">
                                                 <span>Reasoning Tag Style</span>
                                             </label>
@@ -2938,6 +2958,15 @@
                                 <option value="zai">Z.AI (GLM)</option>
                             </optgroup>
                         </select>
+                        <div id="oai_max_context_unlocked_block" class="range-block" data-source="openrouter,nanogpt">
+                            <label class="checkbox_label" for="oai_max_context_unlocked">
+                                <input id="oai_max_context_unlocked" type="checkbox">
+                                <span data-i18n="Unlocked Context Size">Unlocked Context Size</span>
+                            </label>
+                            <div class="toggle-description justifyLeft" data-i18n="Allow context sizes above the model-provided limit.">
+                                Allow context sizes above the model-provided limit.
+                            </div>
+                        </div>
                         <div class="inline-drawer wide100p" data-source="openai,claude,mistralai,makersuite,vertexai,deepseek,xai,zai,moonshot">
                             <div class="inline-drawer-toggle inline-drawer-header">
                                 <b data-i18n="Reverse Proxy">Reverse Proxy</b>
@@ -3720,6 +3749,7 @@
                                 <h4 data-i18n="DeepSeek Model">DeepSeek Model</h4>
                                 <select id="model_deepseek_select">
                                     <option value="deepseek-chat">deepseek-chat</option>
+                                    <option value="deepseek-v4">deepseek-v4</option>
                                     <option value="deepseek-coder">deepseek-coder</option>
                                     <option value="deepseek-reasoner">deepseek-reasoner</option>
                                 </select>
@@ -4953,9 +4983,14 @@
                                         <strong id="world_popup_editor_title" data-i18n="No entry selected">No entry selected</strong>
                                         <span id="world_popup_editor_uid" class="text_muted"></span>
                                     </div>
-                                    <button id="world_popup_editor_close" class="menu_button menu_button_icon" type="button" title="Close entry editor" aria-label="Close entry editor">
-                                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                                    </button>
+                                    <div class="world_popup_editor_actions">
+                                        <button id="world_popup_editor_popout" class="menu_button menu_button_icon" type="button" title="Open editor as pop-up" aria-label="Open editor as pop-up" aria-pressed="false" data-i18n="[title]Open editor as pop-up;[aria-label]Open editor as pop-up">
+                                            <i class="fa-solid fa-window-restore" aria-hidden="true"></i>
+                                        </button>
+                                        <button id="world_popup_editor_close" class="menu_button menu_button_icon" type="button" title="Close entry editor" aria-label="Close entry editor">
+                                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div id="world_popup_editor_empty" class="sb-workspace-empty" data-i18n="Select an entry to edit its keywords and content">
                                     Select an entry to edit its keywords and content
@@ -6117,6 +6152,7 @@
                                         <div id="persona_lore_button" class="menu_button fa-solid fa-globe" title="Persona Lore&#10;&#10;Click to load&#10;Shift/Alt-click or long-press to open 'Link to Persona Lorebook' popup" data-i18n="[title]persona_lore_button_title"></div>
 
                                         <div id="persona_set_image_button" class="menu_button fa-solid fa-image" title="Change Persona Image" data-i18n="[title]Change Persona Image"></div>
+                                        <div id="persona_to_character_button" class="menu_button fa-solid fa-address-card" title="Create Character Card from Persona" data-i18n="[title]Create Character Card from Persona"></div>
                                         <div id="persona_duplicate_button" class="menu_button fa-solid fa-clone" title="Duplicate Persona" data-i18n="[title]Duplicate Persona"></div>
                                         <div id="persona_delete_button" class="menu_button fa-solid fa-skull red_button" title="Delete Persona" data-i18n="[title]Delete Persona"></div>
                                     </div>
@@ -6303,9 +6339,9 @@
                                                     </div>
                                                     <div class="char-button-group char-button-group-primary char-button-group-utility">
                                                         <div id="rm_button_back" class="menu_button fa-solid fa-left-long" data-label="Back"></div>
-                                                        <div id="favorite_button" class="menu_button fa-solid fa-star" title="Add to Favorites" data-i18n="[title]Add to Favorites" data-label="Favorite"></div>
+                                                        <div id="favorite_button" class="menu_button fa-solid fa-star" title="Add to Favorites" data-i18n="[title]Add to Favorites" data-label="FAV."></div>
                                                         <input type="hidden" id="fav_checkbox" name="fav" />
-                                                        <div id="advanced_div" class="menu_button fa-solid fa-book" title="Advanced Definitions" data-i18n="[title]Advanced Definition" data-label="Advanced"></div>
+                                                        <div id="advanced_div" class="menu_button fa-solid fa-book" title="Advanced Definitions" data-i18n="[title]Advanced Definition" data-label="ADV."></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -6521,6 +6557,27 @@
                                                     <option value="2" data-i18n="Join character cards (include muted)">Join character cards (include muted)</option>
                                                 </select>
                                             </div>
+                                            <div class="wide100p flex-container flexFlowColumn flexGap5 group_schedule_controls">
+                                                <div class="flex-container flexGap5 flexWrap alignitemscenter">
+                                                    <label class="checkbox_label whitespacenowrap" title="Adds your local date and time to group auto-message prompts" data-i18n="[title]Adds your local date and time to group auto-message prompts">
+                                                        <input id="rm_group_time_aware" type="checkbox" />
+                                                        <span data-i18n="Time-aware">Time-aware</span>
+                                                    </label>
+                                                    <label class="checkbox_label whitespacenowrap" title="Let scheduled characters message when their schedule is due" data-i18n="[title]Let scheduled characters message when their schedule is due">
+                                                        <input id="rm_group_auto_message" type="checkbox" />
+                                                        <span data-i18n="Scheduled messages">Scheduled messages</span>
+                                                    </label>
+                                                    <button type="button" id="rm_group_generate_schedule" class="menu_button menu_button_icon" title="Ask the AI to make a full 24-hour daily message schedule for this group" data-i18n="[title]Ask the AI to make a full 24-hour daily message schedule for this group">
+                                                        <i class="fa-solid fa-calendar-days"></i>
+                                                        <span data-i18n="Generate Schedule">Generate Schedule</span>
+                                                    </button>
+                                                </div>
+                                                <textarea id="rm_group_ai_schedule" class="text_pole textarea_compact autoSetHeight wide100p" rows="8" placeholder="00:00 Seraphina: sleeps while keeping a faint watch over the glade
+08:00 Bunny Guide: checks in after breakfast
+23:00 Assistant Nahida: winds down and reflects" title="Daily auto-message schedule. Format: HH:MM Character: reason" data-i18n="[placeholder]00:00 Seraphina: sleeps while keeping a faint watch over the glade
+08:00 Bunny Guide: checks in after breakfast
+23:00 Assistant Nahida: winds down and reflects;[title]Daily auto-message schedule. Format: HH:MM Character: reason"></textarea>
+                                            </div>
                                             <div class="flex1 flexGap5" title="Inserted before each part of the joined fields." data-i18n="[title]Inserted before each part of the joined fields.">
                                                 <label for="rm_group_generation_mode_join_prefix" class="flexnowrap width100p whitespacenowrap">
                                                     <span data-i18n="Join Prefix">Join Prefix</span>
@@ -6558,7 +6615,13 @@
                                                 <label id="rm_group_automode_label" class="checkbox_label whitespacenowrap">
                                                     <input id="rm_group_automode" type="checkbox" />
                                                     <span data-i18n="Auto Mode">Auto Mode</span>
-                                                    <input id="rm_group_automode_delay" class="text_pole textarea_compact widthUnset" type="number" min="1" max="999" step="1" value="5" title="Auto Mode delay" data-i18n="[title]Auto Mode delay" />
+                                                    <input id="rm_group_automode_delay" class="text_pole textarea_compact widthUnset" type="number" min="1" max="999" step="1" value="120" title="Auto Mode delay in seconds" data-i18n="[title]Auto Mode delay in seconds" />
+                                                    <span class="auto_mode_delay_unit" title="Auto Mode delay unit" data-i18n="seconds">seconds</span>
+                                                </label>
+                                                <label id="rm_group_auto_dm_cooldown_label" class="checkbox_label whitespacenowrap" title="Minimum delay between scheduled Auto DMs" data-i18n="[title]Minimum delay between scheduled Auto DMs">
+                                                    <span data-i18n="Auto DM cooldown">Auto DM cooldown</span>
+                                                    <input id="rm_group_auto_dm_cooldown" class="text_pole textarea_compact widthUnset" type="number" min="1" max="9999" step="1" value="300" title="Auto DM cooldown in seconds" data-i18n="[title]Auto DM cooldown in seconds" />
+                                                    <span class="auto_mode_delay_unit" title="Auto DM cooldown unit" data-i18n="seconds">seconds</span>
                                                 </label>
                                                 <label id="rm_group_hidemutedsprites_label" class="checkbox_label whitespacenowrap">
                                                     <input id="rm_group_hidemutedsprites" type="checkbox" />
@@ -6596,7 +6659,13 @@
                             <div class="inline-drawer-content">
                                 <div id="unaddedCharList" name="Unadded Char List" class="flex-container flexFlowColumn overflowYAuto flex1">
                                     <div id="rm_group_add_members_header">
-                                        <input id="rm_group_filter" class="text_pole margin0" type="search" data-i18n="[placeholder]Search..." placeholder="Search..." />
+                                        <div class="flex-container flexGap5">
+                                            <input id="rm_group_filter" class="text_pole margin0 flex1" type="search" data-i18n="[placeholder]Search..." placeholder="Search..." />
+                                            <div id="rm_group_quick_create" class="menu_button menu_button_icon" title="Create group from selected members" data-i18n="[title]Create group from selected members">
+                                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                                <span data-i18n="Quick Create">Quick Create</span>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="rm_tag_controls">
                                         <div class="tags rm_tag_filter"></div>
@@ -6702,6 +6771,8 @@
                     </div>
                     <div class="ch_description"></div>
                     <div class="avatar_container_states buttons_block">
+                        <button type="button" class="persona_quick_rename avatar_state menu_button fa-solid fa-pencil" title="Rename Persona" aria-label="Rename Persona" data-i18n="[title]Rename Persona;[aria-label]Rename Persona"></button>
+                        <button type="button" class="persona_quick_delete avatar_state menu_button fa-solid fa-skull red_button" title="Delete Persona" aria-label="Delete Persona" data-i18n="[title]Delete Persona;[aria-label]Delete Persona"></button>
                         <div class="locked_to_chat_label avatar_state has_hover_label menu_button menu_button_icon disabled" title="Persona is locked to the current chat" data-i18n="[title]Persona is locked to the current chat">
                             <i class="icon fa-solid fa-lock fa-fw"></i>
                             <i class="label_icon icon fa-solid fa-comments fa-fw"></i>
@@ -6947,6 +7018,50 @@
                     <input type="search" id="select_chat_search" class="text_pole flex1" data-i18n="[placeholder]Search..." placeholder="Search..." autocomplete="off">
                     <div id="select_chat_cross" class="opacity50p hoverglow fa-solid fa-circle-xmark fontsize120p" alt="Close Past Chat Popup"></div>
                 </div>
+                <div id="chat_management_tools" class="chat_management_tools">
+                    <div class="chat_management_group chat_label_group" aria-label="Chat labeling tools">
+                        <button type="button" id="chat_auto_label_current" class="menu_button menu_button_icon" title="Ask the LLM to rename the current chat" data-i18n="[title]Ask the LLM to rename the current chat">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span data-i18n="Label current">Label current</span>
+                        </button>
+                        <button type="button" id="chat_auto_label_dated" class="menu_button menu_button_icon" title="Ask the LLM to rename timestamp-named chats" data-i18n="[title]Ask the LLM to rename timestamp-named chats">
+                            <i class="fa-solid fa-tags"></i>
+                            <span data-i18n="Label dated">Label dated</span>
+                        </button>
+                        <button type="button" id="chat_tools_cancel" class="menu_button menu_button_icon displayNone" title="Cancel the running chat tool" data-i18n="[title]Cancel the running chat tool">
+                            <i class="fa-solid fa-ban"></i>
+                            <span data-i18n="Cancel">Cancel</span>
+                        </button>
+                    </div>
+                    <div class="chat_management_group chat_cleanup_group" aria-label="Chat cleanup tools">
+                        <label class="chat_cleanup_field" for="chat_cleanup_age">
+                            <span data-i18n="Older than">Older than</span>
+                            <input type="number" id="chat_cleanup_age" class="text_pole" min="0" max="9999" step="1" value="90" inputmode="numeric">
+                        </label>
+                        <select id="chat_cleanup_unit" class="text_pole" aria-label="Cleanup age unit" data-i18n="[aria-label]Cleanup age unit">
+                            <option value="days" data-i18n="days">days</option>
+                            <option value="weeks" data-i18n="weeks">weeks</option>
+                            <option value="months" data-i18n="months">months</option>
+                        </select>
+                        <label class="chat_cleanup_field" for="chat_cleanup_keep">
+                            <span data-i18n="Keep newest">Keep newest</span>
+                            <input type="number" id="chat_cleanup_keep" class="text_pole" min="0" max="9999" step="1" value="25" inputmode="numeric">
+                        </label>
+                        <label class="checkbox_label chat_cleanup_checkbox" for="chat_cleanup_only_dated" title="Only clean timestamp-named chats" data-i18n="[title]Only clean timestamp-named chats">
+                            <input type="checkbox" id="chat_cleanup_only_dated" checked>
+                            <span data-i18n="Dated only">Dated only</span>
+                        </label>
+                        <button type="button" id="chat_cleanup_preview" class="menu_button menu_button_icon" title="Preview chats that match the cleanup settings" data-i18n="[title]Preview chats that match the cleanup settings">
+                            <i class="fa-solid fa-list-check"></i>
+                            <span data-i18n="Preview">Preview</span>
+                        </button>
+                        <button type="button" id="chat_cleanup_run" class="menu_button menu_button_icon" title="Delete chats that match the cleanup settings" data-i18n="[title]Delete chats that match the cleanup settings">
+                            <i class="fa-solid fa-broom"></i>
+                            <span data-i18n="Clean">Clean</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="chat_cleanup_status" class="chat_cleanup_status" aria-live="polite"></div>
                 <div id="select_chat_div"></div>
             </div>
         </div>
@@ -7824,6 +7939,9 @@
                     <div class="tags tags_inline"></div>
                 </div>
                 <input class="ch_fav" value="" hidden />
+                <div class="group_member_model">
+                    <input class="group_member_model_input text_pole textarea_compact" type="text" placeholder="Model override" title="Optional model for this member in this group" data-i18n="[placeholder]Model override;[title]Optional model for this member in this group" />
+                </div>
                 <div class="queue_position"></div>
                 <div class="group_member_icon">
                     <div title="Temporarily disable automatic replies from this character" data-action="disable" class="right_menu_button fa-solid fa-lg fa-comment-slash" data-i18n="[title]Temporarily disable automatic replies from this character"></div>
@@ -8080,8 +8198,7 @@
                         <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                     </div>
                     <div class="inline-drawer-content">
-                        <small data-i18n="Will be automatically added as the author's note for this character. Will be used in groups, but can't be modified when a group chat is open.">Will be automatically added as the author's note for this character. Will be used in groups, but
-                            can't be modified when a group chat is open.</small>
+                        <small data-i18n="Will be saved with this chat and automatically added as the author's note. Individual chats and group chats keep separate private character author's notes.">Will be saved with this chat and automatically added as the author's note. Individual chats and group chats keep separate private character author's notes.</small>
                         <textarea id="extension_floating_chara" data-macros class="text_pole textarea_compact" rows="8" placeholder="Example:&#10;[Scenario: wacky adventures; Genre: romantic comedy; Style: verbose, creative]"></textarea>
                         <div class="extension_token_counter">
                             <span data-i18n="extension_token_counter">Tokens:</span> <span id="extension_floating_chara_token_counter">0</span>
@@ -8354,6 +8471,26 @@
         </div>
         <div id="form_sheld">
             <div id="sb-bottom-chat-bar"></div>
+            <div id="group_speaker_controls" class="group_speaker_controls displayNone">
+                <div id="group_typing_indicator" class="group_typing_indicator displayNone" aria-live="polite"></div>
+                <div class="group_speaker_list"></div>
+                <button type="button" id="group_speaker_now" class="menu_button menu_button_icon" title="Make selected character speak now" data-i18n="[title]Make selected character speak now">
+                    <i class="fa-solid fa-comment-dots"></i>
+                    <span data-i18n="Speak Now">Speak Now</span>
+                </button>
+                <button type="button" id="group_speaker_dm_now" class="menu_button menu_button_icon" title="Toggle private DM mode for the selected character; your next send goes only to them" data-i18n="[title]Toggle private DM mode for the selected character; your next send goes only to them">
+                    <i class="fa-solid fa-envelope"></i>
+                    <span data-i18n="DM">DM</span>
+                </button>
+                <button type="button" id="group_speaker_dm_consolidate" class="menu_button menu_button_icon" title="Open a separate private DM chat with the selected character" data-i18n="[title]Open a separate private DM chat with the selected character">
+                    <i class="fa-solid fa-envelope-open-text"></i>
+                    <span data-i18n="DM Chat">DM Chat</span>
+                </button>
+                <button type="button" id="group_speaker_auto_dm" class="menu_button menu_button_icon group_speaker_toggle" title="Let any character privately DM you during scheduled auto messages" data-i18n="[title]Let any character privately DM you during scheduled auto messages" aria-pressed="false">
+                    <i class="fa-solid fa-bell"></i>
+                    <span data-i18n="Auto DM">Auto DM</span>
+                </button>
+            </div>
             <div id="dialogue_del_mes">
                 <div id="dialogue_del_mes_ok" data-i18n="Delete" class="menu_button">Delete</div>
                 <div id="dialogue_del_mes_cancel" data-i18n="Cancel" class="menu_button">Cancel</div>

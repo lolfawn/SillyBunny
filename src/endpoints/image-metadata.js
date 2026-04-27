@@ -37,12 +37,40 @@ export const METADATA_FILE = 'image-metadata.json';
  * @typedef {'bg' | 'avatar' | 'persona'} ThumbnailType
  */
 
+const THUMBNAIL_DIMENSION_DEFAULTS = Object.freeze({
+    bg: Object.freeze([240, 135]),
+    avatar: Object.freeze([864, 1280]),
+    persona: Object.freeze([864, 1280]),
+});
+
+function normalizeDimensionPair(value, fallback) {
+    const fallbackPair = Array.isArray(fallback) ? fallback : THUMBNAIL_DIMENSION_DEFAULTS.avatar;
+    const sourcePair = Array.isArray(value) ? value : fallbackPair;
+    const width = Math.min(4096, Math.max(1, Math.trunc(Number(sourcePair[0]) || fallbackPair[0])));
+    const height = Math.min(4096, Math.max(1, Math.trunc(Number(sourcePair[1]) || fallbackPair[1])));
+    return [width, height];
+}
+
 /** @type {Record<string, number[]>} */
 export const thumbnailDimensions = {
-    'bg': getConfigValue('thumbnails.dimensions.bg', [160, 90]),
-    'avatar': getConfigValue('thumbnails.dimensions.avatar', [96, 144]),
-    'persona': getConfigValue('thumbnails.dimensions.persona', [96, 144]),
+    bg: normalizeDimensionPair(getConfigValue('thumbnails.dimensions.bg', THUMBNAIL_DIMENSION_DEFAULTS.bg), THUMBNAIL_DIMENSION_DEFAULTS.bg),
+    avatar: normalizeDimensionPair(getConfigValue('thumbnails.dimensions.avatar', THUMBNAIL_DIMENSION_DEFAULTS.avatar), THUMBNAIL_DIMENSION_DEFAULTS.avatar),
+    persona: normalizeDimensionPair(getConfigValue('thumbnails.dimensions.persona', THUMBNAIL_DIMENSION_DEFAULTS.persona), THUMBNAIL_DIMENSION_DEFAULTS.persona),
 };
+
+export function setThumbnailDimensions(nextDimensions = {}) {
+    for (const type of Object.keys(THUMBNAIL_DIMENSION_DEFAULTS)) {
+        thumbnailDimensions[type] = normalizeDimensionPair(nextDimensions?.[type], THUMBNAIL_DIMENSION_DEFAULTS[type]);
+    }
+}
+
+export function getThumbnailDimensions() {
+    return {
+        bg: [...thumbnailDimensions.bg],
+        avatar: [...thumbnailDimensions.avatar],
+        persona: [...thumbnailDimensions.persona],
+    };
+}
 
 /**
  * Gets the configured resolution for a given thumbnail type.
@@ -212,8 +240,8 @@ export async function getOrGenerateMetadataBatch(userDataRoot, relativePaths, ty
         const currentMtime = stats.mtimeMs;
         const cached = index.images[posixPath];
 
-        // If cached and not modified, use cached
-        if (cached && cached.mtime === currentMtime) {
+        // If cached and not modified, use cached unless thumbnail dimensions changed.
+        if (cached && cached.mtime === currentMtime && cached.thumbnailResolution === getThumbnailResolution(type)) {
             results[relativePath] = cached;
             continue;
         }

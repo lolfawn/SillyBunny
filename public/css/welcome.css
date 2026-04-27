@@ -752,6 +752,32 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     line-height: 1.45;
 }
 
+.welcomeRecentTabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border: 1px solid color-mix(in srgb, var(--sb-shell-border, var(--SmartThemeBorderColor)) 72%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor) 38%, transparent);
+}
+
+.welcomeRecentTab {
+    border: 0;
+    border-radius: 999px;
+    padding: 5px 10px;
+    color: var(--SmartThemeBodyColor);
+    background: transparent;
+    cursor: pointer;
+    font-size: calc(var(--mainFontSize) * 0.78);
+    white-space: nowrap;
+}
+
+.welcomeRecentTab.active {
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor) 25%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--SmartThemeQuoteColor) 45%, transparent) inset;
+}
+
 .welcomePanelModeChip {
     min-height: 36px;
     gap: 8px;
@@ -962,7 +988,7 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 .welcomeRecent .recentChatList .recentChat .chatNameContainer {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
-    align-items: start;
+    align-items: center;
     gap: 10px;
     font-size: calc(var(--mainFontSize) * 0.96);
 }
@@ -978,14 +1004,15 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 .welcomeRecent .recentChatList .recentChat .chatNameContainer {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
-    align-items: start;
+    align-items: center;
     gap: 10px;
     font-size: calc(var(--mainFontSize) * 0.96);
     overflow: hidden;
 }
 
 .welcomeRecent .recentChatList .recentChat .chatDate {
-    padding-top: 2px;
+    align-self: center;
+    padding-top: 0;
     color: var(--welcome-muted-fg);
 }
 
@@ -999,6 +1026,9 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     width: 32px;
     height: 32px;
     min-width: 32px;
+    min-height: 32px;
+    max-width: 32px;
+    max-height: 32px;
     padding: 0;
     margin: 0;
     border-radius: 12px;
@@ -1010,7 +1040,7 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 
 .welcomeRecent .recentChatList .recentChat .chatMessageContainer {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
     font-size: calc(var(--mainFontSize) * 0.82);
@@ -1034,6 +1064,7 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
 .welcomeRecent .recentChatList .recentChat .chatStats {
     display: inline-flex;
     align-items: center;
+    align-self: center;
     gap: 10px;
     white-space: nowrap;
 }
@@ -1050,7 +1081,12 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
     color: color-mix(in srgb, var(--sb-shell-border, var(--SmartThemeBorderColor)) 84%, transparent);
 }
 
-.welcomeRecent .recentChatList .recentChat.hidden {
+.welcomeRecent .recentChatList .recentChat:not(.hidden):not(.recentChatFiltered) {
+    display: flex;
+}
+
+.welcomeRecent .recentChatList .recentChat.hidden,
+.welcomeRecent .recentChatList .recentChat.recentChatFiltered {
     display: none;
 }
 
@@ -1993,6 +2029,51 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
     .welcomePromptPanel {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .welcomeHeader {
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .welcomeRecentTabs {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .welcomeRecent .recentChatList .recentChat {
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .welcomeRecent .recentChatList .recentChat .avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 16px;
+    }
+
+    .welcomeRecent .recentChatList .recentChat .chatNameContainer {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+    }
+
+    .welcomeRecent .recentChatList .recentChat .chatActions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+    }
+
+    .welcomeRecent .recentChatList .recentChat .chatMessageContainer {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .welcomeRecent .recentChatList .recentChat .chatStats {
+        align-self: flex-start;
+        flex-wrap: wrap;
+        row-gap: 4px;
+        white-space: normal;
     }
 
     .welcomeGuideMascot {

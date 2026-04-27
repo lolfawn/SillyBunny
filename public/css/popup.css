@@ -194,8 +194,9 @@ body.no-blur .popup[open]::backdrop {
 
 .menu_button.popup-button-ok {
     background-color: var(--color-primary, var(--sb-accent));
-    color: black;
+    color: var(--sb-on-accent, var(--SmartThemeBlurTintColor));
     border-color: transparent;
+    text-shadow: none;
 }
 
 .menu_button.popup-button-ok:hover {

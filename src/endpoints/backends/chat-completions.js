@@ -370,6 +370,14 @@ async function sendClaudeRequest(request, response) {
             }
         }
 
+        if (request.body.claude_disable_temperature) {
+            delete requestBody.temperature;
+        }
+
+        if (request.body.claude_disable_top_p) {
+            delete requestBody.top_p;
+        }
+
         const reasoningEffort = request.body.reasoning_effort;
         const budgetTokens = calculateClaudeBudgetTokens(requestBody.max_tokens, reasoningEffort, requestBody.stream, isAdaptiveModel);
 
@@ -1092,8 +1100,9 @@ async function sendDeepSeekRequest(request, response) {
 
     try {
         let bodyParams = {};
+        const isThinkingModel = /(?:^|-)reasoner$|deepseek-v4/i.test(String(request.body.model || ''));
 
-        if (request.body.logprobs > 0) {
+        if (request.body.logprobs > 0 && !isThinkingModel) {
             bodyParams['top_logprobs'] = request.body.logprobs;
             bodyParams['logprobs'] = true;
         }
@@ -1125,8 +1134,14 @@ async function sendDeepSeekRequest(request, response) {
 
         const processedMessages = addAssistantPrefix(postProcessPrompt(request.body.messages, PROMPT_PROCESSING_TYPE.SEMI_TOOLS, getPromptNames(request)), bodyParams.tools, 'prefix');
 
-        if (/-reasoner/.test(request.body.model)) {
+        if (isThinkingModel && bodyParams.tools) {
             addReasoningContentToToolCalls(processedMessages);
+        } else if (isThinkingModel) {
+            for (const message of processedMessages) {
+                if (message && typeof message === 'object' && 'reasoning_content' in message) {
+                    delete message.reasoning_content;
+                }
+            }
         }
 
         const requestBody = {
@@ -1153,7 +1168,7 @@ async function sendDeepSeekRequest(request, response) {
             signal: controller.signal,
         };
 
-        console.debug('DeepSeek request:', summarizeLlmPayloadForLog(requestBody));
+        console.debug('DeepSeek request:', summarizeLlmPayloadForLog(requestBody, { includeText: true }));
 
         const generateResponse = await fetch(apiUrl + '/chat/completions', config);
 
@@ -2185,6 +2200,19 @@ function transformResponsesApiResponse(data) {
     };
 }
 
+function isExpectedStreamAbort(error) {
+    const name = String(error?.name ?? '');
+    const type = String(error?.type ?? '');
+    const code = String(error?.code ?? '');
+    const message = String(error?.message ?? '').toLowerCase();
+
+    return name === 'AbortError' ||
+        type === 'aborted' ||
+        code === 'ABORT_ERR' ||
+        message.includes('operation was aborted') ||
+        message.includes('aborted');
+}
+
 /**
  * Transforms a Responses API SSE stream into Chat Completions SSE format.
  * @param {import('node-fetch').Response} fetchResponse The upstream Responses API response
@@ -2269,6 +2297,15 @@ function forwardResponsesApiStream(fetchResponse, expressResponse) {
     });
 
     fetchResponse.body.on('error', (err) => {
+        if (done || isExpectedStreamAbort(err) || expressResponse.destroyed) {
+            done = true;
+            if (!expressResponse.destroyed && !expressResponse.writableEnded) {
+                expressResponse.end();
+            }
+            return;
+        }
+
+        done = true;
         console.error('Responses API stream error:', err);
         if (!expressResponse.writableEnded) {
             expressResponse.end();
@@ -2276,6 +2313,11 @@ function forwardResponsesApiStream(fetchResponse, expressResponse) {
     });
 
     expressResponse.on('close', () => {
+        if (done) {
+            return;
+        }
+
+        done = true;
         if (fetchResponse.body && typeof fetchResponse.body.destroy === 'function') {
             fetchResponse.body.destroy();
         }
@@ -2428,6 +2470,13 @@ async function sendOpenAIResponsesRequest(request, response) {
             }
         }
     } catch (error) {
+        if (isExpectedStreamAbort(error)) {
+            if (!response.headersSent && !response.destroyed) {
+                response.end();
+            }
+            return;
+        }
+
         console.error('Error communicating with OpenAI Responses API: ', error);
         if (!response.headersSent) {
             response.send({ error: true });

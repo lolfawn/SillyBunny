@@ -1,7 +1,7 @@
 import {
     moment,
 } from '../lib.js';
-import { chat, closeMessageEditor, event_types, eventSource, main_api, messageFormatting, saveChatConditional, saveChatDebounced, saveSettingsDebounced, substituteParams, syncMesToSwipe, updateMessageBlock } from '../script.js';
+import { chat, closeMessageEditor, event_types, eventSource, main_api, messageFormatting, saveChatConditional, saveChatDebounced, saveSettingsDebounced, substituteParams, syncMesToSwipe, updateMessageBlock, updateMessageTokenAccounting } from '../script.js';
 import { getRegexedString, regex_placement } from './extensions/regex/engine.js';
 import { getCurrentLocale, t, translate } from './i18n.js';
 import { macros, MacroCategory } from './macros/macro-system.js';
@@ -1495,7 +1495,7 @@ function parseReasoningFromStringWithFallbacks(str, options = {}) {
  * @property {string?} reasoning_signature Encrypted signature of the reasoning text
  */
 export function parseReasoningInSwipes(swipes, swipeInfoArray, duration) {
-    if (!power_user.reasoning.auto_parse) {
+    if (!isReasoningAutoParseEnabled()) {
         return;
     }
 
@@ -1505,7 +1505,7 @@ export function parseReasoningInSwipes(swipes, swipeInfoArray, duration) {
     }
 
     for (let index = 0; index < swipes.length; index++) {
-        const parsedReasoning = parseReasoningFromString(swipes[index]);
+        const parsedReasoning = parseReasoningFromStringWithFallbacks(swipes[index]);
         if (parsedReasoning) {
             swipes[index] = getRegexedString(parsedReasoning.content, regex_placement.REASONING);
             swipeInfoArray[index].extra.reasoning = parsedReasoning.reasoning;
@@ -1516,7 +1516,7 @@ export function parseReasoningInSwipes(swipes, swipeInfoArray, duration) {
 }
 
 function registerReasoningAppEvents() {
-    const eventHandler = (/** @type {string} */ type, /** @type {number} */ idx) => {
+    const eventHandler = async (/** @type {string} */ type, /** @type {number} */ idx) => {
         if (!isReasoningAutoParseEnabled()) {
             return;
         }
@@ -1563,6 +1563,16 @@ function registerReasoningAppEvents() {
         // Update the message text if it was changed
         if (parsedReasoning.content !== message.mes) {
             message.mes = parsedReasoning.content;
+        }
+
+        if (parsedReasoning.reasoning) {
+            await updateMessageTokenAccounting(message, {
+                reasoning: message.extra.reasoning,
+                reasoningTokens: message.extra.reasoning_tokens,
+                countReasoning: power_user.message_token_count_enabled,
+            });
+        } else if (contentUpdated && power_user.message_token_count_enabled) {
+            await updateMessageTokenAccounting(message);
         }
 
         if (contentUpdated) {

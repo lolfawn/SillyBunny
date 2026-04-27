@@ -488,11 +488,11 @@
         "type": "openai_preset"
     },
     {
-        "filename": "presets/openai/Pura's Director Preset (SillyTavern).json",
+        "filename": "presets/openai/Geechan - Universal Roleplay (Chat Completions) (v5.1).json",
         "type": "openai_preset"
     },
     {
-        "filename": "presets/openai/Geechan - Universal Roleplay (Chat Completions) (v5.0).json",
+        "filename": "presets/openai/Geechan - Universal Online Chat (Chat Completions) (v1.0).json",
         "type": "openai_preset"
     },
     {
@@ -576,7 +576,11 @@
         "type": "context"
     },
     {
-        "filename": "presets/context/Geechan - Universal Roleplay (V5.0).json",
+        "filename": "presets/context/Geechan - Universal Roleplay (V5.1).json",
+        "type": "context"
+    },
+    {
+        "filename": "presets/context/Geechan - Universal Online Chat (V1.0).json",
         "type": "context"
     },
     {
@@ -728,19 +732,23 @@
         "type": "sysprompt"
     },
     {
-        "filename": "presets/sysprompt/Geechan - Universal Roleplay (V5.0).json",
+        "filename": "presets/sysprompt/Geechan - Universal Roleplay (V5.1).json",
         "type": "sysprompt"
     },
     {
-        "filename": "presets/sysprompt/Geechan - Universal Roleplay (NSFW) (V5.0).json",
+        "filename": "presets/sysprompt/Geechan - Universal Roleplay (NSFW) (V5.1).json",
         "type": "sysprompt"
     },
     {
-        "filename": "presets/sysprompt/Geechan - Universal Roleplay (Simplified) (V5.0).json",
+        "filename": "presets/sysprompt/Geechan - Universal Roleplay (Simplified) (V5.1).json",
         "type": "sysprompt"
     },
     {
-        "filename": "presets/sysprompt/Geechan - Universal Roleplay (NSFW Simplified) (V5.0).json",
+        "filename": "presets/sysprompt/Geechan - Universal Roleplay (NSFW Simplified) (V5.1).json",
+        "type": "sysprompt"
+    },
+    {
+        "filename": "presets/sysprompt/Geechan - Universal Online Chat (V1.0).json",
         "type": "sysprompt"
     },
     {

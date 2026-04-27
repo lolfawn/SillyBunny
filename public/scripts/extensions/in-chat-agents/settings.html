@@ -15,6 +15,10 @@
 
         <div class="ica--toolbar">
             <div class="ica--toolbar-actions">
+                <button type="button" id="ica--globalEnabled" class="menu_button menu_button_icon" title="Enable or disable all In-Chat Agents without changing individual agent toggles" aria-pressed="true">
+                    <i class="fa-solid fa-power-off"></i>
+                    <span>Agents On</span>
+                </button>
                 <div id="ica--addAgent" class="menu_button menu_button_icon" title="Create a new agent from scratch">
                     <i class="fa-solid fa-plus"></i>
                     <span>New Agent</span>
@@ -48,28 +52,36 @@
             </div>
             <div class="ica--bulk-bar-actions">
                 <button type="button" id="ica--bulkSelectAll" class="menu_button menu_button_icon" title="Select all agents">
-                    <i class="fa-solid fa-check-double"></i> Select All
+                    <i class="fa-solid fa-check-double"></i>
+                    <span>Select All</span>
                 </button>
                 <button type="button" id="ica--bulkEnable" class="menu_button menu_button_icon" title="Enable selected agents">
-                    <i class="fa-solid fa-toggle-on"></i> Enable
+                    <i class="fa-solid fa-toggle-on"></i>
+                    <span>Enable</span>
                 </button>
                 <button type="button" id="ica--bulkDisable" class="menu_button menu_button_icon" title="Disable selected agents">
-                    <i class="fa-solid fa-toggle-off"></i> Disable
+                    <i class="fa-solid fa-toggle-off"></i>
+                    <span>Disable</span>
                 </button>
                 <button type="button" id="ica--bulkRoleSystem" class="menu_button menu_button_icon" title="Set injection role to System for all selected agents">
-                    <i class="fa-solid fa-server"></i> System
+                    <i class="fa-solid fa-server"></i>
+                    <span>System</span>
                 </button>
                 <button type="button" id="ica--bulkRoleUser" class="menu_button menu_button_icon" title="Set injection role to User for all selected agents">
-                    <i class="fa-solid fa-user"></i> User
+                    <i class="fa-solid fa-user"></i>
+                    <span>User</span>
                 </button>
                 <button type="button" id="ica--bulkEditProps" class="menu_button menu_button_icon" title="Bulk-edit properties for selected agents">
-                    <i class="fa-solid fa-sliders"></i> Edit
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Edit</span>
                 </button>
                 <button type="button" id="ica--bulkDelete" class="menu_button menu_button_icon caution" title="Delete selected agents">
-                    <i class="fa-solid fa-trash"></i> Delete
+                    <i class="fa-solid fa-trash"></i>
+                    <span>Delete</span>
                 </button>
                 <button type="button" id="ica--bulkCancel" class="menu_button menu_button_icon" title="Cancel selection">
-                    <i class="fa-solid fa-xmark"></i> Cancel
+                    <i class="fa-solid fa-xmark"></i>
+                    <span>Cancel</span>
                 </button>
             </div>
         </div>
@@ -100,6 +112,10 @@
                     <option value="parallel">Parallel (faster)</option>
                     <option value="sequential">Sequential (rate-limit friendly)</option>
                 </select>
+            </label>
+            <label class="checkbox_label" title="Keep enabled In-Chat Agents separate between Individual chats and Group chats.">
+                <input type="checkbox" id="ica--separateRecentChats" />
+                <span>Separate Agents Between Individual and Group Chats</span>
             </label>
             <label class="checkbox_label" title="Master switch for prompt pass toasts. Per-agent notification checkboxes still decide which agents can show them.">
                 <input type="checkbox" id="ica--promptTransformShowNotifications" />
@@ -171,10 +187,12 @@
         </div>
         <div class="ica--bulk-edit-popup-actions">
             <button type="button" id="ica--bulkEditApply" class="menu_button menu_button_icon">
-                <i class="fa-solid fa-check"></i> Apply
+                <i class="fa-solid fa-check"></i>
+                <span>Apply</span>
             </button>
             <button type="button" id="ica--bulkEditCancel" class="menu_button menu_button_icon">
-                <i class="fa-solid fa-xmark"></i> Cancel
+                <i class="fa-solid fa-xmark"></i>
+                <span>Cancel</span>
             </button>
         </div>
     </div>

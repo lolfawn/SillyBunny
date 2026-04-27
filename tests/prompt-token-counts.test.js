@@ -1,0 +1,48 @@
+import { describe, expect, test } from '@jest/globals';
+import { getPromptDisplayTokenCounts } from '../public/scripts/prompt-token-counts.js';
+
+function makeMessage(identifier, tokens) {
+    return {
+        identifier,
+        getTokens: () => tokens,
+    };
+}
+
+function makeCollection(identifier, collection) {
+    return {
+        identifier,
+        getCollection: () => collection,
+        getTokens: () => collection.reduce((total, item) => total + item.getTokens(), 0),
+    };
+}
+
+describe('prompt token display counts', () => {
+    test('uses direct prompt tokens instead of injected collection totals', () => {
+        const messages = makeCollection('root', [
+            makeCollection('main', [
+                makeMessage('main', 550),
+                makeMessage('inchat_agent_style', 1100),
+            ]),
+        ]);
+
+        const counts = getPromptDisplayTokenCounts(messages);
+
+        expect(counts.main).toBe(550);
+        expect(counts.inchat_agent_style).toBe(1100);
+    });
+
+    test('keeps aggregate totals for marker collections without direct prompt messages', () => {
+        const messages = makeCollection('root', [
+            makeCollection('chatHistory', [
+                makeMessage('chatHistory-2', 34),
+                makeMessage('chatHistory-1', 55),
+            ]),
+        ]);
+
+        const counts = getPromptDisplayTokenCounts(messages);
+
+        expect(counts.chatHistory).toBe(89);
+        expect(counts['chatHistory-2']).toBe(34);
+        expect(counts['chatHistory-1']).toBe(55);
+    });
+});

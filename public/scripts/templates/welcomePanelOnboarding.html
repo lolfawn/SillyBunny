@@ -216,9 +216,9 @@
             <div class="welcomeGuidePanel welcomeDeckPanel welcomeBasicsPanel{{#if deckBasicsActive}} is-active{{/if}}" data-deck-panel="basics">
                 <div class="welcomeGuideHeader">
                     <div class="welcomeGuideTitleBlock">
-                        <div class="welcomeHeroEyebrow">UI Shell</div>
+                        <div class="welcomeHeroEyebrow">Graphical Shell</div>
                         <h3>SillyBunny Shell 101</h3>
-                        <p>Refer to the documentation below for more information on SillyBunny's' UI shell. We've designed it to be intuitive and simple to use and understand.</p>
+                        <p>Refer to the documentation below for more information on SillyBunny's graphical shell. We've designed it to be intuitive and simple to use and understand.</p>
                     </div>
                 </div>
                 <div class="welcomeGuideGrid">
@@ -383,6 +383,12 @@
                 </div>
                 <p>Quickly jump back into your most recent conversations.</p>
             </div>
+            <div class="welcomeRecentTabs" role="tablist" aria-label="Recent chat type filter">
+                <button type="button" class="welcomeRecentTab active" data-recent-chat-filter="all" aria-pressed="true" data-i18n="All">All</button>
+                <button type="button" class="welcomeRecentTab" data-recent-chat-filter="individual" aria-pressed="false" data-i18n="Individual">Individual</button>
+                <button type="button" class="welcomeRecentTab" data-recent-chat-filter="group" aria-pressed="false" data-i18n="Groups">Groups</button>
+                <button type="button" class="welcomeRecentTab {{#unless separateAgentRecentChats}}displayNone{{/unless}}" data-recent-chat-filter="agent" aria-pressed="false" data-i18n="Agents">Agents</button>
+            </div>
         </div>
         <div class="welcomeRecent">
             <div class="recentChatList">
@@ -395,9 +401,16 @@
                     </div>
                 </div>
             {{/if}}
+                <div class="noRecentChat displayNone" data-recent-chat-empty-state="filtered">
+                    <i class="fa-solid fa-comment-dots"></i>
+                    <div>
+                        <strong>No recent chats in this view</strong>
+                        <span>Try a different recent chat filter or start a new conversation.</span>
+                    </div>
+                </div>
             {{#each chats}}
                 {{#with this}}
-                <div class="recentChat {{#if hidden}}hidden{{/if}} {{#if is_group}}group{{/if}}" data-file="{{chat_name}}" data-avatar="{{avatar}}" data-group="{{group}}">
+                <div class="recentChat {{#if hidden}}hidden{{/if}} {{#if is_group}}group{{else}}individual{{/if}} {{#if is_agent}}agent{{/if}}" data-recent-chat-type="{{recent_chat_type}}" data-file="{{chat_name}}" data-avatar="{{avatar}}" data-group="{{group}}">
                     {{#if pinned}}
                         <div class="recentChatPinned">
                             <i class="fa-solid fa-thumbtack fa-fw fa-xs" title="Pinned chat" data-i18n="[title]Pinned chat"></i>

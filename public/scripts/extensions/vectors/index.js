@@ -36,6 +36,7 @@ import { commonEnumProviders } from '../../slash-commands/SlashCommandCommonEnum
 import { slashCommandReturnHelper } from '../../slash-commands/SlashCommandReturnHelper.js';
 import { generateWebLlmChatPrompt, isWebLlmSupported } from '../shared.js';
 import { WebLlmVectorProvider } from './webllm.js';
+import { applyLegacyVectorEnabledSetting, bindVectorEnabledSettingsStore, getVectorEnabledState, normalizeVectorEnabledOptions } from './settings-utils.js';
 import { removeReasoningFromString } from '../../reasoning.js';
 import { oai_settings } from '../../openai.js';
 
@@ -749,6 +750,125 @@ function overlapChunks(chunk, index, chunks, overlapSize) {
 }
 
 globalThis.vectors_rearrangeChat = rearrangeChat;
+
+function ensureVectorSettingsStore() {
+    if (!extension_settings.vectors || typeof extension_settings.vectors !== 'object') {
+        extension_settings.vectors = {};
+    }
+
+    return extension_settings.vectors;
+}
+
+function syncVectorEnabledControls() {
+    const controls = {
+        '#vectors_enabled_chats': settings.enabled_chats,
+        '#vectors_enabled_files': settings.enabled_files,
+        '#vectors_enabled_world_info': settings.enabled_world_info,
+    };
+
+    let hasControl = false;
+    for (const [selector, value] of Object.entries(controls)) {
+        const control = $(selector);
+        if (!control.length) {
+            continue;
+        }
+
+        control.prop('checked', !!value);
+        hasControl = true;
+    }
+
+    if (hasControl) {
+        toggleSettings();
+    }
+}
+
+function bindVectorSettingsStore() {
+    const store = ensureVectorSettingsStore();
+    return bindVectorEnabledSettingsStore(settings, store, syncVectorEnabledControls);
+}
+
+function persistVectorSettings({ save = true, updateUi = true } = {}) {
+    const store = ensureVectorSettingsStore();
+    Object.assign(store, settings);
+    bindVectorSettingsStore();
+
+    if (updateUi) {
+        syncVectorEnabledControls();
+    }
+
+    if (save) {
+        saveSettingsDebounced();
+    }
+}
+
+export function getVectorStorageState() {
+    return getVectorEnabledState(settings);
+}
+
+export function isVectorStorageEnabled(scope = 'chats') {
+    switch (scope) {
+        case 'files':
+        case 'file':
+        case 'attachments':
+            return !!settings.enabled_files;
+        case 'worldInfo':
+        case 'world_info':
+        case 'world':
+        case 'wi':
+            return !!settings.enabled_world_info;
+        case 'any':
+            return !!(settings.enabled_chats || settings.enabled_files || settings.enabled_world_info);
+        case 'chats':
+        case 'chat':
+        case 'messages':
+        default:
+            return !!settings.enabled_chats;
+    }
+}
+
+export function setVectorStorageEnabled(options = true, config = {}) {
+    const updates = normalizeVectorEnabledOptions(options);
+
+    for (const [key, value] of Object.entries(updates)) {
+        settings[key] = value;
+    }
+
+    persistVectorSettings(config);
+    return getVectorStorageState();
+}
+
+export function enableVectorStorage(options = {}, config = {}) {
+    const updates = normalizeVectorEnabledOptions(options);
+
+    if (!Object.hasOwn(updates, 'enabled_chats')) {
+        updates.enabled_chats = true;
+    }
+
+    return setVectorStorageEnabled(updates, config);
+}
+
+function exposeVectorStorageApi() {
+    globalThis.SillyTavern ??= {};
+    const api = globalThis.SillyTavern.vectors && typeof globalThis.SillyTavern.vectors === 'object'
+        ? globalThis.SillyTavern.vectors
+        : {};
+
+    Object.assign(api, {
+        getSettings: () => ({ ...settings }),
+        getState: getVectorStorageState,
+        isEnabled: isVectorStorageEnabled,
+        setEnabled: setVectorStorageEnabled,
+        enable: enableVectorStorage,
+    });
+
+    globalThis.SillyTavern.vectors = api;
+    globalThis.SillyTavern.rag = api;
+    globalThis.VectorStorage = api;
+    globalThis.vectors_setEnabled = setVectorStorageEnabled;
+    globalThis.vectors_enable = enableVectorStorage;
+}
+
+exposeVectorStorageApi();
 
 const onChatEvent = debounce(async () => await moduleWorker.update(), debounce_timeout.relaxed);
 
@@ -1705,21 +1825,15 @@ async function activateWorldInfo(chat) {
 }
 
 jQuery(async () => {
-    if (!extension_settings.vectors) {
-        extension_settings.vectors = settings;
-    }
-
-    // Migrate from old settings
-    if (settings.enabled) {
-        settings.enabled_chats = true;
-    }
-
-    Object.assign(settings, extension_settings.vectors);
+    const savedVectorSettings = ensureVectorSettingsStore();
+    Object.assign(settings, savedVectorSettings);
+    applyLegacyVectorEnabledSetting(settings, savedVectorSettings);
 
     // Migrate from TensorFlow to Transformers
     settings.source = settings.source !== 'local' ? settings.source : 'transformers';
     settings.summary_source = settings.summary_source === 'extras' ? 'main' : settings.summary_source;
-    Object.assign(extension_settings.vectors, settings);
+    Object.assign(savedVectorSettings, settings);
+    bindVectorSettingsStore();
     const template = await renderExtensionTemplateAsync(MODULE_NAME, 'settings');
     $('#vectors_container').append(template);
     $('#vectors_enabled_chats').prop('checked', settings.enabled_chats).on('input', () => {

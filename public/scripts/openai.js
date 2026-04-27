@@ -111,7 +111,8 @@ const default_continue_nudge_prompt = '[Continue your last message without repea
 const default_bias = 'Default (none)';
 const default_personality_format = '{{personality}}';
 const default_scenario_format = '{{scenario}}';
-const default_group_nudge_prompt = '[Write the next reply only as {{char}}.]';
+const legacy_group_nudge_prompt = '[Write the next reply only as {{char}}.]';
+const default_group_nudge_prompt = '[Group chat turn: write the next reply only as {{char}}. The full conversation matters: {{char}} may address, react to, interrupt, answer, agree with, disagree with, or ask questions of any participant, not only {{user}}. Other participants currently present: {{notChar}}. Do not write dialogue or actions for anyone except {{char}}.]';
 const default_bias_presets = {
     [default_bias]: [],
     'Anti-bond': [
@@ -336,6 +337,8 @@ export const settingsToUpdate = {
     frequency_penalty: ['#freq_pen_openai', 'freq_pen_openai', false, false],
     presence_penalty: ['#pres_pen_openai', 'pres_pen_openai', false, false],
     top_p: ['#top_p_openai', 'top_p_openai', false, false],
+    claude_disable_temperature: ['#claude_disable_temperature', 'claude_disable_temperature', true, false],
+    claude_disable_top_p: ['#claude_disable_top_p', 'claude_disable_top_p', true, false],
     top_k: ['#top_k_openai', 'top_k_openai', false, false],
     top_a: ['#top_a_openai', 'top_a_openai', false, false],
     min_p: ['#min_p_openai', 'min_p_openai', false, false],
@@ -463,6 +466,8 @@ const default_settings = {
     personality_format: default_personality_format,
     openai_model: 'gpt-4-turbo',
     claude_model: 'claude-sonnet-4-5',
+    claude_disable_temperature: false,
+    claude_disable_top_p: false,
     google_model: 'gemini-2.5-pro',
     vertexai_model: 'gemini-2.5-pro',
     ai21_model: 'jamba-large',
@@ -1810,9 +1815,28 @@ export function getChatCompletionModel(settings = null) {
     }
 }
 
-function ensureAlwaysUnlockedContext(settings = oai_settings) {
-    settings.max_context_unlocked = true;
-    return settings;
+const configurableContextUnlockSources = new Set([
+    chat_completion_sources.OPENROUTER,
+    chat_completion_sources.NANOGPT,
+]);
+
+function isContextUnlockConfigurable(source = oai_settings.chat_completion_source) {
+    return configurableContextUnlockSources.has(source);
+}
+
+function isMaxContextUnlockedForSource(settings = oai_settings) {
+    // SillyBunny keeps most OpenAI-compatible sources unlocked; expose model limits only where users requested them.
+    return !isContextUnlockConfigurable(settings.chat_completion_source) || !!settings.max_context_unlocked;
+}
+
+function syncMaxContextUnlockedControl(settings = oai_settings) {
+    const isConfigurable = isContextUnlockConfigurable(settings.chat_completion_source);
+    const isUnlocked = isMaxContextUnlockedForSource(settings);
+
+    $('#oai_max_context_unlocked').prop('checked', isUnlocked);
+    $('#oai_max_context_unlocked_block').toggle(isConfigurable);
+
+    return isUnlocked;
 }
 
 function shouldRequestReasoning(settings = oai_settings) {
@@ -2253,8 +2277,25 @@ function createOpenAISettingsDrawer(id, title, description) {
         class: 'inline-drawer wide100p flexFlowColumn sb-openai-settings-drawer',
     });
     const $header = $('<div>', { class: 'inline-drawer-toggle inline-drawer-header' });
+    const $title = $('<b>').text(title);
     const $label = $('<div>', { class: 'flex-container flexFlowColumn' })
-        .append($('<b>').text(title));
+        .append($title);
+
+    if (id === 'sb-openai-sampling') {
+        const $helpLink = $('<a>', {
+            class: 'notes-link sb-sampling-docs-link',
+            href: 'https://docs.sillytavern.app/usage/common-settings/',
+            target: '_blank',
+            title: 'Documentation on sampling parameters.',
+            'data-i18n': '[title]Documentation on sampling parameters',
+        }).append($('<span>', {
+            name: 'samplerHelpButton',
+            class: 'note-link-span fa-solid fa-circle-question',
+        }));
+
+        $helpLink.on('click', event => event.stopPropagation());
+        $label.empty().append($('<div>', { class: 'sb-sampling-title-row' }).append($title, $helpLink));
+    }
 
     if (description) {
         $label.append($('<small>', { class: 'sb-group-meta' }).text(description));
@@ -2280,7 +2321,7 @@ function groupOpenAISettingsIntoDrawers() {
         {
             id: 'sb-openai-budget',
             title: 'Token Budget',
-            description: 'Context, response limits, swipes, costs, seed',
+            description: 'Context, response limits, swipes, and costs',
             selectors: [
                 '#range_block_openai > .range-block:has(#openai_max_context)',
                 '#range_block_openai > .range-block:has(#openai_max_tokens)',
@@ -2289,22 +2330,25 @@ function groupOpenAISettingsIntoDrawers() {
                 '#range_block_openai > div:has(#openrouter_max_prompt_cost)',
                 '#range_block_openai > div:has(#electronhub_max_prompt_cost)',
                 '#range_block_openai > div:has(#chutes_max_prompt_cost)',
-                '#range_block_openai > .range-block:has(#seed_openai)',
             ],
         },
         {
             id: 'sb-openai-sampling',
             title: 'Sampling',
-            description: 'Temperature, penalties, and probability controls',
+            description: 'Temperature, penalties, probability controls, seed, and logit bias',
             selectors: [
                 '#range_block_openai > .range-block:has(#temp_openai)',
+                '#range_block_openai > .range-block:has(#claude_disable_temperature)',
                 '#range_block_openai > .range-block:has(#freq_pen_openai)',
                 '#range_block_openai > .range-block:has(#pres_pen_openai)',
                 '#range_block_openai > .range-block:has(#top_k_openai)',
                 '#range_block_openai > .range-block:has(#top_p_openai)',
+                '#range_block_openai > .range-block:has(#claude_disable_top_p)',
                 '#range_block_openai > .range-block:has(#repetition_penalty_openai)',
                 '#range_block_openai > .range-block:has(#min_p_openai)',
                 '#range_block_openai > .range-block:has(#top_a_openai)',
+                '#range_block_openai > .range-block:has(#seed_openai)',
+                '#openai_settings > .range-block:has(#openai_logit_bias_preset)',
             ],
         },
         {
@@ -2325,7 +2369,7 @@ function groupOpenAISettingsIntoDrawers() {
         {
             id: 'sb-openai-advanced',
             title: 'Advanced & Reasoning',
-            description: 'Tools, media, reasoning, bias, and server config',
+            description: 'Tools, media, reasoning, and server config',
             selectors: [
                 '#openai_settings > div > .range-block:has(#openai_enable_web_search)',
                 '#openai_settings > div > .range-block:has(#openai_function_calling)',
@@ -2338,7 +2382,6 @@ function groupOpenAISettingsIntoDrawers() {
                 '#openai_settings > div > .range-block:has(#openai_reasoning_tag_style)',
                 '#openai_settings > div > .flex-container:has(#openai_verbosity)',
                 '#openai_settings > div > .range-block:has(#claude_assistant_prefill)',
-                '#openai_settings > .range-block:has(#openai_logit_bias_preset)',
             ],
         },
         {
@@ -4026,6 +4069,11 @@ export async function createGenerationParameters(settings, model, type, messages
         generate_data.top_p = generate_data.top_p || Number.EPSILON;
     }
 
+    if (settings.chat_completion_source === chat_completion_sources.CLAUDE) {
+        generate_data.claude_disable_temperature = Boolean(settings.claude_disable_temperature);
+        generate_data.claude_disable_top_p = Boolean(settings.claude_disable_top_p);
+    }
+
     if (settings.chat_completion_source === chat_completion_sources.XAI) {
         if (model.includes('grok-3-mini')) {
             delete generate_data.presence_penalty;
@@ -5304,6 +5352,7 @@ export class ChatCompletion {
  */
 function migrateChatCompletionSettings(settings) {
     const migrateMap = [
+        { oldKey: 'group_nudge_prompt', oldValue: legacy_group_nudge_prompt, newKey: 'group_nudge_prompt', newValue: default_group_nudge_prompt },
         { oldKey: 'names_in_completion', oldValue: true, newKey: 'names_behavior', newValue: character_names_behavior.COMPLETION },
         { oldKey: 'chat_completion_source', oldValue: 'palm', newKey: 'chat_completion_source', newValue: chat_completion_sources.MAKERSUITE },
         { oldKey: 'custom_prompt_post_processing', oldValue: custom_prompt_post_processing_types.CLAUDE, newKey: 'custom_prompt_post_processing', newValue: custom_prompt_post_processing_types.MERGE },
@@ -5387,7 +5436,7 @@ function loadOpenAISettings(data, settings) {
         }
     }
 
-    ensureAlwaysUnlockedContext(oai_settings);
+    syncMaxContextUnlockedControl(oai_settings);
 
     $(`#settings_preset_openai option[value="${openai_setting_names[oai_settings.preset_settings_openai]}"]`).prop('selected', true);
     $('#bind_preset_to_connection').prop('checked', oai_settings.bind_preset_to_connection);
@@ -6104,7 +6153,7 @@ function onSettingsPresetChange() {
             }
         }
 
-        ensureAlwaysUnlockedContext(oai_settings);
+        syncMaxContextUnlockedControl(oai_settings);
 
         // These cannot be changed via preset if unbound to connection
         if (oai_settings.bind_preset_to_connection) {
@@ -6127,7 +6176,7 @@ function onSettingsPresetChange() {
 }
 
 function getMaxContextOpenAI(value) {
-    if (oai_settings.max_context_unlocked) {
+    if (isMaxContextUnlockedForSource()) {
         return unlocked_max;
     } else if (value.startsWith('gpt-5.4')) {
         return max_1mil;
@@ -6449,12 +6498,44 @@ function getNanoGptMaxContext(model, isUnlocked) {
     return max_128k;
 }
 
+function applyOpenAIContextMax(maxContext) {
+    const normalizedMaxContext = Number(maxContext) || max_128k;
+
+    $('#openai_max_context').attr('max', normalizedMaxContext);
+    oai_settings.openai_max_context = Math.min(normalizedMaxContext, oai_settings.openai_max_context);
+    $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
+    $('#openai_max_context_counter').attr('max', normalizedMaxContext);
+}
+
+function applyConfigurableContextLimit() {
+    const maxContextUnlocked = isMaxContextUnlockedForSource(oai_settings);
+
+    if (oai_settings.chat_completion_source === chat_completion_sources.OPENROUTER) {
+        if (maxContextUnlocked) {
+            applyOpenAIContextMax(unlocked_max);
+        } else {
+            const model = model_list.find(m => m.id == oai_settings.openrouter_model);
+            applyOpenAIContextMax(model?.context_length || max_128k);
+        }
+        calculateOpenRouterCost();
+        return true;
+    }
+
+    if (oai_settings.chat_completion_source === chat_completion_sources.NANOGPT) {
+        applyOpenAIContextMax(getNanoGptMaxContext(oai_settings.nanogpt_model, maxContextUnlocked));
+        return true;
+    }
+
+    return false;
+}
+
 async function onModelChange() {
     biasCache = undefined;
     let value = String($(this).val() || '');
 
     // Skip setting the context size for sources that get it from external APIs
     const hasModelsLoaded = Array.isArray(model_list) && model_list.length > 0;
+    const maxContextUnlocked = syncMaxContextUnlockedControl(oai_settings);
 
     if ($(this).is('#claude_model_id')) {
         if (value) {
@@ -6697,7 +6778,7 @@ async function onModelChange() {
     }
 
     if ([chat_completion_sources.MAKERSUITE, chat_completion_sources.VERTEXAI].includes(oai_settings.chat_completion_source)) {
-        if (oai_settings.max_context_unlocked) {
+        if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', max_2mil);
         } else if (value.includes('gemini-2.5-flash-image')) {
             $('#openai_max_context').attr('max', max_32k);
@@ -6724,18 +6805,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source == chat_completion_sources.OPENROUTER) {
-        if (oai_settings.max_context_unlocked) {
-            $('#openai_max_context').attr('max', unlocked_max);
-        } else {
-            const model = model_list.find(m => m.id == oai_settings.openrouter_model);
-            if (model?.context_length) {
-                $('#openai_max_context').attr('max', model.context_length);
-            } else {
-                $('#openai_max_context').attr('max', max_128k);
-            }
-        }
-        oai_settings.openai_max_context = Math.min(Number($('#openai_max_context').attr('max')), oai_settings.openai_max_context);
-        $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
+        applyConfigurableContextLimit();
 
         if (value && (value.includes('claude') || value.includes('palm-2'))) {
             oai_settings.temp_openai = Math.min(claude_max_temp, oai_settings.temp_openai);
@@ -6744,12 +6814,10 @@ async function onModelChange() {
             oai_settings.temp_openai = Math.min(oai_max_temp, oai_settings.temp_openai);
             $('#temp_openai').attr('max', oai_max_temp).val(oai_settings.temp_openai).trigger('input');
         }
-
-        calculateOpenRouterCost();
     }
 
     if (oai_settings.chat_completion_source == chat_completion_sources.CLAUDE) {
-        if (oai_settings.max_context_unlocked) {
+        if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
         } else if (/^claude-(sonnet-4-5|sonnet-4-6|opus-4-6)/.test(value)) {
             $('#openai_max_context').attr('max', max_1mil);
@@ -6780,7 +6848,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.MISTRALAI) {
-        const maxContext = getMistralMaxContext(oai_settings.mistralai_model, oai_settings.max_context_unlocked);
+        const maxContext = getMistralMaxContext(oai_settings.mistralai_model, maxContextUnlocked);
         $('#openai_max_context').attr('max', maxContext);
         oai_settings.openai_max_context = Math.min(oai_settings.openai_max_context, Number($('#openai_max_context').attr('max')));
         $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
@@ -6789,7 +6857,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.COHERE) {
-        if (oai_settings.max_context_unlocked) {
+        if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
         } else if (['command-light-nightly', 'command-light', 'command'].includes(oai_settings.cohere_model)) {
             $('#openai_max_context').attr('max', max_4k);
@@ -6810,7 +6878,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.PERPLEXITY) {
-        if (oai_settings.max_context_unlocked) {
+        if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
         } else if (['sonar', 'sonar-reasoning', 'sonar-reasoning-pro', 'r1-1776'].includes(oai_settings.perplexity_model)) {
             $('#openai_max_context').attr('max', 127000);
@@ -6830,7 +6898,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source == chat_completion_sources.GROQ) {
-        const maxContext = getGroqMaxContext(oai_settings.groq_model, oai_settings.max_context_unlocked);
+        const maxContext = getGroqMaxContext(oai_settings.groq_model, maxContextUnlocked);
         $('#openai_max_context').attr('max', maxContext);
         oai_settings.openai_max_context = Math.min(Number($('#openai_max_context').attr('max')), oai_settings.openai_max_context);
         $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
@@ -6839,7 +6907,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source == chat_completion_sources.AI21) {
-        if (oai_settings.max_context_unlocked) {
+        if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
         } else if (oai_settings.ai21_model.startsWith('jamba-')) {
             $('#openai_max_context').attr('max', max_256k);
@@ -6858,7 +6926,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source == chat_completion_sources.CHUTES) {
-        const maxContext = getChutesMaxContext(oai_settings.chutes_model, oai_settings.max_context_unlocked);
+        const maxContext = getChutesMaxContext(oai_settings.chutes_model, maxContextUnlocked);
         $('#openai_max_context').attr('max', maxContext);
         oai_settings.openai_max_context = Math.min(Number($('#openai_max_context').attr('max')), oai_settings.openai_max_context);
         $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
@@ -6869,7 +6937,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source == chat_completion_sources.ELECTRONHUB) {
-        const maxContext = getElectronHubMaxContext(oai_settings.electronhub_model, oai_settings.max_context_unlocked);
+        const maxContext = getElectronHubMaxContext(oai_settings.electronhub_model, maxContextUnlocked);
         $('#openai_max_context').attr('max', maxContext);
         oai_settings.openai_max_context = Math.min(Number($('#openai_max_context').attr('max')), oai_settings.openai_max_context);
         $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
@@ -6880,16 +6948,13 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.NANOGPT) {
-        const maxContext = getNanoGptMaxContext(oai_settings.nanogpt_model, oai_settings.max_context_unlocked);
-        $('#openai_max_context').attr('max', maxContext);
-        oai_settings.openai_max_context = Math.min(Number($('#openai_max_context').attr('max')), oai_settings.openai_max_context);
-        $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
+        applyConfigurableContextLimit();
         oai_settings.temp_openai = Math.min(oai_max_temp, oai_settings.temp_openai);
         $('#temp_openai').attr('max', oai_max_temp).val(oai_settings.temp_openai).trigger('input');
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.POLLINATIONS) {
-        if (oai_settings.max_context_unlocked) {
+        if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
         } else {
             $('#openai_max_context').attr('max', max_128k);
@@ -6901,9 +6966,9 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.DEEPSEEK) {
-        if (oai_settings.max_context_unlocked) {
+        if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
-        } else if (['deepseek-reasoner', 'deepseek-chat'].includes(oai_settings.deepseek_model)) {
+        } else if (['deepseek-reasoner', 'deepseek-chat', 'deepseek-v4'].includes(oai_settings.deepseek_model)) {
             $('#openai_max_context').attr('max', max_128k);
         } else if (oai_settings.deepseek_model == 'deepseek-coder') {
             $('#openai_max_context').attr('max', max_16k);
@@ -6917,14 +6982,14 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.COMETAPI) {
-        $('#openai_max_context').attr('max', oai_settings.max_context_unlocked ? unlocked_max : max_128k);
+        $('#openai_max_context').attr('max', maxContextUnlocked ? unlocked_max : max_128k);
         oai_settings.openai_max_context = Math.min(Number($('#openai_max_context').attr('max')), oai_settings.openai_max_context);
         $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
         $('#temp_openai').attr('max', oai_max_temp).val(oai_settings.temp_openai).trigger('input');
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.XAI) {
-        if (oai_settings.max_context_unlocked) {
+        if (maxContextUnlocked) {
             $('#openai_max_context').attr('max', unlocked_max);
         } else if (oai_settings.xai_model.includes('grok-2-vision')) {
             $('#openai_max_context').attr('max', max_32k);
@@ -6946,7 +7011,7 @@ async function onModelChange() {
 
     if (oai_settings.chat_completion_source === chat_completion_sources.AIMLAPI) {
         let maxContext;
-        if (oai_settings.max_context_unlocked) {
+        if (maxContextUnlocked) {
             maxContext = unlocked_max;
         } else {
             const model = model_list.find(m => m.id === oai_settings.aimlapi_model);
@@ -6979,7 +7044,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.MOONSHOT) {
-        const maxContext = getMoonshotMaxContext(oai_settings.moonshot_model, oai_settings.max_context_unlocked);
+        const maxContext = getMoonshotMaxContext(oai_settings.moonshot_model, maxContextUnlocked);
         $('#openai_max_context').attr('max', maxContext);
         oai_settings.openai_max_context = Math.min(Number($('#openai_max_context').attr('max')), oai_settings.openai_max_context);
         $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
@@ -6988,7 +7053,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.FIREWORKS) {
-        const maxContext = getFireworksMaxContext(oai_settings.fireworks_model, oai_settings.max_context_unlocked);
+        const maxContext = getFireworksMaxContext(oai_settings.fireworks_model, maxContextUnlocked);
         $('#openai_max_context').attr('max', maxContext);
         oai_settings.openai_max_context = Math.min(Number($('#openai_max_context').attr('max')), oai_settings.openai_max_context);
         $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
@@ -6997,7 +7062,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source === chat_completion_sources.SILICONFLOW) {
-        const maxContext = getSiliconflowMaxContext(oai_settings.siliconflow_model, oai_settings.max_context_unlocked);
+        const maxContext = getSiliconflowMaxContext(oai_settings.siliconflow_model, maxContextUnlocked);
         $('#openai_max_context').attr('max', maxContext);
         oai_settings.openai_max_context = Math.min(Number($('#openai_max_context').attr('max')), oai_settings.openai_max_context);
         $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
@@ -7006,7 +7071,7 @@ async function onModelChange() {
     }
 
     if (oai_settings.chat_completion_source == chat_completion_sources.ZAI) {
-        const maxContext = getZaiMaxContext(oai_settings.zai_model, oai_settings.max_context_unlocked);
+        const maxContext = getZaiMaxContext(oai_settings.zai_model, maxContextUnlocked);
         $('#openai_max_context').attr('max', maxContext);
         oai_settings.openai_max_context = Math.min(Number($('#openai_max_context').attr('max')), oai_settings.openai_max_context);
         $('#openai_max_context').val(oai_settings.openai_max_context).trigger('input');
@@ -7863,6 +7928,16 @@ export function initOpenAI() {
         saveSettingsDebounced();
     });
 
+    $('#claude_disable_temperature').on('input', function () {
+        oai_settings.claude_disable_temperature = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#claude_disable_top_p').on('input', function () {
+        oai_settings.claude_disable_top_p = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
     $('#top_k_openai').on('input', function () {
         oai_settings.top_k_openai = Number($(this).val());
         $('#top_k_counter_openai').val(Number($(this).val()).toFixed(0));
@@ -8034,8 +8109,9 @@ export function initOpenAI() {
         cancelStatusCheck('Chat Completion source changed');
         model_list = [];
         oai_settings.chat_completion_source = String($(this).find(':selected').val());
-        ensureAlwaysUnlockedContext(oai_settings);
+        syncMaxContextUnlockedControl(oai_settings);
         toggleChatCompletionForms();
+        applyConfigurableContextLimit();
         saveSettingsDebounced();
         reconnectOpenAi();
         forceCharacterEditorTokenize();
@@ -8044,9 +8120,14 @@ export function initOpenAI() {
     });
 
     $('#oai_max_context_unlocked').on('input', function (_e, data) {
-        ensureAlwaysUnlockedContext(oai_settings);
+        if (isContextUnlockConfigurable()) {
+            oai_settings.max_context_unlocked = !!$(this).prop('checked');
+        }
+        syncMaxContextUnlockedControl(oai_settings);
         if (data?.source !== 'preset') {
             $('#chat_completion_source').trigger('change');
+        } else {
+            applyConfigurableContextLimit();
         }
         saveSettingsDebounced();
     });

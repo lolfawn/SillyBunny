@@ -15,6 +15,13 @@ const ENABLE_ACCOUNTS = getConfigValue('enableUserAccounts', false, 'boolean');
 const basicAuthMiddleware = async function (request, response, callback) {
     const unauthorizedWebpage = safeReadFileSync('./public/error/unauthorized.html') ?? '';
     const unauthorizedResponse = (res) => {
+        res.set({
+            'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+        });
+        res.vary('Authorization');
+        res.vary('Cookie');
         res.set('WWW-Authenticate', 'Basic realm="SillyBunny", charset="UTF-8"');
         return res.status(401).send(unauthorizedWebpage);
     };
@@ -30,6 +37,10 @@ const basicAuthMiddleware = async function (request, response, callback) {
                 return callback();
             }
         }
+    }
+
+    if (ENABLE_ACCOUNTS && request.session?.handle) {
+        return callback();
     }
 
     const basicAuthUserName = getConfigValue('basicAuthUser.username');

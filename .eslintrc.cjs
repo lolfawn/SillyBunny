@@ -15,7 +15,7 @@ module.exports = {
     overrides: [
         {
             // Server-side files (plus this configuration file)
-            files: ['src/**/*.js', './*.js', 'plugins/**/*.js'],
+            files: ['src/**/*.js', './*.js', 'scripts/**/*.js', 'plugins/**/*.js'],
             env: {
                 node: true,
             },

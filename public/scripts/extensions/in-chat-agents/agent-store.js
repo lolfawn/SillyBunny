@@ -1,5 +1,5 @@
-import { getRequestHeaders } from '../../../script.js';
-import { extension_settings } from '../../extensions.js';
+import { getRequestHeaders, saveSettingsDebounced } from '../../../script.js';
+import { extension_settings, getContext } from '../../extensions.js';
 import { uuidv4 } from '../../utils.js';
 import {
     AGENT_REGEX_PLACEMENT,
@@ -91,8 +91,26 @@ let builtinGroups = [];
 /** @type {AgentGroup[]} */
 let customGroups = [];
 
+export const AGENT_CHAT_SCOPES = Object.freeze({
+    INDIVIDUAL: 'individual',
+    GROUP: 'group',
+});
+
+const AGENT_CHAT_SCOPE_KEYS = Object.values(AGENT_CHAT_SCOPES);
+
+function createDefaultScopedEnabledAgentIds() {
+    return {
+        [AGENT_CHAT_SCOPES.INDIVIDUAL]: [],
+        [AGENT_CHAT_SCOPES.GROUP]: [],
+    };
+}
+
 /** Global settings for the In-Chat Agents extension. */
 let globalSettings = {
+    enabled: true,
+    separateRecentChats: false,
+    enabledAgentIdsByChatType: createDefaultScopedEnabledAgentIds(),
+    scopedEnabledAgentIdsInitialized: false,
     connectionProfile: '',
     promptTransformShowNotifications: true,
     appendAgentsExecutionMode: 'parallel',
@@ -100,7 +118,7 @@ let globalSettings = {
 
 /**
  * Returns the global settings.
- * @returns {{ connectionProfile: string, promptTransformShowNotifications: boolean, appendAgentsExecutionMode: 'parallel'|'sequential' }}
+ * @returns {{ enabled: boolean, separateRecentChats: boolean, enabledAgentIdsByChatType: Record<string, string[]>, scopedEnabledAgentIdsInitialized: boolean, connectionProfile: string, promptTransformShowNotifications: boolean, appendAgentsExecutionMode: 'parallel'|'sequential' }}
  */
 export function getGlobalSettings() {
     return globalSettings;
@@ -111,7 +129,239 @@ export function getGlobalSettings() {
  * @param {Partial<typeof globalSettings>} update
  */
 export function setGlobalSettings(update) {
+    if (!update || typeof update !== 'object') {
+        return;
+    }
+
     Object.assign(globalSettings, update);
+    globalSettings.enabledAgentIdsByChatType = normalizeScopedEnabledAgentIds(globalSettings.enabledAgentIdsByChatType);
+
+    if (!globalSettings.scopedEnabledAgentIdsInitialized) {
+        const scopedSetting = update.enabledAgentIdsByChatType;
+        globalSettings.scopedEnabledAgentIdsInitialized = Boolean(
+            scopedSetting &&
+            typeof scopedSetting === 'object' &&
+            AGENT_CHAT_SCOPE_KEYS.some(scope => Object.hasOwn(scopedSetting, scope)),
+        );
+    }
+}
+
+function normalizeAgentIdList(value) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return Array.from(new Set(
+        value
+            .map(id => String(id ?? '').trim())
+            .filter(Boolean),
+    ));
+}
+
+function normalizeAgentChatScope(scope = AGENT_CHAT_SCOPES.INDIVIDUAL) {
+    return AGENT_CHAT_SCOPE_KEYS.includes(scope) ? scope : AGENT_CHAT_SCOPES.INDIVIDUAL;
+}
+
+function normalizeScopedEnabledAgentIds(value = {}) {
+    return {
+        [AGENT_CHAT_SCOPES.INDIVIDUAL]: normalizeAgentIdList(value?.[AGENT_CHAT_SCOPES.INDIVIDUAL]),
+        [AGENT_CHAT_SCOPES.GROUP]: normalizeAgentIdList(value?.[AGENT_CHAT_SCOPES.GROUP]),
+    };
+}
+
+function ensureScopedEnabledAgentIds() {
+    globalSettings.enabledAgentIdsByChatType = normalizeScopedEnabledAgentIds(globalSettings.enabledAgentIdsByChatType);
+    return globalSettings.enabledAgentIdsByChatType;
+}
+
+export function getActiveAgentChatScope() {
+    try {
+        return getContext()?.groupId ? AGENT_CHAT_SCOPES.GROUP : AGENT_CHAT_SCOPES.INDIVIDUAL;
+    } catch {
+        return AGENT_CHAT_SCOPES.INDIVIDUAL;
+    }
+}
+
+export function getAgentChatScopeLabel(scope = getActiveAgentChatScope()) {
+    return normalizeAgentChatScope(scope) === AGENT_CHAT_SCOPES.GROUP ? 'Group chats' : 'Individual chats';
+}
+
+export function areAgentTogglesScopedByChatType() {
+    return Boolean(globalSettings.separateRecentChats);
+}
+
+function getScopedEnabledAgentIdSet(scope = getActiveAgentChatScope()) {
+    const scopedEnabledAgentIds = ensureScopedEnabledAgentIds();
+    return new Set(scopedEnabledAgentIds[normalizeAgentChatScope(scope)]);
+}
+
+function isAgentIdEnabledInAnyScope(agentId, scopedEnabledAgentIds = ensureScopedEnabledAgentIds()) {
+    const normalizedAgentId = String(agentId ?? '').trim();
+    if (!normalizedAgentId) {
+        return false;
+    }
+
+    return AGENT_CHAT_SCOPE_KEYS.some(scope => scopedEnabledAgentIds[scope].includes(normalizedAgentId));
+}
+
+export function isAgentEnabledForScope(agent, scope = getActiveAgentChatScope()) {
+    if (!areAgentTogglesScopedByChatType() || !globalSettings.scopedEnabledAgentIdsInitialized) {
+        return Boolean(agent?.enabled);
+    }
+
+    const agentId = String(agent?.id ?? '').trim();
+    if (!agentId) {
+        return false;
+    }
+
+    return getScopedEnabledAgentIdSet(scope).has(agentId);
+}
+
+export function isAgentEnabledForCurrentScope(agent) {
+    return isAgentEnabledForScope(agent, getActiveAgentChatScope());
+}
+
+export function isAgentEnabledForAnyScope(agent) {
+    if (!areAgentTogglesScopedByChatType() || !globalSettings.scopedEnabledAgentIdsInitialized) {
+        return Boolean(agent?.enabled);
+    }
+
+    const agentId = String(agent?.id ?? '').trim();
+    if (!agentId) {
+        return false;
+    }
+
+    return isAgentIdEnabledInAnyScope(agentId);
+}
+
+export function setAgentEnabledForScope(agent, enabled, scope = getActiveAgentChatScope()) {
+    if (!agent) {
+        return false;
+    }
+
+    const nextEnabled = Boolean(enabled);
+
+    if (!areAgentTogglesScopedByChatType()) {
+        const changed = Boolean(agent.enabled) !== nextEnabled;
+        agent.enabled = nextEnabled;
+        return changed;
+    }
+
+    const agentId = String(agent.id ?? '').trim();
+    if (!agentId) {
+        return false;
+    }
+
+    const normalizedScope = normalizeAgentChatScope(scope);
+    const scopedEnabledAgentIds = ensureScopedEnabledAgentIds();
+    const enabledIds = new Set(scopedEnabledAgentIds[normalizedScope]);
+    const wasEnabled = enabledIds.has(agentId);
+
+    if (nextEnabled) {
+        enabledIds.add(agentId);
+    } else {
+        enabledIds.delete(agentId);
+    }
+
+    scopedEnabledAgentIds[normalizedScope] = [...enabledIds];
+    globalSettings.scopedEnabledAgentIdsInitialized = true;
+
+    const previousLegacyEnabled = Boolean(agent.enabled);
+    agent.enabled = isAgentEnabledForAnyScope(agent);
+
+    return wasEnabled !== nextEnabled || previousLegacyEnabled !== Boolean(agent.enabled);
+}
+
+export function setAgentEnabledForCurrentScope(agent, enabled) {
+    return setAgentEnabledForScope(agent, enabled, getActiveAgentChatScope());
+}
+
+function syncLegacyAgentEnabledFlagsFromScopes() {
+    for (const agent of agents) {
+        agent.enabled = isAgentEnabledForAnyScope(agent);
+    }
+}
+
+export function initializeScopedAgentEnableState(scope = getActiveAgentChatScope()) {
+    ensureScopedEnabledAgentIds();
+
+    if (globalSettings.scopedEnabledAgentIdsInitialized) {
+        return false;
+    }
+
+    const normalizedScope = normalizeAgentChatScope(scope);
+    const enabledAgentIds = agents
+        .filter(agent => agent.enabled)
+        .map(agent => String(agent.id ?? '').trim())
+        .filter(Boolean);
+
+    globalSettings.enabledAgentIdsByChatType = createDefaultScopedEnabledAgentIds();
+    globalSettings.enabledAgentIdsByChatType[normalizedScope] = enabledAgentIds;
+    globalSettings.scopedEnabledAgentIdsInitialized = true;
+    syncLegacyAgentEnabledFlagsFromScopes();
+    return true;
+}
+
+export function reconcileScopedEnabledAgentIdsFromLegacyFlags(scope = getActiveAgentChatScope()) {
+    if (!areAgentTogglesScopedByChatType() || !globalSettings.scopedEnabledAgentIdsInitialized) {
+        return false;
+    }
+
+    const normalizedScope = normalizeAgentChatScope(scope);
+    const scopedEnabledAgentIds = ensureScopedEnabledAgentIds();
+    const enabledIds = new Set(scopedEnabledAgentIds[normalizedScope]);
+    let changed = false;
+
+    for (const agent of agents) {
+        if (!agent?.enabled) {
+            continue;
+        }
+
+        const agentId = String(agent.id ?? '').trim();
+        if (!agentId || isAgentIdEnabledInAnyScope(agentId, scopedEnabledAgentIds)) {
+            continue;
+        }
+
+        enabledIds.add(agentId);
+        changed = true;
+    }
+
+    if (!changed) {
+        return false;
+    }
+
+    scopedEnabledAgentIds[normalizedScope] = [...enabledIds];
+    syncLegacyAgentEnabledFlagsFromScopes();
+    return true;
+}
+
+export function persistAgentGlobalSettings() {
+    extension_settings.inChatAgents = {
+        ...(extension_settings.inChatAgents ?? {}),
+        globalSettings: structuredClone(globalSettings),
+    };
+    delete extension_settings.inChatAgents.groups;
+    saveSettingsDebounced();
+}
+
+function removeAgentIdFromScopedEnabledAgentIds(id) {
+    const agentId = String(id ?? '').trim();
+    if (!agentId) {
+        return false;
+    }
+
+    const scopedEnabledAgentIds = ensureScopedEnabledAgentIds();
+    let changed = false;
+
+    for (const scope of AGENT_CHAT_SCOPE_KEYS) {
+        const nextIds = scopedEnabledAgentIds[scope].filter(enabledId => enabledId !== agentId);
+        if (nextIds.length !== scopedEnabledAgentIds[scope].length) {
+            scopedEnabledAgentIds[scope] = nextIds;
+            changed = true;
+        }
+    }
+
+    return changed;
 }
 
 function normalizeConnectionProfileId(value) {
@@ -160,6 +410,22 @@ export function resolveConnectionProfile(profileId = '') {
 
 export const LEGACY_AGENT_MAX_TOKENS = 2000;
 export const DEFAULT_AGENT_MAX_TOKENS = 8192;
+
+export function areAgentsGloballyEnabled() {
+    return globalSettings.enabled !== false;
+}
+
+export function getPromptTransformMode(agent) {
+    return agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite';
+}
+
+export function normalizePromptTransformMaxTokens(value) {
+    if (!Number.isFinite(Number(value))) {
+        return DEFAULT_AGENT_MAX_TOKENS;
+    }
+
+    return Math.max(16, Math.min(16000, Number(value)));
+}
 
 const TRACKER_CATEGORY_TEMPLATE_IDS = new Set([
     'tpl-cyoa-choices',
@@ -423,8 +689,14 @@ export function getAgents() {
  * @returns {InChatAgent[]}
  */
 export function getEnabledAgents() {
+    if (globalSettings.enabled === false) {
+        return [];
+    }
+
+    const activeScope = getActiveAgentChatScope();
+
     return agents
-        .filter(agent => agent.enabled)
+        .filter(agent => isAgentEnabledForScope(agent, activeScope))
         .sort((a, b) => a.injection.order - b.injection.order);
 }
 
@@ -450,7 +722,12 @@ export function getToolAgents() {
  * @returns {InChatAgent[]}
  */
 export function getEnabledToolAgents() {
-    return agents.filter(agent => agent.enabled && agent.category === 'tool');
+    if (globalSettings.enabled === false) {
+        return [];
+    }
+
+    const activeScope = getActiveAgentChatScope();
+    return agents.filter(agent => isAgentEnabledForScope(agent, activeScope) && agent.category === 'tool');
 }
 
 /**
@@ -503,6 +780,7 @@ export async function saveAgent(agent) {
  */
 export async function deleteAgent(id) {
     agents = agents.filter(agent => agent.id !== id);
+    const scopedStateChanged = removeAgentIdFromScopedEnabledAgentIds(id);
 
     const response = await fetch('/api/in-chat-agents/delete', {
         method: 'POST',
@@ -512,6 +790,10 @@ export async function deleteAgent(id) {
 
     if (!response.ok) {
         throw new Error('Failed to delete agent');
+    }
+
+    if (scopedStateChanged) {
+        persistAgentGlobalSettings();
     }
 }
 

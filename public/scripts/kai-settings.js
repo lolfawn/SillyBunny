@@ -513,16 +513,16 @@ export function initKoboldSettings() {
             const preset = koboldai_settings[koboldai_setting_names[kai_settings.preset_settings]];
             loadKoboldSettingsFromPreset(preset);
             setGenerationParamsFromPreset(preset);
-            $('#kobold_api-settings').find('input').prop('disabled', false);
-            $('#kobold_api-settings').css('opacity', 1.0);
+            $('#kobold_api-settings, #sb-sampling-kobold').find('input').prop('disabled', false);
+            $('#kobold_api-settings, #sb-sampling-kobold').css('opacity', 1.0);
             $('#kobold_order')
                 .css('opacity', 1)
                 .sortable('enable');
         } else {
             kai_settings.preset_settings = 'gui';
 
-            $('#kobold_api-settings').find('input').prop('disabled', true);
-            $('#kobold_api-settings').css('opacity', 0.5);
+            $('#kobold_api-settings, #sb-sampling-kobold').find('input').prop('disabled', true);
+            $('#kobold_api-settings, #sb-sampling-kobold').css('opacity', 0.5);
 
             $('#kobold_order')
                 .css('opacity', 0.5)

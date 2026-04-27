@@ -13,6 +13,7 @@ import { Popup } from './popup.js';
 import { t } from './i18n.js';
 import { isMobile } from './RossAscends-mods.js';
 import { accountStorage } from './util/AccountStorage.js';
+import { getPromptDisplayTokenCounts } from './prompt-token-counts.js';
 
 function debouncePromise(func, delay) {
     let timeoutId;
@@ -368,6 +369,9 @@ class PromptManager {
 
         // Token usage of last dry run
         this.tokenUsage = 0;
+
+        // Prompt row token counts of last dry run/live generation.
+        this.promptTokenCounts = {};
 
         // Error state, contains error message.
         this.error = null;
@@ -1856,6 +1860,7 @@ class PromptManager {
      */
     populateTokenCounts(messages) {
         this.tokenHandler.resetCounts();
+        this.promptTokenCounts = getPromptDisplayTokenCounts(messages);
         const counts = this.tokenHandler.getCounts();
         messages.getCollection().forEach(message => {
             counts[message.identifier] = message.getTokens();
@@ -1961,7 +1966,7 @@ class PromptManager {
             const enabledClass = listEntry.enabled ? '' : `${prefix}prompt_manager_prompt_disabled`;
             const draggableClass = `${prefix}prompt_manager_prompt_draggable`;
             const markerClass = prompt.marker ? `${prefix}prompt_manager_marker` : '';
-            const tokens = this.tokenHandler?.getCounts()[prompt.identifier] ?? 0;
+            const tokens = this.promptTokenCounts?.[prompt.identifier] ?? this.tokenHandler?.getCounts()[prompt.identifier] ?? 0;
 
             // Warn the user if the chat history goes below certain token thresholds.
             let warningClass = '';

@@ -149,6 +149,11 @@
                     <label class="pf--setting-label">Max Candidates</label>
                     <input type="number" id="pf--max-candidates" class="text_pole" min="5" max="50" value="20" />
                 </div>
+                <div class="pf--setting-group">
+                    <label class="pf--setting-label">Retrieval Timeout</label>
+                    <input type="number" id="pf--retrieval-timeout" class="text_pole" min="1" max="60" value="8" />
+                    <div class="pf--setting-help">Seconds before Pathfinder skips retrieval and sends anyway</div>
+                </div>
             </div>
 
             <div class="pf--setting-group">
@@ -203,6 +208,54 @@
         </div>
     </div>
 
+    <!-- Memory Summary Settings -->
+    <div id="pf--memory-summary-settings" class="pf--section pf--section-collapsible">
+        <div class="pf--section-header pf--collapsible-header">
+            <i class="fa-solid fa-chevron-down pf--chevron"></i>
+            <strong>Memory Summaries</strong>
+            <span class="pf--badge">Lorebook</span>
+        </div>
+        <div class="pf--section-body">
+            <div class="pf--setting-group">
+                <label class="checkbox_label">
+                    <input type="checkbox" id="pf--enable-summarize-tool" />
+                    <span>Allow summary memory tool</span>
+                </label>
+                <div class="pf--setting-help">Lets Pathfinder write scene/event summaries into enabled lorebooks with the Summarize tool.</div>
+            </div>
+            <div class="pf--setting-row">
+                <div class="pf--setting-group">
+                    <label class="checkbox_label">
+                        <input type="checkbox" id="pf--auto-summary" />
+                        <span>Auto-track summary interval</span>
+                    </label>
+                    <div class="pf--setting-help">Counts sent/received messages toward automatic summary prompts.</div>
+                </div>
+                <div class="pf--setting-group">
+                    <label class="pf--setting-label" for="pf--auto-summary-interval">Summary Interval</label>
+                    <input type="number" id="pf--auto-summary-interval" class="text_pole" min="2" max="200" value="20" />
+                    <div class="pf--setting-help">Messages before Pathfinder should consider writing a memory summary.</div>
+                </div>
+            </div>
+            <div class="pf--setting-group pf--summary-editor">
+                <div class="pf--summary-editor-header">
+                    <label class="pf--setting-label" for="pf--summary-content">Latest memory summary</label>
+                    <span id="pf--summary-injection-indicator" class="pf--summary-indicator pf--summary-indicator-missing">No summary</span>
+                </div>
+                <textarea id="pf--summary-content" class="text_pole" rows="7" placeholder="When Pathfinder creates a memory summary, it will appear here for review and editing."></textarea>
+                <div class="pf--summary-meta" id="pf--summary-meta">No Pathfinder summary has been created yet.</div>
+                <div class="pf--summary-actions">
+                    <button type="button" id="pf--summary-save" class="menu_button menu_button_icon">
+                        <i class="fa-solid fa-save"></i>
+                        <span>Save Summary</span>
+                    </button>
+                    <span id="pf--summary-save-status" class="pf--prompt-status"></span>
+                </div>
+                <div class="pf--setting-help">Saving updates the actual lorebook summary entry. The indicator shows whether that latest summary was selected and injected by Pathfinder retrieval.</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Tool Settings (shown when tools enabled) -->
     <div id="pf--tool-settings" class="pf--section pf--section-collapsible" style="display: none;">
         <div class="pf--section-header pf--collapsible-header">
@@ -217,7 +270,6 @@
                     <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Remember" checked /><span>Remember - Create new entries</span></label>
                     <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Update" checked /><span>Update - Edit existing entries</span></label>
                     <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Forget" checked /><span>Forget - Disable/delete entries</span></label>
-                    <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Summarize" checked /><span>Summarize - Create scene summaries</span></label>
                     <label class="checkbox_label"><input type="checkbox" data-tool="Pathfinder_Notebook" checked /><span>Notebook - Private AI scratchpad</span></label>
                 </div>
             </div>
@@ -238,12 +290,13 @@
             <i class="fa-solid fa-chevron-right pf--chevron"></i>
             <strong>Diagnostics</strong>
         </div>
-        <div class="pf--section-body" style="display: none;">
+        <div class="pf--section-body pf--diagnostics-panel" style="display: none;">
             <div id="pf--diagnostics-output" class="pf--diagnostics-output">
                 Click "Run Diagnostics" to check your Pathfinder configuration.
             </div>
             <button type="button" id="pf--run-diagnostics" class="menu_button">
-                <i class="fa-solid fa-stethoscope"></i> Run Diagnostics
+                <i class="fa-solid fa-stethoscope"></i>
+                <span>Run Diagnostics</span>
             </button>
         </div>
     </div>
@@ -256,6 +309,15 @@
         </div>
         <div class="pf--section-body" style="display: none;">
             <div class="pf--section-desc">Shows what Pathfinder actually selected or injected, including selected lore entries, stage results, and the prompt payload Pathfinder added before generation.</div>
+            <div class="pf--log-mode-row">
+                <label class="pf--log-mode-control" for="pf--log-mode">
+                    <span>Log detail</span>
+                    <select id="pf--log-mode" class="text_pole">
+                        <option value="summary">Summarized</option>
+                        <option value="detailed">Detailed</option>
+                    </select>
+                </label>
+            </div>
             <div class="pf--log-actions">
                 <button type="button" id="pf--refresh-log" class="menu_button menu_button_icon">
                     <i class="fa-solid fa-rotate"></i>
@@ -465,10 +527,36 @@
     margin-bottom: 10px;
 }
 
+.pf--log-mode-row {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    margin-bottom: 10px;
+    max-width: 100%;
+}
+
+.pf--log-mode-control {
+    display: grid;
+    grid-template-columns: max-content minmax(128px, 160px);
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    min-height: var(--sb-control-min-height, 30px);
+}
+
+.pf--log-mode-control span {
+    white-space: nowrap;
+}
+
+#pf--log-mode {
+    width: 100%;
+    min-width: 0;
+}
+
 .pf--retrieval-log-output,
 .pf--diagnostics-output {
     white-space: pre-wrap;
-    line-height: 1.45;
+    line-height: 1.55;
     font-size: 12px;
     padding: 12px;
     border-radius: 8px;
@@ -476,6 +564,11 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     max-height: 320px;
     overflow: auto;
+    tab-size: 2;
+}
+
+.pf--retrieval-log-output {
+    font-family: var(--mainFontFamily, inherit);
 }
 
 /* Lorebook List */
@@ -683,6 +776,52 @@
     flex: 1;
 }
 
+
+.pf--summary-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.pf--summary-indicator {
+    border-radius: 999px;
+    font-size: 11px;
+    padding: 3px 8px;
+    white-space: nowrap;
+}
+
+.pf--summary-indicator-injected {
+    background: rgba(34, 197, 94, 0.18);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: #86efac;
+}
+
+.pf--summary-indicator-not-injected {
+    background: rgba(245, 158, 11, 0.16);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fcd34d;
+}
+
+.pf--summary-indicator-missing {
+    background: rgba(148, 163, 184, 0.15);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    color: #cbd5e1;
+}
+
+.pf--summary-meta {
+    font-size: 11px;
+    opacity: 0.75;
+    margin-top: 5px;
+}
+
+.pf--summary-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+}
+
 /* Tool List */
 .pf--tool-list {
     display: flex;
@@ -729,6 +868,28 @@
     overflow-y: auto;
     margin-bottom: 10px;
     text-align: left !important;
+}
+
+.pf--diagnostics-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+#pf--run-diagnostics {
+    display: inline-flex;
+    align-self: flex-start;
+    width: fit-content;
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    min-inline-size: var(--sb-control-min-height, 30px);
+    white-space: normal;
+}
+
+#pf--run-diagnostics span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    text-align: center;
 }
 
 .pf--section-body {

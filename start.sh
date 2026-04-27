@@ -186,20 +186,25 @@ fi
 RUNTIME_CMD="$(resolve_runtime_command "$runtime_kind")"
 PACKAGE_MANAGER_CMD="$(resolve_package_manager_command "$runtime_kind")"
 
-if [[ "$runtime_kind" == node ]]; then
-    echo "Installing packages via npm (Node.js mode)..."
-else
-    echo "Installing Bun packages..."
-fi
+has_existing_dev_dependencies() {
+    [[ -f "$SCRIPT_DIR/node_modules/eslint/package.json" ]]
+}
 
 export NODE_ENV=production
 install_args=()
 restore_package_lock_after_install=0
+dependency_profile="${runtime_kind}-production"
 if [[ "$runtime_kind" == node ]]; then
     if [[ -f package-lock.json ]]; then
-        install_args=(ci --no-audit --no-fund --omit=dev)
+        install_args=(ci --no-audit --no-fund)
     else
-        install_args=(install --no-audit --no-fund --omit=dev)
+        install_args=(install --no-audit --no-fund)
+    fi
+
+    if has_existing_dev_dependencies; then
+        dependency_profile=node-development
+    else
+        install_args+=(--omit=dev)
     fi
 
     if command -v git >/dev/null 2>&1 \
@@ -209,16 +214,41 @@ if [[ "$runtime_kind" == node ]]; then
         restore_package_lock_after_install=1
     fi
 else
-    install_args=(install --frozen-lockfile --production)
+    install_args=(install --frozen-lockfile --no-progress --no-summary)
+    if has_existing_dev_dependencies; then
+        dependency_profile=bun-development
+    else
+        install_args+=(--production)
+    fi
+
     if is_termux; then
         install_args+=(--backend=copyfile)
     fi
 fi
-"$PACKAGE_MANAGER_CMD" "${install_args[@]}"
 
-if (( restore_package_lock_after_install )) && ! git diff --quiet -- package-lock.json; then
-    echo "Restoring tracked package-lock.json after npm metadata rewrite..."
-    git restore -- package-lock.json
+if ! "$RUNTIME_CMD" "$SCRIPT_DIR/scripts/dependency-state.js" check "$dependency_profile" >/dev/null 2>&1; then
+    if [[ "$dependency_profile" == *development ]]; then
+        if [[ "$runtime_kind" == node ]]; then
+            echo "Installing packages via npm including development tooling (Node.js mode)..."
+        else
+            echo "Installing Bun packages including development tooling..."
+        fi
+    elif [[ "$runtime_kind" == node ]]; then
+        echo "Installing packages via npm (Node.js mode)..."
+    else
+        echo "Installing Bun packages..."
+    fi
+
+    "$PACKAGE_MANAGER_CMD" "${install_args[@]}"
+
+    if (( restore_package_lock_after_install )) && ! git diff --quiet -- package-lock.json; then
+        echo "Restoring tracked package-lock.json after npm metadata rewrite..."
+        git restore -- package-lock.json
+    fi
+
+    "$RUNTIME_CMD" "$SCRIPT_DIR/scripts/dependency-state.js" mark "$dependency_profile"
+else
+    echo "Dependencies are up to date."
 fi
 
 echo "Entering SillyBunny..."

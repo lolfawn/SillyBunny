@@ -4,6 +4,7 @@ import { sidecarGenerate } from './llm-sidecar.js';
 import { logPathfinderRetrievalDetail, logSidecarRetrieval, logPipelineStart, logPipelineComplete, setSidecarActive } from './activity-feed.js';
 import { buildTreeFromMetadata } from './tree-builder.js';
 import { runPipeline } from './prompts/pipeline-runner.js';
+import { isSummaryMemoryEntry, markSummaryMemoryInjected } from './summary-memory-store.js';
 
 const RETRIEVAL_PROMPT_KEY = 'pathfinder_sidecar_retrieval';
 const PIPELINE_RETRIEVAL_KEY = 'pathfinder_pipeline_retrieval';
@@ -11,6 +12,42 @@ export const PATHFINDER_RETRIEVAL_PROMPT_KEYS = Object.freeze([
     RETRIEVAL_PROMPT_KEY,
     PIPELINE_RETRIEVAL_KEY,
 ]);
+
+function getRetrievalTimeoutMs() {
+    const seconds = Number(getSettings().retrievalTimeoutSeconds ?? 8);
+    return Math.max(1, Math.min(60, Number.isFinite(seconds) ? seconds : 8)) * 1000;
+}
+
+async function withRetrievalTimeout(task, mode = 'retrieval') {
+    const controller = new AbortController();
+    const timeoutMs = getRetrievalTimeoutMs();
+    let timeoutId = null;
+
+    const timeoutPromise = new Promise((resolve) => {
+        timeoutId = setTimeout(() => {
+            controller.abort(new Error(`Pathfinder ${mode} timed out after ${timeoutMs / 1000}s`));
+            console.warn(`[Pathfinder] ${mode} timed out after ${timeoutMs / 1000}s; continuing without retrieval.`);
+            logPathfinderRetrievalDetail({
+                mode,
+                books: getReadableBooks(),
+                selectedEntries: [],
+                stageResults: [],
+                injectedPrompt: '',
+                metadata: { timedOut: true, timeoutSeconds: timeoutMs / 1000 },
+            });
+            resolve(false);
+        }, timeoutMs);
+    });
+
+    try {
+        return await Promise.race([
+            task(controller.signal).then(() => true),
+            timeoutPromise,
+        ]);
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
 function formatCollapsedGuide(tree, bookName) {
     if (!tree) return '';
@@ -72,7 +109,7 @@ async function ensureReadableBookTrees(bookNames) {
  * @param {Object} extensionPromptRoles
  * @returns {Promise<void>}
  */
-async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles) {
+async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal = null) {
     const s = getSettings();
     const pipelineId = s.pipelineId || 'default';
     const books = await ensureReadableBookTrees(getReadableBooks());
@@ -83,27 +120,59 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
 
     if (books.length === 0) {
         console.log('[Pathfinder] No readable lorebooks with built trees for pipeline retrieval');
+        logPathfinderRetrievalDetail({
+            mode: 'pipeline',
+            books,
+            selectedEntries: [],
+            stageResults: [],
+            injectedPrompt: '',
+            metadata: { pipelineId, reason: 'no-readable-lorebooks' },
+        });
         return;
     }
 
     if (chatMessages.length === 0) {
         console.log('[Pathfinder] No chat messages for pipeline retrieval');
+        logPathfinderRetrievalDetail({
+            mode: 'pipeline',
+            books,
+            selectedEntries: [],
+            stageResults: [],
+            injectedPrompt: '',
+            metadata: { pipelineId, reason: 'no-chat-messages' },
+        });
         return;
     }
 
     logPipelineStart(pipelineId, 2); // Assuming 2-stage pipeline
 
-    const result = await runPipeline(pipelineId, chatMessages, 10);
+    const result = await runPipeline(pipelineId, chatMessages, 10, signal);
 
     logPipelineComplete(pipelineId, result.selectedEntries?.length ?? 0, result.stageResults);
 
     if (!result.success) {
         console.warn('[Pathfinder] Pipeline retrieval failed:', result.error);
+        logPathfinderRetrievalDetail({
+            mode: 'pipeline',
+            books,
+            selectedEntries: [],
+            stageResults: result.stageResults,
+            injectedPrompt: '',
+            metadata: { pipelineId, error: result.error },
+        });
         return;
     }
 
     if (result.selectedEntries.length === 0) {
         console.log('[Pathfinder] Pipeline returned no entries');
+        logPathfinderRetrievalDetail({
+            mode: 'pipeline',
+            books,
+            selectedEntries: [],
+            stageResults: result.stageResults,
+            injectedPrompt: '',
+            metadata: { pipelineId, selectedEntryCount: 0 },
+        });
         return;
     }
 
@@ -137,6 +206,10 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
             .join('\n\n');
 
         const content = `<pathfinder_context>\n${formattedContent}\n</pathfinder_context>`;
+        if (entryContents.some(entry => isSummaryMemoryEntry(entry))) {
+            markSummaryMemoryInjected({ mode: 'pipeline' });
+        }
+
         logPathfinderRetrievalDetail({
             mode: 'pipeline',
             books,
@@ -187,7 +260,7 @@ async function runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, ex
  * @param {Object} extensionPromptRoles
  * @returns {Promise<void>}
  */
-async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles) {
+async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal = null) {
     const books = await ensureReadableBookTrees(getReadableBooks());
     if (books.length === 0) return;
 
@@ -204,7 +277,7 @@ async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptType
     const prompt = `Given the current conversation context, which of these lorebook waypoints contain information relevant to what's happening right now? List the waypoint/node IDs you'd retrieve.\n\n${contextText}`;
 
     try {
-        const response = await sidecarGenerate(prompt, 'You are a lorebook retrieval assistant. Analyze the conversation and identify which waypoints are relevant. Respond with waypoint/node IDs, one per line.');
+        const response = await sidecarGenerate(prompt, 'You are a lorebook retrieval assistant. Analyze the conversation and identify which waypoints are relevant. Respond with waypoint/node IDs, one per line.', signal);
         const nodeIds = response.split('\n').map(l => l.trim()).filter(Boolean);
         const allEntries = [];
 
@@ -242,6 +315,10 @@ async function runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptType
             },
         });
 
+        if (allEntries.some(entry => isSummaryMemoryEntry(entry))) {
+            markSummaryMemoryInjected({ mode: 'tool-retrieval' });
+        }
+
         if (allEntries.length > 0) {
             const content = `**Pathfinder Auto-Retrieval** (${allEntries.length} entries relevant)`;
             setExtensionPrompt(RETRIEVAL_PROMPT_KEY, content, extensionPromptTypes?.IN_PROMPT ?? 0, 4, false, extensionPromptRoles?.SYSTEM ?? 0);
@@ -261,12 +338,13 @@ export async function runSidecarRetrieval(setExtensionPrompt, extensionPromptTyp
     setSidecarActive(true);
 
     try {
-        // Use pipeline if enabled, otherwise fall back to legacy
-        if (s.pipelineEnabled) {
-            await runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles);
-        } else {
-            await runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles);
-        }
+        await withRetrievalTimeout(async (signal) => {
+            if (s.pipelineEnabled) {
+                await runPipelineRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal);
+            } else {
+                await runLegacySidecarRetrieval(setExtensionPrompt, extensionPromptTypes, extensionPromptRoles, signal);
+            }
+        }, s.pipelineEnabled ? 'pipeline' : 'tool-retrieval');
     } catch (err) {
         console.warn('[Pathfinder] Retrieval failed:', err);
     } finally {

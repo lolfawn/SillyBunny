@@ -18,12 +18,13 @@ const SB_STORAGE_KEYS = Object.freeze({
     bottomBarScale: 'sb-bottom-bar-scale',
     mobileButtonScale: 'sb-mobile-button-scale',
     settingsDrawerAutoClose: 'sb-settings-drawer-auto-close',
+    compactMode: 'sb-compact-mode',
 });
 
 const SB_SHORTCUT_TARGETS = Object.freeze([
     { value: 'left:presets', label: 'Presets', icon: 'fa-sliders' },
+    { value: 'left:sampling', label: 'Sampling', icon: 'fa-wave-square' },
     { value: 'left:api', label: 'API', icon: 'fa-plug' },
-    { value: 'left:advanced-formatting', label: 'Adv. Formatting', icon: 'fa-font' },
     { value: 'left:world-info', label: 'World Info', icon: 'fa-book-atlas' },
     { value: 'left:agents', label: 'Agents', icon: 'fa-robot' },
     { value: 'action:search', label: 'Search', icon: 'fa-magnifying-glass' },
@@ -195,7 +196,7 @@ const SB_SHELLS = Object.freeze({
         hostIconSelector: '#leftNavDrawerIcon',
         proxyButtonId: 'sb-left-shell-toggle',
         proxyIcon: 'fa-bars',
-        proxyLabel: 'Navigate',
+        proxyLabel: 'Workspace',
         title: 'Workspace',
         subtitle: 'Back end modifications, model setup, presets, lorebooks, and formatting tools live here.',
         searchPlaceholder: 'Quick find presets, samplers, lorebooks...',
@@ -205,7 +206,7 @@ const SB_SHELLS = Object.freeze({
             id: 'presets',
             label: 'Presets',
             icon: 'fa-sliders',
-            description: 'Change presets, tune sampling parameters, and modify other output settings here.',
+            description: 'Change presets, edit system prompts, and modify other output settings here.',
         },
         embeddedTabs: [
             {
@@ -216,13 +217,6 @@ const SB_SHELLS = Object.freeze({
                 description: 'Connect providers, select models, and manage backend-specific options here.',
             },
             {
-                id: 'advanced-formatting',
-                drawerId: 'advanced-formatting-button',
-                label: 'Advanced Formatting',
-                icon: 'fa-font',
-                description: 'Fine-tune instruct templates, formatting rules, and prompt design for Text Completions here.',
-            },
-            {
                 id: 'world-info',
                 drawerId: 'WI-SP-button',
                 label: 'World Info',
@@ -231,6 +225,14 @@ const SB_SHELLS = Object.freeze({
             },
         ],
         customTabs: [
+            {
+                id: 'sampling',
+                label: 'Sampling',
+                icon: 'fa-wave-square',
+                description: 'Control model sampling, seeds, and banned logits/tokens here.',
+                searchPlaceholder: 'Search temperature, top p, repetition penalty, or backend samplers',
+                searchExamples: ['temperature', 'top p', 'repetition penalty'],
+            },
             {
                 id: 'agents',
                 label: 'Agents',
@@ -250,7 +252,7 @@ const SB_SHELLS = Object.freeze({
         title: 'Customize',
         subtitle: 'Personalize your workspace, add/remove extensions, change personas, modify server settings, or check logs here.',
         searchPlaceholder: 'Search themes, top bar, personas, backgrounds, or extensions',
-        searchExamples: ['Moonlit', 'top bar', 'Appearance', 'notify extension updates', 'persona'],
+        searchExamples: ['theme', 'top bar', 'Appearance', 'notify extension updates', 'persona'],
         storageKey: SB_STORAGE_KEYS.rightTab,
         defaultTabId: 'settings',
         baseTab: {
@@ -258,7 +260,7 @@ const SB_SHELLS = Object.freeze({
             label: 'Settings',
             icon: 'fa-sliders',
             searchPlaceholder: 'Search Appearance, top bar, chat style, blur, or update notices',
-            searchExamples: ['Moonlit', 'top bar', 'Appearance', 'notify extension updates'],
+            searchExamples: ['theme', 'top bar', 'Appearance', 'notify extension updates'],
         },
         embeddedTabs: [
             {
@@ -266,8 +268,8 @@ const SB_SHELLS = Object.freeze({
                 drawerId: 'extensions-settings-button',
                 label: 'Extensions',
                 icon: 'fa-cubes',
-                searchPlaceholder: 'Search Moonlit, Quick Reply, Dialogue Colors, or Image Gen',
-                searchExamples: ['Moonlit', 'Quick Reply', 'Dialogue Colors', 'Image Gen'],
+                searchPlaceholder: 'Search themes, Quick Reply, Dialogue Colors, or Image Gen',
+                searchExamples: ['themes', 'Quick Reply', 'Dialogue Colors', 'Image Gen'],
             },
             {
                 id: 'persona',
@@ -308,7 +310,7 @@ const SB_SHELLS = Object.freeze({
 const SB_DRAWER_ROUTES = Object.freeze({
     'user-settings-button': { shell: 'right', tab: 'settings' },
     'sys-settings-button': { shell: 'left', tab: 'api' },
-    'advanced-formatting-button': { shell: 'left', tab: 'advanced-formatting' },
+    'advanced-formatting-button': { shell: 'left', tab: 'presets' },
     'WI-SP-button': { shell: 'left', tab: 'world-info' },
     'extensions-settings-button': { shell: 'right', tab: 'extensions' },
     'persona-management-button': { shell: 'right', tab: 'persona' },
@@ -349,6 +351,7 @@ const sbState = {
     inlineDrawerAutoClose: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.settingsDrawerAutoClose), false),
     theme: normalizeTheme(safeGetItem(SB_STORAGE_KEYS.theme)),
     surfaceTransparency: normalizeSurfaceTransparency(safeGetItem(SB_STORAGE_KEYS.surfaceTransparency)),
+    compactMode: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), false),
     bottomBarScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.bottomBarScale)),
     mobileButtonScale: normalizeTopbarScale(safeGetItem(SB_STORAGE_KEYS.mobileButtonScale)),
     topbarScale: {
@@ -371,6 +374,10 @@ const sbState = {
         bindingRetryTimer: 0,
         boundEventSource: null,
         windowBindingsAttached: false,
+    },
+    presetAdvancedFormatting: {
+        bindingRetryTimer: 0,
+        boundEventSource: null,
     },
     shells: {},
     universalSearch: {
@@ -417,6 +424,11 @@ const sbState = {
         chatbarToggleButton: null,
         dragHandleButton: null,
     },
+    chatAvatars: {
+        observer: null,
+        debounceTimer: 0,
+        retryTimer: 0,
+    },
     bottomChatBar: {
         chatSelect: null,
         personaBubble: null,
@@ -429,6 +441,8 @@ const sbState = {
         refs: null,
         originalConfig: '',
         lastModifiedMs: 0,
+        thumbnailLastModifiedMs: 0,
+        thumbnailSettingsLoaded: false,
         lastStatusData: null,
         busy: false,
         restarting: false,
@@ -633,6 +647,7 @@ function restorePersistedTopbarState() {
     sbState.topbarLabel.customText = normalizeTopbarCustomText(safeGetItem(SB_STORAGE_KEYS.topbarLabelCustomText));
     sbState.chatbar.visible = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.chatbarVisible), sbState.chatbar.visible);
     sbState.chatbar.topbarOffset = normalizeTopbarOffset(safeGetItem(SB_STORAGE_KEYS.topbarOffset));
+    sbState.compactMode = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), sbState.compactMode);
 }
 
 function clampTopbarOffset(offset) {
@@ -710,12 +725,6 @@ function setBottomBarScale(value, { persist = true } = {}) {
     sbState.bottomBarScale = nextScale;
     document.documentElement.style.setProperty('--sb-bottom-bar-scale', scaleFactor);
 
-    // Apply scale to the bottom form via font-size scaling
-    const formSheld = document.getElementById('form_sheld');
-    if (formSheld) {
-        formSheld.style.fontSize = `calc(var(--mainFontSize) * ${scaleFactor})`;
-    }
-
     if (persist) {
         safeSetItem(SB_STORAGE_KEYS.bottomBarScale, String(nextScale));
     }
@@ -732,6 +741,19 @@ function setMobileButtonScale(value, { persist = true } = {}) {
 
     if (persist) {
         safeSetItem(SB_STORAGE_KEYS.mobileButtonScale, String(nextScale));
+    }
+
+    updateThemePickerUi();
+}
+
+function setCompactMode(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.compactMode = nextEnabled;
+    document.documentElement.dataset.sbCompactMode = String(nextEnabled);
+    document.body?.classList.toggle('sb-compact-mode', nextEnabled);
+
+    if (persist) {
+        safeSetItem(SB_STORAGE_KEYS.compactMode, String(nextEnabled));
     }
 
     updateThemePickerUi();
@@ -942,7 +964,11 @@ function canResizeDesktopShells() {
 }
 
 function isDesktopResizableShell(shellKey) {
-    return shellKey === 'left' || shellKey === 'right';
+    return shellKey === 'left' || shellKey === 'right' || shellKey === 'characters';
+}
+
+function getShellSizingKey(shellKey) {
+    return ['left', 'right', 'characters'].includes(shellKey) ? 'right' : shellKey;
 }
 
 function getShellAccountStorage() {
@@ -1020,30 +1046,32 @@ function getPersistedShellSize(shellKey) {
 }
 
 function hydratePersistedShellSizes() {
-    for (const shellKey of ['left', 'right']) {
-        const persistedSize = getPersistedShellSize(shellKey);
+    const persistedSize = getPersistedShellSize('right') ?? getPersistedShellSize('left');
 
-        if (persistedSize) {
-            sbState.shellSizing.overrides[shellKey] = persistedSize;
-        }
+    if (persistedSize) {
+        sbState.shellSizing.overrides.left = persistedSize;
+        sbState.shellSizing.overrides.right = persistedSize;
     }
 }
 
 function getShellSizeStorageKey(shellKey) {
-    if (shellKey === 'left') {
+    const sizingKey = getShellSizingKey(shellKey);
+
+    if (sizingKey === 'left') {
         return SB_STORAGE_KEYS.leftShellSize;
     }
 
-    if (shellKey === 'right') {
+    if (sizingKey === 'right') {
         return SB_STORAGE_KEYS.rightShellSize;
     }
 
     return '';
 }
 
-function getDesktopShellDimensions() {
+function getDesktopShellDimensions(shellKey = '') {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const maxShellWidth = shellKey === 'right' ? Math.min(SB_DESKTOP_SHELL_LAYOUT.maxWidth, 760) : SB_DESKTOP_SHELL_LAYOUT.maxWidth;
 
     if (isMobileViewport() || viewportHeight <= SB_DESKTOP_SHELL_LAYOUT.fullWidthMaxHeight) {
         return {
@@ -1063,7 +1091,7 @@ function getDesktopShellDimensions() {
     const desiredWidth = clampNumber(
         viewportWidth * SB_DESKTOP_SHELL_LAYOUT.ratio,
         SB_DESKTOP_SHELL_LAYOUT.minWidth,
-        SB_DESKTOP_SHELL_LAYOUT.maxWidth,
+        maxShellWidth,
     );
     const gutter = clampNumber(
         viewportWidth * SB_DESKTOP_SHELL_LAYOUT.gutterRatio,
@@ -1079,13 +1107,13 @@ function getDesktopShellDimensions() {
     };
 }
 
-function getDesktopShellResizeBounds() {
+function getDesktopShellResizeBounds(shellKey = '') {
     const viewportWidth = Math.max(0, Math.round(window.innerWidth));
     const topbarOffset = Number.parseFloat(
         window.getComputedStyle(document.documentElement).getPropertyValue('--sb-topbar-layout-offset'),
     );
     const resolvedTopbarOffset = Number.isFinite(topbarOffset) ? topbarOffset : 0;
-    const defaultDimensions = getDesktopShellDimensions();
+    const defaultDimensions = getDesktopShellDimensions(shellKey);
     const maxHeight = Math.max(0, Math.round(window.innerHeight - resolvedTopbarOffset - SB_DESKTOP_SHELL_RESIZE.bottomGap));
 
     return {
@@ -1118,7 +1146,7 @@ function areShellSizesEqual(left, right) {
 }
 
 function getShellSizeOverride(shellKey) {
-    return isDesktopResizableShell(shellKey) ? sbState.shellSizing.overrides[shellKey] ?? null : null;
+    return isDesktopResizableShell(shellKey) ? sbState.shellSizing.overrides.right ?? sbState.shellSizing.overrides.left ?? null : null;
 }
 
 function setShellSizeOverride(shellKey, size, { persist = true } = {}) {
@@ -1126,24 +1154,29 @@ function setShellSizeOverride(shellKey, size, { persist = true } = {}) {
         return null;
     }
 
-    const storageKey = getShellSizeStorageKey(shellKey);
     const nextSize = clampShellSize(size);
 
-    sbState.shellSizing.overrides[shellKey] = nextSize;
+    sbState.shellSizing.overrides.left = nextSize;
+    sbState.shellSizing.overrides.right = nextSize;
 
-    if (!persist || !storageKey) {
+    if (!persist) {
         return nextSize;
     }
 
     const accountStorage = getShellAccountStorage();
+    const storageKeys = [SB_STORAGE_KEYS.leftShellSize, SB_STORAGE_KEYS.rightShellSize];
 
     if (nextSize) {
         const serializedSize = JSON.stringify(nextSize);
-        safeSetItem(storageKey, serializedSize);
-        accountStorage?.setItem(storageKey, serializedSize);
+        for (const storageKey of storageKeys) {
+            safeSetItem(storageKey, serializedSize);
+            accountStorage?.setItem(storageKey, serializedSize);
+        }
     } else {
-        safeRemoveItem(storageKey);
-        accountStorage?.removeItem(storageKey);
+        for (const storageKey of storageKeys) {
+            safeRemoveItem(storageKey);
+            accountStorage?.removeItem(storageKey);
+        }
     }
 
     return nextSize;
@@ -1159,15 +1192,18 @@ function applyDesktopShellSize(root, size) {
 function syncDesktopShellSizing() {
     hydratePersistedShellSizes();
 
-    const { width, maxWidth } = getDesktopShellDimensions();
-    const bounds = getDesktopShellResizeBounds();
     const resizingEnabled = canResizeDesktopShells();
 
-    for (const shellKey of ['left', 'right']) {
-        const root = document.getElementById(getShellConfig(shellKey).rootPanelId);
+    for (const shellKey of ['left', 'right', 'characters']) {
+        const root = shellKey === 'characters'
+            ? document.getElementById('right-nav-panel')
+            : document.getElementById(getShellConfig(shellKey).rootPanelId);
         if (!(root instanceof HTMLElement)) {
             continue;
         }
+
+        const { width, maxWidth } = getDesktopShellDimensions(shellKey);
+        const bounds = getDesktopShellResizeBounds(shellKey);
 
         if (isMobileViewport()) {
             root.style.setProperty('width', `${width}px`, 'important');
@@ -1192,7 +1228,7 @@ function syncDesktopShellSizing() {
                 if (!areShellSizesEqual(storedOverride, clampedOverride)) {
                     setShellSizeOverride(shellKey, clampedOverride);
                 } else {
-                    sbState.shellSizing.overrides[shellKey] = clampedOverride;
+                    sbState.shellSizing.overrides[getShellSizingKey(shellKey)] = clampedOverride;
                 }
             }
         }
@@ -1202,12 +1238,20 @@ function syncDesktopShellSizing() {
     }
 }
 
+function getResizableShellRoot(shellKey) {
+    if (shellKey === 'characters') {
+        return document.getElementById('right-nav-panel');
+    }
+
+    return document.getElementById(getShellConfig(shellKey).rootPanelId);
+}
+
 function beginShellResize(shellKey, event) {
     if (!canResizeDesktopShells() || !isDesktopResizableShell(shellKey) || event.button !== 0) {
         return;
     }
 
-    const root = document.getElementById(getShellConfig(shellKey).rootPanelId);
+    const root = getResizableShellRoot(shellKey);
     if (!(root instanceof HTMLElement) || !root.classList.contains('openDrawer')) {
         return;
     }
@@ -1217,7 +1261,7 @@ function beginShellResize(shellKey, event) {
     }
 
     const handle = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
-    const bounds = getDesktopShellResizeBounds();
+    const bounds = getDesktopShellResizeBounds(shellKey);
     const startRect = root.getBoundingClientRect();
     const startSize = clampShellSize({
         width: startRect.width || bounds.defaultWidth,
@@ -1263,13 +1307,13 @@ function beginShellResize(shellKey, event) {
         const nextSize = clampShellSize({
             width: startSize.width + (moveEvent.clientX - event.clientX),
             height: startSize.height + (moveEvent.clientY - event.clientY),
-        });
+        }, bounds);
 
         if (!nextSize) {
             return;
         }
 
-        sbState.shellSizing.overrides[shellKey] = nextSize;
+        sbState.shellSizing.overrides[getShellSizingKey(shellKey)] = nextSize;
         applyDesktopShellSize(root, nextSize);
     };
 
@@ -1360,6 +1404,175 @@ function setMessageStyle(styleId) {
     }
 
     updateThemePickerUi();
+}
+
+function stripAvatarOrigin(url) {
+    const normalizedUrl = String(url ?? '').trim();
+    if (!normalizedUrl) {
+        return '';
+    }
+
+    return normalizedUrl.startsWith(window.location.origin)
+        ? normalizedUrl.slice(window.location.origin.length)
+        : normalizedUrl;
+}
+
+function safeDecodeUriComponent(value) {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
+}
+
+function parseChatAvatarSource(rawSrc) {
+    const normalizedSrc = stripAvatarOrigin(rawSrc);
+    if (!normalizedSrc) {
+        return null;
+    }
+
+    const trimmedSrc = normalizedSrc.startsWith('/') ? normalizedSrc.slice(1) : normalizedSrc;
+
+    try {
+        const parsedUrl = new URL(normalizedSrc, window.location.origin);
+        if (parsedUrl.pathname.endsWith('thumbnail')) {
+            const type = parsedUrl.searchParams.get('type');
+            const file = parsedUrl.searchParams.get('file');
+
+            if (type && file) {
+                return { type, file: safeDecodeUriComponent(file) };
+            }
+        }
+    } catch {
+        // Fall back to direct path inspection below.
+    }
+
+    if (trimmedSrc.startsWith('characters/')) {
+        return { type: 'avatar', file: trimmedSrc.replace(/^characters\//, '') };
+    }
+
+    if (trimmedSrc.startsWith('User Avatars/')) {
+        return { type: 'persona', file: trimmedSrc.replace(/^User Avatars\//, '') };
+    }
+
+    return { type: null, file: normalizedSrc };
+}
+
+function isAbsoluteAvatarUrl(path) {
+    return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(String(path ?? ''));
+}
+
+function ensureAvatarPath(path) {
+    const normalizedPath = String(path ?? '').trim();
+    if (!normalizedPath || isAbsoluteAvatarUrl(normalizedPath)) {
+        return normalizedPath;
+    }
+
+    return normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
+}
+
+function getChatAvatarSources(rawSrc) {
+    const avatarInfo = parseChatAvatarSource(rawSrc);
+    if (!avatarInfo) {
+        return { thumb: '', original: '' };
+    }
+
+    const { type, file } = avatarInfo;
+    const thumb = type === 'avatar' || type === 'persona'
+        ? `/thumbnail?type=${type}&file=${encodeURIComponent(file)}`
+        : ensureAvatarPath(file);
+    const original = type === 'avatar'
+        ? ensureAvatarPath(`characters/${file}`)
+        : type === 'persona'
+            ? ensureAvatarPath(`User Avatars/${file}`)
+            : ensureAvatarPath(file);
+
+    return {
+        thumb: stripAvatarOrigin(thumb),
+        original: stripAvatarOrigin(original),
+    };
+}
+
+function formatAvatarCssUrl(url) {
+    const normalizedUrl = stripAvatarOrigin(url);
+    return normalizedUrl ? `url(${JSON.stringify(normalizedUrl)})` : '';
+}
+
+function updateChatAvatarVariables(root = document) {
+    const messages = root instanceof HTMLElement && root.matches('.mes')
+        ? [root]
+        : Array.from(root.querySelectorAll?.('.mes') ?? []);
+
+    for (const message of messages) {
+        if (!(message instanceof HTMLElement)) {
+            continue;
+        }
+
+        const avatarImg = message.querySelector('.avatar img');
+        if (!(avatarImg instanceof HTMLImageElement)) {
+            continue;
+        }
+
+        const srcCandidate = avatarImg.getAttribute('src') || avatarImg.getAttribute('data-src') || avatarImg.currentSrc;
+        const { thumb, original } = getChatAvatarSources(srcCandidate);
+
+        if (!thumb && !original) {
+            continue;
+        }
+
+        const thumbUrl = thumb || original;
+        const originalUrl = original || thumbUrl;
+        const displayUrl = originalUrl || thumbUrl;
+
+        message.dataset.avatarThumb = thumbUrl;
+        message.dataset.avatarOriginal = originalUrl;
+        message.dataset.avatar = displayUrl;
+        message.style.setProperty('--mes-avatar-thumb-url', formatAvatarCssUrl(thumbUrl));
+        message.style.setProperty('--mes-avatar-original-url', formatAvatarCssUrl(originalUrl));
+        message.style.setProperty('--mes-avatar-url', formatAvatarCssUrl(displayUrl));
+    }
+}
+
+function scheduleChatAvatarVariableUpdate(delay = 80) {
+    window.clearTimeout(sbState.chatAvatars.debounceTimer);
+    sbState.chatAvatars.debounceTimer = window.setTimeout(() => {
+        sbState.chatAvatars.debounceTimer = 0;
+        updateChatAvatarVariables();
+    }, delay);
+}
+
+function initChatAvatarVariables() {
+    window.updateSillyBunnyChatAvatars = updateChatAvatarVariables;
+    updateChatAvatarVariables();
+
+    if (sbState.chatAvatars.observer instanceof MutationObserver) {
+        return;
+    }
+
+    const chatContainer = document.getElementById('chat');
+    if (!(chatContainer instanceof HTMLElement)) {
+        if (!sbState.chatAvatars.retryTimer) {
+            sbState.chatAvatars.retryTimer = window.setTimeout(() => {
+                sbState.chatAvatars.retryTimer = 0;
+                initChatAvatarVariables();
+            }, SB_INIT_RETRY_DELAY_MS);
+        }
+        return;
+    }
+
+    window.clearTimeout(sbState.chatAvatars.retryTimer);
+    sbState.chatAvatars.retryTimer = 0;
+
+    const observer = new MutationObserver(() => scheduleChatAvatarVariableUpdate());
+    observer.observe(chatContainer, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['src', 'data-src'],
+    });
+
+    sbState.chatAvatars.observer = observer;
+    document.addEventListener('sb:chat-style-updated', () => scheduleChatAvatarVariableUpdate(0));
 }
 
 function setShellTheme(themeId, { persist = true } = {}) {
@@ -3497,8 +3710,36 @@ function closeCharacterPanel() {
     syncChatbarVisibilityState();
 }
 
+function ensureCharacterResizeHandle() {
+    const panel = document.getElementById('right-nav-panel');
+    if (!(panel instanceof HTMLElement)) {
+        return null;
+    }
+
+    let handle = panel.querySelector(':scope > .sb-shell-resize-handle');
+    if (handle instanceof HTMLElement) {
+        return handle;
+    }
+
+    handle = createElement('div', {
+        className: 'sb-shell-resize-handle',
+        attrs: {
+            role: 'separator',
+            'aria-orientation': 'both',
+            'aria-label': 'Resize Characters panel',
+            title: 'Resize Characters panel',
+        },
+    });
+
+    stopProxyPointerPropagation(handle);
+    handle.addEventListener('pointerdown', event => beginShellResize('characters', event));
+    panel.appendChild(handle);
+    return handle;
+}
+
 function toggleCharacterPanel() {
     injectCharacterCloseButton();
+    ensureCharacterResizeHandle();
     const shouldOpenActiveCharacterEditor = hasActiveCharacterChat();
 
     if (isCharacterPanelOpen()) {
@@ -3535,6 +3776,7 @@ function toggleCharacterPanel() {
         }
 
         syncChatbarVisibilityState();
+        syncDesktopShellSizing();
     });
 }
 
@@ -3566,7 +3808,7 @@ function toggleShellPanel(shellKey, tabId = null) {
     }
 
     closeAllDropdowns({ except: shellKey });
-    openShell(shellKey, tabId);
+    window.requestAnimationFrame(() => openShell(shellKey, tabId));
 }
 
 function isLandingPageVisible() {
@@ -3953,8 +4195,8 @@ function moveChildrenIntoContainer(sourceElement, targetElement) {
     }
 }
 
-function prepareEmbeddedDrawer(drawerId) {
-    const drawer = document.getElementById(drawerId);
+function prepareEmbeddedDrawer(drawerId, root = document) {
+    const drawer = root.querySelector?.(`#${CSS.escape(drawerId)}`) ?? document.getElementById(drawerId);
     if (!(drawer instanceof HTMLElement)) {
         return null;
     }
@@ -3983,6 +4225,579 @@ function prepareEmbeddedDrawer(drawerId) {
     }
 
     return { drawer, drawerContent };
+}
+
+function updatePresetAdvancedFormattingVisibility() {
+    const advancedFormattingDrawer = document.getElementById('advanced-formatting-button');
+    if (!(advancedFormattingDrawer instanceof HTMLElement)) {
+        return;
+    }
+
+    advancedFormattingDrawer.hidden = getCurrentMainApiValue() !== 'textgenerationwebui';
+}
+
+function bindPresetAdvancedFormattingVisibilityEvents() {
+    const context = getSillyTavernContext();
+    const eventSource = context?.eventSource;
+    const eventTypes = context?.eventTypes;
+
+    if (!eventSource || !eventTypes) {
+        if (!sbState.presetAdvancedFormatting.bindingRetryTimer) {
+            sbState.presetAdvancedFormatting.bindingRetryTimer = window.setTimeout(() => {
+                sbState.presetAdvancedFormatting.bindingRetryTimer = 0;
+                bindPresetAdvancedFormattingVisibilityEvents();
+                updatePresetAdvancedFormattingVisibility();
+            }, SB_INIT_RETRY_DELAY_MS);
+        }
+        return;
+    }
+
+    window.clearTimeout(sbState.presetAdvancedFormatting.bindingRetryTimer);
+    sbState.presetAdvancedFormatting.bindingRetryTimer = 0;
+
+    if (sbState.presetAdvancedFormatting.boundEventSource === eventSource) {
+        return;
+    }
+
+    const events = [
+        eventTypes.APP_READY,
+        eventTypes.MAIN_API_CHANGED,
+    ].filter(Boolean);
+
+    for (const eventName of new Set(events)) {
+        eventSource.on(eventName, updatePresetAdvancedFormattingVisibility);
+    }
+
+    sbState.presetAdvancedFormatting.boundEventSource = eventSource;
+}
+
+function embedAdvancedFormattingInPresets(originalContent) {
+    if (!(originalContent instanceof HTMLElement)) {
+        return;
+    }
+
+    const prepared = prepareEmbeddedDrawer('advanced-formatting-button', originalContent);
+    if (!prepared) {
+        return;
+    }
+
+    prepared.drawer.classList.add('sb-presets-advanced-formatting');
+
+    const insertionTarget = originalContent.querySelector('#common-gen-settings-block');
+    if (insertionTarget?.parentNode) {
+        insertionTarget.insertAdjacentElement('afterend', prepared.drawer);
+    } else {
+        originalContent.appendChild(prepared.drawer);
+    }
+
+    updatePresetAdvancedFormattingVisibility();
+}
+
+const SB_SAMPLING_BACKENDS = Object.freeze([
+    {
+        id: 'openai',
+        apiIds: ['openai'],
+        title: 'Chat Completions',
+        description: 'Uses the active Chat Completions provider and its provider-specific sampler support.',
+        controls: [
+            '#seed_openai',
+            '#openai_logit_bias_preset',
+            '#temp_openai',
+            '#claude_disable_temperature',
+            '#top_p_openai',
+            '#claude_disable_top_p',
+            '#repetition_penalty_openai',
+            '#freq_pen_openai',
+            '#pres_pen_openai',
+            '#top_k_openai',
+            '#min_p_openai',
+            '#top_a_openai',
+        ],
+    },
+    {
+        id: 'textgenerationwebui',
+        apiIds: ['textgenerationwebui'],
+        title: 'Text Completions',
+        description: 'Uses the selected Text Completions backend and sampler visibility rules.',
+        controls: [
+            '#seed_textgenerationwebui',
+            '#n_textgenerationwebui',
+            '#samplerResetButton',
+            '#sampler_order_block_kcpp',
+            '#sampler_order_block_lcpp',
+            '#sampler_priority_block_ooba',
+            '#sampler_priority_block_aphrodite',
+            '#json_schema_block',
+            '#banned_tokens_block_ooba',
+            '#logit_bias_block_ooba',
+            '#temp_textgenerationwebui',
+            '#top_k_textgenerationwebui',
+            '#top_p_textgenerationwebui',
+            '#typical_p_textgenerationwebui',
+            '#min_p_textgenerationwebui',
+            '#top_a_textgenerationwebui',
+            '#tfs_textgenerationwebui',
+            '#epsilon_cutoff_textgenerationwebui',
+            '#nsigma_textgenerationwebui',
+            '#min_keep_textgenerationwebui',
+            '#eta_cutoff_textgenerationwebui',
+            '#rep_pen_textgenerationwebui',
+            '#rep_pen_range_textgenerationwebui',
+            '#rep_pen_slope_textgenerationwebui',
+            '#rep_pen_decay_textgenerationwebui',
+            '#encoder_rep_pen_textgenerationwebui',
+            '#freq_pen_textgenerationwebui',
+            '#presence_pen_textgenerationwebui',
+            '#no_repeat_ngram_size_textgenerationwebui',
+            '#skew_textgenerationwebui',
+            '#min_length_textgenerationwebui',
+            '#max_tokens_second_textgenerationwebui',
+            '#adaptive_p_block',
+            '#smoothingBlock',
+            '#xtc_block',
+            '#dryBlock',
+            '#dynatemp_block_ooba',
+            '#mirostat_block_ooba',
+            '#beamSearchBlock',
+            '#contrastiveSearchBlock',
+            '#do_sample_textgenerationwebui',
+            '#add_bos_token_textgenerationwebui',
+            '#ignore_eos_token_textgenerationwebui',
+            '#include_reasoning_textgenerationwebui',
+            '#temperature_last_textgenerationwebui',
+            '#speculative_ngram_textgenerationwebui',
+            '#spaces_between_special_tokens_textgenerationwebui',
+            '#cfg_block_ooba',
+            '#grammar_block_ooba',
+        ],
+    },
+    {
+        id: 'kobold',
+        apiIds: ['kobold', 'koboldhorde'],
+        title: 'Kobold / Horde',
+        description: 'Kobold Horde reuses Kobold sampler settings; Horde still requires a non-GUI preset.',
+        controls: ['#temp', '#top_p', '#rep_pen'],
+    },
+    {
+        id: 'novel',
+        apiIds: ['novel'],
+        title: 'NovelAI',
+        description: 'Uses NovelAI preset sampling fields without changing the backend request format.',
+        controls: ['#temp_novel', '#top_p_novel', '#rep_pen_novel'],
+    },
+]);
+
+const SB_LARGE_SAMPLING_CONTROLS = Object.freeze(new Set([
+    '#seed_openai',
+    '#openai_logit_bias_preset',
+    '#samplerResetButton',
+    '#n_textgenerationwebui',
+    '#seed_textgenerationwebui',
+    '#banned_tokens_block_ooba',
+    '#logit_bias_block_ooba',
+    '#json_schema_block',
+    '#sampler_order_block_kcpp',
+    '#sampler_order_block_lcpp',
+    '#sampler_priority_block_ooba',
+    '#sampler_priority_block_aphrodite',
+]));
+
+const SB_COMPACT_PRIORITY_SAMPLING_CONTROLS = Object.freeze(new Set([
+    '#samplerResetButton',
+    '#n_textgenerationwebui',
+    '#seed_textgenerationwebui',
+    '#json_schema_block',
+]));
+
+const SB_WIDE_PRIORITY_SAMPLING_CONTROLS = Object.freeze(new Set([
+    '#sampler_order_block_kcpp',
+    '#sampler_order_block_lcpp',
+    '#sampler_priority_block_ooba',
+    '#sampler_priority_block_aphrodite',
+]));
+
+const SB_AFTER_SAMPLER_CONTROLS = Object.freeze(new Set([
+    '#sampler_order_block_kcpp',
+    '#sampler_order_block_lcpp',
+    '#sampler_priority_block_ooba',
+    '#sampler_priority_block_aphrodite',
+    '#json_schema_block',
+]));
+
+const SB_BOTTOM_PRIORITY_SAMPLING_CONTROLS = Object.freeze(new Set([
+    '#banned_tokens_block_ooba',
+    '#logit_bias_block_ooba',
+]));
+
+const SB_MULTI_SAMPLING_CONTROLS = Object.freeze(new Set([
+    '#adaptive_p_block',
+    '#smoothingBlock',
+    '#xtc_block',
+    '#dryBlock',
+    '#dynatemp_block_ooba',
+    '#mirostat_block_ooba',
+    '#beamSearchBlock',
+    '#contrastiveSearchBlock',
+]));
+
+function getSamplingPriorityTier(selector) {
+    if (SB_AFTER_SAMPLER_CONTROLS.has(selector)) {
+        return 'after';
+    }
+
+    if (SB_BOTTOM_PRIORITY_SAMPLING_CONTROLS.has(selector)) {
+        return 'bottom';
+    }
+
+    if (SB_LARGE_SAMPLING_CONTROLS.has(selector)) {
+        return 'top';
+    }
+
+    return '';
+}
+
+function getSpecialTokenControlBlock() {
+    const controls = [
+        document.getElementById('ban_eos_token_textgenerationwebui')?.closest('.checkbox_label'),
+        document.getElementById('skip_special_tokens_textgenerationwebui')?.closest('.checkbox_label'),
+    ].filter(control => control instanceof HTMLElement);
+
+    if (!controls.length) {
+        return null;
+    }
+
+    const block = createElement('div', { className: 'sb-sampling-special-token-controls' });
+    controls.forEach(control => block.appendChild(control));
+    return block;
+}
+
+function getSamplerToolbarControlBlock() {
+    const toolbar = getSamplingControlBlock('#samplerResetButton');
+    if (!(toolbar instanceof HTMLElement)) {
+        return null;
+    }
+
+    const block = createElement('div', { className: 'sb-sampling-sampler-tools-card' });
+    block.appendChild(toolbar);
+
+    const specialTokenControls = getSpecialTokenControlBlock();
+    if (specialTokenControls) {
+        block.appendChild(specialTokenControls);
+    }
+
+    return block;
+}
+
+function neutralizeChatCompletionSamplers() {
+    const values = {
+        '#temp_openai': 1,
+        '#top_p_openai': 1,
+        '#top_k_openai': 0,
+        '#min_p_openai': 0,
+        '#top_a_openai': 0,
+        '#repetition_penalty_openai': 1,
+        '#freq_pen_openai': 0,
+        '#pres_pen_openai': 0,
+    };
+
+    for (const [selector, value] of Object.entries(values)) {
+        const input = document.querySelector(selector);
+        if (input instanceof HTMLInputElement) {
+            input.value = String(value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+
+    ['#claude_disable_temperature', '#claude_disable_top_p'].forEach(selector => {
+        const input = document.querySelector(selector);
+        if (input instanceof HTMLInputElement) {
+            input.checked = false;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
+}
+
+function decorateSamplingControlCard(card, selector) {
+    if (!(card instanceof HTMLElement)) {
+        return;
+    }
+
+    if (selector === '#seed_textgenerationwebui') {
+        const seedLabel = card.querySelector('label');
+        seedLabel?.classList.add('range-block-title', 'justifyLeft', 'sb-sampling-seed-title');
+        seedLabel?.insertAdjacentElement('afterend', createElement('small', {
+            className: 'sb-sampling-card-help',
+            text: 'Set to get deterministic results. Use -1 for a random seed.',
+        }));
+    }
+
+    if (selector === '#seed_openai') {
+        const row = createElement('small', { className: 'sb-chat-neutralize-row flex-container alignitemscenter' });
+        const button = createElement('button', {
+            className: 'menu_button menu_button_icon sb-neutralize-chat-samplers',
+            text: 'Neutralize Samplers',
+            attrs: { type: 'button' },
+        });
+        const info = createElement('div', {
+            className: 'fa-solid fa-circle-info opacity50p',
+            attrs: {
+                title: 'Set all samplers to their neutral/disabled state.',
+                'data-i18n': '[title]Set all samplers to their neutral/disabled state.',
+            },
+        });
+        button.addEventListener('click', neutralizeChatCompletionSamplers);
+        row.append(button, info);
+        card.appendChild(row);
+    }
+}
+
+function getSamplingControlBlock(selector) {
+    const input = document.querySelector(selector);
+    if (!(input instanceof HTMLElement)) {
+        return null;
+    }
+
+    if (input.id === 'samplerResetButton' || input.id === 'samplerSelectButton') {
+        return input.closest('.flex-container.justifyCenter') ?? input.parentElement;
+    }
+
+    return input.closest('.range-block')
+        ?? input.closest('[data-tg-samplers]')
+        ?? input.parentElement;
+}
+
+function buildSamplingControlCard(selector) {
+    const controlBlock = selector === '#samplerResetButton'
+        ? getSamplerToolbarControlBlock()
+        : getSamplingControlBlock(selector);
+    if (!(controlBlock instanceof HTMLElement)) {
+        return null;
+    }
+
+    const isTextGenSampler = controlBlock.hasAttribute('data-tg-samplers') || controlBlock.querySelector('[data-tg-samplers]');
+    const card = createElement('div', {
+        className: [
+            'sb-sampling-control-card',
+            isTextGenSampler ? 'sb-sampling-textgen-card' : '',
+            SB_LARGE_SAMPLING_CONTROLS.has(selector) ? 'sb-sampling-large-card' : '',
+            SB_COMPACT_PRIORITY_SAMPLING_CONTROLS.has(selector) ? 'sb-sampling-compact-priority-card' : '',
+            SB_WIDE_PRIORITY_SAMPLING_CONTROLS.has(selector) ? 'sb-sampling-wide-priority-card' : '',
+            SB_MULTI_SAMPLING_CONTROLS.has(selector) ? 'sb-sampling-multi-card' : '',
+            getSamplingPriorityTier(selector) ? `sb-sampling-priority-${getSamplingPriorityTier(selector)}` : '',
+        ].filter(Boolean).join(' '),
+    });
+    card.dataset.sbSamplingControl = selector;
+    for (const attributeName of ['data-source', 'data-source-mode']) {
+        if (controlBlock.hasAttribute(attributeName)) {
+            card.setAttribute(attributeName, controlBlock.getAttribute(attributeName));
+        }
+    }
+
+    card.appendChild(controlBlock);
+    decorateSamplingControlCard(card, selector);
+    return card;
+}
+
+function drawerHasControls(drawer) {
+    if (!(drawer instanceof HTMLElement)) {
+        return false;
+    }
+
+    const content = drawer.querySelector('.inline-drawer-content');
+    if (!(content instanceof HTMLElement)) {
+        return false;
+    }
+
+    return Boolean(content.querySelector([
+        '.range-block',
+        '[data-tg-samplers]',
+        'select',
+        'textarea',
+        'button',
+        '.menu_button',
+        'input:not([type="hidden"])',
+    ].join(',')));
+}
+
+function hideEmptyGroupedSettingsDrawers() {
+    document.querySelectorAll('#range_block_openai .sb-openai-settings-drawer, #textgenerationwebui_api-settings .sb-textgen-drawers > .inline-drawer').forEach(drawer => {
+        if (!(drawer instanceof HTMLElement)) {
+            return;
+        }
+
+        drawer.style.display = drawerHasControls(drawer) ? '' : 'none';
+    });
+}
+
+function updateSamplingCardVisibility(section) {
+    if (!(section instanceof HTMLElement)) {
+        return;
+    }
+
+    section.querySelectorAll('[data-sb-sampling-control]').forEach(card => {
+        if (!(card instanceof HTMLElement)) {
+            return;
+        }
+
+        const hasVisibleContent = Array.from(card.children).some(child => child instanceof HTMLElement && getComputedStyle(child).display !== 'none');
+        card.hidden = !hasVisibleContent;
+    });
+
+    section.querySelectorAll('.sb-sampling-priority-row').forEach(row => {
+        if (!(row instanceof HTMLElement)) {
+            return;
+        }
+
+        row.hidden = !Array.from(row.children).some(child => child instanceof HTMLElement && !child.hidden);
+    });
+
+    section.querySelectorAll('.sb-sampling-multi-grid').forEach(row => {
+        if (!(row instanceof HTMLElement)) {
+            return;
+        }
+
+        row.hidden = !Array.from(row.children).some(child => child instanceof HTMLElement && !child.hidden);
+    });
+}
+
+function syncSamplingPanelControls(root) {
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+
+    for (const backend of SB_SAMPLING_BACKENDS) {
+        const section = root.querySelector(`#sb-sampling-${backend.id}`);
+        const priorityRows = {
+            top: section?.querySelector('.sb-sampling-priority-row[data-sb-priority-tier="top"]'),
+            bottom: section?.querySelector('.sb-sampling-priority-row[data-sb-priority-tier="bottom"]'),
+            after: section?.querySelector('.sb-sampling-after-row[data-sb-priority-tier="after"]'),
+        };
+        const grid = section?.querySelector('.sb-sampling-grid');
+        const multiGrid = section?.querySelector('.sb-sampling-multi-grid');
+        if (!Object.values(priorityRows).every(row => row instanceof HTMLElement) || !(grid instanceof HTMLElement) || !(multiGrid instanceof HTMLElement)) {
+            continue;
+        }
+
+        section.querySelector('.sb-sampling-note')?.remove();
+
+        for (const selector of backend.controls) {
+            const tier = getSamplingPriorityTier(selector);
+            const target = tier ? priorityRows[tier] : (SB_MULTI_SAMPLING_CONTROLS.has(selector) ? multiGrid : grid);
+            const existingCard = Array.from(section.querySelectorAll('[data-sb-sampling-control]'))
+                .find(card => card instanceof HTMLElement && card.dataset.sbSamplingControl === selector);
+            if (existingCard instanceof HTMLElement && existingCard.children.length > 0) {
+                if (existingCard.parentElement !== target) {
+                    target.appendChild(existingCard);
+                }
+                continue;
+            }
+
+            existingCard?.remove();
+
+            const card = buildSamplingControlCard(selector);
+            if (card) {
+                target.appendChild(card);
+            }
+        }
+
+        if (!Object.values(priorityRows).some(row => row.children.length) && !grid.children.length && !multiGrid.children.length) {
+            grid.appendChild(createElement('p', {
+                className: 'sb-sampling-note',
+                text: 'Sampler controls are not ready yet. Reopen the Workspace menu after settings finish loading.',
+            }));
+        }
+
+        updateSamplingCardVisibility(section);
+    }
+
+    hideEmptyGroupedSettingsDrawers();
+}
+
+function updateSamplingPanelVisibility(root) {
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+
+    syncSamplingPanelControls(root);
+
+    const activeApi = getCurrentMainApiValue();
+    let activeSection = null;
+
+    for (const section of root.querySelectorAll('[data-sb-sampling-apis]')) {
+        if (!(section instanceof HTMLElement)) {
+            continue;
+        }
+
+        const apiIds = String(section.dataset.sbSamplingApis ?? '').split(',');
+        const isActive = apiIds.includes(activeApi);
+        section.hidden = !isActive;
+
+        if (isActive) {
+            activeSection = section;
+        }
+    }
+
+    const empty = root.querySelector('#sb-sampling-empty');
+    if (empty instanceof HTMLElement) {
+        empty.hidden = Boolean(activeSection);
+    }
+}
+
+function buildSamplingPanel() {
+    const { panel, scroller } = createShellPanel({ id: 'sampling' });
+    const column = createElement('div', { className: 'sb-shell-column sb-sampling-panel' });
+
+    const sections = createElement('div', { className: 'sb-sampling-sections' });
+
+    for (const backend of SB_SAMPLING_BACKENDS) {
+        const section = createElement('section', {
+            id: `sb-sampling-${backend.id}`,
+            className: 'sb-sampling-section',
+            attrs: {
+                'data-sb-sampling-apis': backend.apiIds.join(','),
+            },
+        });
+        const header = createElement('div', { className: 'sb-sampling-section-header' });
+        const titleRow = createElement('div', { className: 'sb-sampling-title-row' });
+        const title = createElement('strong', { text: 'Sampling Backend' });
+        const mode = createElement('span', { className: 'sb-sampling-mode-pill', text: backend.title });
+        const description = createElement('p', { text: `Active backend samplers are shown here. ${backend.description}` });
+        const priorityStack = createElement('div', { className: 'sb-sampling-priority-stack' });
+        const priorityTop = createElement('div', { className: 'sb-sampling-priority-row sb-sampling-priority-row-top', attrs: { 'data-sb-priority-tier': 'top' } });
+        const priorityBottom = createElement('div', { className: 'sb-sampling-priority-row sb-sampling-priority-row-bottom', attrs: { 'data-sb-priority-tier': 'bottom' } });
+        const grid = createElement('div', { className: 'sb-sampling-grid' });
+        const multiGrid = createElement('div', { className: 'sb-sampling-multi-grid' });
+        const afterRow = createElement('div', { className: 'sb-sampling-priority-row sb-sampling-after-row', attrs: { 'data-sb-priority-tier': 'after' } });
+
+        titleRow.append(title, mode);
+        header.append(titleRow, description);
+
+        priorityStack.append(priorityTop, priorityBottom);
+        section.append(header, priorityStack, grid, multiGrid, afterRow);
+        sections.appendChild(section);
+    }
+
+    const empty = createElement('div', {
+        id: 'sb-sampling-empty',
+        className: 'sb-sampling-empty sb-shell-callout',
+        html: '<strong>No unified samplers for this backend yet</strong><p>This POC currently supports Chat Completions, Text Completions, Kobold/Kobold Horde, and NovelAI.</p>',
+    });
+
+    column.append(sections, empty);
+    scroller.appendChild(column);
+
+    $('#main_api').on('change.sbSamplingPanel', () => updateSamplingPanelVisibility(column));
+    window.requestAnimationFrame(() => updateSamplingPanelVisibility(column));
+    window.setTimeout(() => updateSamplingPanelVisibility(column), 250);
+    window.setTimeout(() => updateSamplingPanelVisibility(column), 1000);
+
+    return {
+        id: 'sampling',
+        panel,
+        button: null,
+        searchRoot: column,
+        onActivate: () => updateSamplingPanelVisibility(column),
+    };
 }
 
 function buildInChatAgentsPanel() {
@@ -4345,6 +5160,73 @@ function setServerAdminButtonLabel(button, isBusy, busyLabel) {
     button.textContent = isBusy ? busyLabel : button.dataset.idleLabel;
 }
 
+function getThumbnailSettingsFromRefs(refs = getServerAdminRefs()) {
+    const parseSize = (input, fallback) => {
+        const value = Number.parseInt(input?.value, 10);
+        return Number.isFinite(value) ? Math.min(4096, Math.max(1, value)) : fallback;
+    };
+
+    return {
+        enabled: Boolean(refs?.thumbnailEnabled?.checked),
+        format: refs?.thumbnailFormat?.value === 'jpg' ? 'jpg' : 'png',
+        quality: parseSize(refs?.thumbnailQuality, 100),
+        dimensions: {
+            bg: [
+                parseSize(refs?.thumbnailBgWidth, 240),
+                parseSize(refs?.thumbnailBgHeight, 135),
+            ],
+            avatar: [
+                parseSize(refs?.thumbnailAvatarWidth, 864),
+                parseSize(refs?.thumbnailAvatarHeight, 1280),
+            ],
+            persona: [
+                parseSize(refs?.thumbnailPersonaWidth, 864),
+                parseSize(refs?.thumbnailPersonaHeight, 1280),
+            ],
+        },
+    };
+}
+
+function setThumbnailInputValues(settings = {}, refs = getServerAdminRefs()) {
+    if (!refs) {
+        return;
+    }
+
+    refs.thumbnailEnabled.checked = Boolean(settings.enabled);
+    refs.thumbnailFormat.value = settings.format === 'jpg' ? 'jpg' : 'png';
+    refs.thumbnailQuality.value = String(settings.quality ?? 100);
+    refs.thumbnailBgWidth.value = String(settings.dimensions?.bg?.[0] ?? 240);
+    refs.thumbnailBgHeight.value = String(settings.dimensions?.bg?.[1] ?? 135);
+    refs.thumbnailAvatarWidth.value = String(settings.dimensions?.avatar?.[0] ?? 864);
+    refs.thumbnailAvatarHeight.value = String(settings.dimensions?.avatar?.[1] ?? 1280);
+    refs.thumbnailPersonaWidth.value = String(settings.dimensions?.persona?.[0] ?? 864);
+    refs.thumbnailPersonaHeight.value = String(settings.dimensions?.persona?.[1] ?? 1280);
+}
+
+function setThumbnailInputsDisabled(disabled, refs = getServerAdminRefs()) {
+    const controls = [
+        refs?.thumbnailEnabled,
+        refs?.thumbnailFormat,
+        refs?.thumbnailQuality,
+        refs?.thumbnailBgWidth,
+        refs?.thumbnailBgHeight,
+        refs?.thumbnailAvatarWidth,
+        refs?.thumbnailAvatarHeight,
+        refs?.thumbnailPersonaWidth,
+        refs?.thumbnailPersonaHeight,
+        refs?.thumbnailUseRecommendedButton,
+        refs?.thumbnailSaveButton,
+        refs?.thumbnailSaveClearButton,
+        refs?.thumbnailClearButton,
+    ];
+
+    for (const control of controls) {
+        if (control instanceof HTMLElement) {
+            control.disabled = disabled;
+        }
+    }
+}
+
 function appendServerAdminStat(target, label, value) {
     if (!(target instanceof HTMLElement)) {
         return;
@@ -4380,6 +5262,7 @@ function updateServerAdminInteractivity() {
     }
 
     const locked = state.busy || state.restarting;
+    const thumbnailLocked = locked || !state.thumbnailSettingsLoaded;
     const canUpdate = refs.updateButton?.dataset.sbCanUpdate === 'true';
     const hasConfigContent = Boolean(refs.configEditor?.value.trim());
 
@@ -4389,6 +5272,7 @@ function updateServerAdminInteractivity() {
     setButtonDisabled(refs.restartButton, locked);
     setButtonDisabled(refs.saveConfigButton, locked || !hasConfigContent);
     setButtonDisabled(refs.saveConfigRestartButton, locked || !hasConfigContent);
+    setThumbnailInputsDisabled(thumbnailLocked);
 
     if (refs.configEditor instanceof HTMLTextAreaElement) {
         refs.configEditor.disabled = locked;
@@ -4508,8 +5392,30 @@ function renderServerAdminConfig(data, { overwrite = true } = {}) {
     }
 }
 
-async function waitForServerReturn(expectedRevision = '') {
+function renderServerThumbnailSettings(data) {
+    const state = getServerAdminState();
+    const refs = getServerAdminRefs();
+
+    if (!refs) {
+        return;
+    }
+
+    setThumbnailInputValues(data?.settings ?? {});
+    state.thumbnailLastModifiedMs = Number(data?.lastModifiedMs ?? 0) || state.thumbnailLastModifiedMs;
+    state.thumbnailRecommended = data?.recommended ?? state.thumbnailRecommended;
+    state.thumbnailSettingsLoaded = true;
+    setServerAdminMessage(refs.thumbnailNote, 'Thumbnail settings loaded. Saving applies to new thumbnails immediately.', 'neutral');
+}
+
+async function waitForServerReturn(expectedRevision = '', { clearCacheBeforeReload = false } = {}) {
     let sawOffline = false;
+
+    async function reloadAfterOptionalCacheClear() {
+        if (clearCacheBeforeReload && typeof window.SillyBunnyClearFrontendCache === 'function') {
+            await window.SillyBunnyClearFrontendCache({ skipConfirmation: true, saveBeforeClear: false });
+        }
+        location.reload();
+    }
     const timeoutAt = Date.now() + 180000;
 
     while (Date.now() < timeoutAt) {
@@ -4524,12 +5430,12 @@ async function waitForServerReturn(expectedRevision = '') {
             const revision = String(version?.gitRevision ?? '').trim();
 
             if (expectedRevision && revision === expectedRevision) {
-                location.reload();
+                await reloadAfterOptionalCacheClear();
                 return true;
             }
 
             if (sawOffline) {
-                location.reload();
+                await reloadAfterOptionalCacheClear();
                 return true;
             }
         } catch {
@@ -4546,6 +5452,7 @@ async function refreshServerAdminPanel({ includeConfig = false, forceConfig = fa
     const state = getServerAdminState();
     const refs = getServerAdminRefs();
     const shouldLoadConfig = includeConfig || forceConfig || !state.configLoaded;
+    const shouldLoadThumbnails = forceConfig || !state.thumbnailSettingsLoaded;
 
     if (!refs || state.busy || state.restarting) {
         return;
@@ -4561,6 +5468,9 @@ async function refreshServerAdminPanel({ includeConfig = false, forceConfig = fa
 
     const statusPromise = requestServerAdmin('/api/server-admin/status');
     const configPromise = shouldLoadConfig ? requestServerAdmin('/api/server-admin/config/get') : null;
+    const thumbnailPromise = shouldLoadThumbnails
+        ? requestServerAdmin('/api/server-admin/config/thumbnail-settings/get')
+        : null;
 
     if (configPromise) {
         try {
@@ -4583,6 +5493,19 @@ async function refreshServerAdminPanel({ includeConfig = false, forceConfig = fa
             setServerAdminMessage(refs.configNote, error.message || 'Failed to load config.yaml.', tone);
             if (error?.status !== 403) {
                 console.error('Failed to load config.yaml.', error);
+            }
+        }
+    }
+
+    if (thumbnailPromise) {
+        try {
+            renderServerThumbnailSettings(await thumbnailPromise);
+        } catch (error) {
+            state.thumbnailSettingsLoaded = false;
+            const tone = error?.status === 403 ? 'warn' : 'danger';
+            setServerAdminMessage(refs.thumbnailNote, error.message || 'Failed to load thumbnail settings.', tone);
+            if (error?.status !== 403) {
+                console.error('Failed to load thumbnail settings.', error);
             }
         }
     }
@@ -4671,6 +5594,126 @@ async function handleServerAdminSaveConfig({ restart = false } = {}) {
     }
 }
 
+async function handleServerThumbnailSave({ clearCache = false } = {}) {
+    const state = getServerAdminState();
+    const refs = getServerAdminRefs();
+
+    if (!refs || state.busy || state.restarting) {
+        return;
+    }
+
+    if (updateServerConfigDirtyState()) {
+        setServerAdminMessage(refs.thumbnailNote, 'Save or reload the config.yaml editor before changing thumbnail settings.', 'warn');
+        toastr.warning('Save or reload the config.yaml editor before changing thumbnail settings.', 'Thumbnails');
+        return;
+    }
+
+    state.busy = true;
+    updateServerAdminInteractivity();
+    setServerAdminMessage(refs.thumbnailNote, clearCache ? 'Saving settings and clearing thumbnail cache…' : 'Saving thumbnail settings…');
+
+    try {
+        const result = await requestServerAdmin('/api/server-admin/config/thumbnail-settings/save', {
+            settings: getThumbnailSettingsFromRefs(refs),
+            expectedLastModifiedMs: state.thumbnailLastModifiedMs || state.lastModifiedMs,
+            clearCache,
+        });
+
+        renderServerThumbnailSettings(result);
+        state.lastModifiedMs = Number(result?.lastModifiedMs ?? 0) || state.lastModifiedMs;
+        setServerAdminMessage(refs.thumbnailNote, result?.message || 'Thumbnail settings saved.', 'good');
+        toastr.success(result?.message || 'Thumbnail settings saved.', 'Thumbnails');
+        renderServerAdminConfig(await requestServerAdmin('/api/server-admin/config/get'), { overwrite: true });
+    } catch (error) {
+        console.error('Failed to save thumbnail settings.', error);
+        setServerAdminMessage(refs.thumbnailNote, error.message || 'Failed to save thumbnail settings.', 'danger');
+        toastr.error(error.message || 'Failed to save thumbnail settings.', 'Thumbnails');
+    } finally {
+        state.busy = false;
+        updateServerAdminInteractivity();
+    }
+}
+
+async function handleServerThumbnailClearCache() {
+    const state = getServerAdminState();
+    const refs = getServerAdminRefs();
+
+    if (!refs || state.busy || state.restarting) {
+        return;
+    }
+
+    if (!window.confirm('Clear cached thumbnails for this user? They will be rebuilt as images are loaded.')) {
+        return;
+    }
+
+    state.busy = true;
+    updateServerAdminInteractivity();
+    setServerAdminMessage(refs.thumbnailNote, 'Clearing thumbnail cache…');
+
+    try {
+        const result = await requestServerAdmin('/api/server-admin/thumbnails/clear-cache');
+        setServerAdminMessage(refs.thumbnailNote, result?.message || 'Thumbnail cache cleared.', 'good');
+        toastr.success(result?.message || 'Thumbnail cache cleared.', 'Thumbnails');
+    } catch (error) {
+        console.error('Failed to clear thumbnail cache.', error);
+        setServerAdminMessage(refs.thumbnailNote, error.message || 'Failed to clear thumbnail cache.', 'danger');
+        toastr.error(error.message || 'Failed to clear thumbnail cache.', 'Thumbnails');
+    } finally {
+        state.busy = false;
+        updateServerAdminInteractivity();
+    }
+}
+
+function handleUseRecommendedThumbnailSettings() {
+    const state = getServerAdminState();
+    const refs = getServerAdminRefs();
+    const recommended = state.thumbnailRecommended ?? {
+        enabled: true,
+        format: 'png',
+        quality: 100,
+        dimensions: {
+            bg: [240, 135],
+            avatar: [864, 1280],
+            persona: [864, 1280],
+        },
+    };
+
+    setThumbnailInputValues(recommended, refs);
+    setServerAdminMessage(refs.thumbnailNote, 'Recommended high-quality thumbnail settings are staged. Save them when ready.', 'warn');
+}
+
+function createThumbnailSizeRow(label, key) {
+    const row = createElement('div', { className: 'sb-thumbnail-size-row' });
+    const rowLabel = createElement('span', { className: 'sb-thumbnail-size-label', text: label });
+    const widthInput = createElement('input', {
+        className: 'text_pole sb-thumbnail-number',
+        attrs: {
+            type: 'number',
+            inputmode: 'numeric',
+            min: '1',
+            max: '4096',
+            step: '1',
+            'aria-label': `${label} thumbnail width`,
+        },
+    });
+    const separator = createElement('span', { className: 'sb-thumbnail-size-separator', text: 'x' });
+    const heightInput = createElement('input', {
+        className: 'text_pole sb-thumbnail-number',
+        attrs: {
+            type: 'number',
+            inputmode: 'numeric',
+            min: '1',
+            max: '4096',
+            step: '1',
+            'aria-label': `${label} thumbnail height`,
+        },
+    });
+
+    row.dataset.thumbnailSize = key;
+    row.append(rowLabel, widthInput, separator, heightInput);
+    return { row, widthInput, heightInput };
+}
+
 async function handleServerAdminRestart() {
     const state = getServerAdminState();
     const refs = getServerAdminRefs();
@@ -4757,7 +5800,8 @@ async function handleServerAdminUpdate() {
         toastr.info(result?.message || 'Update applied. Restarting SillyBunny…', 'Server update');
 
         const expectedRevision = String(result?.version?.gitRevision ?? result?.repository?.currentCommit ?? '').trim();
-        const restarted = await waitForServerReturn(expectedRevision);
+        const autoClearCacheEnabled = Boolean(document.getElementById('auto_clear_cache_on_update')?.checked);
+        const restarted = await waitForServerReturn(expectedRevision, { clearCacheBeforeReload: autoClearCacheEnabled });
 
         if (!restarted) {
             state.restarting = false;
@@ -4924,6 +5968,59 @@ function buildServerAdminPanel() {
     updateHeader.append(updateCopy);
     updateCard.append(updateHeader, updateActions, autoStashLabel, updateNote, updateOutput);
 
+    const thumbnailCard = createElement('section', { className: 'sb-admin-card sb-server-card sb-thumbnail-card' });
+    const thumbnailHeader = createElement('div', { className: 'sb-admin-card-header' });
+    const thumbnailCopy = createElement('div', { className: 'sb-admin-card-copy' });
+    const thumbnailTitle = createElement('strong', { text: 'Thumbnail Quality' });
+    const thumbnailDescription = createElement('p', { text: 'Set thumbnail format, quality, and generated sizes without hand-editing config.yaml.' });
+    thumbnailCopy.append(thumbnailTitle, thumbnailDescription);
+    thumbnailHeader.append(thumbnailCopy);
+
+    const thumbnailControls = createElement('div', { className: 'sb-thumbnail-controls' });
+    const thumbnailEnabledLabel = createElement('label', { className: 'checkbox_label sb-thumbnail-enabled' });
+    const thumbnailEnabled = createElement('input', { attrs: { type: 'checkbox' } });
+    const thumbnailEnabledText = createElement('small', { text: 'Generate thumbnails' });
+    thumbnailEnabledLabel.append(thumbnailEnabled, thumbnailEnabledText);
+
+    const thumbnailFormatGroup = createElement('label', { className: 'sb-thumbnail-field' });
+    const thumbnailFormatText = createElement('span', { text: 'Format' });
+    const thumbnailFormat = createElement('select', { className: 'text_pole' });
+    thumbnailFormat.append(
+        createElement('option', { text: 'JPG', attrs: { value: 'jpg' } }),
+        createElement('option', { text: 'PNG', attrs: { value: 'png' } }),
+    );
+    thumbnailFormatGroup.append(thumbnailFormatText, thumbnailFormat);
+
+    const thumbnailQualityGroup = createElement('label', { className: 'sb-thumbnail-field' });
+    const thumbnailQualityText = createElement('span', { text: 'Quality' });
+    const thumbnailQuality = createElement('input', {
+        className: 'text_pole sb-thumbnail-number',
+        attrs: {
+            type: 'number',
+            inputmode: 'numeric',
+            min: '1',
+            max: '100',
+            step: '1',
+        },
+    });
+    thumbnailQualityGroup.append(thumbnailQualityText, thumbnailQuality);
+    thumbnailControls.append(thumbnailEnabledLabel, thumbnailFormatGroup, thumbnailQualityGroup);
+
+    const thumbnailSizes = createElement('div', { className: 'sb-thumbnail-sizes' });
+    const bgSize = createThumbnailSizeRow('Background', 'bg');
+    const avatarSize = createThumbnailSizeRow('Character', 'avatar');
+    const personaSize = createThumbnailSizeRow('Persona', 'persona');
+    thumbnailSizes.append(bgSize.row, avatarSize.row, personaSize.row);
+
+    const thumbnailActions = createElement('div', { className: 'sb-server-actions' });
+    const thumbnailUseRecommendedButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Use recommended', attrs: { type: 'button' } });
+    const thumbnailSaveButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Save thumbnails', attrs: { type: 'button' } });
+    const thumbnailSaveClearButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action menu_button_primary', text: 'Save & Clear Cache', attrs: { type: 'button' } });
+    const thumbnailClearButton = createElement('button', { className: 'menu_button menu_button_icon sb-server-action', text: 'Clear cache only', attrs: { type: 'button' } });
+    const thumbnailNote = createElement('div', { className: 'sb-server-note', text: 'Use PNG at 100 quality with larger avatar/persona dimensions for sharper character thumbnails, then clear the cache to rebuild them.' });
+    thumbnailActions.append(thumbnailUseRecommendedButton, thumbnailSaveButton, thumbnailSaveClearButton, thumbnailClearButton);
+    thumbnailCard.append(thumbnailHeader, thumbnailControls, thumbnailSizes, thumbnailActions, thumbnailNote);
+
     const configCard = createElement('section', { className: 'sb-admin-card sb-server-card' });
     const configHeader = createElement('div', { className: 'sb-admin-card-header' });
     const configCopy = createElement('div', { className: 'sb-admin-card-copy' });
@@ -4951,7 +6048,7 @@ function buildServerAdminPanel() {
     configActions.append(reloadConfigButton, saveConfigButton, saveConfigRestartButton);
     configCard.append(configHeader, configMeta, configEditor, configActions, configNote);
 
-    column.append(callout, statusCard, updateCard, configCard);
+    column.append(callout, statusCard, updateCard, thumbnailCard, configCard);
     scroller.appendChild(column);
 
     const state = getServerAdminState();
@@ -4965,6 +6062,20 @@ function buildServerAdminPanel() {
         updateNote,
         updateOutput,
         autoStashCheckbox,
+        thumbnailEnabled,
+        thumbnailFormat,
+        thumbnailQuality,
+        thumbnailBgWidth: bgSize.widthInput,
+        thumbnailBgHeight: bgSize.heightInput,
+        thumbnailAvatarWidth: avatarSize.widthInput,
+        thumbnailAvatarHeight: avatarSize.heightInput,
+        thumbnailPersonaWidth: personaSize.widthInput,
+        thumbnailPersonaHeight: personaSize.heightInput,
+        thumbnailUseRecommendedButton,
+        thumbnailSaveButton,
+        thumbnailSaveClearButton,
+        thumbnailClearButton,
+        thumbnailNote,
         configPath,
         configState,
         configEditor,
@@ -4981,6 +6092,10 @@ function buildServerAdminPanel() {
     refreshButton.addEventListener('click', () => refreshServerAdminPanel({ includeConfig: false }));
     updateButton.addEventListener('click', handleServerAdminUpdate);
     restartButton.addEventListener('click', handleServerAdminRestart);
+    thumbnailUseRecommendedButton.addEventListener('click', handleUseRecommendedThumbnailSettings);
+    thumbnailSaveButton.addEventListener('click', () => handleServerThumbnailSave({ clearCache: false }));
+    thumbnailSaveClearButton.addEventListener('click', () => handleServerThumbnailSave({ clearCache: true }));
+    thumbnailClearButton.addEventListener('click', handleServerThumbnailClearCache);
     reloadConfigButton.addEventListener('click', handleServerAdminReloadConfig);
     saveConfigButton.addEventListener('click', () => handleServerAdminSaveConfig({ restart: false }));
     saveConfigRestartButton.addEventListener('click', () => handleServerAdminSaveConfig({ restart: true }));
@@ -5677,8 +6792,8 @@ function injectSillyTavernImportCard() {
     updateSillyTavernImportInteractivity();
 }
 
-function createThemeSliderGroup({ title, valueId, inputId, value, min, max, step, ariaLabel, caption, onInput }) {
-    const sliderGroup = createElement('div', { className: 'sb-theme-slider-group' });
+function createThemeSliderGroup({ title, valueId, inputId, value, min, max, step, ariaLabel, caption, onInput, className = '' }) {
+    const sliderGroup = createElement('div', { className: `sb-theme-slider-group ${className}`.trim() });
     const sliderHeader = createElement('div', { className: 'sb-theme-slider-header' });
     const sliderTitle = createElement('strong', { text: title });
     const sliderValue = createElement('span', { id: valueId, className: 'sb-theme-slider-value' });
@@ -5794,6 +6909,40 @@ function createShortcutSettingsGroup() {
     }
 
     group.appendChild(rows);
+    return group;
+}
+
+function createCompactModeSettingsGroup() {
+    const group = createElement('section', {
+        className: 'sb-theme-slider-group sb-compact-mode-group',
+    });
+    const label = createElement('label', {
+        className: 'sb-compact-mode-option',
+        attrs: {
+            for: 'sb-compact-mode-input',
+        },
+    });
+    const checkbox = createElement('input', {
+        id: 'sb-compact-mode-input',
+        className: 'sb-compact-mode-checkbox',
+        attrs: {
+            type: 'checkbox',
+        },
+    });
+    const copy = createElement('span', { className: 'sb-compact-mode-copy' });
+    const title = createElement('strong', { text: 'Compact Mode' });
+    const description = createElement('small', {
+        text: 'Reduce spacing, controls, and mobile composer height for denser screens.',
+    });
+
+    checkbox.addEventListener('change', event => {
+        const input = event.currentTarget;
+        setCompactMode(input instanceof HTMLInputElement && input.checked);
+    });
+
+    copy.append(title, description);
+    label.append(checkbox, copy);
+    group.appendChild(label);
     return group;
 }
 
@@ -5949,8 +7098,10 @@ function injectThemePicker() {
         ariaLabel: 'Mobile button size',
         caption: 'Increase or decrease the mobile nav and mobile chat tool buttons without changing desktop controls.',
         onInput: nextValue => setMobileButtonScale(nextValue),
+        className: 'sb-mobile-only-setting',
     });
     const topbarLabelSettingsGroup = createTopbarLabelSettingsGroup();
+    const compactModeSettingsGroup = createCompactModeSettingsGroup();
     const shortcutSettingsGroup = createShortcutSettingsGroup();
     header.append(title, description);
 
@@ -5975,7 +7126,7 @@ function injectThemePicker() {
     getMessageStyleSelect()?.addEventListener('change', updateThemePickerUi);
     document.addEventListener('sb:chat-style-updated', updateThemePickerUi);
 
-    card.append(header, optionRow, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
+    card.append(header, optionRow, surfaceSliderGroup, bottomBarSliderGroup, mobileButtonSliderGroup, compactModeSettingsGroup, topbarLabelSettingsGroup, shortcutSettingsGroup);
     themeBlock.prepend(card);
     updateThemePickerUi();
 }
@@ -5990,6 +7141,7 @@ function updateThemePickerUi() {
     const mobileButtonScaleInput = document.getElementById('sb-mobile-button-scale-input');
     const mobileButtonScaleValue = document.getElementById('sb-mobile-button-scale-value');
     const customTextInput = document.getElementById('sb-topbar-custom-text-input');
+    const compactModeInput = document.getElementById('sb-compact-mode-input');
 
     for (const button of document.querySelectorAll('[data-sb-theme-option]')) {
         const themeId = button.getAttribute('data-sb-theme-option');
@@ -6047,6 +7199,11 @@ function updateThemePickerUi() {
 
     if (customTextInput instanceof HTMLInputElement && customTextInput.value !== sbState.topbarLabel.customText) {
         customTextInput.value = sbState.topbarLabel.customText;
+    }
+
+    if (compactModeInput instanceof HTMLInputElement) {
+        compactModeInput.checked = sbState.compactMode;
+        compactModeInput.closest('.sb-compact-mode-option')?.classList.toggle('is-selected', sbState.compactMode);
     }
 
     for (const button of document.querySelectorAll('[data-sb-message-style]')) {
@@ -6620,11 +7777,20 @@ function buildShell(shellKey) {
     }).observe(shellRoot, { attributes: true, attributeFilter: ['class'] });
 
     const basePanel = createShellPanel(shellConfig.baseTab);
+    if (shellKey === 'left') {
+        embedAdvancedFormattingInPresets(originalContent);
+    }
     basePanel.scroller.appendChild(originalContent);
     registerShellTab(shellKey, shellConfig.baseTab, basePanel);
 
+    const samplingTab = shellConfig.customTabs.find(tab => tab.id === 'sampling');
+    if (samplingTab) {
+        const samplingPanel = buildSamplingPanel();
+        registerShellTab(shellKey, samplingTab, samplingPanel, samplingPanel.searchRoot);
+    }
+
     for (const embeddedTab of shellConfig.embeddedTabs) {
-        const prepared = prepareEmbeddedDrawer(embeddedTab.drawerId);
+        const prepared = prepareEmbeddedDrawer(embeddedTab.drawerId, originalContent);
         if (!prepared) {
             continue;
         }
@@ -6635,6 +7801,10 @@ function buildShell(shellKey) {
     }
 
     for (const customTab of shellConfig.customTabs) {
+        if (customTab.id === 'sampling') {
+            continue;
+        }
+
         if (customTab.id === 'agents') {
             const agentPanel = buildInChatAgentsPanel();
             registerShellTab(shellKey, customTab, agentPanel, agentPanel.searchRoot);
@@ -6662,6 +7832,12 @@ function buildShell(shellKey) {
     if (shellKey === 'right') {
         injectThemePicker();
         injectSillyTavernImportCard();
+    }
+
+    if (shellKey === 'left') {
+        $('#main_api').on('change.sbPresetAdvancedFormatting', updatePresetAdvancedFormattingVisibility);
+        bindPresetAdvancedFormattingVisibilityEvents();
+        updatePresetAdvancedFormattingVisibility();
     }
 }
 
@@ -6885,8 +8061,8 @@ function buildMobileNav() {
             label: 'Quick Actions',
             items: [
                 { shell: 'left', tab: 'presets', icon: 'fa-sliders', label: 'Presets' },
+                { shell: 'left', tab: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
                 { shell: 'left', tab: 'api', icon: 'fa-plug', label: 'API' },
-                { shell: 'left', tab: 'advanced-formatting', icon: 'fa-font', label: 'Advanced Formatting' },
                 { shell: 'left', tab: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
                 { shell: 'left', tab: 'agents', icon: 'fa-robot', label: 'Agents' },
             ],
@@ -7724,12 +8900,37 @@ function togglePersonaPicker() {
         }
     }
 
-    // Position relative to the bubble
     const bubble = document.getElementById('sb-persona-bubble');
-    if (bubble) {
-        bubble.parentElement.style.position = 'relative';
-        bubble.parentElement.appendChild(picker);
+    if (bubble instanceof HTMLElement) {
+        document.body.appendChild(picker);
+        positionPersonaPicker(picker, bubble);
     }
+}
+
+function positionPersonaPicker(picker, bubble) {
+    const bubbleRect = bubble.getBoundingClientRect();
+    picker.style.visibility = 'hidden';
+    picker.style.left = '0px';
+    picker.style.top = '0px';
+    picker.style.right = 'auto';
+    picker.style.bottom = 'auto';
+
+    requestAnimationFrame(() => {
+        const pickerRect = picker.getBoundingClientRect();
+        const viewportPadding = 8;
+        const left = Math.min(
+            Math.max(viewportPadding, bubbleRect.left),
+            Math.max(viewportPadding, window.innerWidth - pickerRect.width - viewportPadding),
+        );
+        const top = Math.max(
+            viewportPadding,
+            bubbleRect.top - pickerRect.height - viewportPadding,
+        );
+
+        picker.style.left = `${Math.round(left)}px`;
+        picker.style.top = `${Math.round(top)}px`;
+        picker.style.visibility = '';
+    });
 }
 
 function addPersonaOption(picker, avatarId, name, title, isActive, context) {
@@ -7842,10 +9043,12 @@ function initAll() {
     bindCharacterEditorExitButton();
     setShellTheme(sbState.theme, { persist: false });
     setSurfaceTransparency(sbState.surfaceTransparency, { persist: false });
+    setCompactMode(sbState.compactMode, { persist: false });
     setTopbarScale('desktop', sbState.topbarScale.desktop, { persist: false });
     setTopbarScale('mobile', sbState.topbarScale.mobile, { persist: false });
     setBottomBarScale(sbState.bottomBarScale, { persist: false });
     setMobileButtonScale(sbState.mobileButtonScale, { persist: false });
+    initChatAvatarVariables();
     syncDesktopShellSizing();
     buildTopBar();
     bindLandingPageObserver();
@@ -7898,6 +9101,9 @@ function initAll() {
         setMobileButtonScale(value) {
             setMobileButtonScale(value);
         },
+        setCompactMode(value) {
+            setCompactMode(value);
+        },
         setMessageStyle,
         openChatTools() {
             if (isMobileViewport()) {
@@ -7930,6 +9136,9 @@ function initAll() {
         },
         getMobileButtonScale() {
             return sbState.mobileButtonScale;
+        },
+        getCompactMode() {
+            return sbState.compactMode;
         },
     };
 }

@@ -1130,7 +1130,7 @@ export function initTextGenSettings() {
  * @returns void
  */
 function showSamplerControls(apiType = null) {
-    $('#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers]').each(function (idx, elem) {
+    $('#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers], #sb-sampling-textgenerationwebui [data-tg-samplers]').each(function (idx, elem) {
         const typeSpecificControlled = $(elem).data('tg-type') !== undefined;
 
         if (!typeSpecificControlled) $(this).show();
@@ -1143,7 +1143,7 @@ function showSamplerControls(apiType = null) {
 
     if (!samplersActivatedManually?.length || !prioritizeManualSamplerSelect) return;
 
-    $('#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers]').each(function () {
+    $('#textgenerationwebui_api-settings [data-tg-samplers], #textgenerationwebui_api [data-tg-samplers], #sb-sampling-textgenerationwebui [data-tg-samplers]').each(function () {
         const tgSamplers = $(this).attr('data-tg-samplers').split(',').map(x => x.trim()).filter(str => str !== '');
 
         for (const tgSampler of tgSamplers) {
@@ -1854,8 +1854,25 @@ function createTextGenSettingsDrawer(id, title, description) {
         class: 'inline-drawer wide100p flexFlowColumn sb-textgen-settings-drawer',
     });
     const $header = $('<div>', { class: 'inline-drawer-toggle inline-drawer-header' });
+    const $title = $('<b>').text(title);
     const $label = $('<div>', { class: 'flex-container flexFlowColumn' })
-        .append($('<b>').text(title));
+        .append($title);
+
+    if (id === 'sb-textgen-sampling') {
+        const $helpLink = $('<a>', {
+            class: 'notes-link sb-sampling-docs-link',
+            href: 'https://docs.sillytavern.app/usage/common-settings/',
+            target: '_blank',
+            title: 'Documentation on sampling parameters.',
+            'data-i18n': '[title]Documentation on sampling parameters',
+        }).append($('<span>', {
+            name: 'samplerHelpButton',
+            class: 'note-link-span fa-solid fa-circle-question',
+        }));
+
+        $helpLink.on('click', event => event.stopPropagation());
+        $label.empty().append($('<div>', { class: 'sb-sampling-title-row' }).append($title, $helpLink));
+    }
 
     if (description) {
         $label.append($('<small>', { class: 'sb-group-meta' }).text(description));

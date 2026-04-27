@@ -1,8 +1,12 @@
 import { t } from './i18n.js';
 import { callGenericPopup, Popup, POPUP_TYPE } from './popup.js';
-import { getFileExtension, sortMoments, timestampToMoment } from './utils.js';
+import { clamp, escapeHtml, getFileExtension, sortMoments, timestampToMoment } from './utils.js';
 import { displayPastChats, getRequestHeaders, importCharacterChat } from '/script.js';
 import { importGroupChat } from './group-chats.js';
+
+const DEFAULT_BACKUP_CLEANUP_AGE = 30;
+const DEFAULT_BACKUP_CLEANUP_KEEP = 25;
+const BACKUP_CLEANUP_UNITS = ['days', 'weeks', 'months'];
 
 class BackupsBrowser {
     /** @type {HTMLElement} */
@@ -11,6 +15,8 @@ class BackupsBrowser {
     #buttonChevronIcon;
     /** @type {HTMLElement} */
     #backupsListElement;
+    /** @type {import('../../src/endpoints/chats.js').ChatInfo[]} */
+    #loadedBackups = [];
     /** @type {AbortController} */
     #loadingAbortController;
     /** @type {boolean} */
@@ -117,12 +123,17 @@ class BackupsBrowser {
     /**
      * Delete a backup file.
      * @param {string} name File name of the backup to delete.
+     * @param {object} options Delete options.
+     * @param {boolean} [options.confirm=true] Whether to confirm before deleting.
+     * @param {boolean} [options.silent=false] Whether to hide the success toast.
      * @returns {Promise<boolean>} True if deleted, false otherwise.
      */
-    async deleteBackup(name) {
-        const confirm = await Popup.show.confirm(t`Are you sure?`);
-        if (!confirm) {
-            return false;
+    async deleteBackup(name, { confirm = true, silent = false } = {}) {
+        if (confirm) {
+            const confirmed = await Popup.show.confirm(t`Are you sure?`);
+            if (!confirmed) {
+                return false;
+            }
         }
 
         const response = await fetch('/api/backups/chat/delete', {
@@ -137,8 +148,248 @@ class BackupsBrowser {
             return false;
         }
 
-        toastr.success(t`Backup deleted successfully.`);
+        if (!silent) {
+            toastr.success(t`Backup deleted successfully.`);
+        }
         return true;
+    }
+
+    /**
+     * Gets a stable timestamp for backup sorting and age cleanup.
+     * @param {import('../../src/endpoints/chats.js').ChatInfo & {mtime?: number}} backup Backup info
+     * @returns {number} Backup timestamp in milliseconds
+     */
+    getBackupTimestamp(backup) {
+        if (Number.isFinite(Number(backup?.mtime))) {
+            return Number(backup.mtime);
+        }
+
+        const momentDate = timestampToMoment(backup?.last_mes);
+        return momentDate.isValid() ? momentDate.valueOf() : 0;
+    }
+
+    /**
+     * Gets parsed cleanup control values.
+     * @returns {{age: number, unit: string, keepNewest: number}}
+     */
+    getCleanupOptions() {
+        const ageInput = this.#backupsListElement.querySelector('[data-chat-backups-cleanup-age]');
+        const keepInput = this.#backupsListElement.querySelector('[data-chat-backups-cleanup-keep]');
+        const unitInput = this.#backupsListElement.querySelector('[data-chat-backups-cleanup-unit]');
+        const age = clamp(parseInt(String(ageInput?.value || DEFAULT_BACKUP_CLEANUP_AGE), 10) || 0, 0, 9999);
+        const keepNewest = clamp(parseInt(String(keepInput?.value || DEFAULT_BACKUP_CLEANUP_KEEP), 10) || 0, 0, 9999);
+        const unit = BACKUP_CLEANUP_UNITS.includes(String(unitInput?.value)) ? String(unitInput.value) : 'days';
+
+        return { age, unit, keepNewest };
+    }
+
+    /**
+     * Gets backups that match the cleanup controls.
+     * @returns {import('../../src/endpoints/chats.js').ChatInfo[]} Matching backups
+     */
+    getCleanupCandidates() {
+        const { age, unit, keepNewest } = this.getCleanupOptions();
+        const sortedBackups = [...this.#loadedBackups].sort((a, b) => this.getBackupTimestamp(b) - this.getBackupTimestamp(a));
+        const keptNames = new Set(sortedBackups.slice(0, keepNewest).map(backup => backup.file_name));
+        const cutoff = age > 0 ? timestampToMoment(Date.now()).clone().subtract(age, unit).valueOf() : null;
+
+        return sortedBackups.filter((backup) => {
+            if (!backup.file_name || keptNames.has(backup.file_name)) {
+                return false;
+            }
+
+            if (cutoff !== null && this.getBackupTimestamp(backup) >= cutoff) {
+                return false;
+            }
+
+            return true;
+        });
+    }
+
+    /**
+     * Renders the cleanup preview list for the confirmation popup.
+     * @param {import('../../src/endpoints/chats.js').ChatInfo[]} backups Matching backups
+     * @returns {string} HTML preview
+     */
+    renderCleanupPreview(backups) {
+        const listItems = backups.slice(0, 18).map((backup) => {
+            const backupDate = timestampToMoment(this.getBackupTimestamp(backup)).format('lll');
+            return `<li><code>${escapeHtml(backup.file_name)}</code> <small>${escapeHtml(backupDate)}</small></li>`;
+        }).join('');
+        const moreCount = Math.max(0, backups.length - 18);
+        const moreText = moreCount ? `<p>${escapeHtml(String(moreCount))} ${t`more backup(s) not shown.`}</p>` : '';
+        return `<ol class="chatBackupsCleanupPreview">${listItems}</ol>${moreText}`;
+    }
+
+    /**
+     * Updates the cleanup status line.
+     * @param {string} message Status message
+     */
+    setCleanupStatus(message = '') {
+        const status = this.#backupsListElement?.querySelector('[data-chat-backups-cleanup-status]');
+        if (status) {
+            status.textContent = message;
+        }
+    }
+
+    /**
+     * Shows a preview of old backups matching the cleanup controls.
+     * @returns {Promise<void>}
+     */
+    async previewCleanup() {
+        const candidates = this.getCleanupCandidates();
+        if (!candidates.length) {
+            toastr.info(t`No backups match those cleanup settings.`);
+            this.setCleanupStatus(t`No backups match those cleanup settings.`);
+            return;
+        }
+
+        await callGenericPopup(
+            `<h3>${t`Backup cleanup preview`}</h3>
+            <p>${escapeHtml(String(candidates.length))} ${t`backup(s) match. Newest kept backups are protected.`}</p>
+            ${this.renderCleanupPreview(candidates)}`,
+            POPUP_TYPE.TEXT,
+            '',
+            { wider: true, allowVerticalScrolling: true },
+        );
+        this.setCleanupStatus(`${candidates.length} ${t`backup(s) match the cleanup settings.`}`);
+    }
+
+    /**
+     * Deletes old backups matching the cleanup controls.
+     * @returns {Promise<void>}
+     */
+    async cleanupOldBackups() {
+        const candidates = this.getCleanupCandidates();
+        if (!candidates.length) {
+            toastr.info(t`No backups match those cleanup settings.`);
+            this.setCleanupStatus(t`No backups match those cleanup settings.`);
+            return;
+        }
+
+        const confirmed = await Popup.show.confirm(
+            t`Clean old backups?`,
+            `<p>${escapeHtml(String(candidates.length))} ${t`backup(s) will be permanently deleted.`}</p>
+            ${this.renderCleanupPreview(candidates)}`,
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        let deleted = 0;
+        let failed = 0;
+
+        for (const [index, backup] of candidates.entries()) {
+            this.setCleanupStatus(`${t`Deleting`} ${index + 1}/${candidates.length}: ${backup.file_name}`);
+            const success = await this.deleteBackup(backup.file_name, { confirm: false, silent: true });
+            success ? deleted++ : failed++;
+        }
+
+        if (failed) {
+            toastr.warning(`${deleted} ${t`backup(s) deleted.`} ${failed} ${t`failed.`}`);
+        } else {
+            toastr.success(`${deleted} ${t`old backup(s) deleted.`}`);
+        }
+
+        await this.reloadBackupsList();
+        this.setCleanupStatus(`${deleted} ${t`backup(s) deleted.`}${failed ? ` ${failed} ${t`failed.`}` : ''}`);
+    }
+
+    /**
+     * Creates the cleanup controls for the backups list.
+     * @returns {HTMLElement} Cleanup controls element
+     */
+    renderCleanupControls() {
+        const controls = document.createElement('div');
+        controls.classList.add('chatBackupsCleanupTools');
+
+        const ageField = document.createElement('label');
+        ageField.classList.add('chatBackupsCleanupField', 'chatBackupsCleanupAgeField');
+        const ageLabel = document.createElement('span');
+        ageLabel.textContent = t`Older than`;
+        const ageInput = document.createElement('input');
+        ageInput.classList.add('text_pole');
+        ageInput.type = 'number';
+        ageInput.min = '0';
+        ageInput.max = '9999';
+        ageInput.step = '1';
+        ageInput.inputMode = 'numeric';
+        ageInput.value = String(DEFAULT_BACKUP_CLEANUP_AGE);
+        ageInput.setAttribute('data-chat-backups-cleanup-age', '');
+        ageField.appendChild(ageLabel);
+        ageField.appendChild(ageInput);
+
+        const unitSelect = document.createElement('select');
+        unitSelect.classList.add('text_pole');
+        unitSelect.setAttribute('aria-label', t`Backup cleanup age unit`);
+        unitSelect.setAttribute('data-chat-backups-cleanup-unit', '');
+        for (const unit of BACKUP_CLEANUP_UNITS) {
+            const option = document.createElement('option');
+            option.value = unit;
+            option.textContent = unit;
+            unitSelect.appendChild(option);
+        }
+
+        const keepField = document.createElement('label');
+        keepField.classList.add('chatBackupsCleanupField', 'chatBackupsCleanupKeepField');
+        const keepLabel = document.createElement('span');
+        keepLabel.textContent = t`Keep newest`;
+        const keepInput = document.createElement('input');
+        keepInput.classList.add('text_pole');
+        keepInput.type = 'number';
+        keepInput.min = '0';
+        keepInput.max = '9999';
+        keepInput.step = '1';
+        keepInput.inputMode = 'numeric';
+        keepInput.value = String(DEFAULT_BACKUP_CLEANUP_KEEP);
+        keepInput.setAttribute('data-chat-backups-cleanup-keep', '');
+        keepField.appendChild(keepLabel);
+        keepField.appendChild(keepInput);
+
+        const previewButton = document.createElement('button');
+        previewButton.type = 'button';
+        previewButton.classList.add('menu_button', 'menu_button_icon', 'chatBackupsCleanupPreviewButton');
+        previewButton.title = t`Preview old backups that match the cleanup settings`;
+        previewButton.innerHTML = '<i class="fa-solid fa-list-check"></i><span></span>';
+        previewButton.querySelector('span').textContent = t`Preview`;
+        previewButton.addEventListener('click', () => this.previewCleanup());
+
+        const cleanupButton = document.createElement('button');
+        cleanupButton.type = 'button';
+        cleanupButton.classList.add('menu_button', 'menu_button_icon', 'chatBackupsCleanupCleanButton');
+        cleanupButton.title = t`Delete old backups that match the cleanup settings`;
+        cleanupButton.innerHTML = '<i class="fa-solid fa-broom"></i><span></span>';
+        cleanupButton.querySelector('span').textContent = t`Clean`;
+        cleanupButton.addEventListener('click', () => this.cleanupOldBackups());
+
+        const status = document.createElement('div');
+        status.classList.add('chatBackupsCleanupStatus');
+        status.setAttribute('data-chat-backups-cleanup-status', '');
+        status.setAttribute('aria-live', 'polite');
+
+        controls.appendChild(ageField);
+        controls.appendChild(unitSelect);
+        controls.appendChild(keepField);
+        controls.appendChild(previewButton);
+        controls.appendChild(cleanupButton);
+        controls.appendChild(status);
+        return controls;
+    }
+
+    /**
+     * Reloads the backups list when the panel is open.
+     * @returns {Promise<void>}
+     */
+    async reloadBackupsList() {
+        if (!this.#isOpen) {
+            return;
+        }
+
+        if (this.#loadingAbortController) {
+            this.#loadingAbortController.abort();
+        }
+        this.#loadingAbortController = new AbortController();
+        await this.loadBackupsIntoList(this.#loadingAbortController.signal);
     }
 
     /**
@@ -152,6 +403,7 @@ class BackupsBrowser {
         }
 
         this.#backupsListElement.innerHTML = '';
+        this.#loadedBackups = [];
 
         const response = await fetch('/api/backups/chat/get', {
             method: 'POST',
@@ -166,8 +418,19 @@ class BackupsBrowser {
 
         /** @type {import('../../src/endpoints/chats.js').ChatInfo[]} */
         const backupsList = await response.json();
+        this.#loadedBackups = backupsList;
 
-        for (const backup of backupsList.sort((a, b) => sortMoments(timestampToMoment(a.last_mes), timestampToMoment(b.last_mes)))) {
+        this.#backupsListElement.appendChild(this.renderCleanupControls());
+
+        if (!backupsList.length) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.classList.add('chatBackupsEmptyMessage');
+            emptyMessage.textContent = t`No chat backups found.`;
+            this.#backupsListElement.appendChild(emptyMessage);
+            return;
+        }
+
+        for (const backup of backupsList.sort((a, b) => sortMoments(timestampToMoment(this.getBackupTimestamp(a)), timestampToMoment(this.getBackupTimestamp(b))))) {
             const listItem = document.createElement('div');
             listItem.classList.add('chatBackupsListItem');
 
@@ -177,7 +440,7 @@ class BackupsBrowser {
 
             const backupInfo = document.createElement('div');
             backupInfo.classList.add('chatBackupsListItemInfo');
-            backupInfo.textContent = `${timestampToMoment(backup.last_mes).format('lll')} (${backup.file_size}, ${backup.chat_items} 💬)`;
+            backupInfo.textContent = `${timestampToMoment(this.getBackupTimestamp(backup)).format('lll')} (${backup.file_size}, ${backup.chat_items} 💬)`;
 
             const actionsList = document.createElement('div');
             actionsList.classList.add('chatBackupsListItemActions');
@@ -203,6 +466,7 @@ class BackupsBrowser {
                 const isDeleted = await this.deleteBackup(backup.file_name);
                 if (isDeleted) {
                     listItem.remove();
+                    this.#loadedBackups = this.#loadedBackups.filter(item => item.file_name !== backup.file_name);
                 }
             });
 

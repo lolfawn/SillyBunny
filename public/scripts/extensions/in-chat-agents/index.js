@@ -1,10 +1,11 @@
 import { DiffMatchPatch } from '../../../lib.js';
 import { extension_settings, renderExtensionTemplateAsync, getContext } from '../../extensions.js';
 import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../popup.js';
-import { download, getSortableDelay, uuidv4 } from '../../utils.js';
+import { download, escapeHtml, escapeRegex, getSortableDelay, uuidv4 } from '../../utils.js';
 import { CLIENT_VERSION, chat, getRequestHeaders, generateQuietPrompt, normalizeContentText, saveSettingsDebounced } from '../../../script.js';
 import { eventSource, event_types } from '../../events.js';
 import {
+    areAgentsGloballyEnabled,
     getAgents,
     getAgentById,
     getAgentRegexScripts,
@@ -18,9 +19,15 @@ import {
     AGENT_CATEGORIES,
     DEFAULT_AGENT_MAX_TOKENS,
     getGlobalSettings,
+    initializeScopedAgentEnableState,
+    isAgentEnabledForCurrentScope,
     LEGACY_AGENT_MAX_TOKENS,
     normalizeAgentCategory,
+    getAgentChatScopeLabel,
+    getPromptTransformMode,
+    reconcileScopedEnabledAgentIdsFromLegacyFlags,
     resolveConnectionProfile,
+    setAgentEnabledForCurrentScope,
     setGlobalSettings,
     getGroups,
     getCustomGroups,
@@ -34,11 +41,12 @@ import {
     cancelAgentGeneration,
     initAgentRunner,
     isAgentGenerationActive,
+    onAgentGenerationStateChanged,
+    getPromptTransformHistoryForMessage,
     runAgentOnMessage,
     syncToolAgentRegistrations,
     undoPromptTransform,
     redoPromptTransform,
-    PROMPT_TRANSFORM_HISTORY_KEY,
 } from './agent-runner.js';
 import {
     AGENT_REGEX_PLACEMENT,
@@ -48,6 +56,12 @@ import {
 } from './regex-scripts.js';
 import { initPathfinder } from './pathfinder-init.js';
 import { openPathfinderSettings, isPathfinderAgent } from './pathfinder-settings-ui.js';
+import { buildFallbackPromptText, extractProfileResponseText } from './llm-utils.js';
+import {
+    buildConnectionProfileNameMap,
+    getConnectionManagerRequestService,
+    populateConnectionProfileSelect,
+} from './profile-utils.js';
 
 const MODULE_NAME = 'in-chat-agents';
 
@@ -137,13 +151,29 @@ function updateCancelGenerationButton() {
     $('#ica--cancelGeneration').toggle(isAgentGenerationActive());
 }
 
+function updateGlobalAgentToggle() {
+    const enabled = areAgentsGloballyEnabled();
+    const button = $('#ica--globalEnabled');
+    button.toggleClass('active', enabled);
+    button.attr('aria-pressed', String(enabled));
+    button.attr('title', enabled
+        ? 'Agents are enabled. Click to disable all In-Chat Agents.'
+        : 'Agents are disabled. Click to re-enable In-Chat Agents.');
+    button.find('span').text(enabled ? 'Agents On' : 'Agents Off');
+}
+
+function populateSeparateRecentChatsToggle() {
+    $('#ica--separateRecentChats').prop('checked', Boolean(getGlobalSettings().separateRecentChats));
+}
+
 function sortAgentsByOrder(agentList = []) {
     return [...agentList].sort((a, b) => Number(a?.injection?.order ?? 0) - Number(b?.injection?.order ?? 0));
 }
 
 async function toggleAgentEnabled(agent) {
-    agent.enabled = !agent.enabled;
+    setAgentEnabledForCurrentScope(agent, !isAgentEnabledForCurrentScope(agent));
     await saveAgent(agent);
+    persistExtensionState();
     syncToolAgentRegistrations();
     renderAgentList();
 }
@@ -152,65 +182,6 @@ async function toggleAgentFavorite(agent) {
     agent.favorite = !agent.favorite;
     await saveAgent(agent);
     renderAgentList();
-}
-
-function getConnectionManagerRequestService() {
-    try {
-        return SillyTavern.getContext().ConnectionManagerRequestService ?? null;
-    } catch {
-        return null;
-    }
-}
-
-function getSupportedConnectionProfiles() {
-    const CMRS = getConnectionManagerRequestService();
-    if (!CMRS || typeof CMRS.getSupportedProfiles !== 'function') {
-        return [];
-    }
-
-    try {
-        return CMRS.getSupportedProfiles();
-    } catch {
-        return [];
-    }
-}
-
-function populateConnectionProfileSelect(select, { emptyLabel = 'Use default profile', selectedValue = '' } = {}) {
-    if (!(select instanceof HTMLSelectElement)) {
-        return;
-    }
-
-    const profiles = getSupportedConnectionProfiles();
-    const resolvedValue = typeof selectedValue === 'string' ? selectedValue : '';
-    select.innerHTML = '';
-
-    const emptyOption = document.createElement('option');
-    emptyOption.value = '';
-    emptyOption.textContent = emptyLabel;
-    select.appendChild(emptyOption);
-
-    for (const profile of profiles) {
-        const option = document.createElement('option');
-        option.value = profile.id;
-        option.textContent = profile.name || profile.id;
-        select.appendChild(option);
-    }
-
-    if (resolvedValue && !profiles.some(profile => profile.id === resolvedValue)) {
-        const missingOption = document.createElement('option');
-        missingOption.value = resolvedValue;
-        missingOption.textContent = `Missing profile (${resolvedValue})`;
-        select.appendChild(missingOption);
-    }
-
-    select.value = resolvedValue;
-}
-
-function buildProfileNameMap() {
-    return new Map(
-        getSupportedConnectionProfiles()
-            .map(profile => [profile.id, profile.name || profile.id]),
-    );
 }
 
 function findTemplateById(templateId) {
@@ -382,10 +353,6 @@ function hasPromptTransform(agent) {
         ['post', 'both'].includes(String(agent?.phase ?? '')) &&
         String(agent?.prompt ?? '').trim(),
     );
-}
-
-function getPromptTransformMode(agent) {
-    return agent?.postProcess?.promptTransformMode === 'append' ? 'append' : 'rewrite';
 }
 
 function getPromptTransformLabel(agent) {
@@ -1074,7 +1041,7 @@ function renderAgentList() {
     const scrollState = captureAgentListScrollState(container[0]);
     container.empty();
     updateCancelGenerationButton();
-    const profileNames = buildProfileNameMap();
+    const profileNames = buildConnectionProfileNameMap();
     const allAgents = sortAgentsByOrder(getAgents());
 
     const searchTerm = ($('#ica--search').val() || '').toString().toLowerCase();
@@ -1114,15 +1081,16 @@ function renderAgentList() {
             quickGrid.append('<div class="ica--quick-empty">No pinned agents yet. Use the star button on an agent card or in the editor to keep it here.</div>');
         } else {
             for (const agent of favoriteAgents) {
-                const enabledClass = agent.enabled ? 'is-enabled' : '';
+                const agentEnabled = isAgentEnabledForCurrentScope(agent);
+                const enabledClass = agentEnabled ? 'is-enabled' : '';
                 const categoryLabel = AGENT_CATEGORIES[agent.category]?.label ?? 'Custom';
                 const phaseLabel = AGENT_PHASE_LABELS[agent.phase] || agent.phase;
                 const canApplyToLastReply = !isPathfinderAgent(agent);
                 const quickItem = $(`
                     <div class="ica--quick-chip ${enabledClass}">
-                        <button type="button" class="ica--quick-chip-main" title="${agent.enabled ? 'Disable agent' : 'Enable agent'}">
+                        <button type="button" class="ica--quick-chip-main" title="${agentEnabled ? 'Disable agent' : 'Enable agent'}">
                             <span class="ica--quick-chip-status">
-                                <i class="fa-solid ${agent.enabled ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>
+                                <i class="fa-solid ${agentEnabled ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>
                             </span>
                             <span class="ica--quick-chip-copy">
                                 <span class="ica--quick-chip-name">${escapeHtml(agent.name || 'Untitled Agent')}</span>
@@ -1211,8 +1179,9 @@ function renderAgentList() {
         const items = $('<div class="ica--category-items"></div>');
 
         for (const agent of catAgents) {
-            const enabledClass = agent.enabled ? 'is-enabled' : '';
-            const toggleClass = agent.enabled ? 'is-on' : '';
+            const agentEnabled = isAgentEnabledForCurrentScope(agent);
+            const enabledClass = agentEnabled ? 'is-enabled' : '';
+            const toggleClass = agentEnabled ? 'is-on' : '';
             const desc = agent.description || agent.prompt.substring(0, 80).replace(/\n/g, ' ') + (agent.prompt.length > 80 ? '...' : '');
             const regexCount = getAgentRegexScripts(agent).length;
             const promptTransformEnabled = hasPromptTransform(agent);
@@ -1227,7 +1196,7 @@ function renderAgentList() {
             const card = $(`
                 <div class="ica--agent-card ${enabledClass}${selectModeActive ? ' ica--selectable' : ''}${selectedAgentIds.has(agent.id) ? ' ica--selected' : ''}" data-agent-id="${escapeHtml(agent.id)}">
                     <div class="ica--card-header">
-                        ${selectModeActive ? `<input type="checkbox" class="ica--card-select" title="Select agent" ${selectedAgentIds.has(agent.id) ? 'checked' : ''} />` : `<button type="button" class="ica--card-toggle ${toggleClass}" title="${agent.enabled ? 'Disable' : 'Enable'}"></button>`}
+                        ${selectModeActive ? `<input type="checkbox" class="ica--card-select" title="Select agent" ${selectedAgentIds.has(agent.id) ? 'checked' : ''} />` : `<button type="button" class="ica--card-toggle ${toggleClass}" title="${agentEnabled ? 'Disable' : 'Enable'}"></button>`}
                         <span class="ica--card-name">${escapeHtml(agent.name)}</span>
                         <div class="ica--card-header-actions">
                             <button type="button" class="ica--card-favorite ${agent.favorite ? 'is-active' : ''}" title="${agent.favorite ? 'Remove from Quick Toggles' : 'Add to Quick Toggles'}">
@@ -2140,17 +2109,6 @@ function handleExportAll() {
 
 // ===================== Utilities =====================
 
-/**
- * Simple HTML escape.
- * @param {string} str
- * @returns {string}
- */
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-}
-
 function normalizeMultilineInput(value) {
     return String(value ?? '').replace(/\r\n?/g, '\n').trim();
 }
@@ -2175,7 +2133,7 @@ function slugifyIdentifier(value, fallback = 'tracker_data') {
 }
 
 function escapeRegexPattern(value) {
-    return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return escapeRegex(String(value ?? ''));
 }
 
 function parseTrackerFormat(formatText) {
@@ -2406,7 +2364,7 @@ async function openPromptTransformHistoryPopup(messageIndex) {
     }
 
     const message = chat[Number(messageIndex)];
-    const history = message.extra?.[PROMPT_TRANSFORM_HISTORY_KEY];
+    const history = getPromptTransformHistoryForMessage(message);
     if (!Array.isArray(history) || history.length === 0) {
         toastr.info('No transform history available.');
         return;
@@ -2529,6 +2487,8 @@ function refreshConnectionProfileUi() {
 }
 
 function populateGlobalNotificationToggle() {
+    updateGlobalAgentToggle();
+    populateSeparateRecentChatsToggle();
     $('#ica--promptTransformShowNotifications').prop(
         'checked',
         Boolean(getGlobalSettings().promptTransformShowNotifications),
@@ -2538,25 +2498,6 @@ function populateGlobalNotificationToggle() {
 function populateGlobalExecutionModeDropdown() {
     const mode = getGlobalSettings().appendAgentsExecutionMode || 'parallel';
     $('#ica--appendAgentsExecutionMode').val(mode);
-}
-
-function extractProfileResponseText(response) {
-    return normalizeContentText(response?.content)
-        || normalizeContentText(response?.choices?.[0]?.message?.content)
-        || normalizeContentText(response?.candidates?.[0]?.content?.parts)
-        || normalizeContentText(response?.candidates?.[0]?.output?.parts)
-        || normalizeContentText(response?.text)
-        || normalizeContentText(response?.output)
-        || normalizeContentText(response?.message?.content)
-        || normalizeContentText(response?.message?.tool_plan)
-        || normalizeContentText(response?.message)
-        || '';
-}
-
-function buildFallbackPromptText(messages) {
-    return messages
-        .map(message => `${String(message?.role ?? 'user').toUpperCase()}:\n${normalizeContentText(message?.content)}`)
-        .join('\n\n');
 }
 
 /**
@@ -2900,6 +2841,14 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         toastr.success(`Removed ${removedDuplicateCount} redundant bundled agent duplicate(s).`);
     }
 
+    if (getGlobalSettings().separateRecentChats) {
+        const initializedScopedAgentState = initializeScopedAgentEnableState();
+        const reconciledScopedAgentState = reconcileScopedEnabledAgentIdsFromLegacyFlags();
+        if (initializedScopedAgentState || reconciledScopedAgentState) {
+            persistExtensionState();
+        }
+    }
+
     // Initialize the pipeline runner
     try {
         initAgentRunner();
@@ -2925,6 +2874,14 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     renderAgentList();
 
     // Wire up toolbar
+    $('#ica--globalEnabled').on('click', () => {
+        const enabled = !areAgentsGloballyEnabled();
+        setGlobalSettings({ enabled });
+        persistExtensionState();
+        updateGlobalAgentToggle();
+        syncToolAgentRegistrations();
+        toastr.info(enabled ? 'In-Chat Agents enabled.' : 'In-Chat Agents disabled.');
+    });
     $('#ica--addAgent').on('click', () => openEditor());
     $('#ica--importAgent').on('click', () => $('#ica--importFile').trigger('click'));
     $('#ica--importFile').on('change', handleImport);
@@ -2952,22 +2909,34 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         renderAgentList();
     });
     $('#ica--bulkEnable').on('click', async () => {
+        let changed = false;
         for (const id of selectedAgentIds) {
             const agent = getAgentById(id);
-            if (agent && !agent.enabled) {
-                agent.enabled = true;
+            if (agent && !isAgentEnabledForCurrentScope(agent)) {
+                setAgentEnabledForCurrentScope(agent, true);
                 await saveAgent(agent);
+                changed = true;
             }
+        }
+        if (changed) {
+            persistExtensionState();
+            syncToolAgentRegistrations();
         }
         exitSelectMode();
     });
     $('#ica--bulkDisable').on('click', async () => {
+        let changed = false;
         for (const id of selectedAgentIds) {
             const agent = getAgentById(id);
-            if (agent && agent.enabled) {
-                agent.enabled = false;
+            if (agent && isAgentEnabledForCurrentScope(agent)) {
+                setAgentEnabledForCurrentScope(agent, false);
                 await saveAgent(agent);
+                changed = true;
             }
+        }
+        if (changed) {
+            persistExtensionState();
+            syncToolAgentRegistrations();
         }
         exitSelectMode();
     });
@@ -3031,6 +3000,20 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
         setGlobalSettings({ connectionProfile: this.value });
         persistExtensionState();
         renderAgentList();
+    });
+    $('#ica--separateRecentChats').on('change', function () {
+        const separated = $(this).prop('checked');
+        setGlobalSettings({ separateRecentChats: separated });
+        if (separated) {
+            initializeScopedAgentEnableState();
+            reconcileScopedEnabledAgentIdsFromLegacyFlags();
+        }
+        persistExtensionState();
+        renderAgentList();
+        syncToolAgentRegistrations();
+        toastr.info(separated
+            ? `Agent toggles are now scoped to ${getAgentChatScopeLabel().toLowerCase()}. Switch chat types to configure the other scope.`
+            : 'Agent toggles are shared across Individual and Group chats again.');
     });
     $('#ica--promptTransformShowNotifications').on('change', function () {
         setGlobalSettings({ promptTransformShowNotifications: $(this).prop('checked') });
@@ -3108,6 +3091,7 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     }
 
     const refreshGenerationUi = () => updateCancelGenerationButton();
+    onAgentGenerationStateChanged(refreshGenerationUi);
     for (const eventName of [
         event_types.GENERATION_STARTED,
         event_types.GENERATION_ENDED,

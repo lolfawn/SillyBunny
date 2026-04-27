@@ -1,0 +1,53 @@
+export function getPositiveTokenCount(value) {
+    const tokenCount = Number(value);
+    return Number.isFinite(tokenCount) && tokenCount > 0 ? tokenCount : 0;
+}
+
+/**
+ * Stores output and reasoning token counts separately for message metadata.
+ * @param {object} message Message to update.
+ * @param {object} options Token accounting options.
+ * @param {(text: string) => Promise<number>} options.countTokens Token counter to use when a count must be refreshed.
+ * @param {string} [options.reasoning] Reasoning text to count separately.
+ * @param {number} [options.reasoningTokens] Provider-reported reasoning token count, if available.
+ * @param {boolean} [options.countOutput=true] Whether to refresh the visible output token count.
+ * @param {boolean} [options.countReasoning=options.countOutput] Whether to estimate reasoning tokens when the provider did not report them.
+ * @returns {Promise<{outputTokens: number, reasoningTokens: number}>}
+ */
+export async function updateReasoningTokenAccounting(
+    message,
+    {
+        countTokens,
+        reasoning = message?.extra?.reasoning ?? '',
+        reasoningTokens = message?.extra?.reasoning_tokens ?? 0,
+        countOutput = true,
+        countReasoning = countOutput,
+    },
+) {
+    if (!message || typeof message !== 'object') {
+        return { outputTokens: 0, reasoningTokens: 0 };
+    }
+
+    if (typeof countTokens !== 'function') {
+        throw new TypeError('countTokens must be a function');
+    }
+
+    if (!message.extra || typeof message.extra !== 'object') {
+        message.extra = {};
+    }
+
+    let outputTokens = getPositiveTokenCount(message.extra.token_count);
+    if (countOutput) {
+        outputTokens = await countTokens(message.mes ?? '');
+        message.extra.token_count = outputTokens;
+    }
+
+    let countedReasoningTokens = getPositiveTokenCount(reasoningTokens);
+    const reasoningText = String(reasoning ?? '');
+    if (!countedReasoningTokens && reasoningText && countReasoning) {
+        countedReasoningTokens = await countTokens(reasoningText);
+    }
+
+    message.extra.reasoning_tokens = countedReasoningTokens;
+    return { outputTokens, reasoningTokens: countedReasoningTokens };
+}

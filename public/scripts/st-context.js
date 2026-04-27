@@ -200,6 +200,12 @@ export function getContext() {
         hideLoader,
         mainApi: main_api,
         extensionSettings: extension_settings,
+        get vectors() {
+            return globalThis.SillyTavern?.vectors ?? null;
+        },
+        get rag() {
+            return globalThis.SillyTavern?.rag ?? null;
+        },
         ModuleWorkerWrapper,
         getTokenizerModel,
         generateQuietPrompt,

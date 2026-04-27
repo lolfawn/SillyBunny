@@ -1,3 +1,5 @@
+import { generateRaw } from '../../../../script.js';
+import { extractProfileResponseText } from '../llm-utils.js';
 import { getSettings } from './tree-store.js';
 
 /**
@@ -6,10 +8,10 @@ import { getSettings } from './tree-store.js';
  * @param {string} [systemPrompt=''] - System prompt
  * @returns {Promise<string>}
  */
-export async function sidecarGenerate(prompt, systemPrompt = '') {
+export async function sidecarGenerate(prompt, systemPrompt = '', signal = null) {
     const s = getSettings();
     const profileId = s.connectionProfile ?? '';
-    return sidecarGenerateWithProfile(prompt, systemPrompt, profileId);
+    return sidecarGenerateWithProfile(prompt, systemPrompt, profileId, 2048, signal);
 }
 
 /**
@@ -18,9 +20,10 @@ export async function sidecarGenerate(prompt, systemPrompt = '') {
  * @param {string} [systemPrompt=''] - System prompt
  * @param {string} [profileId=''] - Connection profile ID (empty = use default/main model)
  * @param {number} [maxTokens=2048] - Maximum tokens for response
+ * @param {AbortSignal?} [signal=null] - Optional abort signal
  * @returns {Promise<string>}
  */
-export async function sidecarGenerateWithProfile(prompt, systemPrompt = '', profileId = '', maxTokens = 2048) {
+export async function sidecarGenerateWithProfile(prompt, systemPrompt = '', profileId = '', maxTokens = 2048, signal = null) {
     const ctx = window?.SillyTavern?.getContext?.();
 
     const messages = [];
@@ -35,26 +38,23 @@ export async function sidecarGenerateWithProfile(prompt, systemPrompt = '', prof
                 extractData: true,
                 includePreset: true,
                 stream: false,
+                signal,
             });
-            return typeof result === 'string' ? result : result?.content || '';
+            return typeof result === 'string' ? result : extractProfileResponseText(result);
         } catch (err) {
             console.warn(`[Pathfinder] Sidecar via profile "${profileId}" failed:`, err);
         }
     }
 
-    // Fallback to main model
-    const cm = ctx?.ConnectionManagerRequestService;
-    if (cm) {
-        try {
-            const result = await cm.sendRequest('', messages, maxTokens, {
-                extractData: true,
-                includePreset: true,
-                stream: false,
-            });
-            return typeof result === 'string' ? result : result?.content || '';
-        } catch (err) {
-            console.warn('[Pathfinder] Sidecar via main model failed:', err);
-        }
+    try {
+        return await generateRaw({
+            prompt: messages,
+            responseLength: maxTokens,
+            trimNames: false,
+            signal,
+        });
+    } catch (err) {
+        console.warn('[Pathfinder] Sidecar via main model failed:', err);
     }
 
     return '';

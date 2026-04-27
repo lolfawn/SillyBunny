@@ -177,7 +177,7 @@ body.big-avatars .avatar {
     flex-direction: column;
     align-items: center;
     /* align-self: unset; */
-    overflow: visible;
+    overflow: hidden;
     border-radius: calc(var(--avatar-base-border-radius) * var(--big-avatar-border-factor));
 }
 

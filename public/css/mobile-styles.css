@@ -167,6 +167,17 @@
         justify-content: center;
     }
 
+    #send_form.sb-generating-controls #mes_stop {
+        display: flex !important;
+        width: var(--bottomFormBlockSize) !important;
+        min-width: var(--bottomFormBlockSize) !important;
+        max-width: var(--bottomFormBlockSize) !important;
+        height: var(--bottomFormBlockSize) !important;
+        min-height: var(--bottomFormBlockSize) !important;
+        max-height: var(--bottomFormBlockSize) !important;
+        flex: 0 0 var(--bottomFormBlockSize) !important;
+    }
+
     /* Hide stop button when not generating */
     #send_form .mes_stop:not(.active):not([style*="display: flex"]):not([style*="display: inline-flex"]) {
         display: none !important;
@@ -401,11 +412,6 @@
         padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
     }
 
-    /* Ignore desktop bottom bar scale on mobile — mobile sizing is handled by CSS */
-    #form_sheld {
-        font-size: var(--mainFontSize) !important;
-    }
-
     /* Compact bottom bar on mobile */
     #nonQRFormItems {
         column-gap: 3px;
@@ -418,8 +424,44 @@
     }
 
     /* Minimum touch targets for mobile */
-    button, .menu_button, .right_menu_button, select {
+    button, .menu_button, .right_menu_button, select:not(.select2-hidden-accessible) {
         min-height: 44px;
+    }
+
+    .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .menu_button_icon:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .menu_button_icon:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child),
+    .menu_button_icon:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> input[hidden] + :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):last-child),
+    .menu_button:not(.sb-server-action):not(.api_button):not(.openrouter_authorize):not(#bg_selection_mode_button):not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child),
+    .menu_button:not(.sb-server-action):not(.api_button):not(.openrouter_authorize):not(#bg_selection_mode_button):not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> input[hidden] + :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):last-child),
+    .right_menu_button:not(:has(> span)):not(:has(> small)):not(:has(> b)):not(:has(> strong)):has(> :is(.fa, .fa-solid, .fa-regular, .fa-brands, i, svg, img):only-child) {
+        width: var(--sb-control-icon-physical-size, 44px);
+        min-width: var(--sb-control-icon-physical-size, 44px);
+        max-width: var(--sb-control-icon-physical-size, 44px);
+        height: var(--sb-control-icon-physical-size, 44px);
+        min-height: var(--sb-control-icon-physical-size, 44px);
+        max-height: var(--sb-control-icon-physical-size, 44px);
+        padding: 0 !important;
+    }
+
+    .menu_button.sb-accent-preset,
+    button.sb-accent-preset {
+        min-height: var(--sb-accent-swatch-size, 30px);
+        height: var(--sb-accent-swatch-size, 30px);
+        max-height: var(--sb-accent-swatch-size, 30px);
+        padding: 0;
+    }
+
+    #chat .mes .mes_view_agent_changes {
+        width: var(--sb-message-icon-size, 2rem);
+        min-width: var(--sb-message-icon-size, 2rem);
+        max-width: var(--sb-message-icon-size, 2rem);
+        height: var(--sb-message-icon-size, 2rem);
+        min-height: var(--sb-message-icon-size, 2rem);
+        max-height: var(--sb-message-icon-size, 2rem);
+        padding: 0;
+        aspect-ratio: 1 / 1;
     }
 
     .drawer-content .floating_panel_maximize,
@@ -431,6 +473,7 @@
         align-items: start;
         height: min-content;
         align-content: start;
+        width: calc(100vw - 20px);
         max-width: unset;
     }
 
@@ -538,6 +581,36 @@
     .mes_button,
     .extraMesButtons > div {
         flex: 0 0 auto;
+    }
+
+    #chat .mes .mes_button,
+    #chat .mes .extraMesButtons > div {
+        inline-size: var(--sb-message-icon-size, 2rem);
+        block-size: var(--sb-message-icon-size, 2rem);
+        min-inline-size: var(--sb-message-icon-size, 2rem);
+        min-block-size: var(--sb-message-icon-size, 2rem);
+        max-inline-size: var(--sb-message-icon-size, 2rem);
+        max-block-size: var(--sb-message-icon-size, 2rem);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-basis: var(--sb-message-icon-size, 2rem);
+        padding: 0;
+    }
+
+    .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .menu_button_icon:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
+    .right_menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty {
+        inline-size: var(--sb-control-icon-physical-size, 44px);
+        block-size: var(--sb-control-icon-physical-size, 44px);
+        min-inline-size: var(--sb-control-icon-physical-size, 44px);
+        min-block-size: var(--sb-control-icon-physical-size, 44px);
+        max-inline-size: var(--sb-control-icon-physical-size, 44px);
+        max-block-size: var(--sb-control-icon-physical-size, 44px);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
     }
 
     .checkbox_label {
@@ -886,15 +959,6 @@
         height: unset;
     }
 
-    /* Fix help button positioning - make it sticky */
-    .topRightInset {
-        position: sticky;
-        top: calc(var(--topBarBlockSize) + 10px);
-        z-index: 100;
-        float: right;
-        margin-left: 10px;
-    }
-
     .note-link-span {
         display: inline-flex;
         align-items: center;
@@ -1041,4 +1105,364 @@
     .checkbox_label {
         min-height: 28px;
     }
+}
+
+/* Final mobile chat-bar guardrails: keep controls compact and square. */
+@media screen and (max-width: 768px) {
+    :root {
+        --bottomFormBlockSize: 36px;
+        --bottomFormIconSize: 18px;
+        --sb-mobile-composer-input-height: 46px;
+    }
+
+    :root[data-sb-compact-mode='true'] {
+        --bottomFormBlockSize: 34px;
+        --bottomFormIconSize: 17px;
+        --sb-mobile-composer-input-height: 42px;
+    }
+
+    #send_form {
+        border-radius: 14px 14px 0 0;
+    }
+
+    #nonQRFormItems {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) max-content !important;
+        grid-template-rows: minmax(var(--sb-mobile-composer-input-height), auto) var(--bottomFormBlockSize) !important;
+        grid-template-areas:
+            "input input"
+            "tools action" !important;
+        align-items: center !important;
+        column-gap: 6px !important;
+        row-gap: 5px !important;
+        min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 14px) !important;
+        padding: 5px 6px !important;
+        box-sizing: border-box !important;
+    }
+
+    :root[data-sb-compact-mode='true'] #nonQRFormItems {
+        column-gap: 5px !important;
+        row-gap: 4px !important;
+        min-height: calc(var(--sb-mobile-composer-input-height) + var(--bottomFormBlockSize) + 12px) !important;
+        padding: 4px 6px !important;
+    }
+
+    #leftSendForm,
+    #rightSendForm {
+        flex: 0 0 auto !important;
+        min-width: 0 !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+    }
+
+    #leftSendForm {
+        grid-area: tools !important;
+        width: 100% !important;
+        min-height: var(--bottomFormBlockSize) !important;
+        height: var(--bottomFormBlockSize) !important;
+        justify-content: flex-start !important;
+        gap: 4px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scrollbar-width: none !important;
+    }
+
+    :root[data-sb-compact-mode='true'] #leftSendForm {
+        min-height: var(--bottomFormBlockSize) !important;
+        height: var(--bottomFormBlockSize) !important;
+        gap: 3px !important;
+    }
+
+    #leftSendForm::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    #rightSendForm {
+        grid-area: action !important;
+        width: auto !important;
+        min-width: var(--bottomFormBlockSize) !important;
+        height: var(--bottomFormBlockSize) !important;
+        min-height: var(--bottomFormBlockSize) !important;
+        align-items: center !important;
+        justify-content: center !important;
+        align-self: center !important;
+        gap: 4px !important;
+    }
+
+    #leftSendForm > div,
+    #rightSendForm > div:not(.stscript_btn),
+    #send_but,
+    #send_form .mes_stop,
+    #send_form.sb-generating-controls #mes_stop {
+        width: var(--bottomFormBlockSize) !important;
+        min-width: var(--bottomFormBlockSize) !important;
+        max-width: var(--bottomFormBlockSize) !important;
+        height: var(--bottomFormBlockSize) !important;
+        min-height: var(--bottomFormBlockSize) !important;
+        max-height: var(--bottomFormBlockSize) !important;
+        flex: 0 0 var(--bottomFormBlockSize) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+        border-radius: 10px !important;
+        line-height: 1 !important;
+        font-size: 18px !important;
+    }
+
+    :root[data-sb-compact-mode='true'] #leftSendForm > div,
+    :root[data-sb-compact-mode='true'] #rightSendForm > div:not(.stscript_btn),
+    :root[data-sb-compact-mode='true'] #send_but,
+    :root[data-sb-compact-mode='true'] #send_form .mes_stop,
+    :root[data-sb-compact-mode='true'] #send_form.sb-generating-controls #mes_stop {
+        border-radius: 9px !important;
+        font-size: 17px !important;
+    }
+
+    #send_textarea {
+        grid-area: input !important;
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: var(--sb-mobile-composer-input-height) !important;
+        height: var(--sb-mobile-composer-input-height) !important;
+        max-height: 42dvh !important;
+        padding: 8px 10px !important;
+        font-size: 16px !important;
+        line-height: 1.25 !important;
+        align-self: stretch !important;
+        box-sizing: border-box !important;
+    }
+
+    :root[data-sb-compact-mode='true'] #send_textarea {
+        min-height: var(--sb-mobile-composer-input-height) !important;
+        height: var(--sb-mobile-composer-input-height) !important;
+        padding: 7px 9px !important;
+        line-height: 1.22 !important;
+    }
+
+    #send_but::before,
+    #mes_stop > i {
+        width: 1em !important;
+        height: 1em !important;
+        margin: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 18px !important;
+        line-height: 1 !important;
+    }
+
+    :root[data-sb-compact-mode='true'] #send_but::before,
+    :root[data-sb-compact-mode='true'] #mes_stop > i {
+        font-size: 17px !important;
+    }
+
+    #send_form:not(.sb-generating-controls) #mes_stop {
+        display: none !important;
+    }
+
+    #send_form.sb-generating-controls #send_but,
+    #send_form.sb-generating-controls #mes_continue,
+    #send_form.sb-generating-controls #mes_impersonate {
+        display: none !important;
+    }
+
+    #send_form.sb-generating-controls #rightSendForm {
+        grid-area: action !important;
+        align-self: center !important;
+        align-items: center !important;
+        justify-content: center !important;
+        height: var(--bottomFormBlockSize) !important;
+        min-height: var(--bottomFormBlockSize) !important;
+        max-height: var(--bottomFormBlockSize) !important;
+        margin-block: 0 !important;
+    }
+
+    #send_form.sb-generating-controls #mes_stop {
+        display: flex !important;
+        order: 2 !important;
+        position: static !important;
+        inset: auto !important;
+        top: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        left: auto !important;
+        transform: none !important;
+        translate: none !important;
+        align-self: center !important;
+        justify-self: center !important;
+        place-self: center !important;
+        margin: 0 !important;
+        opacity: 1 !important;
+    }
+
+    .group_speaker_controls {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) repeat(4, 32px) !important;
+        grid-template-areas: "avatars speak dm chat auto" !important;
+        gap: 4px !important;
+        align-items: center !important;
+        min-height: 40px !important;
+        padding: 4px 6px !important;
+        margin-bottom: 2px !important;
+        border-radius: 9px !important;
+        overflow: hidden !important;
+    }
+
+    .group_speaker_controls.displayNone {
+        display: none !important;
+    }
+
+    .group_typing_indicator {
+        grid-area: avatars !important;
+        align-self: center !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        padding: 0 2px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        font-size: 14px !important;
+        line-height: 32px !important;
+        pointer-events: none !important;
+    }
+
+    .group_speaker_list {
+        grid-area: avatars !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        justify-content: space-evenly !important;
+        gap: 0 !important;
+        min-width: 0 !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scrollbar-width: none !important;
+    }
+
+    .group_speaker_list::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .group_speaker_controls.is-typing .group_speaker_list {
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    .group_speaker_controls.is-typing .group_typing_indicator {
+        display: block !important;
+        z-index: 2 !important;
+    }
+
+    .group_speaker_avatar {
+        width: 30px !important;
+        min-width: 30px !important;
+        max-width: 30px !important;
+        margin-inline: 1px !important;
+        height: 30px !important;
+        min-height: 30px !important;
+        max-height: 30px !important;
+        flex: 0 0 30px !important;
+        padding: 1px !important;
+        gap: 0 !important;
+        justify-content: center !important;
+        border-radius: 999px !important;
+        overflow: visible !important;
+    }
+
+    .group_speaker_avatar img {
+        width: 26px !important;
+        height: 26px !important;
+    }
+
+    .group-dm-unread-dot {
+        top: -2px !important;
+        right: -2px !important;
+        display: block !important;
+        width: 10px !important;
+        height: 10px !important;
+        min-width: 10px !important;
+        min-height: 10px !important;
+    }
+
+    .group_speaker_avatar.has-unread-dm {
+        border-color: #ff3b3b !important;
+        box-shadow: 0 0 0 1px color-mix(in srgb, #ff3b3b 42%, transparent) !important;
+        animation: none !important;
+    }
+
+    .group_speaker_avatar.has-unread-dm::after {
+        inset: -4px !important;
+    }
+
+    .group_speaker_avatar span,
+    #group_speaker_now span,
+    #group_speaker_dm_now span,
+    #group_speaker_dm_consolidate span,
+    #group_speaker_auto_dm span,
+    .group_speaker_toggle span {
+        display: none !important;
+    }
+
+    #group_speaker_now,
+    #group_speaker_dm_now,
+    #group_speaker_dm_consolidate,
+    #group_speaker_auto_dm,
+    .group_speaker_toggle {
+        width: 32px !important;
+        min-width: 32px !important;
+        max-width: 32px !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0 !important;
+        border-radius: 9px !important;
+        box-sizing: border-box !important;
+        font-size: 16px !important;
+    }
+
+    #group_speaker_now {
+        grid-area: speak !important;
+    }
+
+    #group_speaker_dm_now {
+        grid-area: dm !important;
+    }
+
+    #group_speaker_dm_consolidate {
+        grid-area: chat !important;
+    }
+
+    .group_speaker_toggle {
+        grid-area: auto !important;
+    }
+
+    #group_speaker_dm_now.selected,
+    #group_speaker_auto_dm.selected {
+        color: var(--SmartThemeBlurTintColor) !important;
+        background: var(--SmartThemeQuoteColor) !important;
+        border-color: var(--SmartThemeQuoteColor) !important;
+        opacity: 1 !important;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--SmartThemeQuoteColor) 45%, transparent), 0 0 10px color-mix(in srgb, var(--SmartThemeQuoteColor) 55%, transparent) !important;
+    }
+
+    #group_speaker_dm_now.selected i,
+    #group_speaker_auto_dm.selected i {
+        color: var(--SmartThemeBlurTintColor) !important;
+    }
+
+    #group_speaker_dm_now:not(.selected),
+    #group_speaker_auto_dm:not(.selected) {
+        opacity: 0.58 !important;
+        background: color-mix(in srgb, var(--SmartThemeBodyColor) 8%, transparent) !important;
+    }
+
 }

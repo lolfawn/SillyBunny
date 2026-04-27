@@ -3,6 +3,7 @@ import { createEntry } from '../entry-manager.js';
 import { getActiveTunnelVisionBooks, resolveTargetBook, TOOL_NAMES } from '../pathfinder-tool-bridge.js';
 import { registerToolAction, registerToolFormatter } from '../../tool-action-registry.js';
 import { logToolCallStarted, logToolCallCompleted, logToolCallError } from '../activity-feed.js';
+import { setSummaryMemoryCreated } from '../summary-memory-store.js';
 
 const COMPACT_DESCRIPTION = 'Create a scene or event summary with significance level and optional narrative arc.';
 
@@ -32,6 +33,14 @@ async function summarizeAction(args) {
 
     try {
         const result = await createEntry(targetBook, summaryTitle, formattedContent, ['summary', significance.toLowerCase()]);
+        setSummaryMemoryCreated({
+            title: summaryTitle,
+            content,
+            significance,
+            arc,
+            bookName: targetBook,
+            uid: result.uid,
+        });
 
         const tree = getTree(targetBook);
         if (tree && arc) {

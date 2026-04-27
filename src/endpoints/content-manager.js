@@ -66,6 +66,17 @@ export const PRESET_CONTENT_TYPES = Object.freeze([
     CONTENT_TYPES.REASONING,
 ]);
 
+// SillyBunny divergence: remove superseded bundled preset files from user data
+// during the existing default content update pass, without adding new metadata.
+const OBSOLETE_CONTENT_ITEMS = Object.freeze([
+    { filename: 'presets/openai/Geechan - Universal Roleplay (Chat Completions) (v5.0).json', type: CONTENT_TYPES.OPENAI_PRESET },
+    { filename: 'presets/context/Geechan - Universal Roleplay (V5.0).json', type: CONTENT_TYPES.CONTEXT },
+    { filename: 'presets/sysprompt/Geechan - Universal Roleplay (V5.0).json', type: CONTENT_TYPES.SYSPROMPT },
+    { filename: 'presets/sysprompt/Geechan - Universal Roleplay (NSFW) (V5.0).json', type: CONTENT_TYPES.SYSPROMPT },
+    { filename: 'presets/sysprompt/Geechan - Universal Roleplay (Simplified) (V5.0).json', type: CONTENT_TYPES.SYSPROMPT },
+    { filename: 'presets/sysprompt/Geechan - Universal Roleplay (NSFW Simplified) (V5.0).json', type: CONTENT_TYPES.SYSPROMPT },
+]);
+
 function isPresetContentType(type) {
     return PRESET_CONTENT_TYPES.includes(type);
 }
@@ -133,6 +144,8 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
     const contentLogPath = path.join(directories.root, 'content.log');
     const contentLog = getContentLog(contentLogPath);
 
+    removeObsoleteContent(contentLog, directories);
+
     for (const contentItem of contentIndex) {
         const hasLoggedContent = contentLog.includes(contentItem.filename);
 
@@ -182,6 +195,37 @@ async function seedContentForUser(contentIndex, directories, forceCategories) {
 
     writeFileAtomicSync(contentLogPath, contentLog.join('\n'));
     return anyContentAdded;
+}
+
+/**
+ * Removes obsolete bundled content from user data after it has been superseded.
+ * @param {string[]} contentLog Array of content log lines
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ */
+function removeObsoleteContent(contentLog, directories) {
+    for (const contentItem of OBSOLETE_CONTENT_ITEMS) {
+        const contentLogIndex = contentLog.indexOf(contentItem.filename);
+
+        if (contentLogIndex === -1) {
+            continue;
+        }
+
+        const contentTarget = getTargetByType(contentItem.type, directories);
+
+        if (!contentTarget) {
+            continue;
+        }
+
+        const basePath = path.parse(contentItem.filename).base;
+        const targetPath = path.join(contentTarget, basePath);
+
+        if (fs.existsSync(targetPath)) {
+            fs.rmSync(targetPath, { recursive: true, force: true });
+            console.info(`Obsolete content file ${contentItem.filename} removed from ${contentTarget}`);
+        }
+
+        contentLog.splice(contentLogIndex, 1);
+    }
 }
 
 /**

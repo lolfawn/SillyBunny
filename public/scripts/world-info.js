@@ -89,6 +89,8 @@ const sortFn = (a, b) => b.order - a.order;
 let updateEditor = (navigation, flashOnNav = true) => { console.debug('Triggered WI navigation', navigation, flashOnNav); };
 const WORLD_INFO_DESKTOP_SPLIT_QUERY = '(min-width: 961px)';
 let desktopSelectedWorldInfoUid = null;
+let isWorldInfoEditorPopoutRequested = false;
+let isWorldInfoEditorPopoutShellSyncBound = false;
 
 // Do not optimize. updateEditor is a function that is updated by the displayWorldEntries with new data.
 export const worldInfoFilter = new FilterHelper(() => updateEditor());
@@ -2107,18 +2109,85 @@ function isWorldInfoDesktopSplitLayout() {
 function getWorldInfoDesktopEditorElements() {
     return {
         workspace: $('#world_popup_workspace'),
+        pane: $('#world_popup_editor_pane'),
         host: $('#world_popup_editor_host'),
         title: $('#world_popup_editor_title'),
         uid: $('#world_popup_editor_uid'),
+        popoutButton: $('#world_popup_editor_popout'),
     };
 }
 
+function updateWorldInfoDesktopEditorPopoutButton(isPopout) {
+    const { popoutButton } = getWorldInfoDesktopEditorElements();
+    if (!popoutButton.length) {
+        return;
+    }
+
+    const label = isPopout ? t`Dock editor in panel` : t`Open editor as pop-up`;
+    popoutButton.attr({
+        title: label,
+        'aria-label': label,
+        'aria-pressed': String(isPopout),
+    });
+    popoutButton.find('i')
+        .toggleClass('fa-window-restore', !isPopout)
+        .toggleClass('fa-down-left-and-up-right-to-center', isPopout);
+}
+
+function setWorldInfoDesktopEditorPopout(isPopout) {
+    const { workspace, pane } = getWorldInfoDesktopEditorElements();
+    const requested = Boolean(isPopout);
+    const enabled = requested && isWorldInfoDesktopSplitLayout() && pane.length > 0 && workspace.length > 0;
+
+    isWorldInfoEditorPopoutRequested = requested;
+    workspace.toggleClass('world_popup_editor_popout', enabled);
+    pane.toggleClass('world_popup_editor_pane_popout', enabled);
+
+    if (enabled && pane.parent()[0] !== document.body) {
+        pane.appendTo(document.body);
+    } else if (!enabled && pane.parent()[0] !== workspace[0]) {
+        pane.appendTo(workspace);
+    }
+
+    updateWorldInfoDesktopEditorPopoutButton(enabled);
+}
+
+function syncWorldInfoDesktopEditorPopout() {
+    setWorldInfoDesktopEditorPopout(isWorldInfoEditorPopoutRequested);
+}
+
+function bindWorldInfoDesktopEditorPopoutShellSync() {
+    if (isWorldInfoEditorPopoutShellSyncBound) {
+        return;
+    }
+
+    const leftShell = document.getElementById('left-nav-panel');
+    if (leftShell instanceof HTMLElement) {
+        new MutationObserver(() => {
+            if (!leftShell.classList.contains('openDrawer')) {
+                setWorldInfoDesktopEditorPopout(false);
+            }
+        }).observe(leftShell, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    document.addEventListener('sb:shell-tab-activated', (event) => {
+        if (event instanceof CustomEvent
+            && event.detail?.shellKey === 'left'
+            && event.detail?.tabId !== 'world-info') {
+            setWorldInfoDesktopEditorPopout(false);
+        }
+    });
+
+    isWorldInfoEditorPopoutShellSyncBound = true;
+}
+
 function clearWorldInfoDesktopEditor() {
-    const { workspace, host, title, uid } = getWorldInfoDesktopEditorElements();
+    const { workspace, pane, host, title, uid } = getWorldInfoDesktopEditorElements();
     if (host.length) {
         clearEntryList(host);
     }
     workspace.removeClass('world_popup_has_selection');
+    pane.removeClass('world_popup_editor_pane_has_selection');
     title.text(t`No entry selected`);
     uid.text('');
 }
@@ -2182,9 +2251,10 @@ function shouldRefreshWorldInfoListForViewFilter(entry) {
 }
 
 function setWorldInfoDesktopEditorMeta(entry) {
-    const { workspace, title, uid } = getWorldInfoDesktopEditorElements();
+    const { workspace, pane, title, uid } = getWorldInfoDesktopEditorElements();
     const fallbackTitle = Array.isArray(entry?.key) && entry.key.length > 0 ? entry.key.join(', ') : t`Untitled entry`;
     workspace.addClass('world_popup_has_selection');
+    pane.addClass('world_popup_editor_pane_has_selection');
     title.text(String(entry?.comment || fallbackTitle));
     uid.text(`UID ${entry?.uid ?? ''}`.trim());
 }
@@ -2425,6 +2495,7 @@ async function displayWorldEntries(name, data, navigation = navigation_option.no
     const worldEntriesList = $('#world_popup_entries_list');
     const { workspace: desktopWorkspace, host: desktopEditorHost } = getWorldInfoDesktopEditorElements();
     const isDesktopSplit = isWorldInfoDesktopSplitLayout();
+    syncWorldInfoDesktopEditorPopout();
     const requestedUid = typeof navigation === 'number' && Number(navigation) >= 0 ? Number(navigation) : null;
     if (requestedUid !== null) {
         desktopSelectedWorldInfoUid = requestedUid;
@@ -2435,6 +2506,7 @@ async function displayWorldEntries(name, data, navigation = navigation_option.no
     worldEntriesList.show();
 
     if (!data || !('entries' in data)) {
+        setWorldInfoDesktopEditorPopout(false);
         $('#world_popup_new').off('click').on('click', nullWorldInfo);
         $('#world_popup_name_button').off('click').on('click', nullWorldInfo);
         $('#world_popup_export').off('click').on('click', nullWorldInfo);
@@ -6274,6 +6346,15 @@ function updateAuxBooks(fileName, computeNext) {
 export function initWorldInfo() {
     worldInfoListViewFilter = getWorldInfoListViewFilter();
     updateWorldInfoViewFilterButtons();
+    syncWorldInfoDesktopEditorPopout();
+
+    const desktopSplitMediaQuery = window.matchMedia(WORLD_INFO_DESKTOP_SPLIT_QUERY);
+    if (typeof desktopSplitMediaQuery.addEventListener === 'function') {
+        desktopSplitMediaQuery.addEventListener('change', syncWorldInfoDesktopEditorPopout);
+    } else {
+        desktopSplitMediaQuery.addListener(syncWorldInfoDesktopEditorPopout);
+    }
+    bindWorldInfoDesktopEditorPopoutShellSync();
 
     $('#world_info').on('mousedown change', async function (e) {
         // If there's no world names, don't do anything
@@ -6312,10 +6393,25 @@ export function initWorldInfo() {
         }
     });
 
-    $('#world_popup_editor_close').on('click', () => {
+    $('#world_popup_editor_close').on('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         desktopSelectedWorldInfoUid = null;
+        setWorldInfoDesktopEditorPopout(false);
         clearWorldInfoDesktopEditor();
         updateEditor(navigation_option.none, false);
+    });
+
+    $('#world_popup_editor_popout').on('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const { workspace } = getWorldInfoDesktopEditorElements();
+        setWorldInfoDesktopEditorPopout(!workspace.hasClass('world_popup_editor_popout'));
+    });
+    $('#world_popup_editor_pane').on('mousedown touchstart', (event) => {
+        if ($(event.currentTarget).hasClass('world_popup_editor_pane_popout')) {
+            event.stopPropagation();
+        }
     });
 
     $('#world_editor_select').on('change', async () => {

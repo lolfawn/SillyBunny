@@ -618,19 +618,35 @@
 
 @media (max-width: 768px) {
     .ica--quick-section {
-        padding: 12px;
+        max-width: 100%;
+        min-width: 0;
+        padding: 10px;
+        overflow: hidden;
     }
 
     .ica--quick-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
+        min-width: 0;
     }
 
     .ica--quick-chip {
+        min-width: 0;
         padding: 4px;
     }
 
     .ica--quick-chip-main {
-        padding: 8px 9px;
+        min-width: 0;
+        padding: 8px 7px;
+    }
+
+    .ica--quick-chip-actions {
+        gap: 2px;
+    }
+
+    .ica--quick-chip-pin,
+    .ica--quick-chip-apply {
+        width: 30px;
+        min-width: 30px;
     }
 
     .ica--card-toggle {
@@ -706,8 +722,22 @@
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 6px;
     align-items: center;
+}
+
+.ica--bulk-bar-actions > .menu_button.menu_button_icon,
+.ica--bulk-edit-popup-actions > .menu_button.menu_button_icon {
+    width: auto;
+    inline-size: auto;
+    min-width: max-content;
+    min-inline-size: max-content;
+    max-width: 100%;
+    max-inline-size: 100%;
+    flex: 0 0 auto;
+    padding-inline: 12px !important;
+    aspect-ratio: auto;
+    white-space: nowrap;
 }
 
 /* Footer */
@@ -797,14 +827,17 @@
 }
 
 .ica--editor .checkbox_label {
-    align-items: flex-start;
+    align-items: center;
     column-gap: 8px;
     font-size: calc(var(--mainFontSize) * 0.88);
+    line-height: 1.25;
 }
 
-.ica--editor .checkbox_label > input[type="checkbox"] {
+.ica--editor .checkbox_label > input[type="checkbox"],
+.ica--editor .checkbox_label > input[type="radio"] {
+    align-self: center;
     flex: 0 0 auto;
-    margin-top: 0.2em;
+    margin: 0;
 }
 
 .ica--regex-note {

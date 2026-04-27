@@ -77,6 +77,44 @@ export class MockServer {
     }
 
     /**
+     * Writes a Responses API SSE stream.
+     * @param {object} jsonBody The parsed JSON body from the request.
+     * @param {import('node:http').ServerResponse} res The HTTP response.
+     */
+    handleResponsesStream(jsonBody, res) {
+        const responseId = 'resp-stream-1';
+        const writeEvent = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
+        const writeDone = () => {
+            res.write('data: [DONE]\n\n');
+            res.end();
+        };
+
+        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+        writeEvent({
+            type: 'response.reasoning_summary_text.delta',
+            response_id: responseId,
+            delta: `${jsonBody?.model} stream`,
+        });
+
+        if (jsonBody?.model === 'gpt-5.4-slow') {
+            const timeout = setTimeout(() => {
+                if (res.destroyed) {
+                    return;
+                }
+
+                writeEvent({ type: 'response.output_text.delta', response_id: responseId, delta: 'Slow stream.' });
+                writeDone();
+            }, 250);
+
+            res.on('close', () => clearTimeout(timeout));
+            return;
+        }
+
+        writeEvent({ type: 'response.output_text.delta', response_id: responseId, delta: 'Hello from Responses.' });
+        writeDone();
+    }
+
+    /**
      * Handles Chat Completions requests.
      * @param {object} jsonBody The parsed JSON body from the request.
      * @returns {object} Mock response object.
@@ -121,6 +159,11 @@ export class MockServer {
                         res.writeHead(200, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify(mockResponse));
                     } else if (req.method === 'POST' && req.url === '/v1/responses') {
+                        if (jsonBody?.stream) {
+                            this.handleResponsesStream(jsonBody, res);
+                            return;
+                        }
+
                         const mockResponse = this.handleResponses(jsonBody);
                         res.writeHead(200, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify(mockResponse));
