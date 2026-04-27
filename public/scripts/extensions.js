@@ -1904,7 +1904,9 @@ export async function loadExtensionSettings(settings, versionChanged, enableAuto
     });
     const removedCount = originalDisabledCount - extension_settings.disabledExtensions.length;
 
-    if (applyBundledOptInDefaults() || removedCount > 0) {
+    if (applyBundledOptInDefaults()) {
+        saveSettingsDebounced();
+    } else if (removedCount > 0) {
         saveSettingsDebounced();
     }
 

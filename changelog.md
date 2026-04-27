@@ -73,7 +73,6 @@ Group Chats still work for normal group RP: you can pick a group, write as the u
 - Removed the bundled Moonlit Echoes extension, built-in Moonlit chat stylesheet, and Echo, Whisper, Hush, Ripple, and Tide options from core Appearance.
 - Kept core chat style validation to Flat, Bubbles, and Document; old saved Moonlit style values now reset to Flat and clear legacy body classes.
 - Added the SillyBunny-specific Moonlit Echoes fork to Launchpad optional installs.
-- Added a fork-safe Moonlit Echoes migration that cleans obsolete bundled extension disable entries while preserving the shared fork settings key.
 - Replaced the patched bundled Nemo preset extension with the SillyBunny-owned Bunny Preset Tools local extension, including saved-settings migration and no nested upstream git checkout.
 - Fixed duplicate extension settings drawers so repeated extension activation does not create doubled panels.
 - Fixed Moonlit Echoes fork styling so enabled Moonlit chat thumbnails and the mobile composer remain usable.
