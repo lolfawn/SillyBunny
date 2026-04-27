@@ -73,7 +73,6 @@ const extensionLoadErrors = new Set();
 const extensionSettingsHostIds = ['extensions_settings', 'extensions_settings2'];
 const ignoredExtensionSettingsSelectors = [];
 const ignoredExtensionSettingsSelector = ignoredExtensionSettingsSelectors.join(', ');
-const LEGACY_MOONLIT_ECHOES_EXTENSION_NAME = 'SillyTavernMoonlitEchoesTheme';
 const genericExtensionSettingsClasses = new Set([
     'alignitemscenter',
     'alignitemsbaseline',
@@ -302,28 +301,6 @@ function applyBundledOptInDefaults() {
 
     extension_settings.bundledOptInDefaultsApplied = true;
     return changed;
-}
-
-function migrateLegacyMoonlitEchoesSettings() {
-    const legacySettings = extension_settings[LEGACY_MOONLIT_ECHOES_EXTENSION_NAME];
-    if (!legacySettings || typeof legacySettings !== 'object' || legacySettings.enabled !== true) {
-        return false;
-    }
-
-    // SillyBunny: bundled Moonlit Echoes moved to the Launchpad fork, so keep old core state inert.
-    legacySettings.enabled = false;
-
-    if (extensionNames.includes(LEGACY_MOONLIT_ECHOES_EXTENSION_NAME) && !extension_settings.disabledExtensions.includes(LEGACY_MOONLIT_ECHOES_EXTENSION_NAME)) {
-        extension_settings.disabledExtensions.push(LEGACY_MOONLIT_ECHOES_EXTENSION_NAME);
-    }
-
-    toastr.info(
-        t`Bundled Moonlit Echoes was disabled because it moved out of SillyBunny core. Install or enable the SillyBunny Moonlit Echoes Theme from Launchpad optional installs to keep using Moonlit styles.`,
-        t`Moonlit Echoes moved`,
-        { timeOut: 15000, extendedTimeOut: 10000 },
-    );
-
-    return true;
 }
 
 function showHideExtensionsMenu() {
@@ -1915,7 +1892,6 @@ export async function loadExtensionSettings(settings, versionChanged, enableAuto
     extensionNames = extensions.map(x => x.name);
     extensionTypes = Object.fromEntries(extensions.map(x => [x.name, x.type]));
     manifests = await getManifests(extensionNames);
-    const migratedLegacyMoonlitEchoes = migrateLegacyMoonlitEchoesSettings();
 
     // Clean stale entries from disabledExtensions list
     const originalDisabledCount = extension_settings.disabledExtensions.length;
@@ -1928,9 +1904,7 @@ export async function loadExtensionSettings(settings, versionChanged, enableAuto
     });
     const removedCount = originalDisabledCount - extension_settings.disabledExtensions.length;
 
-    if (applyBundledOptInDefaults() || migratedLegacyMoonlitEchoes) {
-        saveSettingsDebounced();
-    } else if (removedCount > 0) {
+    if (applyBundledOptInDefaults() || removedCount > 0) {
         saveSettingsDebounced();
     }
 

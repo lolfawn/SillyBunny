@@ -73,6 +73,7 @@ import { ServerStartup, setupPrivateEndpoints } from './server-startup.js';
 import { diskCache } from './endpoints/characters.js';
 import { migrateFlatSecrets } from './endpoints/secrets.js';
 import { migrateGroupChatsMetadataFormat } from './endpoints/groups.js';
+import { migrateMoonlitEchoesSettingsForUsers } from './migrations/moonlit-echoes.js';
 
 // Unrestrict console logs display limit
 util.inspect.defaultOptions.maxArrayLength = null;
@@ -339,6 +340,7 @@ async function preSetupTasks() {
     console.log();
 
     startupDirectories = await getUserDirectoriesList();
+    migrateMoonlitEchoesSettingsForUsers(startupDirectories);
     await migrateGroupChatsMetadataFormat(startupDirectories);
     await checkForNewContent(startupDirectories, PRESET_CONTENT_TYPES);
     migrateFlatSecrets(startupDirectories);
