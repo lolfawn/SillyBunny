@@ -5,7 +5,6 @@ import {
     Generate,
     activateSendButtons,
     addOneMessage,
-    autoLabelCurrentChat,
     characters,
     chat,
     chatElement,
@@ -459,14 +458,6 @@ export function initDefaultSlashCommands() {
             ),
         ],
         helpString: t`Renames the current chat.`,
-    }));
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'autonamechat',
-        callback: async function doAutoNameChat() {
-            await autoLabelCurrentChat();
-            return '';
-        },
-        helpString: t`Asks the current LLM to rename the current chat.`,
     }));
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'getchatname',
