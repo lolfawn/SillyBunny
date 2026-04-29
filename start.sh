@@ -253,16 +253,35 @@ fi
 
 echo "Entering SillyBunny..."
 export NODE_NO_WARNINGS=1
-if (( ${#server_args[@]} )); then
+export SILLYBUNNY_LAUNCHER=1
+
+restart_exit_code=75
+server_restart_count=0
+
+run_server() {
     if [[ "$runtime_kind" == node ]]; then
-        "$RUNTIME_CMD" --no-warnings server.js "${server_args[@]}"
+        "$RUNTIME_CMD" --no-warnings server.js "$@"
     else
-        "$RUNTIME_CMD" server.js "${server_args[@]}"
+        "$RUNTIME_CMD" server.js "$@"
     fi
-else
-    if [[ "$runtime_kind" == node ]]; then
-        "$RUNTIME_CMD" --no-warnings server.js
+}
+
+while true; do
+    if (( server_restart_count > 0 )); then
+        export SILLYBUNNY_SKIP_BROWSER_AUTO_LAUNCH=1
+    fi
+
+    if run_server "${server_args[@]}"; then
+        server_exit_code=0
     else
-        "$RUNTIME_CMD" server.js
+        server_exit_code=$?
     fi
-fi
+
+    if (( server_exit_code == restart_exit_code )); then
+        ((server_restart_count += 1))
+        echo "Restarting SillyBunny..."
+        continue
+    fi
+
+    exit "$server_exit_code"
+done

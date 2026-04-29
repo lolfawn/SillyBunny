@@ -405,7 +405,7 @@ async function postSetupTasks(result) {
 
     if (cliArgs.browserLaunchEnabled) {
         if (skipBrowserAutoLaunch) {
-            console.log('Skipping browser auto-launch after restart to keep the Termux session attached.');
+            console.log('Skipping browser auto-launch after restart to keep the existing session attached.');
         } else {
             try {
                 // Load the browser launcher only when auto-open is enabled.

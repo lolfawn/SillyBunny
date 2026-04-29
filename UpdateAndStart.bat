@@ -40,6 +40,7 @@ if %errorlevel% neq 0 (
 
 set NODE_ENV=production
 set NODE_NO_WARNINGS=1
+set SILLYBUNNY_LAUNCHER=1
 set "_dependency_profile=bun-production"
 if exist node_modules\eslint\package.json set "_dependency_profile=bun-development"
 bun scripts\dependency-state.js check !_dependency_profile! > nul 2>&1
@@ -58,7 +59,15 @@ if !errorlevel! neq 0 (
     echo Dependencies are up to date.
 )
 
+:server_loop
 bun server.js %*
+set "_server_exit=!errorlevel!"
+if "!_server_exit!"=="75" (
+    echo.
+    echo [SillyBunny] Restarting server...
+    set SILLYBUNNY_SKIP_BROWSER_AUTO_LAUNCH=1
+    goto server_loop
+)
 
 :end
 pause

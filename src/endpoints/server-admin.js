@@ -19,6 +19,8 @@ import { getThumbnailRuntimeSettings, setThumbnailRuntimeSettings } from './thum
 
 const GIT_OPTIONS = Object.freeze({ timeout: { block: 10 * 60 * 1000 } });
 const RESTART_RESPONSE_DELAY_MS = 200;
+const RESTART_EXIT_CODE = 75;
+const RESTART_LAUNCHER_ENV = 'SILLYBUNNY_LAUNCHER';
 const CHAT_COMPLETION_CONFIG_DEFAULTS = Object.freeze({
     claude: Object.freeze({
         enableSystemPromptCache: false,
@@ -293,7 +295,21 @@ function getRestartPayload() {
     return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');
 }
 
+function isLauncherManagedRestart() {
+    return process.env[RESTART_LAUNCHER_ENV] === '1';
+}
+
 function scheduleRestart(response) {
+    if (isLauncherManagedRestart()) {
+        response.once('finish', () => {
+            setTimeout(() => {
+                console.info(`Restart requested; exiting with code ${RESTART_EXIT_CODE} for launcher relaunch.`);
+                process.exit(RESTART_EXIT_CODE);
+            }, RESTART_RESPONSE_DELAY_MS);
+        });
+        return;
+    }
+
     const helperScriptPath = path.join(serverDirectory, 'src', 'restart-helper.js');
     const helper = spawn(process.argv[0], [helperScriptPath, getRestartPayload()], {
         cwd: serverDirectory,
