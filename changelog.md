@@ -4,7 +4,7 @@
 
 Date: 2026-04-29
 
-This update restores Prose Polisher coverage for guided impersonation workflows, makes Advanced Formatting a first-class workspace tab again, and adds conservative startup-loading improvements for desktop and mobile.
+This update restores Prose Polisher coverage for guided impersonation workflows, makes Advanced Formatting a first-class workspace tab again, adds conservative startup-loading improvements for desktop and mobile, and polishes cross-platform UI alignment, focus, safe-area, and touch-target behavior.
 
 ### In-Chat Agents
 - Added an opt-in prompt-pass condition for generated impersonation text so Prose Polisher can rewrite Guided Generations impersonations without mutating the previous assistant message.
@@ -19,10 +19,21 @@ This update restores Prose Polisher coverage for guided impersonation workflows,
 - Deferred ordered classic library scripts, preloaded startup modules, and limited the mobile stylesheet to mobile viewports.
 - Added a guarded service worker that stale-while-revalidates static library, CSS, image, and webfont assets while using network-first handling for HTML and JavaScript.
 
+### UI Polish
+- Replaced clipped outer focus outlines and oversized active-control shadows with inset rings so focused and highlighted controls stay inside rounded containers.
+- Aligned shell headers, character drawer padding, welcome headers, and checkbox labels across desktop and mobile breakpoints.
+- Normalized mobile safe-area fallbacks and 44 px tap targets for the composer, bottom chat controls, and welcome recent-chat actions.
+- Cleaned up redundant shell borders, trailing recent-chat stat dividers, and duplicated macOS browser chrome patches.
+
 ### Local Commits
 - `1f3c9b3 feat(agents): allow prompt passes on impersonations`
 - `c6f8903 feat(shell): promote advanced formatting to workspace tab`
 - `887be36 perf(loading): defer startup assets and cache statics`
+- `de68413 fix(ui): replace clipped focus outlines with inset focus rings`
+- `1434631 fix(ui): align headers drawer padding and shell title`
+- `1f1fdd6 fix(ui): align checkbox layouts across breakpoints`
+- `88ccda0 fix(mobile): normalize safe areas and tap targets`
+- `cf7ea0a fix(ui): clean up borders and browser chrome patches`
 
 ## v1.5.1
 
