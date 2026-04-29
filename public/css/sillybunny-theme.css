@@ -1327,7 +1327,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     }
 
     #form_sheld {
-        padding-block-end: var(--sb-mobile-safe-area-bottom);
+        padding-block-end: max(var(--sb-chat-composer-edge-gap), env(safe-area-inset-bottom, 0px));
     }
 
     :root:not([data-sb-theme]),
