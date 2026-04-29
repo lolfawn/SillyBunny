@@ -119,6 +119,50 @@ function getMessageFromJquery(element) {
 }
 
 /**
+ * Persists the collapsed state of a reasoning block for a message.
+ * @param {number} messageId Message ID
+ * @param {boolean} collapsed Whether the reasoning block is collapsed
+ * @param {object} [options]
+ * @param {boolean} [options.save=true] Whether to schedule a chat save
+ */
+function setReasoningCollapsed(messageId, collapsed, { save = true } = {}) {
+    const message = chat[messageId];
+    if (!message) {
+        return;
+    }
+
+    if (!message.extra || typeof message.extra !== 'object') {
+        message.extra = {};
+    }
+
+    message.extra.reasoning_collapsed = Boolean(collapsed);
+
+    if (save) {
+        saveChatDebounced();
+    }
+}
+
+/**
+ * Persists the current open state of a reasoning details element.
+ * @param {HTMLElement|JQuery<HTMLElement>} detailsElement Reasoning details element
+ * @param {object} [options]
+ * @param {boolean} [options.save=true] Whether to schedule a chat save
+ */
+function persistReasoningCollapsedFromDetails(detailsElement, { save = true } = {}) {
+    const details = detailsElement instanceof HTMLElement ? detailsElement : $(detailsElement)[0];
+    if (!details) {
+        return;
+    }
+
+    const messageId = Number($(details).closest('.mes').attr('mesid'));
+    if (isNaN(messageId)) {
+        return;
+    }
+
+    setReasoningCollapsed(messageId, !(details instanceof HTMLDetailsElement && details.open), { save });
+}
+
+/**
  * Toggles the auto-expand state of reasoning blocks.
  */
 function toggleReasoningAutoExpand() {
@@ -414,8 +458,12 @@ export class ReasoningHandler {
 
         this.updateDom(messageId);
 
-        if (power_user.reasoning.auto_expand && this.state !== ReasoningState.Hidden) {
-            this.messageReasoningDetailsDom.open = true;
+        if (this.state !== ReasoningState.Hidden) {
+            if (typeof extra.reasoning_collapsed === 'boolean') {
+                this.messageReasoningDetailsDom.open = !extra.reasoning_collapsed;
+            } else if (power_user.reasoning.auto_expand) {
+                this.messageReasoningDetailsDom.open = true;
+            }
         }
     }
 
@@ -988,13 +1036,23 @@ function registerReasoningSlashCommands() {
 
             message.extra.reasoning = String(value ?? '');
             message.extra.reasoning_type = ReasoningType.Manual;
+            if (isTrueBoolean(String(args.collapse))) {
+                message.extra.reasoning_collapsed = true;
+            } else if (isFalseBoolean(String(args.collapse))) {
+                message.extra.reasoning_collapsed = false;
+            } else {
+                delete message.extra.reasoning_collapsed;
+            }
             await saveChatConditional();
 
             closeMessageEditor('reasoning');
             updateMessageBlock(messageId, message);
 
-            if (isTrueBoolean(String(args.collapse))) $(`#chat [mesid="${messageId}"] .mes_reasoning_details`).removeAttr('open');
-            if (isFalseBoolean(String(args.collapse))) $(`#chat [mesid="${messageId}"] .mes_reasoning_details`).attr('open', '');
+            if (isTrueBoolean(String(args.collapse))) {
+                $(`#chat [mesid="${messageId}"] .mes_reasoning_details`).removeAttr('open');
+            } else if (isFalseBoolean(String(args.collapse))) {
+                $(`#chat [mesid="${messageId}"] .mes_reasoning_details`).attr('open', '');
+            }
             return message.extra.reasoning;
         },
     }));
@@ -1143,7 +1201,13 @@ function registerReasoningSlashCommands() {
         unnamedArgumentList: reasoningVisibilityArgs,
         callback: (_args, value) => {
             const details = getReasoningDetailsElements(value);
-            if (details) details.removeAttr('open');
+            if (details) {
+                details.removeAttr('open');
+                details.each(function () {
+                    persistReasoningCollapsedFromDetails(this, { save: false });
+                });
+                saveChatDebounced();
+            }
             return '';
         },
     }));
@@ -1155,7 +1219,13 @@ function registerReasoningSlashCommands() {
         unnamedArgumentList: reasoningVisibilityArgs,
         callback: (_args, value) => {
             const details = getReasoningDetailsElements(value);
-            if (details) details.attr('open', '');
+            if (details) {
+                details.attr('open', '');
+                details.each(function () {
+                    persistReasoningCollapsedFromDetails(this, { save: false });
+                });
+                saveChatDebounced();
+            }
             return '';
         },
     }));
@@ -1175,7 +1245,9 @@ function registerReasoningSlashCommands() {
                 } else {
                     $el.attr('open', '');
                 }
+                persistReasoningCollapsedFromDetails(this, { save: false });
             });
+            saveChatDebounced();
             return '';
         },
     }));
@@ -1234,6 +1306,8 @@ function setReasoningEventHandlers() {
                 summary.find('.mes_reasoning_edit').trigger('click');
             }
         }
+
+        setTimeout(() => persistReasoningCollapsedFromDetails(details), 0);
     });
 
     $(document).on('click', '.mes_reasoning_copy', (e) => {
@@ -1286,7 +1360,12 @@ function setReasoningEventHandlers() {
         e.stopPropagation();
         e.preventDefault();
 
-        $('.mes_reasoning_details[open] .mes_reasoning_header').trigger('click');
+        const details = $('.mes_reasoning_details[open]');
+        details.removeAttr('open');
+        details.each(function () {
+            persistReasoningCollapsedFromDetails(this, { save: false });
+        });
+        saveChatDebounced();
     });
 
     $(document).on('click', '.mes_reasoning_edit_done', async function (e) {
