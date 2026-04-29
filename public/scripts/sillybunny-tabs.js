@@ -24,6 +24,7 @@ const SB_STORAGE_KEYS = Object.freeze({
 const SB_SHORTCUT_TARGETS = Object.freeze([
     { value: 'left:presets', label: 'Presets', icon: 'fa-sliders' },
     { value: 'left:sampling', label: 'Sampling', icon: 'fa-wave-square' },
+    { value: 'left:advanced-formatting', label: 'Formatting', icon: 'fa-text-height' },
     { value: 'left:api', label: 'API', icon: 'fa-plug' },
     { value: 'left:world-info', label: 'World Info', icon: 'fa-book-atlas' },
     { value: 'left:agents', label: 'Agents', icon: 'fa-robot' },
@@ -210,6 +211,13 @@ const SB_SHELLS = Object.freeze({
         },
         embeddedTabs: [
             {
+                id: 'advanced-formatting',
+                drawerId: 'advanced-formatting-button',
+                label: 'Formatting',
+                icon: 'fa-text-height',
+                description: 'Tune context and instruction formatting tools here.',
+            },
+            {
                 id: 'api',
                 drawerId: 'sys-settings-button',
                 label: 'API',
@@ -310,7 +318,7 @@ const SB_SHELLS = Object.freeze({
 const SB_DRAWER_ROUTES = Object.freeze({
     'user-settings-button': { shell: 'right', tab: 'settings' },
     'sys-settings-button': { shell: 'left', tab: 'api' },
-    'advanced-formatting-button': { shell: 'left', tab: 'presets' },
+    'advanced-formatting-button': { shell: 'left', tab: 'advanced-formatting' },
     'WI-SP-button': { shell: 'left', tab: 'world-info' },
     'extensions-settings-button': { shell: 'right', tab: 'extensions' },
     'persona-management-button': { shell: 'right', tab: 'persona' },
@@ -374,10 +382,6 @@ const sbState = {
         bindingRetryTimer: 0,
         boundEventSource: null,
         windowBindingsAttached: false,
-    },
-    presetAdvancedFormatting: {
-        bindingRetryTimer: 0,
-        boundEventSource: null,
     },
     shells: {},
     universalSearch: {
@@ -4227,72 +4231,6 @@ function prepareEmbeddedDrawer(drawerId, root = document) {
     return { drawer, drawerContent };
 }
 
-function updatePresetAdvancedFormattingVisibility() {
-    const advancedFormattingDrawer = document.getElementById('advanced-formatting-button');
-    if (!(advancedFormattingDrawer instanceof HTMLElement)) {
-        return;
-    }
-
-    advancedFormattingDrawer.hidden = getCurrentMainApiValue() !== 'textgenerationwebui';
-}
-
-function bindPresetAdvancedFormattingVisibilityEvents() {
-    const context = getSillyTavernContext();
-    const eventSource = context?.eventSource;
-    const eventTypes = context?.eventTypes;
-
-    if (!eventSource || !eventTypes) {
-        if (!sbState.presetAdvancedFormatting.bindingRetryTimer) {
-            sbState.presetAdvancedFormatting.bindingRetryTimer = window.setTimeout(() => {
-                sbState.presetAdvancedFormatting.bindingRetryTimer = 0;
-                bindPresetAdvancedFormattingVisibilityEvents();
-                updatePresetAdvancedFormattingVisibility();
-            }, SB_INIT_RETRY_DELAY_MS);
-        }
-        return;
-    }
-
-    window.clearTimeout(sbState.presetAdvancedFormatting.bindingRetryTimer);
-    sbState.presetAdvancedFormatting.bindingRetryTimer = 0;
-
-    if (sbState.presetAdvancedFormatting.boundEventSource === eventSource) {
-        return;
-    }
-
-    const events = [
-        eventTypes.APP_READY,
-        eventTypes.MAIN_API_CHANGED,
-    ].filter(Boolean);
-
-    for (const eventName of new Set(events)) {
-        eventSource.on(eventName, updatePresetAdvancedFormattingVisibility);
-    }
-
-    sbState.presetAdvancedFormatting.boundEventSource = eventSource;
-}
-
-function embedAdvancedFormattingInPresets(originalContent) {
-    if (!(originalContent instanceof HTMLElement)) {
-        return;
-    }
-
-    const prepared = prepareEmbeddedDrawer('advanced-formatting-button', originalContent);
-    if (!prepared) {
-        return;
-    }
-
-    prepared.drawer.classList.add('sb-presets-advanced-formatting');
-
-    const insertionTarget = originalContent.querySelector('#common-gen-settings-block');
-    if (insertionTarget?.parentNode) {
-        insertionTarget.insertAdjacentElement('afterend', prepared.drawer);
-    } else {
-        originalContent.appendChild(prepared.drawer);
-    }
-
-    updatePresetAdvancedFormattingVisibility();
-}
-
 const SB_SAMPLING_BACKENDS = Object.freeze([
     {
         id: 'openai',
@@ -7777,9 +7715,6 @@ function buildShell(shellKey) {
     }).observe(shellRoot, { attributes: true, attributeFilter: ['class'] });
 
     const basePanel = createShellPanel(shellConfig.baseTab);
-    if (shellKey === 'left') {
-        embedAdvancedFormattingInPresets(originalContent);
-    }
     basePanel.scroller.appendChild(originalContent);
     registerShellTab(shellKey, shellConfig.baseTab, basePanel);
 
@@ -7832,12 +7767,6 @@ function buildShell(shellKey) {
     if (shellKey === 'right') {
         injectThemePicker();
         injectSillyTavernImportCard();
-    }
-
-    if (shellKey === 'left') {
-        $('#main_api').on('change.sbPresetAdvancedFormatting', updatePresetAdvancedFormattingVisibility);
-        bindPresetAdvancedFormattingVisibilityEvents();
-        updatePresetAdvancedFormattingVisibility();
     }
 }
 
