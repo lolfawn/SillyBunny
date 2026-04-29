@@ -4,7 +4,7 @@
 
 Date: 2026-04-29
 
-This update restores Prose Polisher coverage for guided impersonation workflows, makes Advanced Formatting a first-class workspace tab again, adds conservative startup-loading improvements for desktop and mobile, and polishes cross-platform UI alignment, focus, safe-area, and touch-target behavior.
+This update restores Prose Polisher coverage for guided impersonation workflows, makes Advanced Formatting a first-class workspace tab again, adds conservative startup-loading improvements for desktop and mobile, expands bottom-bar chat management, and polishes cross-platform UI alignment, focus, safe-area, and touch-target behavior.
 
 ### In-Chat Agents
 - Added an opt-in prompt-pass condition for generated impersonation text so Prose Polisher can rewrite Guided Generations impersonations without mutating the previous assistant message.
@@ -29,11 +29,17 @@ This update restores Prose Polisher coverage for guided impersonation workflows,
 - Gave mobile Customize, Navigate, and Characters drawers a rounded native sheet treatment with a slide-up entry, handle pill, side gutters, and safe-area-aware header spacing.
 - Stabilized mobile Recent Chats text sizing in WebKit with scoped text-size adjustment, stronger line-clamp bounds, and narrow-screen overflow guards.
 - Tightened the mobile composer bottom spacing by removing duplicate safe-area padding and avoiding the forced 34 px fallback under the chat bar.
+- Narrowed the mobile bottom chat bar with symmetric safe-area-aware side gutters while preserving mobile tap targets and compact-mode sizing.
 
 This patch focuses on persistence and restart fixes for the new agentic and admin workflows introduced around `v1.5.0`.
 
 ### Chat And Reasoning
 - Persisted collapsed thinking/reasoning block state per message so user-expanded or user-collapsed reasoning blocks survive chat switches and reloads.
+
+### Chat Management
+- Added bottom chat bar shortcuts for current-scope chat management, including mass chat deletion and LLM-assisted naming for the current chat.
+- Added a mobile-friendly mass-delete popup with aligned checkboxes, Select All and Clear controls, protected current-chat rows, confirmation previews, cancellable deletion progress, and an older-than-days cleanup path with 7, 30, 90, and 180 day presets.
+- Added `/autonamechat` so the current LLM can rename the active chat through the same existing auto-label flow used by the chat history tools.
 
 ### Pathfinder
 - Added an independent Pathfinder enable switch in settings so saving books, modes, or prompt settings no longer toggles Pathfinder off unexpectedly.
@@ -55,6 +61,9 @@ This patch focuses on persistence and restart fixes for the new agentic and admi
 - `bef9327 fix(ui): polish sillybunny shell drawers`
 - `d92f1cf fix(mobile): stabilize recent chats text sizing`
 - `7339d9e fix(mobile): tighten composer bottom spacing`
+- `84a9938 fix(mobile): narrow bottom chat bar gutters`
+- `8028825 feat(chat): add bottom-bar mass chat delete with age filter`
+- `7e9e239 feat(chat): add bottom-bar auto-name current chat button`
 
 ## v1.5.0
 
