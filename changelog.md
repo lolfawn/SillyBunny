@@ -30,6 +30,11 @@ This update restores Prose Polisher coverage for guided impersonation workflows,
 - Stabilized mobile Recent Chats text sizing in WebKit with scoped text-size adjustment, stronger line-clamp bounds, and narrow-screen overflow guards.
 - Tightened the mobile composer bottom spacing by removing duplicate safe-area padding and avoiding the forced 34 px fallback under the chat bar.
 
+### Chat Management
+- Narrowed the Persona bottom chat bar on mobile with safe-area-aware side gutters while leaving the message composer width unchanged.
+- Added Persona bottom bar shortcuts for mass deleting chats in the current character/group scope and asking the active LLM to name the current chat.
+- Added aligned mass-delete checkboxes, protected the currently open chat, and included 7/30/90/180 day cleanup presets plus a matching `/autonamechat` command.
+
 This patch focuses on persistence and restart fixes for the new agentic and admin workflows introduced around `v1.5.0`.
 
 ### Chat And Reasoning
@@ -55,6 +60,11 @@ This patch focuses on persistence and restart fixes for the new agentic and admi
 - `bef9327 fix(ui): polish sillybunny shell drawers`
 - `d92f1cf fix(mobile): stabilize recent chats text sizing`
 - `7339d9e fix(mobile): tighten composer bottom spacing`
+- `ce14e54 Revert "docs(changelog): note 1.5.1 chat-bar additions"`
+- `3cecab4 Revert "feat(chat): add bottom-bar auto-name current chat button"`
+- `4f78732 Revert "feat(chat): add bottom-bar mass chat delete with age filter"`
+- `1c9bb64 Revert "fix(mobile): narrow bottom chat bar gutters"`
+- `eeec412 feat(chat): add persona-bar chat management actions`
 
 ## v1.5.0
 
