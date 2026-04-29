@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.5.1
+
+Date: 2026-04-29
+
+This patch focuses on persistence and restart fixes for the new agentic and admin workflows introduced around `v1.5.0`.
+
+### Chat And Reasoning
+- Persisted collapsed thinking/reasoning block state per message so user-expanded or user-collapsed reasoning blocks survive chat switches and reloads.
+
+### Pathfinder
+- Added an independent Pathfinder enable switch in settings so saving books, modes, or prompt settings no longer toggles Pathfinder off unexpectedly.
+- Preserved nested Pathfinder settings, including pipeline prompts, custom pipelines, book permissions, and tool confirmations, instead of resetting omitted fields back to defaults.
+- Raised Pathfinder pipeline stage output limits from `1024` to `32000` tokens by default and exposed the stage max-token setting in both prompt editors.
+
+### Server Admin
+- Fixed frontend Save & Restart and update restarts when launched from the provided Linux, macOS, and Windows launchers so the server relaunches in the same terminal instead of becoming a detached silent process.
+
 ## v1.5.0
 
 Date: 2026-04-26
