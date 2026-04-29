@@ -2999,22 +2999,23 @@ body.sb-shell-resizing * {
     #sb-bottom-chat-bar {
         gap: 6px;
         margin-block-end: 6px;
-        padding: 4px 8px;
-        min-height: 38px;
+        padding: 6px 8px;
+        min-height: 58px;
         border-radius: 16px;
     }
 
     #sb-bottom-chat-select {
-        height: 30px;
-        min-height: 30px;
+        height: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
         padding: 0 10px;
         font-size: calc(var(--mainFontSize) * 0.82);
         border-radius: 12px;
     }
 
     .sb-bottom-chat-btn {
-        min-height: 30px;
-        padding: 3px 6px;
+        min-width: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        padding: 0 8px;
         font-size: calc(var(--mainFontSize) * 0.86);
     }
 }
@@ -3043,10 +3044,10 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 768px) {
     #sb-persona-bubble {
-        width: 28px;
-        height: 28px;
-        min-width: 28px;
-        min-height: 28px;
+        width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
     }
 }
 
@@ -3866,7 +3867,7 @@ body.sb-shell-resizing * {
     }
 
     .sb-shell-panel-scroller {
-        padding: 14px 14px calc(34px + env(safe-area-inset-bottom));
+        padding: 14px 14px var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
     }
 
     .sb-brand-title,
@@ -4257,7 +4258,7 @@ body.sb-shell-resizing * {
         height: calc(100dvh - var(--sb-topbar-layout-offset)) !important;
         max-height: calc(100dvh - var(--sb-topbar-layout-offset)) !important;
         overflow-y: auto !important;
-        padding-bottom: max(18px, env(safe-area-inset-bottom)) !important;
+        padding-bottom: var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px))) !important;
         -webkit-overflow-scrolling: touch !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;

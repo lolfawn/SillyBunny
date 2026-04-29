@@ -1038,6 +1038,17 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     font-size: 0.8em;
 }
 
+@media (max-width: 768px) {
+    .welcomeRecent .recentChatList .recentChat .chatActions button {
+        width: var(--sb-mobile-touch-target, 44px);
+        height: var(--sb-mobile-touch-target, 44px);
+        min-width: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
+        max-width: var(--sb-mobile-touch-target, 44px);
+        max-height: var(--sb-mobile-touch-target, 44px);
+    }
+}
+
 .welcomeRecent .recentChatList .recentChat .chatMessageContainer {
     display: flex;
     align-items: center;

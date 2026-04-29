@@ -27,6 +27,9 @@
     --sb-message-meta-line-height: 1.18;
     --sb-chat-composer-gap: 8px;
     --sb-chat-composer-edge-gap: 8px;
+    --sb-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --sb-mobile-safe-area-bottom: max(34px, env(safe-area-inset-bottom, 0px));
+    --sb-mobile-touch-target: 44px;
     --sb-everforest-dusk-main: rgba(131, 179, 142, 1);
     --sb-everforest-dusk-soft: rgba(161, 209, 172, 1);
     --sb-everforest-dusk-surface: rgba(55, 60, 63, 1);
@@ -719,7 +722,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     box-sizing: border-box;
     margin: var(--sb-chat-composer-gap) auto 0;
     padding-inline: var(--sb-chat-composer-edge-gap);
-    padding-block-end: max(var(--sb-chat-composer-edge-gap), env(safe-area-inset-bottom, 0px));
+    padding-block-end: max(var(--sb-chat-composer-edge-gap), var(--sb-safe-area-bottom));
 }
 
 #send_form {
@@ -950,7 +953,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 @media screen and (max-width: 768px) {
     #character_popup {
         gap: 6px;
-        padding: 10px 10px max(12px, env(safe-area-inset-bottom, 0px));
+        padding: 10px 10px var(--sb-mobile-safe-area-bottom);
     }
 
     #character_popup .inline-drawer-header {
@@ -1118,12 +1121,12 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     }
 
     #send_form .mes_stop {
-        width: calc(var(--bottomFormBlockSize) - 6px);
-        min-width: calc(var(--bottomFormBlockSize) - 6px);
-        max-width: calc(var(--bottomFormBlockSize) - 6px);
-        height: calc(var(--bottomFormBlockSize) - 6px);
-        min-height: calc(var(--bottomFormBlockSize) - 6px);
-        max-height: calc(var(--bottomFormBlockSize) - 6px);
+        width: var(--bottomFormBlockSize);
+        min-width: var(--bottomFormBlockSize);
+        max-width: var(--bottomFormBlockSize);
+        height: var(--bottomFormBlockSize);
+        min-height: var(--bottomFormBlockSize);
+        max-height: var(--bottomFormBlockSize);
     }
 
     #send_textarea {
@@ -1345,8 +1348,18 @@ body.bubblechat .mes[is_user='true'] .mes_block {
 @media screen and (max-width: 768px) {
     :root {
         --sb-icon-control-size: 2.5rem;
+        --sb-control-min-height: var(--sb-mobile-touch-target);
         --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
         --sb-message-icon-size: 2rem;
+    }
+
+    :root[data-sb-compact-mode='true'] {
+        --sb-control-min-height: var(--sb-mobile-touch-target);
+        --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
+    }
+
+    #form_sheld {
+        padding-block-end: var(--sb-mobile-safe-area-bottom);
     }
 
     :root:not([data-sb-theme]),
@@ -1416,7 +1429,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     }
 
     #completion_prompt_manager_popup {
-        padding: 12px 12px max(18px, env(safe-area-inset-bottom, 0px)) !important;
+        padding: 12px 12px var(--sb-mobile-safe-area-bottom) !important;
         background: var(--sb-mobile-overlay-bg, color-mix(in srgb, var(--SmartThemeBlurTintColor) 96%, transparent)) !important;
         box-sizing: border-box;
     }
@@ -1563,7 +1576,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
         justify-content: center;
         gap: 10px;
         margin-top: 0;
-        padding-bottom: max(4px, env(safe-area-inset-bottom, 0px));
+        padding-bottom: 4px;
     }
 
     .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
@@ -4680,11 +4693,11 @@ input[type='range']::-moz-range-thumb {
     #rightSendForm > div:not(.mes_stop),
     #send_form .mes_stop,
     #options_button {
-        width: var(--button-size-md);
-        min-width: var(--button-size-md);
-        height: 42px;
-        min-height: 42px;
-        max-height: 42px;
+        width: var(--sb-mobile-touch-target);
+        min-width: var(--sb-mobile-touch-target);
+        height: var(--sb-mobile-touch-target);
+        min-height: var(--sb-mobile-touch-target);
+        max-height: var(--sb-mobile-touch-target);
     }
 
     #send_textarea {
