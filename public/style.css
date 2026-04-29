@@ -314,25 +314,27 @@ table.responsiveTable {
 
 /* Outline for "normal" buttons should only be when actual keyboard navigation is used */
 .interactable:focus-visible {
-    outline: 2px solid var(--color-focus-ring, var(--interactable-outline-color));
-    outline-offset: 2px;
+    /* SillyBunny: keep keyboard rings inside rounded clipped surfaces. */
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--color-focus-ring, var(--interactable-outline-color));
 }
 
-/* Prevent the outline from being cut off by hiding the overflow */
+/* Keep tag focus consistent with other inset SillyBunny rings. */
 .tag.interactable:focus-visible {
-    outline-offset: -1px;
+    box-shadow: inset 0 0 0 2px var(--color-focus-ring, var(--interactable-outline-color));
 }
 
 /* The specific input controls can always have a faint outline, even on mouse interaction, to give a better hint */
 select:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-    outline: 2px solid var(--color-focus-ring, var(--interactable-outline-color-faint));
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--color-focus-ring, var(--interactable-outline-color-faint));
 }
 
 input[type='checkbox']:focus-visible {
-    outline: 1px solid var(--interactable-outline-color);
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--interactable-outline-color);
 }
 
 /* General dragover styling */
