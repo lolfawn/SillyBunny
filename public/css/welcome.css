@@ -1086,7 +1086,7 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
     gap: 5px;
 }
 
-.welcomeRecent .recentChatList .recentChat .chatStats .counterBlock::after {
+.welcomeRecent .recentChatList .recentChat .chatStats .counterBlock:not(:last-child)::after {
     content: "|";
     margin-left: 4px;
     color: color-mix(in srgb, var(--sb-shell-border, var(--SmartThemeBorderColor)) 84%, transparent);
