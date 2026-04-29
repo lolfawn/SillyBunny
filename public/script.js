@@ -9851,7 +9851,7 @@ async function autoLabelChatFile(fileName, { existingNames, force = false, sourc
     return { status: 'renamed', oldFileName, newFileName };
 }
 
-async function autoLabelCurrentChat() {
+export async function autoLabelCurrentChat() {
     const chatDetails = getCurrentChatDetails();
     const currentChat = getChatBaseName(chatDetails.sessionName);
 
@@ -9892,6 +9892,13 @@ async function autoLabelCurrentChat() {
         toastr.error(String(error?.message || error), t`Auto-label Chat`);
         endChatHistoryTool(t`Could not auto-label the current chat.`);
     }
+}
+
+function setBottomAutoNameButtonBusy(isBusy) {
+    const button = $('#sb_auto_name_chat');
+    button.toggleClass('fa-wand-magic-sparkles', !isBusy);
+    button.toggleClass('fa-spinner fa-spin', isBusy);
+    button.attr('aria-disabled', String(isBusy));
 }
 
 async function autoLabelDatedChats() {
@@ -13625,6 +13632,26 @@ jQuery(async function () {
         e.preventDefault();
         e.stopPropagation();
         await showMassChatDeletePopup();
+    });
+
+    $('#sb_auto_name_chat').on('click keydown', async function (e) {
+        if (e.type === 'keydown' && !['Enter', ' '].includes(e.key)) {
+            return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        if ($(this).attr('aria-disabled') === 'true') {
+            return;
+        }
+
+        setBottomAutoNameButtonBusy(true);
+        try {
+            await autoLabelCurrentChat();
+        } finally {
+            setBottomAutoNameButtonBusy(false);
+        }
     });
 
     $('#chat_tools_cancel').on('click', function (e) {
