@@ -10036,6 +10036,199 @@ function renderChatCleanupList(candidates) {
     return `<ol class="chat_cleanup_preview_list">${listItems}</ol>${moreText}`;
 }
 
+function renderMassChatDeleteRows(chats, currentChat) {
+    if (!chats.length) {
+        return `<p class="sb_mass_chat_delete_empty">${t`No saved chats were found for the current character or group.`}</p>`;
+    }
+
+    return chats.map((chatItem) => {
+        const fileName = getChatBaseName(chatItem.file_name);
+        const isCurrent = fileName === currentChat;
+        const lastMessageMoment = timestampToMoment(chatItem.last_mes);
+        const lastMessageDate = lastMessageMoment.isValid() ? lastMessageMoment.format('lll') : t`Unknown date`;
+        const preview = String(chatItem.preview_message || '').trim() || t`No preview available.`;
+        const messageCount = chatItem.message_count ? `${escapeHtml(String(chatItem.message_count))} ${t`messages`}` : t`No messages`;
+
+        return `
+            <label class="sb_mass_chat_delete_row checkbox_label${isCurrent ? ' sb_mass_chat_delete_current' : ''}" data-file-name="${escapeHtml(fileName)}">
+                <input type="checkbox" class="sb_mass_chat_delete_checkbox" value="${escapeHtml(fileName)}"${isCurrent ? ' data-protected="true" disabled' : ''}>
+                <span class="sb_mass_chat_delete_body">
+                    <span class="sb_mass_chat_delete_title">
+                        <strong>${escapeHtml(fileName)}</strong>
+                        ${isCurrent ? `<em>${t`Current chat protected`}</em>` : ''}
+                    </span>
+                    <span class="sb_mass_chat_delete_meta">${escapeHtml(lastMessageDate)} · ${messageCount}</span>
+                    <span class="sb_mass_chat_delete_preview">${escapeHtml(preview)}</span>
+                </span>
+            </label>`;
+    }).join('');
+}
+
+function getMassDeleteSelectedNames(root) {
+    return root.find('.sb_mass_chat_delete_checkbox:checked').toArray()
+        .map(element => String($(element).val() || '').trim())
+        .filter(Boolean);
+}
+
+function setMassDeleteBusy(root, isBusy, message = '') {
+    root.toggleClass('sb_mass_chat_delete_busy', isBusy);
+    root.find('button, input').not('#sb_mass_chat_delete_abort, .sb_mass_chat_delete_checkbox[data-protected="true"]').prop('disabled', isBusy);
+    root.find('.sb_mass_chat_delete_checkbox[data-protected="true"]').prop('disabled', true);
+    root.find('#sb_mass_chat_delete_abort').toggleClass('displayNone', !isBusy).prop('disabled', !isBusy);
+    root.find('.sb_mass_chat_delete_status').text(message);
+}
+
+async function deleteScopedChatFiles(fileNames, root, signal = null) {
+    const deletedNames = [];
+
+    for (const [index, fileName] of fileNames.entries()) {
+        throwIfChatHistoryToolAborted(signal);
+        setMassDeleteBusy(root, true, `${t`Deleting`} ${index + 1}/${fileNames.length}: ${fileName}`);
+
+        if (selected_group) {
+            const deleted = await deleteGroupChatByName(selected_group, fileName);
+            if (!deleted) {
+                throw new Error(`Could not delete ${fileName}`);
+            }
+        } else {
+            const deleted = await delChat(`${fileName}.jsonl`);
+            if (!deleted) {
+                throw new Error(`Could not delete ${fileName}`);
+            }
+        }
+
+        deletedNames.push(fileName);
+        root.find(`.sb_mass_chat_delete_row[data-file-name="${CSS.escape(fileName)}"]`).remove();
+    }
+
+    await displayPastChats();
+    return deletedNames;
+}
+
+async function confirmMassChatDelete(fileNames, title) {
+    const listItems = fileNames.slice(0, 16).map(fileName => `<li><code>${escapeHtml(fileName)}</code></li>`).join('');
+    const moreCount = Math.max(0, fileNames.length - 16);
+    const moreText = moreCount ? `<p>${escapeHtml(String(moreCount))} ${t`more chat(s) not shown.`}</p>` : '';
+    return await callGenericPopup(
+        `<h3>${escapeHtml(title)}</h3>
+        <p>${escapeHtml(String(fileNames.length))} ${t`chat(s) will be deleted. This cannot be undone from this screen.`}</p>
+        <ol class="chat_cleanup_preview_list">${listItems}</ol>${moreText}`,
+        POPUP_TYPE.CONFIRM,
+        null,
+        { wider: true, allowVerticalScrolling: true },
+    ) === POPUP_RESULT.AFFIRMATIVE;
+}
+
+async function runMassChatDelete(fileNames, root, title) {
+    const uniqueFileNames = [...new Set(fileNames.map(getChatBaseName).filter(Boolean))];
+    if (!uniqueFileNames.length) {
+        toastr.info(t`No chats selected.`);
+        return;
+    }
+
+    if (!await confirmMassChatDelete(uniqueFileNames, title)) {
+        return;
+    }
+
+    const abortController = new AbortController();
+    root.data('abortController', abortController);
+    setMassDeleteBusy(root, true, t`Deleting chats…`);
+
+    try {
+        const deletedNames = await deleteScopedChatFiles(uniqueFileNames, root, abortController.signal);
+        const message = `${t`Deleted`} ${deletedNames.length} ${t`chat(s).`}`;
+        toastr.success(message, t`Mass-delete Chats`);
+        setMassDeleteBusy(root, false, message);
+    } catch (error) {
+        if (isChatHistoryToolAbort(error)) {
+            setMassDeleteBusy(root, false, t`Mass-delete cancelled.`);
+            return;
+        }
+
+        console.error('Could not mass-delete chats:', error);
+        toastr.error(String(error?.message || error), t`Mass-delete Chats`);
+        setMassDeleteBusy(root, false, t`Could not finish deleting chats.`);
+    } finally {
+        root.removeData('abortController');
+    }
+}
+
+async function showMassChatDeletePopup() {
+    const chats = (await searchPastChats('')).map(chatItem => ({
+        ...chatItem,
+        file_name: getChatBaseName(chatItem.file_name),
+    }));
+    const currentChat = getChatBaseName(getCurrentChatDetails().sessionName);
+    const contextName = getCurrentChatDetails().characterName || t`current chat`;
+    const popup = $(`
+        <div id="sb_mass_chat_delete_popup" class="sb_mass_chat_delete_popup">
+            <h3>${t`Mass-delete chats`}</h3>
+            <p>${escapeHtml(contextName)}: ${t`select saved chats to delete, or delete chats older than a chosen number of days. The current chat is protected.`}</p>
+            <div class="sb_mass_chat_delete_toolbar">
+                <button type="button" id="sb_mass_chat_delete_select_all" class="menu_button menu_button_icon"><i class="fa-solid fa-check-double"></i><span>${t`Select all`}</span></button>
+                <button type="button" id="sb_mass_chat_delete_clear" class="menu_button menu_button_icon"><i class="fa-solid fa-eraser"></i><span>${t`Clear`}</span></button>
+                <button type="button" id="sb_mass_chat_delete_selected" class="menu_button menu_button_icon"><i class="fa-solid fa-trash-can"></i><span>${t`Delete selected`}</span></button>
+                <button type="button" id="sb_mass_chat_delete_abort" class="menu_button menu_button_icon displayNone"><i class="fa-solid fa-ban"></i><span>${t`Cancel`}</span></button>
+            </div>
+            <div class="sb_mass_chat_delete_age_bar">
+                <label class="chat_cleanup_field" for="sb_mass_chat_delete_age"><span>${t`Older than`}</span><input type="number" id="sb_mass_chat_delete_age" class="text_pole" min="1" max="9999" step="1" value="90" inputmode="numeric"></label>
+                <span>${t`days`}</span>
+                <div class="sb_mass_chat_delete_presets" aria-label="Age presets">
+                    <button type="button" class="menu_button" data-days="7">7</button>
+                    <button type="button" class="menu_button" data-days="30">30</button>
+                    <button type="button" class="menu_button" data-days="90">90</button>
+                    <button type="button" class="menu_button" data-days="180">180</button>
+                </div>
+                <button type="button" id="sb_mass_chat_delete_older" class="menu_button menu_button_icon"><i class="fa-solid fa-broom"></i><span>${t`Delete older`}</span></button>
+            </div>
+            <div class="sb_mass_chat_delete_status" aria-live="polite"></div>
+            <div class="sb_mass_chat_delete_list">${renderMassChatDeleteRows(chats, currentChat)}</div>
+        </div>`);
+
+    await callGenericPopup(popup, POPUP_TYPE.TEXT, '', {
+        large: true,
+        wide: true,
+        allowVerticalScrolling: true,
+        onOpen: () => {
+            const root = $('#sb_mass_chat_delete_popup');
+
+            root.on('change', '.sb_mass_chat_delete_checkbox', () => {
+                const count = getMassDeleteSelectedNames(root).length;
+                root.find('.sb_mass_chat_delete_status').text(count ? `${count} ${t`chat(s) selected.`}` : '');
+            });
+            root.find('#sb_mass_chat_delete_select_all').on('click', () => {
+                root.find('.sb_mass_chat_delete_checkbox:not(:disabled)').prop('checked', true).trigger('change');
+            });
+            root.find('#sb_mass_chat_delete_clear').on('click', () => {
+                root.find('.sb_mass_chat_delete_checkbox').prop('checked', false).trigger('change');
+            });
+            root.find('.sb_mass_chat_delete_presets button').on('click', function () {
+                root.find('#sb_mass_chat_delete_age').val($(this).data('days'));
+            });
+            root.find('#sb_mass_chat_delete_selected').on('click', async () => {
+                await runMassChatDelete(getMassDeleteSelectedNames(root), root, t`Delete selected chats?`);
+            });
+            root.find('#sb_mass_chat_delete_older').on('click', async () => {
+                const age = getClampedChatToolInteger('#sb_mass_chat_delete_age', 90);
+                const cutoff = moment().subtract(Math.max(1, age), 'days');
+                const candidates = chats
+                    .filter(chatItem => chatItem.file_name !== currentChat)
+                    .filter(chatItem => root.find(`.sb_mass_chat_delete_row[data-file-name="${CSS.escape(chatItem.file_name)}"]`).length > 0)
+                    .filter(chatItem => {
+                        const lastMessageMoment = timestampToMoment(chatItem.last_mes);
+                        return lastMessageMoment.isValid() && lastMessageMoment.isBefore(cutoff);
+                    })
+                    .map(chatItem => chatItem.file_name);
+                await runMassChatDelete(candidates, root, t`Delete older chats?`);
+            });
+            root.find('#sb_mass_chat_delete_abort').on('click', () => {
+                root.data('abortController')?.abort(new Error('Cancelled by user.'));
+                root.find('.sb_mass_chat_delete_status').text(t`Cancelling…`);
+            });
+        },
+    });
+}
+
 async function previewChatCleanup() {
     try {
         const candidates = await getChatCleanupCandidates();
@@ -13422,6 +13615,16 @@ jQuery(async function () {
         e.preventDefault();
         e.stopPropagation();
         await runChatCleanup();
+    });
+
+    $('#sb_mass_delete_chats').on('click keydown', async function (e) {
+        if (e.type === 'keydown' && !['Enter', ' '].includes(e.key)) {
+            return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+        await showMassChatDeletePopup();
     });
 
     $('#chat_tools_cancel').on('click', function (e) {
