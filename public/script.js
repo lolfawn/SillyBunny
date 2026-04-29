@@ -9851,7 +9851,7 @@ async function autoLabelChatFile(fileName, { existingNames, force = false, sourc
     return { status: 'renamed', oldFileName, newFileName };
 }
 
-async function autoLabelCurrentChat() {
+export async function autoLabelCurrentChat() {
     const chatDetails = getCurrentChatDetails();
     const currentChat = getChatBaseName(chatDetails.sessionName);
 
