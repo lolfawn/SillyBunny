@@ -729,7 +729,7 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 
 .welcomeHeader {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 14px;
 }

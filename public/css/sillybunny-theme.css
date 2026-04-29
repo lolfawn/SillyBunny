@@ -356,6 +356,8 @@ h3:not(.popup h3):not(#chat h3),
 h3:not(.popup h3):not(#chat h3) {
     border-left: 3px solid color-mix(in srgb, var(--color-primary, var(--sb-accent)) 82%, transparent);
     padding-left: 12px;
+    padding-right: 12px;
+    box-sizing: border-box;
 }
 
 .inline-drawer-header {
@@ -780,7 +782,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 #character_popup {
     align-items: stretch;
     gap: 6px;
-    padding: 6px 14px 14px;
+    padding: 10px 14px 14px;
     text-align: left;
 }
 
@@ -817,8 +819,8 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 #character_popup .inline-drawer-header {
     width: 100%;
     min-height: 40px;
-    padding: 8px 12px;
-    justify-content: space-between;
+    padding: 8px 14px;
+    justify-content: flex-start;
     text-align: left;
 }
 
@@ -836,7 +838,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     width: 100%;
     box-sizing: border-box;
     margin-top: 8px;
-    padding: 10px 0 4px;
+    padding: 10px 14px 4px;
     text-align: left;
 }
 
@@ -932,12 +934,16 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 @media screen and (max-width: 768px) {
     #character_popup {
         gap: 6px;
-        padding: 6px 10px max(12px, env(safe-area-inset-bottom, 0px));
+        padding: 10px 10px max(12px, env(safe-area-inset-bottom, 0px));
     }
 
     #character_popup .inline-drawer-header {
         min-height: 38px;
-        padding: 7px 10px;
+        padding: 8px 10px;
+    }
+
+    #character_popup .inline-drawer-content {
+        padding-inline: 10px;
     }
 
     #character_popup .inline-drawer-content > .flex-container.flexnowrap {

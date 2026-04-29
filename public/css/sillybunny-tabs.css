@@ -1437,7 +1437,7 @@ body.sb-shell-resizing * {
     flex-wrap: nowrap;
     justify-content: center;
     gap: 6px;
-    padding: 12px 24px 10px;
+    padding: 12px 24px;
     background: transparent;
     border-bottom: 1px solid color-mix(in srgb, var(--sb-shell-border) 88%, transparent);
     border-right: none;
@@ -1543,7 +1543,7 @@ body.sb-shell-resizing * {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 22px 24px 20px;
+    padding: 22px 24px;
     border-bottom: 1px solid color-mix(in srgb, var(--sb-shell-border) 80%, transparent);
     background: transparent;
 }
@@ -3829,8 +3829,7 @@ body.sb-shell-resizing * {
 
     .sb-shell-header {
         gap: 8px;
-        padding: 14px 14px 12px;
-        padding-right: 58px;
+        padding: 14px 58px;
     }
 
     .sb-shell-kicker {
