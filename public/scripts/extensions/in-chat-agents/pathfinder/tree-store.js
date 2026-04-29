@@ -26,6 +26,7 @@ export const SETTING_DEFAULTS = {
     sidecarEnabled: false,
     enabledLorebooks: [],
     autoUseAttachedLorebook: false,
+    bookPermissions: {},
     confirmTools: {},
     // Pipeline settings
     pipelineEnabled: false,
@@ -50,7 +51,15 @@ export function getSettings() {
 }
 
 export function setSettings(newSettings) {
-    settings = { ...SETTING_DEFAULTS, ...newSettings };
+    const nextSettings = { ...SETTING_DEFAULTS, ...settings, ...(newSettings || {}) };
+    for (const key of ['bookPermissions', 'confirmTools', 'pipelinePrompts', 'pipelines']) {
+        nextSettings[key] = {
+            ...(SETTING_DEFAULTS[key] || {}),
+            ...(settings?.[key] || {}),
+            ...(newSettings?.[key] || {}),
+        };
+    }
+    settings = nextSettings;
 }
 
 const trees = new Map();
