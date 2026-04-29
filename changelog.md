@@ -24,20 +24,10 @@ This update restores Prose Polisher coverage for guided impersonation workflows,
 - Aligned shell headers, character drawer padding, welcome headers, and checkbox labels across desktop and mobile breakpoints.
 - Normalized mobile safe-area fallbacks and 44 px tap targets for the composer, bottom chat controls, and welcome recent-chat actions.
 - Cleaned up redundant shell borders, trailing recent-chat stat dividers, and duplicated macOS browser chrome patches.
-
-### Local Commits
-- `1f3c9b3 feat(agents): allow prompt passes on impersonations`
-- `c6f8903 feat(shell): promote advanced formatting to workspace tab`
-- `887be36 perf(loading): defer startup assets and cache statics`
-- `de68413 fix(ui): replace clipped focus outlines with inset focus rings`
-- `1434631 fix(ui): align headers drawer padding and shell title`
-- `1f1fdd6 fix(ui): align checkbox layouts across breakpoints`
-- `88ccda0 fix(mobile): normalize safe areas and tap targets`
-- `cf7ea0a fix(ui): clean up borders and browser chrome patches`
-
-## v1.5.1
-
-Date: 2026-04-29
+- Left-aligned SillyBunny shell drawer eyebrow labels, titles, subtitles, and descriptions across desktop and mobile.
+- Contained shell close-button focus rings inside rounded borders so highlights no longer bleed past the control edge.
+- Gave mobile Customize, Navigate, and Characters drawers a rounded native sheet treatment with a slide-up entry, handle pill, side gutters, and safe-area-aware header spacing.
+- Stabilized mobile Recent Chats text sizing in WebKit with scoped text-size adjustment, stronger line-clamp bounds, and narrow-screen overflow guards.
 
 This patch focuses on persistence and restart fixes for the new agentic and admin workflows introduced around `v1.5.0`.
 
@@ -51,6 +41,18 @@ This patch focuses on persistence and restart fixes for the new agentic and admi
 
 ### Server Admin
 - Fixed frontend Save & Restart and update restarts when launched from the provided Linux, macOS, and Windows launchers so the server relaunches in the same terminal instead of becoming a detached silent process.
+
+### Local Commits
+- `1f3c9b3 feat(agents): allow prompt passes on impersonations`
+- `c6f8903 feat(shell): promote advanced formatting to workspace tab`
+- `887be36 perf(loading): defer startup assets and cache statics`
+- `de68413 fix(ui): replace clipped focus outlines with inset focus rings`
+- `1434631 fix(ui): align headers drawer padding and shell title`
+- `1f1fdd6 fix(ui): align checkbox layouts across breakpoints`
+- `88ccda0 fix(mobile): normalize safe areas and tap targets`
+- `cf7ea0a fix(ui): clean up borders and browser chrome patches`
+- `bef9327 fix(ui): polish sillybunny shell drawers`
+- `d92f1cf fix(mobile): stabilize recent chats text sizing`
 
 ## v1.5.0
 
