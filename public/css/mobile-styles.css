@@ -1122,6 +1122,9 @@
 
     #send_form {
         border-radius: 14px 14px 0 0;
+        left: max(12px, env(safe-area-inset-left)) !important;
+        right: max(12px, env(safe-area-inset-right)) !important;
+        width: auto !important;
     }
 
     #nonQRFormItems {
