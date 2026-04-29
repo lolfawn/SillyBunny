@@ -26,6 +26,7 @@ import { getSummaryMemoryState, onSummaryMemoryChanged, saveSummaryMemoryContent
 const MODULE_NAME = 'in-chat-agents';
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
 const PATHFINDER_LOG_MODE_KEY = 'pathfinder-retrieval-log-mode';
+const DEFAULT_PIPELINE_MAX_TOKENS = 32000;
 
 let settingsEl = null;
 let currentAgent = null;
@@ -331,6 +332,11 @@ function setPathfinderToolEnabled(toolName, enabled) {
 function isPathfinderToolEnabled(toolName) {
     const tool = currentAgent?.tools?.find(t => t.name === toolName);
     return tool?.enabled !== false;
+}
+
+function readPromptMaxTokens() {
+    const value = parseInt(settingsEl.find('#pf--prompt-max-tokens').val(), 10) || DEFAULT_PIPELINE_MAX_TOKENS;
+    return Math.min(200000, Math.max(100, value));
 }
 
 /**
@@ -1098,6 +1104,7 @@ function loadPromptIntoEditor(promptId) {
 
     logPathfinder('Loaded Pathfinder prompt into editor.', { promptId, promptName: prompt.name || promptId });
     settingsEl.find('#pf--prompt-system').val(prompt.systemPrompt || '');
+    settingsEl.find('#pf--prompt-max-tokens').val(prompt.settings?.maxTokens ?? DEFAULT_PIPELINE_MAX_TOKENS);
     settingsEl.find('#pf--prompt-user').val(prompt.userPromptTemplate || '');
     clearPromptStatus();
 }
@@ -1105,7 +1112,7 @@ function loadPromptIntoEditor(promptId) {
 /**
  * Save the current prompt
  */
-function saveCurrentPrompt() {
+async function saveCurrentPrompt() {
     const promptId = settingsEl.find('#pf--prompt-selector').val();
     if (!promptId) return;
 
@@ -1114,8 +1121,13 @@ function saveCurrentPrompt() {
 
     prompt.systemPrompt = settingsEl.find('#pf--prompt-system').val();
     prompt.userPromptTemplate = settingsEl.find('#pf--prompt-user').val();
+    prompt.settings = {
+        ...(prompt.settings || {}),
+        maxTokens: readPromptMaxTokens(),
+    };
 
     savePrompt(prompt);
+    await updateAgentSettings();
     logPathfinder('Saved Pathfinder prompt changes.', { promptId, promptName: prompt.name || promptId });
     showPromptStatus('Saved!', 'success');
 }
@@ -1123,7 +1135,7 @@ function saveCurrentPrompt() {
 /**
  * Reset the current prompt to default
  */
-function resetCurrentPrompt() {
+async function resetCurrentPrompt() {
     const promptId = settingsEl.find('#pf--prompt-selector').val();
     if (!promptId) return;
 
@@ -1136,6 +1148,7 @@ function resetCurrentPrompt() {
     }
 
     savePrompt({ ...defaultPrompt, isDefault: true });
+    await updateAgentSettings();
     logPathfinder('Reset Pathfinder prompt to defaults.', { promptId, promptName: defaultPrompt.name || promptId });
     loadPromptIntoEditor(promptId);
     showPromptStatus('Reset to default', 'success');

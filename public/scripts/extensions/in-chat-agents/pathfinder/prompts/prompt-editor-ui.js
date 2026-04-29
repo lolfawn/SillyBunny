@@ -6,6 +6,8 @@ import { getAllPrompts, getPrompt, savePrompt, isPromptModified, getAllPipelines
 import { getDefaultPrompts } from './default-prompts.js';
 import { getSettings, setSettings, listConnectionProfiles } from '../tree-store.js';
 
+const DEFAULT_PIPELINE_MAX_TOKENS = 32000;
+
 const EDITOR_HTML = `
 <div id="pathfinder-prompt-editor" class="pathfinder-prompt-editor">
     <div class="prompt-editor-header">
@@ -54,7 +56,7 @@ const EDITOR_HTML = `
         <div class="prompt-field-row">
             <div class="prompt-field">
                 <label for="pf-prompt-maxTokens">Max Tokens</label>
-                <input type="number" id="pf-prompt-maxTokens" class="text_pole" min="100" max="4096" />
+                <input type="number" id="pf-prompt-maxTokens" class="text_pole" min="100" max="200000" />
             </div>
             <div class="prompt-field">
                 <label for="pf-prompt-temperature">Temperature</label>
@@ -348,7 +350,7 @@ function loadPromptIntoEditor(promptId) {
     document.getElementById('pf-prompt-connection').value = prompt.connectionProfile || '';
     document.getElementById('pf-prompt-system').value = prompt.systemPrompt || '';
     document.getElementById('pf-prompt-user').value = prompt.userPromptTemplate || '';
-    document.getElementById('pf-prompt-maxTokens').value = prompt.settings?.maxTokens ?? 1024;
+    document.getElementById('pf-prompt-maxTokens').value = prompt.settings?.maxTokens ?? DEFAULT_PIPELINE_MAX_TOKENS;
     document.getElementById('pf-prompt-temperature').value = prompt.settings?.temperature ?? 0.3;
     document.getElementById('pf-prompt-outputFormat').value = prompt.outputFormat || 'json_object';
 
@@ -382,7 +384,7 @@ function saveCurrentPrompt() {
         userPromptTemplate: document.getElementById('pf-prompt-user').value,
         outputFormat: document.getElementById('pf-prompt-outputFormat').value,
         settings: {
-            maxTokens: parseInt(document.getElementById('pf-prompt-maxTokens').value) || 1024,
+            maxTokens: parseInt(document.getElementById('pf-prompt-maxTokens').value) || DEFAULT_PIPELINE_MAX_TOKENS,
             temperature: parseFloat(document.getElementById('pf-prompt-temperature').value) || 0.3,
         },
     };
