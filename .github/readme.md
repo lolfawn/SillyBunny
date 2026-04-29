@@ -1,3 +1,5 @@
+<!-- This file mirrors the root README so GitHub renders the correct project homepage copy. -->
+
 # 🐰 SillyBunny 🐰
 <div>
 <img src="screenshots/banner.jpg" width="100%">
@@ -8,20 +10,20 @@
 An elegant fork of [SillyTavern](https://github.com/SillyTavern/SillyTavern), designed with a cleaner, graphical shell UI; Bun-based backend; built-in tutorials, presets, extensions, and a quick-start dashboard; and a lightweight agnetic system to faciliate modern agent functionality.
 
 > [!WARNING]
-> This is an in-dev fork, and is considered beta quality. [Please direct all issues to this project's issue tracker.](https://github.com/platberlitz/SillyBunny/issues)
+> This is an in-dev fork, and is considered beta quality. [Please direct SillyBunny-specific issues to this project's issue tracker.](https://github.com/platberlitz/SillyBunny/issues) If an issue is reproducible in upstream SillyTavern, please report it upstream instead.
 >
 > Disclaimer: LLMs are used to facilitate development of this fork. Overall software design, prompting, testing, and documentation are handled by humans. To keep things simple, we try to maintain close to upstream as possible.
 
 <details>
 <summary><h2>Screenshots</h2></summary>
 
-These screenshots show the graphical shell UI across Navigate, Customize, Agents, Characters, Search, and a Bunny Guide in-chat view on desktop and mobile.
+These screenshots show the graphical shell UI across Workspace, Customize, Agents, Characters, Search, and a Bunny Guide in-chat view on desktop and mobile.
 
 #### Desktop
 
-| Desktop Navigation Menu | Desktop Customize Menu |
+| Desktop Workspace Menu | Desktop Customize Menu |
 | :---: | :---: |
-| <img src="screenshots/sillybunny-ui-desktop-navigate-v1.4.0.png" alt="Desktop Navigation Menu" width="100%"> | <img src="screenshots/sillybunny-ui-desktop-customize-v1.4.0.png" alt="Desktop Customize Menu" width="100%"> |
+| <img src="screenshots/sillybunny-ui-desktop-navigate-v1.4.0.png" alt="Desktop Workspace Menu" width="100%"> | <img src="screenshots/sillybunny-ui-desktop-customize-v1.4.0.png" alt="Desktop Customize Menu" width="100%"> |
 
 | Desktop Agents Menu | Desktop Characters Menu |
 | :---: | :---: |
@@ -33,9 +35,9 @@ These screenshots show the graphical shell UI across Navigate, Customize, Agents
 
 #### Mobile
 
-| Mobile Navigation Menu | Mobile Customize Menu | Mobile Agents Menu |
+| Mobile Workspace Menu | Mobile Customize Menu | Mobile Agents Menu |
 | :---: | :---: | :---: |
-| <img src="screenshots/sillybunny-ui-mobile-navigate-v1.4.0.png" alt="Mobile Navigation Menu" width="100%"> | <img src="screenshots/sillybunny-ui-mobile-customize-v1.4.0.png" alt="Mobile Customize Menu" width="100%"> | <img src="screenshots/sillybunny-ui-mobile-agents-v1.4.0.png" alt="Mobile Agents Menu" width="100%"> |
+| <img src="screenshots/sillybunny-ui-mobile-navigate-v1.4.0.png" alt="Mobile Workspace Menu" width="100%"> | <img src="screenshots/sillybunny-ui-mobile-customize-v1.4.0.png" alt="Mobile Customize Menu" width="100%"> | <img src="screenshots/sillybunny-ui-mobile-agents-v1.4.0.png" alt="Mobile Agents Menu" width="100%"> |
 
 | Mobile Characters Menu | Mobile Search | Mobile Chat |
 | :---: | :---: | :---: |
@@ -54,7 +56,7 @@ These screenshots show the graphical shell UI across Navigate, Customize, Agents
 * [Project Goals](#project-goals-aka-why-we-made-this-fork)
 * [Changes Compared to SillyTavern](#changes-vs-sillytavern)
 * [Latest Update](#latest-update)
-    * [v1.4.1 (2026-04-23)](#v141-2026-04-23)
+    * [v1.5.1 (2026-04-29)](#v151-2026-04-29)
 * [Upstream Information](#upstream-information)
 * [Contributors](#contributors)
 ***
@@ -127,6 +129,7 @@ bash start.sh
 
 | What you want | Command |
 |---------------|---------|
+| Update from the running app | Open Customize > Server and use the built-in updater |
 | Normal launch (auto-checks for updates) | `./start.sh` |
 | Force update then launch | `./start.sh --self-update` |
 | Update only, don't start | `./start.sh --self-update-only` |
@@ -153,7 +156,7 @@ Our primary goals for SillyBunny are as follows:
 
 The original SillyTavern layout is replaced with a custom, easy-to-navigate graphical shell:
 
-- **Top bar**: Reworked with cleaner, better-defined nested menus. Includes Navigate, Customize, Home, and Characters.
+- **Top bar**: Reworked with cleaner, better-defined nested menus. Includes Workspace, Customize, Home, and Characters.
 - **Bottom bar**: New bottom bar designed for quick access to persona switching, quick chat switching, and add/edit/remove existing chat functionality.
 - **Panel-oriented navigation**: Easy access to all settings in nested panels. Collapsible settings sections in both Chat Completions and Text Completions presets.
 - **Global search**: A global search bar that queries across presets, lore, extensions, personas, and settings at once.
@@ -215,15 +218,13 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Latest Update
 
-### v1.4.1 (2026-04-23)
+### v1.5.1 (2026-04-29)
 
-- Restored World Info entry enable/disable behavior and tightened the World Info layout with smaller cards, narrower popup rows, and cleaner mobile/desktop spacing.
-- Added selectable multi-delete pickers for saved presets and connection profiles instead of delete-all-only flows.
-- Improved Pathfinder usability with clearer tool-mode diagnostics, persisted tool toggles like Update and Forget, and a detailed retrieval log showing selected lore entries, stage results, and injected Pathfinder context.
-- Kept List Only mode focused on recent chats by removing its extra shortcut row, while also cleaning up home-screen preset copy so only the bundled SillyBunny-tuned Director preset is promoted.
-- Polished shell/UI consistency by aligning the reasoning token badge, matching bottom-bar sizing to the top bar, and preserving transparency for cropped avatars and alpha-capable thumbnails.
-- Hardened self-update behavior so existing Node/npm installs no longer dirty `package-lock.json` during routine updates.
-- Bumped the app version strings and default-user settings version to `1.4.1`.
+- Persisted collapsed thinking/reasoning blocks per message so chat switches and reloads keep the user's expanded or collapsed state.
+- Fixed Pathfinder settings so saving configuration no longer turns the agent off or resets saved lorebook, pipeline, prompt, and tool selections.
+- Raised Pathfinder pipeline stage output defaults to `32000` tokens and added visible max-token controls to the prompt editors.
+- Fixed Save & Restart from the server admin UI so launcher-based Linux, macOS, and Windows sessions relaunch the server in the same terminal.
+- Bumped the user-facing app version strings, package version references, Horde fallback client string, and bundled extension manifests to `1.5.1`.
 
 [Find other changelogs in our Releases.](https://github.com/platberlitz/SillyBunny/releases)
 
@@ -231,7 +232,7 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Upstream Information
 
-SillyBunny is a fork of SillyTavern. Most SillyTavern behavior, data formats, and ecosystem knowledge still apply. If running into an issue reproducable in upstream, please direct issues there.
+SillyBunny is a fork of SillyTavern. Most SillyTavern behavior, data formats, and ecosystem knowledge still apply. Please report SillyBunny-specific issues here, while reporting SillyTavern adjacent issues upstream.
 
 | Resource | Link |
 |----------|------|

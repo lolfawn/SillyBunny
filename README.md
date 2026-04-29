@@ -54,7 +54,7 @@ These screenshots show the graphical shell UI across Workspace, Customize, Agent
 * [Project Goals](#project-goals-aka-why-we-made-this-fork)
 * [Changes Compared to SillyTavern](#changes-vs-sillytavern)
 * [Latest Update](#latest-update)
-    * [v1.4.1 (2026-04-23)](#v141-2026-04-23)
+    * [v1.5.1 (2026-04-29)](#v151-2026-04-29)
 * [Upstream Information](#upstream-information)
 * [Contributors](#contributors)
 ***
@@ -216,15 +216,13 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ## Latest Update
 
-### v1.4.1 (2026-04-23)
+### v1.5.1 (2026-04-29)
 
-- Restored World Info entry enable/disable behavior and tightened the World Info layout with smaller cards, narrower popup rows, and cleaner mobile/desktop spacing.
-- Added selectable multi-delete pickers for saved presets and connection profiles instead of delete-all-only flows.
-- Improved Pathfinder usability with clearer tool-mode diagnostics, persisted tool toggles like Update and Forget, and a detailed retrieval log showing selected lore entries, stage results, and injected Pathfinder context.
-- Kept List Only mode focused on recent chats by removing its extra shortcut row, while also cleaning up home-screen preset copy so only the bundled SillyBunny-tuned Director preset is promoted.
-- Polished shell/UI consistency by aligning the reasoning token badge, matching bottom-bar sizing to the top bar, and preserving transparency for cropped avatars and alpha-capable thumbnails.
-- Hardened self-update behavior so existing Node/npm installs no longer dirty `package-lock.json` during routine updates.
-- Bumped the user-facing app version strings, package version references, Horde fallback client string, and default-user settings version to `1.4.1`.
+- Persisted collapsed thinking/reasoning blocks per message so chat switches and reloads keep the user's expanded or collapsed state.
+- Fixed Pathfinder settings so saving configuration no longer turns the agent off or resets saved lorebook, pipeline, prompt, and tool selections.
+- Raised Pathfinder pipeline stage output defaults to `32000` tokens and added visible max-token controls to the prompt editors.
+- Fixed Save & Restart from the server admin UI so launcher-based Linux, macOS, and Windows sessions relaunch the server in the same terminal.
+- Bumped the user-facing app version strings, package version references, Horde fallback client string, and bundled extension manifests to `1.5.1`.
 
 [Find other changelogs in our Releases.](https://github.com/platberlitz/SillyBunny/releases)
 
