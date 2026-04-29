@@ -458,22 +458,25 @@ h3:not(.popup h3):not(#chat h3) {
     min-height: var(--sb-control-min-height);
     line-height: 1.45;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--sb-row-gap);
     margin: 0;
     min-width: 0;
+    padding-block: max(0px, calc((var(--sb-control-min-height) - 1.45em) / 2));
     box-sizing: border-box;
 }
 
 :root[data-sb-compact-mode='true'] .checkbox_label {
     min-height: 30px;
     gap: 6px;
+    padding-block: max(0px, calc((var(--sb-control-min-height) - 1.32em) / 2));
 }
 
 .checkbox_label > input[type="checkbox"],
 .checkbox_label > input[type="radio"] {
     flex: 0 0 auto;
     margin: 0;
+    margin-top: 0.18em;
     accent-color: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor)));
 }
 
@@ -489,6 +492,8 @@ h3:not(.popup h3):not(#chat h3) {
 .checkbox_label span {
     line-height: 1.45;
     min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 :root[data-sb-compact-mode='true'] .checkbox_label small,
@@ -496,9 +501,20 @@ h3:not(.popup h3):not(#chat h3) {
     line-height: 1.32;
 }
 
+:root[data-sb-compact-mode='true'] .checkbox_label > input[type="checkbox"],
+:root[data-sb-compact-mode='true'] .checkbox_label > input[type="radio"] {
+    margin-top: 0.12em;
+}
+
 @media screen and (min-width: 769px) and (max-width: 1280px) and (pointer: fine) {
     .checkbox_label {
         min-height: 32px;
+        gap: 8px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .checkbox_label {
         gap: 8px;
     }
 }
@@ -1522,10 +1538,10 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     }
 
     #completion_prompt_manager_popup #completion_prompt_manager_forbid_overrides_block .checkbox_label {
-        justify-content: flex-end;
+        justify-content: flex-start;
         min-height: var(--sb-icon-control-size);
-        padding: 0;
-        text-align: right;
+        padding-inline: 4px;
+        text-align: left;
     }
 
     #completion_prompt_manager_popup #completion_prompt_manager_forbid_overrides_block .checkbox_label span {
@@ -2017,6 +2033,20 @@ input[type='range']::-moz-range-thumb {
     min-height: auto;
     line-height: 1;
     gap: 0;
+    padding-block: 0;
+}
+
+.sb-sampling-multi-card > :is(
+    #adaptive_p_block,
+    #smoothingBlock,
+    #xtc_block,
+    #dryBlock,
+    #dynatemp_block_ooba,
+    #mirostat_block_ooba,
+    #beamSearchBlock,
+    #contrastiveSearchBlock
+) > h4 .checkbox_label > input[type="checkbox"] {
+    margin-top: 0;
 }
 
 .sb-sampling-multi-card > :is(
@@ -2423,7 +2453,7 @@ input[type='range']::-moz-range-thumb {
 #range_block_openai .checkbox_label {
     width: 100%;
     flex-wrap: nowrap;
-    align-items: center;
+    align-items: flex-start;
     justify-content: flex-start;
     gap: 10px;
 }
@@ -2435,8 +2465,9 @@ input[type='range']::-moz-range-thumb {
 #range_block_openai .checkbox_label > input[type="checkbox"],
 #range_block_openai .checkbox_label > input[type="radio"] {
     flex: 0 0 auto;
-    align-self: center;
+    align-self: flex-start;
     margin: 0;
+    margin-top: 0.18em;
 }
 
 #openai_api .checkbox_label > span,
@@ -4108,7 +4139,7 @@ input[type='range']::-moz-range-thumb {
     border-radius: var(--sb-radius-md);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 70%, transparent);
-    align-items: center;
+    align-items: flex-start;
 }
 
 #STscriptToggles .checkbox_label > span,
@@ -4423,7 +4454,7 @@ input[type='range']::-moz-range-thumb {
     border-radius: var(--sb-radius-md);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 74%, transparent);
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
 }
 
