@@ -8,6 +8,8 @@
     position: relative;
     overflow: hidden;
     flex-shrink: 0;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     --welcome-strong-fg: var(--sb-landing-strong, color-mix(in srgb, var(--SmartThemeBodyColor) 92%, var(--SmartThemeBlurTintColor) 8%));
     --welcome-muted-fg: var(--sb-landing-muted, color-mix(in srgb, var(--SmartThemeBodyColor) 74%, var(--SmartThemeBlurTintColor) 26%));
     color: var(--welcome-strong-fg);
@@ -451,7 +453,7 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     white-space: nowrap;
 }
 
-@media screen and (max-width: 760px) {
+@media screen and (max-width: 768px) {
     .welcomePanel--listOnly .welcomeListShortcuts {
         gap: 8px;
     }
@@ -991,6 +993,7 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     align-items: center;
     gap: 10px;
     font-size: calc(var(--mainFontSize) * 0.96);
+    overflow: hidden;
 }
 
 .welcomeRecent .recentChatList .recentChat .chatNameContainer .chatName {
@@ -999,15 +1002,6 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
     white-space: nowrap;
     text-overflow: ellipsis;
     max-width: 100%;
-}
-
-.welcomeRecent .recentChatList .recentChat .chatNameContainer {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: 10px;
-    font-size: calc(var(--mainFontSize) * 0.96);
-    overflow: hidden;
 }
 
 .welcomeRecent .recentChatList .recentChat .chatDate {
@@ -1060,11 +1054,15 @@ body.hideChatAvatars .welcomePanel .recentChatList .recentChat .avatar {
 
 .welcomeRecent .recentChatList .recentChat .chatMessageContainer .chatMessage {
     display: -webkit-box;
+    min-width: 0;
+    max-width: 100%;
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
     line-clamp: 3;
     line-height: 1.5;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContainer .chatMessage {
@@ -1919,7 +1917,7 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
     }
 }
 
-@media screen and (max-width: 760px) {
+@media screen and (max-width: 768px) {
     .welcomeDeckToggle {
         width: 100%;
         justify-content: center;
@@ -2067,6 +2065,12 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
     .welcomeRecent .recentChatList .recentChat .chatNameContainer {
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 8px;
+        font-size: max(14px, calc(var(--mainFontSize) * 0.88));
+        line-height: 1.25;
+    }
+
+    .welcomeRecent .recentChatList .recentChat .chatNameContainer .chatName {
+        min-width: 0;
     }
 
     .welcomeRecent .recentChatList .recentChat .chatActions {
@@ -2078,6 +2082,15 @@ body.big-avatars .welcomeRecent .recentChatList .recentChat .chatMessageContaine
         align-items: flex-start;
         flex-direction: column;
         gap: 8px;
+        width: 100%;
+        min-width: 0;
+        font-size: max(14px, calc(var(--mainFontSize) * 0.8));
+        line-height: 1.45;
+    }
+
+    .welcomeRecent .recentChatList .recentChat .chatMessageContainer .chatMessage {
+        width: 100%;
+        line-height: 1.45;
     }
 
     .welcomeRecent .recentChatList .recentChat .chatStats {
