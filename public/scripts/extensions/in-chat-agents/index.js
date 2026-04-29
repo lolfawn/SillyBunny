@@ -100,6 +100,9 @@ const REMOVED_BUNDLED_GROUP_IDS = new Set([
 ]);
 
 const BUNDLED_REGEX_POST_DEFAULT_EXCLUDED_TEMPLATE_IDS = new Set();
+const BUNDLED_PROMPT_TRANSFORM_IMPERSONATE_TEMPLATE_IDS = new Set([
+    'tpl-prose-polisher',
+]);
 
 const REGEX_PLACEMENT_LABELS = {
     [AGENT_REGEX_PLACEMENT.AI_OUTPUT]: 'AI Output',
@@ -539,6 +542,51 @@ function shouldMigrateBundledRegexPostDefaults(agent, template) {
     }
 
     return getPromptTransformMode(agent) !== getPromptTransformMode(desiredTemplate);
+}
+
+function shouldMigrateBundledPromptTransformImpersonate(agent, template) {
+    if (!template) {
+        return false;
+    }
+
+    if (shouldSkipBundledTemplateMigrations(agent)) {
+        return false;
+    }
+
+    const templateId = String(template?.id ?? '').trim();
+    if (!BUNDLED_PROMPT_TRANSFORM_IMPERSONATE_TEMPLATE_IDS.has(templateId)) {
+        return false;
+    }
+
+    if (String(agent?.name ?? '').trim() !== String(template?.name ?? '').trim()) {
+        return false;
+    }
+
+    if (String(agent?.prompt ?? '').trim() !== String(template?.prompt ?? '').trim()) {
+        return false;
+    }
+
+    const desiredTemplate = mergeTemplateDefaults(template);
+    const desiredRunOnImpersonate = Boolean(desiredTemplate?.conditions?.runOnImpersonate);
+    return Boolean(agent?.conditions?.runOnImpersonate) !== desiredRunOnImpersonate;
+}
+
+async function migrateBundledPromptTransformImpersonateToSavedAgents() {
+    let migratedCount = 0;
+
+    for (const agent of getAgents()) {
+        const template = findTemplateForAgent(agent);
+        if (!shouldMigrateBundledPromptTransformImpersonate(agent, template)) {
+            continue;
+        }
+
+        const desiredTemplate = mergeTemplateDefaults(template);
+        agent.conditions.runOnImpersonate = Boolean(desiredTemplate?.conditions?.runOnImpersonate);
+        await saveAgent(agent);
+        migratedCount++;
+    }
+
+    return migratedCount;
 }
 
 async function migrateBundledRegexPostDefaultsToSavedAgents() {
@@ -1472,6 +1520,7 @@ async function openEditor(agentId = null) {
     editorEl.find('#ica--editor-pp-promptMode').val(getPromptTransformMode(agent));
     editorEl.find('#ica--editor-pp-promptMaxTokens').val(agent.postProcess.promptTransformMaxTokens ?? DEFAULT_AGENT_MAX_TOKENS);
     editorEl.find('#ica--editor-pp-promptShowNotifications').prop('checked', Boolean(agent.postProcess.promptTransformShowNotifications));
+    editorEl.find('#ica--editor-pp-runOnImpersonate').prop('checked', Boolean(agent.conditions.runOnImpersonate));
     editorEl.find('#ica--editor-pp-enabled').prop('checked', agent.postProcess.enabled && agent.postProcess.type !== 'regex');
     editorEl.find('#ica--editor-pp-type').val(postProcessType);
     editorEl.find('#ica--editor-pp-extractPattern').val(agent.postProcess.extractPattern);
@@ -1746,6 +1795,7 @@ async function openEditor(agentId = null) {
     agent.postProcess.promptTransformMode = editorEl.find('#ica--editor-pp-promptMode').val()?.toString() === 'append' ? 'append' : 'rewrite';
     agent.postProcess.promptTransformMaxTokens = Number(editorEl.find('#ica--editor-pp-promptMaxTokens').val()) || DEFAULT_AGENT_MAX_TOKENS;
     agent.regexScripts = regexScripts.map(script => normalizeRegexScript(script));
+    agent.conditions.runOnImpersonate = editorEl.find('#ica--editor-pp-runOnImpersonate').prop('checked');
 
     agent.conditions.triggerProbability = Number(editorEl.find('#ica--editor-probability').val());
     const kwText = editorEl.find('#ica--editor-keywords').val().toString();
@@ -2824,6 +2874,11 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
     const migratedRegexPostDefaultsCount = await migrateBundledRegexPostDefaultsToSavedAgents();
     if (migratedRegexPostDefaultsCount > 0) {
         toastr.success(`Updated ${migratedRegexPostDefaultsCount} bundled regex agent(s) to post-generation defaults.`);
+    }
+
+    const migratedPromptTransformImpersonateCount = await migrateBundledPromptTransformImpersonateToSavedAgents();
+    if (migratedPromptTransformImpersonateCount > 0) {
+        toastr.success(`Updated ${migratedPromptTransformImpersonateCount} bundled prompt pass agent(s) for impersonations.`);
     }
 
     const migratedPromptTransformTokenCount = await migrateLegacyPromptTransformMaxTokens();

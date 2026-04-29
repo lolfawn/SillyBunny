@@ -375,6 +375,17 @@ function isImpersonateGenerationType(generationType) {
     return normalizeGenerationType(generationType) === IMPERSONATE_GENERATION_TYPE;
 }
 
+function getUserMessageName() {
+    try {
+        const context = getContext();
+        const userName = String(context?.name1 ?? '').trim();
+
+        return userName || 'User';
+    } catch {
+        return 'User';
+    }
+}
+
 function getStreamingTarget(messageIndex) {
     if (!Number.isInteger(Number(messageIndex))) {
         return null;
@@ -1321,6 +1332,10 @@ function getPromptTransformAgentsForMessage(activeAgents, generationType) {
     return getPromptTransformAgents(activeAgents);
 }
 
+function getPromptTransformAgentsForImpersonate(activeAgents) {
+    return getPromptTransformAgents(activeAgents).filter(agent => Boolean(agent?.conditions?.runOnImpersonate));
+}
+
 function describePromptTransformMode(mode) {
     return mode === 'append' ? 'prompt append' : 'prompt rewrite';
 }
@@ -1562,10 +1577,15 @@ function unwrapAssistantResponseWrapper(value) {
 }
 
 function buildPromptTransformMessages(agentPrompt, messageText, assistantName, generationType, mode) {
+    const isImpersonate = isImpersonateGenerationType(generationType);
+    const targetLabel = isImpersonate ? 'generated impersonation text' : 'assistant response';
+    const originalLabel = isImpersonate ? 'original text' : 'original response';
+    const contentLabel = isImpersonate ? 'text' : 'response';
     const actionInstruction = mode === 'append'
-        ? 'Generate only the new content that should be appended after the assistant response according to the instructions above. Do not repeat, rewrite, summarize, or quote the original assistant response. Return only the appended content, with no labels or commentary unless the appended content itself requires them.'
-        : 'Rewrite the assistant response according to the instructions above. Return only the final rewritten assistant response. If no changes are needed, return the original response verbatim. Do not add commentary, labels, or code fences unless the response itself requires them.';
+        ? `Generate only the new content that should be appended after the ${targetLabel} according to the instructions above. Do not repeat, rewrite, summarize, or quote the original ${targetLabel}. Return only the appended content, with no labels or commentary unless the appended content itself requires them.`
+        : `Rewrite the ${targetLabel} according to the instructions above. Return only the final rewritten ${targetLabel}. If no changes are needed, return the ${originalLabel} verbatim. Do not add commentary, labels, or code fences unless the ${contentLabel} itself requires them.`;
     const currentAssistantResponse = unwrapAssistantResponseWrapper(messageText);
+    const responseLabel = isImpersonate ? 'Current generated impersonation text' : 'Current assistant response';
 
     return [
         {
@@ -1574,7 +1594,7 @@ function buildPromptTransformMessages(agentPrompt, messageText, assistantName, g
         },
         {
             role: 'user',
-            content: `Assistant name: ${assistantName || 'Assistant'}\nGeneration type: ${generationType}\n\nCurrent assistant response:\n<assistant_response>\n${currentAssistantResponse}\n</assistant_response>`,
+            content: `Assistant name: ${assistantName || 'Assistant'}\nGeneration type: ${generationType}\n\n${responseLabel}:\n<assistant_response>\n${currentAssistantResponse}\n</assistant_response>`,
         },
     ];
 }
@@ -2503,12 +2523,113 @@ function onMessageEdited(messageIndex) {
     saveChatDebounced();
 }
 
-async function onImpersonateReady() {
+async function runPromptTransformAgentsForText(promptTransformAgents, initialText, generationType) {
+    const message = {
+        mes: initialText,
+        name: getUserMessageName(),
+        is_user: true,
+        is_system: false,
+        extra: {},
+    };
+    const promptRuns = [];
+    let currentPromptTransformText = unwrapAssistantResponseWrapper(initialText);
+    let appendBatch = [];
+
+    const flushAppendBatch = async () => {
+        if (appendBatch.length === 0) {
+            return;
+        }
+
+        const batchAgents = appendBatch;
+        appendBatch = [];
+
+        const batchResult = await runPromptTransformAppendBatch(
+            batchAgents,
+            message,
+            generationType,
+            currentPromptTransformText,
+            null,
+        );
+        promptRuns.push(...batchResult.results);
+        currentPromptTransformText = batchResult.nextMessageText;
+    };
+
+    for (const agent of promptTransformAgents) {
+        if (getPromptTransformMode(agent) === 'append') {
+            appendBatch.push(agent);
+            continue;
+        }
+
+        await flushAppendBatch();
+
+        try {
+            const result = await runPromptTransformAgent(agent, message, generationType, currentPromptTransformText, null, {
+                applyToMessage: false,
+            });
+            promptRuns.push(result);
+            currentPromptTransformText = result.nextMessageText;
+        } catch (error) {
+            promptRuns.push({
+                agentId: agent.id,
+                agentName: agent.name,
+                changed: false,
+                status: 'error',
+                mode: getPromptTransformMode(agent),
+                error: error instanceof Error ? error.message : String(error),
+                runner: 'error',
+                timestamp: new Date().toISOString(),
+            });
+        }
+    }
+
+    await flushAppendBatch();
+
+    return {
+        promptRuns,
+        text: currentPromptTransformText,
+        changed: currentPromptTransformText !== unwrapAssistantResponseWrapper(initialText),
+    };
+}
+
+async function onImpersonateReady(text = '') {
     if (internalPromptTransformDepth > 0 || !areAgentsGloballyEnabled()) {
         return;
     }
 
-    // Impersonate produces user-side text; this event must not mutate the last assistant swipe.
+    const textarea = document.querySelector('#send_textarea');
+    if (!textarea) {
+        return;
+    }
+
+    const textareaTextAtStart = normalizeContentText(textarea.value);
+    const eventText = normalizeContentText(text);
+    const initialText = textareaTextAtStart || eventText;
+    if (!initialText.trim()) {
+        return;
+    }
+
+    const activationSnapshot = pendingGenerationSnapshot?.generationType === IMPERSONATE_GENERATION_TYPE
+        ? cloneActivationSnapshot(pendingGenerationSnapshot, IMPERSONATE_GENERATION_TYPE)
+        : buildActivationSnapshot(IMPERSONATE_GENERATION_TYPE);
+    const activeAgents = getSnapshotAgents(activationSnapshot);
+    const promptTransformAgents = getPromptTransformAgentsForImpersonate(activeAgents);
+    if (promptTransformAgents.length === 0) {
+        return;
+    }
+
+    // Impersonate produces user-side text; rewrite only the composer value, never the last assistant swipe.
+    const result = await runPromptTransformAgentsForText(promptTransformAgents, initialText, IMPERSONATE_GENERATION_TYPE);
+    if (!result.changed) {
+        return;
+    }
+
+    if (normalizeContentText(textarea.value) !== textareaTextAtStart) {
+        toastr.warning('Skipped applying the impersonation prompt pass because the input changed while it was running.', 'In-Chat Agents');
+        return;
+    }
+
+    textarea.value = result.text;
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 async function onMessageSwiped(data) {
