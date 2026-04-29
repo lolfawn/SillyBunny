@@ -712,6 +712,25 @@ export async function pingServer() {
     }
 }
 
+function registerSillyBunnyServiceWorker() {
+    if (!('serviceWorker' in navigator) || !window.isSecureContext) {
+        return;
+    }
+
+    const register = () => {
+        navigator.serviceWorker.register('/sw.js').catch((error) => {
+            console.warn('Failed to register SillyBunny service worker.', error);
+        });
+    };
+
+    if (document.readyState === 'complete') {
+        window.setTimeout(register, 0);
+        return;
+    }
+
+    window.addEventListener('load', register, { once: true });
+}
+
 //MARK: firstLoadInit
 async function firstLoadInit() {
     const scheduleStartupLoaderCleanup = (reason) => {
@@ -14335,6 +14354,8 @@ jQuery(async function () {
         await getCharacters();
         await eventSource.emit(event_types.OPEN_CHARACTER_LIBRARY);
     });
+
+    registerSillyBunnyServiceWorker();
 
     // Added here to prevent execution before script.js is loaded and get rid of quirky timeouts
     await firstLoadInit();

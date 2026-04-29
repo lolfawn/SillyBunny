@@ -18,6 +18,8 @@
         }
     </style>
     <link rel="preload" as="style" href="style.css">
+    <link rel="modulepreload" href="script.js">
+    <link rel="preload" as="script" href="scripts/sillybunny-tabs.js?v=20260408b">
     <link rel="manifest" crossorigin="use-credentials" href="manifest.json">
     <link href="webfonts/Figtree/stylesheet.css?v=20260422b" rel="stylesheet">
     <link href="webfonts/NotoSans/stylesheet.css" rel="stylesheet">
@@ -42,7 +44,7 @@
     <link rel="stylesheet" type="text/css" href="css/world-info.css?v=20260425b">
     <link rel="stylesheet" type="text/css" href="css/extensions-panel.css?v=20260425a">
     <link rel="stylesheet" type="text/css" href="css/select2-overrides.css">
-    <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260426a">
+    <link rel="stylesheet" type="text/css" href="css/mobile-styles.css?v=20260426a" media="(max-width: 768px)">
     <link rel="stylesheet" type="text/css" href="css/sillybunny-theme.css?v=20260426f">
     <link rel="stylesheet" type="text/css" href="css/sillybunny-tabs.css?v=20260426b">
     <link rel="stylesheet" type="text/css" href="css/macros.css">
@@ -8606,20 +8608,20 @@
     <div id="secrets_datalists" class="displayNone"></div>
 
     <!-- Script includes -->
-    <script src="lib/polyfill.js"></script>
-    <script src="lib/jquery-3.5.1.min.js"></script>
-    <script src="lib/jquery-ui.min.js"></script>
-    <script src="lib/jquery.transit.min.js"></script>
-    <script src="lib/jquery-cookie-1.4.1.min.js"></script>
-    <script src="lib/jquery.ui.touch-punch.min.js"></script>
-    <script src="lib/cropper.min.js"></script>
-    <script src="lib/jquery-cropper.min.js"></script>
-    <script src="lib/toastr.min.js"></script>
-    <script src="lib/select2.min.js"></script>
-    <script src="lib/select2-search-placeholder.js"></script>
-    <script src="lib/pagination.js"></script>
-    <script src="lib/toolcool-color-picker.js"></script>
-    <script src="lib/jquery.izoomify.js"></script>
+    <script src="lib/polyfill.js" defer></script>
+    <script src="lib/jquery-3.5.1.min.js" defer></script>
+    <script src="lib/jquery-ui.min.js" defer></script>
+    <script src="lib/jquery.transit.min.js" defer></script>
+    <script src="lib/jquery-cookie-1.4.1.min.js" defer></script>
+    <script src="lib/jquery.ui.touch-punch.min.js" defer></script>
+    <script src="lib/cropper.min.js" defer></script>
+    <script src="lib/jquery-cropper.min.js" defer></script>
+    <script src="lib/toastr.min.js" defer></script>
+    <script src="lib/select2.min.js" defer></script>
+    <script src="lib/select2-search-placeholder.js" defer></script>
+    <script src="lib/pagination.js" defer></script>
+    <script src="lib/toolcool-color-picker.js" defer></script>
+    <script src="lib/jquery.izoomify.js" defer></script>
     <script type="module" src="lib/structured-clone/monkey-patch.js"></script>
     <script type="module" src="lib/swiped-events.js"></script>
     <script type="module" src="lib/eventemitter.js"></script>
