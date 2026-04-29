@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+Date: 2026-04-29
+
+This update restores Prose Polisher coverage for guided impersonation workflows, makes Advanced Formatting a first-class workspace tab again, and adds conservative startup-loading improvements for desktop and mobile.
+
+### In-Chat Agents
+- Added an opt-in prompt-pass condition for generated impersonation text so Prose Polisher can rewrite Guided Generations impersonations without mutating the previous assistant message.
+- Shipped the bundled Prose Polisher template with impersonation polishing enabled, while keeping the new behavior off by default for other prompt-pass agents.
+- Added editor UI and migration support for saved bundled Prose Polisher agents, plus unit coverage for both opted-out and opted-in impersonation behavior.
+
+### Workspace And Formatting
+- Promoted Advanced Formatting into its own left workspace tab immediately after Sampling.
+- Kept the Formatting tab visible across backends instead of hiding the whole Advanced Formatting drawer outside Text Completions.
+
+### Loading
+- Deferred ordered classic library scripts, preloaded startup modules, and limited the mobile stylesheet to mobile viewports.
+- Added a guarded service worker that stale-while-revalidates static library, CSS, image, and webfont assets while using network-first handling for HTML and JavaScript.
+
+### Local Commits
+- `1f3c9b3 feat(agents): allow prompt passes on impersonations`
+- `c6f8903 feat(shell): promote advanced formatting to workspace tab`
+- `887be36 perf(loading): defer startup assets and cache statics`
+
 ## v1.5.1
 
 Date: 2026-04-29
