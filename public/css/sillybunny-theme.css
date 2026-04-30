@@ -715,7 +715,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     background:
         linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent), transparent 90%),
         var(--sb-chat-surface-bg);
-    opacity: 1;
+    opacity: var(--sb-page-card-opacity);
 }
 
 #nonQRFormItems {
@@ -1347,6 +1347,10 @@ body.bubblechat .mes[is_user='true'] .mes_block {
         :root[data-sb-theme='clean-minimal'] {
             --sb-mobile-default-surface-solid: rgb(from var(--SmartThemeBlurTintColor) r g b / 0.98);
             --sb-mobile-default-input-solid: rgb(from var(--SmartThemeChatTintColor) r g b / 0.96);
+            --sb-chat-surface-source: rgb(from var(--SmartThemeBlurTintColor) r g b / calc(var(--sb-page-card-opacity) * 0.98));
+            --sb-chatbar-surface-bg: rgb(from var(--SmartThemeBlurTintColor) r g b / calc(var(--sb-shell-surface-opacity) * 0.98));
+            --sb-mobile-overlay-bg: rgb(from var(--SmartThemeBlurTintColor) r g b / calc(var(--sb-page-overlay-opacity) * 0.98));
+            --sb-mobile-panel-bg: rgb(from var(--SmartThemeBlurTintColor) r g b / calc(var(--sb-page-card-opacity) * 0.98));
         }
     }
 
@@ -1378,7 +1382,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     :root[data-sb-theme='clean-minimal'] #send_form::before,
     :root[data-sb-theme='clean-minimal'] #sb-chatbar::before,
     :root[data-sb-theme='clean-minimal'] #sb-mobile-chat-tools-panel::before {
-        opacity: 1 !important;
+        opacity: var(--sb-shell-surface-opacity) !important;
     }
 
     #chat .mes:not(.smallSysMes) .mesAvatarWrapper {

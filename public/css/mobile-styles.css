@@ -1109,14 +1109,14 @@
 /* Final mobile chat-bar guardrails: keep controls compact and square. */
 @media screen and (max-width: 768px) {
     :root {
-        --bottomFormBlockSize: var(--sb-mobile-touch-target, 44px);
-        --bottomFormIconSize: 20px;
+        --bottomFormBlockSize: calc(var(--sb-mobile-touch-target, 44px) * var(--sb-bottom-bar-scale, 1));
+        --bottomFormIconSize: calc(20px * var(--sb-bottom-bar-scale, 1));
         --sb-mobile-composer-input-height: 46px;
     }
 
     :root[data-sb-compact-mode='true'] {
-        --bottomFormBlockSize: var(--sb-mobile-touch-target, 44px);
-        --bottomFormIconSize: 18px;
+        --bottomFormBlockSize: calc(var(--sb-mobile-touch-target, 44px) * var(--sb-bottom-bar-scale, 1));
+        --bottomFormIconSize: calc(18px * var(--sb-bottom-bar-scale, 1));
         --sb-mobile-composer-input-height: 42px;
     }
 
@@ -1207,7 +1207,7 @@
         box-sizing: border-box !important;
         border-radius: 10px !important;
         line-height: 1 !important;
-        font-size: 18px !important;
+        font-size: var(--bottomFormIconSize) !important;
     }
 
     :root[data-sb-compact-mode='true'] #leftSendForm > div,
@@ -1216,7 +1216,7 @@
     :root[data-sb-compact-mode='true'] #send_form .mes_stop,
     :root[data-sb-compact-mode='true'] #send_form.sb-generating-controls #mes_stop {
         border-radius: 9px !important;
-        font-size: 17px !important;
+        font-size: var(--bottomFormIconSize) !important;
     }
 
     #send_textarea {
@@ -1249,13 +1249,13 @@
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        font-size: 18px !important;
+        font-size: var(--bottomFormIconSize) !important;
         line-height: 1 !important;
     }
 
     :root[data-sb-compact-mode='true'] #send_but::before,
     :root[data-sb-compact-mode='true'] #mes_stop > i {
-        font-size: 17px !important;
+        font-size: var(--bottomFormIconSize) !important;
     }
 
     #send_form:not(.sb-generating-controls) #mes_stop {

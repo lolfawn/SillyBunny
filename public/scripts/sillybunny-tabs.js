@@ -1598,7 +1598,7 @@ function setShellTheme(themeId, { persist = true } = {}) {
 
 function setSurfaceTransparency(value, { persist = true } = {}) {
     const nextTransparency = normalizeSurfaceTransparency(value);
-    const surfaceOpacity = Math.max(0.42, 1 - (nextTransparency / 100));
+    const surfaceOpacity = Math.max(0, 1 - (nextTransparency / 100));
     const cardOpacity = Math.min(1, surfaceOpacity + 0.12);
     const controlOpacity = Math.min(1, surfaceOpacity + 0.22);
     const overlayOpacity = Math.min(1, surfaceOpacity + 0.08);
