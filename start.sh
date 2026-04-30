@@ -271,10 +271,18 @@ while true; do
         export SILLYBUNNY_SKIP_BROWSER_AUTO_LAUNCH=1
     fi
 
-    if run_server "${server_args[@]}"; then
-        server_exit_code=0
+    if (( ${#server_args[@]} )); then
+        if run_server "${server_args[@]}"; then
+            server_exit_code=0
+        else
+            server_exit_code=$?
+        fi
     else
-        server_exit_code=$?
+        if run_server; then
+            server_exit_code=0
+        else
+            server_exit_code=$?
+        fi
     fi
 
     if (( server_exit_code == restart_exit_code )); then
