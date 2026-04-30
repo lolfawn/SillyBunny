@@ -246,6 +246,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 **Agents And Chat Naming**
 * Deleting a swipe now clears pending post-generation recovery state so already-run post-generation agents do not fire again from the swipe-delete DOM update.
 * Chat auto-naming now allows longer title responses and strips reasoning wrappers before parsing, making the Persona bottom-bar wand more reliable with reasoning models.
+* Persona bottom-bar Auto-label Chat now uses structured title output when available and falls back to raw title parsing, preventing false `No message generated` errors.
 
 **UI Polish**
 * The Bottom Bar Size slider now scales the SillyBunny chatbar and Persona bottom chat controls on mobile instead of only affecting the legacy composer sizing.
@@ -264,6 +265,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * `135cd0a fix(ui): allow full background visibility`
 * `5cfff2a fix(ui): left align mobile label options`
 * `15a29d9 fix(mobile): stabilize chat rendering`
+* `fix(chat): stabilize bottom bar auto-labeling`
 
 ### v1.5.1 (2026-04-29)
 

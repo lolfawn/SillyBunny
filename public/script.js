@@ -9586,6 +9586,24 @@ const CHAT_LABEL_FILENAME_LIMIT = 120;
 const CHAT_LABEL_MAX_MESSAGES = 14;
 const CHAT_LABEL_HEAD_MESSAGES = 4;
 const CHAT_LABEL_MAX_MESSAGE_CHARS = 650;
+const CHAT_LABEL_JSON_SCHEMA = Object.freeze({
+    name: 'chat_label',
+    description: 'A concise title for a saved chat.',
+    strict: true,
+    value: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['title'],
+        properties: {
+            title: {
+                type: 'string',
+                description: 'A concise title for the chat.',
+                minLength: 1,
+                maxLength: CHAT_LABEL_TITLE_LIMIT,
+            },
+        },
+    },
+});
 const CHAT_LABEL_TIMESTAMP_PATTERN = '\\d{4}-\\d{2}-\\d{2}@\\d{2}h\\d{2}m\\d{2}s\\d{3}ms';
 let chatHistoryToolsAbortController = null;
 
@@ -9798,6 +9816,31 @@ function extractGeneratedChatLabel(responseText, displayName = '') {
     return '';
 }
 
+async function generateChatAutoLabelResponse(prompt, displayName, signal) {
+    const generated = await generateRaw({
+        prompt,
+        responseLength: 256,
+        trimNames: false,
+        jsonSchema: CHAT_LABEL_JSON_SCHEMA,
+        signal,
+    });
+
+    return extractGeneratedChatLabel(generated, displayName);
+}
+
+async function generatePlainChatAutoLabelResponse(prompt, displayName, signal) {
+    const api = main_api;
+    const data = await generateRawData({
+        prompt,
+        api,
+        responseLength: 256,
+        signal,
+    });
+    const generated = typeof data === 'string' ? data : extractMessageFromData(data, api);
+
+    return extractGeneratedChatLabel(generated, displayName);
+}
+
 async function loadChatForAutoLabel(fileName, { isGroupChat, groupId, characterId, signal } = {}) {
     const endpoint = isGroupChat ? '/api/chats/group/get' : '/api/chats/get';
     const requestBody = isGroupChat
@@ -9852,18 +9895,42 @@ ${transcript}`,
         },
     ];
 
-    const generated = await generateRaw({
-        prompt,
-        responseLength: 256,
-        trimNames: true,
-        signal,
-    });
-    const label = extractGeneratedChatLabel(generated, displayName);
-    if (!label) {
-        throw new Error('The model did not return a usable chat label.');
+    let generationError = null;
+
+    if (main_api === 'openai') {
+        try {
+            const structuredLabel = await generateChatAutoLabelResponse(prompt, displayName, signal);
+            if (structuredLabel) {
+                return structuredLabel;
+            }
+        } catch (error) {
+            if (isChatHistoryToolAbort(error)) {
+                throw error;
+            }
+
+            generationError = error;
+            console.debug('Structured chat label generation failed; retrying without schema.', error);
+        }
     }
 
-    return label;
+    try {
+        const plainLabel = await generatePlainChatAutoLabelResponse(prompt, displayName, signal);
+        if (plainLabel) {
+            return plainLabel;
+        }
+    } catch (error) {
+        if (isChatHistoryToolAbort(error)) {
+            throw error;
+        }
+
+        generationError = error;
+    }
+
+    if (generationError && String(generationError?.message || generationError) !== 'No message generated') {
+        throw generationError;
+    }
+
+    throw new Error('The model did not return a usable chat label.');
 }
 
 async function buildAutoLabeledChatFileName(label, { displayName, isGroupChat, existingNames, oldFileName } = {}) {
