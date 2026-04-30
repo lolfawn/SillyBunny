@@ -3017,26 +3017,53 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 768px) {
     #sb-bottom-chat-bar {
-        gap: 6px;
+        gap: 4px;
         margin: 0 max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
-        padding: 6px 8px;
-        min-height: 58px;
-        border-radius: 16px;
+        padding: 4px 6px;
+        min-height: 42px;
+        border-radius: 14px;
     }
 
     #sb-bottom-chat-select {
-        height: var(--sb-mobile-touch-target, 44px);
-        min-height: var(--sb-mobile-touch-target, 44px);
-        padding: 0 10px;
-        font-size: calc(var(--mainFontSize) * 0.82);
-        border-radius: 12px;
+        flex: 1 1 72px;
+        height: 34px;
+        min-height: 34px;
+        padding: 0 8px;
+        font-size: calc(var(--mainFontSize) * 0.78);
+        border-radius: 11px;
     }
 
     .sb-bottom-chat-btn {
-        min-width: var(--sb-mobile-touch-target, 44px);
-        min-height: var(--sb-mobile-touch-target, 44px);
-        padding: 0 8px;
-        font-size: calc(var(--mainFontSize) * 0.86);
+        min-width: 34px;
+        min-height: 34px;
+        padding: 0 6px;
+        border-radius: 9px;
+        font-size: calc(var(--mainFontSize) * 0.78);
+    }
+}
+
+@media screen and (max-width: 420px) {
+    #sb-bottom-chat-bar {
+        gap: 3px;
+        padding: 3px 5px;
+        min-height: 38px;
+        border-radius: 13px;
+    }
+
+    #sb-bottom-chat-select {
+        flex-basis: 58px;
+        height: 30px;
+        min-height: 30px;
+        padding: 0 6px;
+        font-size: calc(var(--mainFontSize) * 0.72);
+        border-radius: 10px;
+    }
+
+    .sb-bottom-chat-btn {
+        min-width: 30px;
+        min-height: 30px;
+        padding: 0 5px;
+        font-size: calc(var(--mainFontSize) * 0.72);
     }
 }
 
@@ -3165,10 +3192,20 @@ body.sb-shell-resizing * {
 
 @media screen and (max-width: 768px) {
     #sb-persona-bubble {
-        width: var(--sb-mobile-touch-target, 44px);
-        height: var(--sb-mobile-touch-target, 44px);
-        min-width: var(--sb-mobile-touch-target, 44px);
-        min-height: var(--sb-mobile-touch-target, 44px);
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        min-height: 34px;
+        border-width: 1px;
+    }
+}
+
+@media screen and (max-width: 420px) {
+    #sb-persona-bubble {
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        min-height: 30px;
     }
 }
 

@@ -32,6 +32,7 @@ This update restores Prose Polisher coverage for guided impersonation workflows,
 
 ### Chat Management
 - Narrowed the Persona bottom chat bar on mobile with safe-area-aware side gutters while leaving the message composer width unchanged.
+- Tightened mobile Persona bottom bar control heights, avatar sizing, icon buttons, gaps, and narrow-phone spacing so the bar no longer dominates the screen.
 - Added Persona bottom bar shortcuts for mass deleting chats in the current character/group scope and asking the active LLM to name the current chat.
 - Added aligned mass-delete checkboxes, protected the currently open chat, and included 7/30/90/180 day cleanup presets plus a matching `/autonamechat` command.
 
