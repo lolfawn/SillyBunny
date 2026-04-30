@@ -403,6 +403,59 @@ function withGroupPrivateDmFilter(speakerAvatar, callback) {
     }
 }
 
+async function withGroupPrivateDmMemory(group, speakerAvatar, callback) {
+    const dmMessages = isGroupDmChatMetadata() ? [] : await getGroupDmMemoryMessages(group, speakerAvatar);
+    chat.splice(0, 0, ...dmMessages);
+
+    try {
+        return await withGroupPrivateDmFilter(speakerAvatar, callback);
+    } finally {
+        if (dmMessages.length) {
+            const injected = new Set(dmMessages);
+            for (let index = chat.length - 1; index >= 0; index--) {
+                if (injected.has(chat[index])) {
+                    chat.splice(index, 1);
+                }
+            }
+        }
+    }
+}
+
+async function getGroupDmMemoryMessages(group, speakerAvatar) {
+    const avatar = String(speakerAvatar || '');
+    if (!group || !avatar || !Array.isArray(group.chats)) {
+        return [];
+    }
+
+    const messages = [];
+    for (const chatId of group.chats) {
+        const data = await loadGroupChat(chatId);
+        const metadata = data?.[0]?.chat_metadata;
+        if (!isGroupDmChatMetadata(metadata) || !isGroupDmParticipant(avatar, metadata)) {
+            continue;
+        }
+
+        for (const message of data.slice(1)) {
+            if (!message || message.is_system) {
+                continue;
+            }
+
+            const clone = structuredClone(message);
+            const isUserMessage = Boolean(clone.is_user);
+            clone.extra = {
+                ...(clone.extra || {}),
+                is_group_dm: true,
+                dm_from: clone.extra?.dm_from || (isUserMessage ? 'user' : avatar),
+                dm_to: clone.extra?.dm_to || (isUserMessage ? avatar : 'user'),
+            };
+            clone.title = clone.title || 'Private DM';
+            messages.push(clone);
+        }
+    }
+
+    return messages;
+}
+
 function getSelectedGroupSpeakerChid(group) {
     if (!selectedGroupSpeakerAvatar) {
         return -1;
@@ -1947,12 +2000,12 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             if (type === 'dm' || isGroupDmChatMetadata()) {
                 setPendingGeneratedMessageExtra(getGroupDmExtra(characters[chId]?.avatar, 'user'));
             }
-            textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => withGroupPrivateDmFilter(characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...mergedParams })));
+            textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => withGroupPrivateDmMemory(group, characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...mergedParams })));
             let messageChunk = textResult?.messageChunk;
 
             if (messageChunk) {
                 while (shouldAutoContinue(messageChunk, type === 'impersonate')) {
-                    textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => Generate('continue', { automatic_trigger: byAutoMode, ...mergedParams }));
+                    textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => withGroupPrivateDmMemory(group, characters[chId]?.avatar, () => Generate('continue', { automatic_trigger: byAutoMode, ...mergedParams })));
                     messageChunk = textResult?.messageChunk;
                 }
             }
