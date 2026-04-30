@@ -7238,8 +7238,18 @@ body:not(.movingUI) .drawer-content.maximized {
     background: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 14%, transparent);
 }
 
+.popup:has(.ica-transform-history) .popup-content {
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.ica-transform-history {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 .ica-transform-history-entry {
-    margin-bottom: 12px;
     padding: 12px;
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 55%, transparent);
     border-radius: 10px;
@@ -7266,6 +7276,9 @@ body:not(.movingUI) .drawer-content.maximized {
     line-height: 1.55;
     font-family: var(--monoFontFamily, monospace);
     font-size: calc(var(--mainFontSize) * 0.84);
+    max-height: min(48vh, 520px);
+    max-height: min(48dvh, 520px);
+    overflow-y: auto;
 }
 
 .ica-transform-diff-part--ins {

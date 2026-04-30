@@ -2455,7 +2455,12 @@ async function openPromptTransformHistoryPopup(messageIndex) {
         }
     });
 
-    await new Popup(html, POPUP_TYPE.TEXT, '', { wide: true }).show();
+    await new Popup(html, POPUP_TYPE.TEXT, '', {
+        wide: true,
+        large: true,
+        allowVerticalScrolling: true,
+        leftAlign: true,
+    }).show();
 }
 
 // ===================== Pathfinder Editor =====================

@@ -1,4 +1,4 @@
-const SB_SW_CACHE_VERSION = 'sillybunny-cache-v20260430b';
+const SB_SW_CACHE_VERSION = 'sillybunny-cache-v20260430c';
 const SB_STATIC_CACHE = `${SB_SW_CACHE_VERSION}-static`;
 const SB_SHELL_CACHE = `${SB_SW_CACHE_VERSION}-shell`;
 
