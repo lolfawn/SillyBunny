@@ -3857,9 +3857,12 @@ function getCharacterPanelMenuType() {
 }
 
 function hasActiveCharacterChat(context = getSillyTavernContext()) {
+    if (context?.groupId) {
+        return true;
+    }
+
     return Boolean(
         context
-        && !context.groupId
         && context.characterId !== undefined
         && context.characterId !== null
         && context.characters?.[context.characterId],
