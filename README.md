@@ -237,7 +237,6 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * Added lazy/async loading hints for chat avatars and attached message images.
 * Added mobile content-visibility containment for off-screen chat messages to reduce WebKit layout and memory pressure during longer chats.
 * Chat rendering now uses smaller mobile batches and older-history loads ignore duplicate touch/mouse activations, reducing iOS Safari crashes and accidental auto-loading during longer chats.
-* Mobile streaming now uses a lighter in-progress preview cadence and saves full markdown formatting for completion, reducing iOS Safari reloads during longer generations.
 * Agent output history popups now use a scrollable desktop layout so long diffs no longer push Undo and Redo controls below the viewport.
 
 **Group Chats**
@@ -270,7 +269,6 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * `15a29d9 fix(mobile): stabilize chat rendering`
 * `fix(chat): stabilize bottom bar auto-labeling`
 * `fix(cache): refresh 1.5.2 frontend assets`
-* `fix(mobile): stabilize long streaming generations`
 * `fix(agents): make output history scrollable`
 
 ### v1.5.1 (2026-04-29)

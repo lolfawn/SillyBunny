@@ -469,7 +469,6 @@ const messageTemplate = $('#message_template .mes');
 export const chatElement = $('#chat');
 const MOBILE_CHAT_RENDER_MEDIA_QUERY = '(max-width: 1000px)';
 const MOBILE_CHAT_RENDER_BATCH_SIZE = 8;
-const MOBILE_STREAMING_RENDER_FPS = 4;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
@@ -1518,14 +1517,6 @@ function getMobileChatRenderBatchSize(messageCount) {
     }
 
     return Math.min(MOBILE_CHAT_RENDER_BATCH_SIZE, messageCount);
-}
-
-function shouldUseMobileStreamingPreview() {
-    return shouldBatchMobileChatRendering();
-}
-
-function formatMobileStreamingPreview(text) {
-    return escapeHtml(String(text ?? '')).replace(/\r\n|\r|\n/g, '<br>');
 }
 
 function waitForNextFrame() {
@@ -3885,10 +3876,8 @@ class StreamingProcessor {
      * Initializes DOM elements for the current message.
      * @param {number} messageId Current message ID
      * @param {boolean?} continueOnReasoning If continuing on reasoning
-     * @param {object} options Additional render options
-     * @param {boolean} [options.updateReasoningDom=true] Whether to refresh the reasoning DOM
      */
-    async #checkDomElements(messageId, continueOnReasoning = null, { updateReasoningDom = true } = {}) {
+    async #checkDomElements(messageId, continueOnReasoning = null) {
         if (this.messageDom === null || this.messageTextDom === null) {
             this.messageDom = document.querySelector(`#chat .mes[mesid="${messageId}"]`);
             this.messageTextDom = this.messageDom?.querySelector('.mes_text');
@@ -3898,9 +3887,7 @@ class StreamingProcessor {
         if (continueOnReasoning) {
             await this.reasoningHandler.process(messageId, false, this.promptReasoning);
         }
-        if (updateReasoningDom) {
-            this.reasoningHandler.updateDom(messageId);
-        }
+        this.reasoningHandler.updateDom(messageId);
     }
 
     #updateMessageBlockVisibility() {
@@ -3976,9 +3963,8 @@ class StreamingProcessor {
             this.sendTextarea.value = processedText;
             this.sendTextarea.dispatchEvent(new Event('input', { bubbles: true }));
         } else {
-            const useMobileStreamingPreview = !isFinal && shouldUseMobileStreamingPreview();
             const mesChanged = chat[messageId].mes !== processedText;
-            await this.#checkDomElements(messageId, null, { updateReasoningDom: !useMobileStreamingPreview });
+            await this.#checkDomElements(messageId);
             this.#updateMessageBlockVisibility();
             const currentTime = new Date();
             chat[messageId].mes = processedText;
@@ -4022,19 +4008,17 @@ class StreamingProcessor {
                 };
             }
 
-            const formattedText = useMobileStreamingPreview
-                ? formatMobileStreamingPreview(processedText)
-                : messageFormatting(
-                    processedText,
-                    chat[messageId].name,
-                    chat[messageId].is_system,
-                    chat[messageId].is_user,
-                    messageId,
-                    {},
-                    false,
-                );
+            const formattedText = messageFormatting(
+                processedText,
+                chat[messageId].name,
+                chat[messageId].is_system,
+                chat[messageId].is_user,
+                messageId,
+                {},
+                false,
+            );
             if (this.messageTextDom instanceof HTMLElement) {
-                if (power_user.stream_fade_in && !useMobileStreamingPreview) {
+                if (power_user.stream_fade_in) {
                     applyStreamFadeIn(this.messageTextDom, formattedText);
                 } else {
                     this.messageTextDom.innerHTML = formattedText;
@@ -4047,9 +4031,7 @@ class StreamingProcessor {
                 this.messageTimerDom.title = timePassed.timerTitle;
             }
 
-            if (isFinal) {
-                this.setFirstSwipe(messageId);
-            }
+            this.setFirstSwipe(messageId);
         }
 
         if (!scrollLock) {
@@ -4196,11 +4178,7 @@ class StreamingProcessor {
         this.stoppingStrings = getStoppingStrings(isImpersonate, isContinue, main_api);
 
         try {
-            const configuredStreamingFps = Number(power_user.streaming_fps) || 30;
-            const effectiveStreamingFps = shouldUseMobileStreamingPreview()
-                ? Math.min(configuredStreamingFps, MOBILE_STREAMING_RENDER_FPS)
-                : configuredStreamingFps;
-            const sw = new Stopwatch(1000 / effectiveStreamingFps);
+            const sw = new Stopwatch(1000 / power_user.streaming_fps);
             const timestamps = [];
             for await (const { text, swipes, logprobs, toolCalls, state } of this.generator()) {
                 const now = Date.now();
@@ -4211,7 +4189,6 @@ class StreamingProcessor {
                 if (this.isStopped || this.abortController.signal.aborted) {
                     this.isStopped = true;
                     this.isFinished = true;
-                    this.setFirstSwipe(this.messageId);
                     return this.result;
                 }
 
@@ -4236,7 +4213,6 @@ class StreamingProcessor {
             if (!this.isFinished && isCancelled) {
                 this.isStopped = true;
                 this.isFinished = true;
-                this.setFirstSwipe(this.messageId);
                 return this.result;
             }
 
