@@ -37,6 +37,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - The Bottom Bar Size slider now scales the SillyBunny chatbar and Persona bottom chat controls on mobile instead of only affecting the legacy composer sizing.
 - Background Visibility can now be raised to 100% without changing existing saved values.
 - Background Visibility now refreshes its range metadata when the Customize panel updates, so upgraded sessions keep the full 100% slider range.
+- The frontend service worker cache now rotates for 1.5.2 so iOS Safari stops reusing 1.5.1 assets with the old 55% Background Visibility cap.
 - Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 - Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
 
@@ -51,6 +52,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `5cfff2a fix(ui): left align mobile label options`
 - `15a29d9 fix(mobile): stabilize chat rendering`
 - `fix(chat): stabilize bottom bar auto-labeling`
+- `fix(cache): refresh 1.5.2 frontend assets`
 
 ## v1.5.1
 
