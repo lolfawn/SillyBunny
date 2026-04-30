@@ -23,6 +23,7 @@ import {
     extractMessageBias,
     generateQuietPrompt,
     generateRaw,
+    autoLabelCurrentChat,
     getCharacters,
     getCurrentChatDetails,
     getCurrentChatId,
@@ -458,6 +459,20 @@ export function initDefaultSlashCommands() {
             ),
         ],
         helpString: t`Renames the current chat.`,
+    }));
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'autonamechat',
+        callback: async function doAutoNameChat() {
+            const currentChatName = getCurrentChatId();
+            if (!currentChatName) {
+                toastr.warning(t`No chat selected that can be renamed.`);
+                return '';
+            }
+
+            await autoLabelCurrentChat();
+            return '';
+        },
+        helpString: t`Asks the current LLM to rename the current chat.`,
     }));
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'getchatname',

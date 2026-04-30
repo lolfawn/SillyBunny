@@ -438,7 +438,7 @@ export let isChatSaving = false;
 export let firstRun = false;
 export let settingsReady = false;
 let currentVersion = '0.0.0';
-const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.5.0';
+const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.5.1';
 
 export let displayVersion = SILLYBUNNY_UI_VERSION;
 
@@ -455,7 +455,7 @@ export const default_avatar = 'img/ai4.png';
 export const system_avatar = 'img/sillybunny-pixel-logo.png';
 export const comment_avatar = 'img/quill.png';
 export const default_user_avatar = 'img/user-default.png';
-export let CLIENT_VERSION = 'SillyBunny:v1.5.0:platberlitz'; // For Horde header
+export let CLIENT_VERSION = 'SillyBunny:v1.5.1:platberlitz'; // For Horde header
 let optionsPopper = Popper.createPopper(document.getElementById('options_button'), document.getElementById('options'), {
     placement: 'top-start',
 });
@@ -710,6 +710,25 @@ export async function pingServer() {
         console.error('Error pinging server', error);
         return false;
     }
+}
+
+function registerSillyBunnyServiceWorker() {
+    if (!('serviceWorker' in navigator) || !window.isSecureContext) {
+        return;
+    }
+
+    const register = () => {
+        navigator.serviceWorker.register('/sw.js').catch((error) => {
+            console.warn('Failed to register SillyBunny service worker.', error);
+        });
+    };
+
+    if (document.readyState === 'complete') {
+        window.setTimeout(register, 0);
+        return;
+    }
+
+    window.addEventListener('load', register, { once: true });
 }
 
 //MARK: firstLoadInit
@@ -9832,7 +9851,7 @@ async function autoLabelChatFile(fileName, { existingNames, force = false, sourc
     return { status: 'renamed', oldFileName, newFileName };
 }
 
-async function autoLabelCurrentChat() {
+export async function autoLabelCurrentChat() {
     const chatDetails = getCurrentChatDetails();
     const currentChat = getChatBaseName(chatDetails.sessionName);
 
@@ -14335,6 +14354,8 @@ jQuery(async function () {
         await getCharacters();
         await eventSource.emit(event_types.OPEN_CHARACTER_LIBRARY);
     });
+
+    registerSillyBunnyServiceWorker();
 
     // Added here to prevent execution before script.js is loaded and get rid of quirky timeouts
     await firstLoadInit();

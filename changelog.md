@@ -1,5 +1,72 @@
 # Changelog
 
+## v1.5.1
+
+Date: 2026-04-29
+
+This update restores Prose Polisher coverage for guided impersonation workflows, makes Advanced Formatting a first-class workspace tab again, adds conservative startup-loading improvements for desktop and mobile, and polishes cross-platform UI alignment, focus, safe-area, and touch-target behavior.
+
+### In-Chat Agents
+- Added an opt-in prompt-pass condition for generated impersonation text so Prose Polisher can rewrite Guided Generations impersonations without mutating the previous assistant message.
+- Shipped the bundled Prose Polisher template with impersonation polishing enabled, while keeping the new behavior off by default for other prompt-pass agents.
+- Added editor UI and migration support for saved bundled Prose Polisher agents, plus unit coverage for both opted-out and opted-in impersonation behavior.
+
+### Workspace And Formatting
+- Promoted Advanced Formatting into its own left workspace tab immediately after Sampling.
+- Kept the Formatting tab visible across backends instead of hiding the whole Advanced Formatting drawer outside Text Completions.
+
+### Loading
+- Deferred ordered classic library scripts, preloaded startup modules, and limited the mobile stylesheet to mobile viewports.
+- Added a guarded service worker that stale-while-revalidates static library, CSS, image, and webfont assets while using network-first handling for HTML and JavaScript.
+
+### UI Polish
+- Replaced clipped outer focus outlines and oversized active-control shadows with inset rings so focused and highlighted controls stay inside rounded containers.
+- Aligned shell headers, character drawer padding, welcome headers, and checkbox labels across desktop and mobile breakpoints.
+- Normalized mobile safe-area fallbacks and 44 px tap targets for the composer, bottom chat controls, and welcome recent-chat actions.
+- Cleaned up redundant shell borders, trailing recent-chat stat dividers, and duplicated macOS browser chrome patches.
+- Left-aligned SillyBunny shell drawer eyebrow labels, titles, subtitles, and descriptions across desktop and mobile.
+- Contained shell close-button focus rings inside rounded borders so highlights no longer bleed past the control edge.
+- Gave mobile Customize, Navigate, and Characters drawers a rounded native sheet treatment with a slide-up entry, handle pill, side gutters, and safe-area-aware header spacing.
+- Stabilized mobile Recent Chats text sizing in WebKit with scoped text-size adjustment, stronger line-clamp bounds, and narrow-screen overflow guards.
+- Tightened the mobile composer bottom spacing by removing duplicate safe-area padding and avoiding the forced 34 px fallback under the chat bar.
+
+### Chat Management
+- Narrowed the Persona bottom chat bar on mobile with safe-area-aware side gutters while leaving the message composer width unchanged.
+- Tightened mobile Persona bottom bar control heights, avatar sizing, icon buttons, gaps, and narrow-phone spacing so the bar no longer dominates the screen.
+- Added Persona bottom bar shortcuts for mass deleting chats in the current character/group scope and asking the active LLM to name the current chat.
+- Added aligned mass-delete checkboxes, protected the currently open chat, and included 7/30/90/180 day cleanup presets plus a matching `/autonamechat` command.
+
+This patch focuses on persistence and restart fixes for the new agentic and admin workflows introduced around `v1.5.0`.
+
+### Chat And Reasoning
+- Persisted collapsed thinking/reasoning block state per message so user-expanded or user-collapsed reasoning blocks survive chat switches and reloads.
+
+### Pathfinder
+- Added an independent Pathfinder enable switch in settings so saving books, modes, or prompt settings no longer toggles Pathfinder off unexpectedly.
+- Preserved nested Pathfinder settings, including pipeline prompts, custom pipelines, book permissions, and tool confirmations, instead of resetting omitted fields back to defaults.
+- Raised Pathfinder pipeline stage output limits from `1024` to `32000` tokens by default and exposed the stage max-token setting in both prompt editors.
+
+### Server Admin
+- Fixed frontend Save & Restart and update restarts when launched from the provided Linux, macOS, and Windows launchers so the server relaunches in the same terminal instead of becoming a detached silent process.
+
+### Local Commits
+- `1f3c9b3 feat(agents): allow prompt passes on impersonations`
+- `c6f8903 feat(shell): promote advanced formatting to workspace tab`
+- `887be36 perf(loading): defer startup assets and cache statics`
+- `de68413 fix(ui): replace clipped focus outlines with inset focus rings`
+- `1434631 fix(ui): align headers drawer padding and shell title`
+- `1f1fdd6 fix(ui): align checkbox layouts across breakpoints`
+- `88ccda0 fix(mobile): normalize safe areas and tap targets`
+- `cf7ea0a fix(ui): clean up borders and browser chrome patches`
+- `bef9327 fix(ui): polish sillybunny shell drawers`
+- `d92f1cf fix(mobile): stabilize recent chats text sizing`
+- `7339d9e fix(mobile): tighten composer bottom spacing`
+- `ce14e54 Revert "docs(changelog): note 1.5.1 chat-bar additions"`
+- `3cecab4 Revert "feat(chat): add bottom-bar auto-name current chat button"`
+- `4f78732 Revert "feat(chat): add bottom-bar mass chat delete with age filter"`
+- `1c9bb64 Revert "fix(mobile): narrow bottom chat bar gutters"`
+- `eeec412 feat(chat): add persona-bar chat management actions`
+
 ## v1.5.0
 
 Date: 2026-04-26

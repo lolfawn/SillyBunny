@@ -27,6 +27,9 @@
     --sb-message-meta-line-height: 1.18;
     --sb-chat-composer-gap: 8px;
     --sb-chat-composer-edge-gap: 8px;
+    --sb-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --sb-mobile-safe-area-bottom: max(34px, env(safe-area-inset-bottom, 0px));
+    --sb-mobile-touch-target: 44px;
     --sb-everforest-dusk-main: rgba(131, 179, 142, 1);
     --sb-everforest-dusk-soft: rgba(161, 209, 172, 1);
     --sb-everforest-dusk-surface: rgba(55, 60, 63, 1);
@@ -273,8 +276,8 @@ body::before {
     opacity: var(--sb-shell-surface-opacity);
 }
 
-/* Firefox on macOS can mispaint the fixed header surface pseudo-element. */
-body.firefox-macos #top-bar {
+/* Firefox and Chrome on macOS can mispaint the fixed header surface pseudo-element. */
+body:is(.firefox-macos, .chrome-macos) #top-bar {
     background:
         linear-gradient(180deg, color-mix(in srgb, var(--sb-shell-header-glow) 80%, transparent), transparent 110%),
         var(--sb-topbar-surface-bg) !important;
@@ -282,21 +285,21 @@ body.firefox-macos #top-bar {
     -webkit-backdrop-filter: none !important;
 }
 
-body.firefox-macos #top-bar::before {
+body:is(.firefox-macos, .chrome-macos) #top-bar::before {
     display: none !important;
 }
 
 /*
- * Firefox on macOS 15/26 can also mispaint contained/transformed descendants in
+ * macOS browser compositors can mispaint contained/transformed descendants in
  * the top-bar stack, which shows up as a dark block in the center header area.
- * Keep the header surface simple for that platform/browser combination.
+ * Keep the header surface simple for those platform/browser combinations.
  */
-body.firefox-macos #sb-topbar-stack,
-body.firefox-macos #sb-chatbar-layer {
+body:is(.firefox-macos, .chrome-macos, .safari-macos) #sb-topbar-stack,
+body:is(.firefox-macos, .chrome-macos, .safari-macos) #sb-chatbar-layer {
     contain: none !important;
 }
 
-body.firefox-macos #sb-chatbar-layer {
+body:is(.firefox-macos, .chrome-macos) #sb-chatbar-layer {
     will-change: auto !important;
 }
 
@@ -306,40 +309,6 @@ body.safari-macos #top-bar {
     box-shadow:
         0 1px 0 color-mix(in srgb, var(--sb-shell-border) 90%, transparent),
         0 12px 28px color-mix(in srgb, var(--SmartThemeShadowColor) 16%, transparent);
-}
-
-/*
- * Safari on macOS can mispaint contained/transformed descendants in
- * the top-bar stack, similar to the Firefox-macOS issue above.
- */
-body.safari-macos #sb-topbar-stack,
-body.safari-macos #sb-chatbar-layer {
-    contain: none !important;
-}
-
-/*
- * Chrome on macOS can also mispaint the fixed header surface pseudo-element
- * and contained/transformed descendants in the top-bar stack.
- */
-body.chrome-macos #top-bar {
-    background:
-        linear-gradient(180deg, color-mix(in srgb, var(--sb-shell-header-glow) 80%, transparent), transparent 110%),
-        var(--sb-topbar-surface-bg) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-
-body.chrome-macos #top-bar::before {
-    display: none !important;
-}
-
-body.chrome-macos #sb-topbar-stack,
-body.chrome-macos #sb-chatbar-layer {
-    contain: none !important;
-}
-
-body.chrome-macos #sb-chatbar-layer {
-    will-change: auto !important;
 }
 
 hr {
@@ -356,6 +325,8 @@ h3:not(.popup h3):not(#chat h3),
 h3:not(.popup h3):not(#chat h3) {
     border-left: 3px solid color-mix(in srgb, var(--color-primary, var(--sb-accent)) 82%, transparent);
     padding-left: 12px;
+    padding-right: 12px;
+    box-sizing: border-box;
 }
 
 .inline-drawer-header {
@@ -456,22 +427,25 @@ h3:not(.popup h3):not(#chat h3) {
     min-height: var(--sb-control-min-height);
     line-height: 1.45;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--sb-row-gap);
     margin: 0;
     min-width: 0;
+    padding-block: max(0px, calc((var(--sb-control-min-height) - 1.45em) / 2));
     box-sizing: border-box;
 }
 
 :root[data-sb-compact-mode='true'] .checkbox_label {
     min-height: 30px;
     gap: 6px;
+    padding-block: max(0px, calc((var(--sb-control-min-height) - 1.32em) / 2));
 }
 
 .checkbox_label > input[type="checkbox"],
 .checkbox_label > input[type="radio"] {
     flex: 0 0 auto;
     margin: 0;
+    margin-top: 0.18em;
     accent-color: var(--color-primary, var(--sb-accent, var(--SmartThemeQuoteColor)));
 }
 
@@ -487,6 +461,8 @@ h3:not(.popup h3):not(#chat h3) {
 .checkbox_label span {
     line-height: 1.45;
     min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 :root[data-sb-compact-mode='true'] .checkbox_label small,
@@ -494,9 +470,20 @@ h3:not(.popup h3):not(#chat h3) {
     line-height: 1.32;
 }
 
+:root[data-sb-compact-mode='true'] .checkbox_label > input[type="checkbox"],
+:root[data-sb-compact-mode='true'] .checkbox_label > input[type="radio"] {
+    margin-top: 0.12em;
+}
+
 @media screen and (min-width: 769px) and (max-width: 1280px) and (pointer: fine) {
     .checkbox_label {
         min-height: 32px;
+        gap: 8px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .checkbox_label {
         gap: 8px;
     }
 }
@@ -572,7 +559,7 @@ h3:not(.popup h3):not(#chat h3) {
     background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 88%, white 12%);
     color: var(--sb-on-accent);
     border-color: transparent;
-    box-shadow: 0 14px 28px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 18%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 30%, transparent);
     text-shadow: none;
 }
 
@@ -582,7 +569,9 @@ h3:not(.popup h3):not(#chat h3) {
 .menu_button.popup-button-ok:not(.disabled):not([disabled]).active {
     background: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 82%, white 18%);
     border-color: transparent;
-    box-shadow: 0 18px 32px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 22%, transparent);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 34%, transparent),
+        inset 0 -2px 0 color-mix(in srgb, black 12%, transparent);
 }
 
 .inline-drawer-header > b,
@@ -645,7 +634,7 @@ textarea.text_pole:focus,
 select.text_pole:focus,
 input.text_pole:focus {
     border-color: color-mix(in srgb, var(--sb-focus-ring) 85%, transparent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sb-focus-ring) 20%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 35%, transparent);
     outline: none;
 }
 
@@ -685,7 +674,7 @@ select:where(:not([multiple]):not([size]):not(.select2-hidden-accessible)) {
 
 select:where(:not([multiple]):not([size]):not(.select2-hidden-accessible)):focus {
     border-color: color-mix(in srgb, var(--sb-focus-ring) 85%, transparent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sb-focus-ring) 20%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 35%, transparent);
     outline: none;
 }
 
@@ -701,7 +690,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     box-sizing: border-box;
     margin: var(--sb-chat-composer-gap) auto 0;
     padding-inline: var(--sb-chat-composer-edge-gap);
-    padding-block-end: max(var(--sb-chat-composer-edge-gap), env(safe-area-inset-bottom, 0px));
+    padding-block-end: max(var(--sb-chat-composer-edge-gap), var(--sb-safe-area-bottom));
 }
 
 #send_form {
@@ -780,7 +769,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 #character_popup {
     align-items: stretch;
     gap: 6px;
-    padding: 6px 14px 14px;
+    padding: 10px 14px 14px;
     text-align: left;
 }
 
@@ -817,8 +806,8 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 #character_popup .inline-drawer-header {
     width: 100%;
     min-height: 40px;
-    padding: 8px 12px;
-    justify-content: space-between;
+    padding: 8px 14px;
+    justify-content: flex-start;
     text-align: left;
 }
 
@@ -836,7 +825,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     width: 100%;
     box-sizing: border-box;
     margin-top: 8px;
-    padding: 10px 0 4px;
+    padding: 10px 14px 4px;
     text-align: left;
 }
 
@@ -932,12 +921,16 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 @media screen and (max-width: 768px) {
     #character_popup {
         gap: 6px;
-        padding: 6px 10px max(12px, env(safe-area-inset-bottom, 0px));
+        padding: 10px 10px var(--sb-mobile-safe-area-bottom);
     }
 
     #character_popup .inline-drawer-header {
         min-height: 38px;
-        padding: 7px 10px;
+        padding: 8px 10px;
+    }
+
+    #character_popup .inline-drawer-content {
+        padding-inline: 10px;
     }
 
     #character_popup .inline-drawer-content > .flex-container.flexnowrap {
@@ -1022,7 +1015,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
 }
 
 #send_but {
-    box-shadow: 0 14px 28px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 22%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 30%, transparent);
 }
 
 /*
@@ -1096,12 +1089,12 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     }
 
     #send_form .mes_stop {
-        width: calc(var(--bottomFormBlockSize) - 6px);
-        min-width: calc(var(--bottomFormBlockSize) - 6px);
-        max-width: calc(var(--bottomFormBlockSize) - 6px);
-        height: calc(var(--bottomFormBlockSize) - 6px);
-        min-height: calc(var(--bottomFormBlockSize) - 6px);
-        max-height: calc(var(--bottomFormBlockSize) - 6px);
+        width: var(--bottomFormBlockSize);
+        min-width: var(--bottomFormBlockSize);
+        max-width: var(--bottomFormBlockSize);
+        height: var(--bottomFormBlockSize);
+        min-height: var(--bottomFormBlockSize);
+        max-height: var(--bottomFormBlockSize);
     }
 
     #send_textarea {
@@ -1323,8 +1316,18 @@ body.bubblechat .mes[is_user='true'] .mes_block {
 @media screen and (max-width: 768px) {
     :root {
         --sb-icon-control-size: 2.5rem;
+        --sb-control-min-height: var(--sb-mobile-touch-target);
         --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
         --sb-message-icon-size: 2rem;
+    }
+
+    :root[data-sb-compact-mode='true'] {
+        --sb-control-min-height: var(--sb-mobile-touch-target);
+        --sb-control-icon-physical-size: max(var(--sb-icon-control-size), var(--sb-control-min-height));
+    }
+
+    #form_sheld {
+        padding-block-end: max(var(--sb-chat-composer-edge-gap), env(safe-area-inset-bottom, 0px));
     }
 
     :root:not([data-sb-theme]),
@@ -1394,7 +1397,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     }
 
     #completion_prompt_manager_popup {
-        padding: 12px 12px max(18px, env(safe-area-inset-bottom, 0px)) !important;
+        padding: 12px 12px var(--sb-mobile-safe-area-bottom) !important;
         background: var(--sb-mobile-overlay-bg, color-mix(in srgb, var(--SmartThemeBlurTintColor) 96%, transparent)) !important;
         box-sizing: border-box;
     }
@@ -1516,10 +1519,10 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     }
 
     #completion_prompt_manager_popup #completion_prompt_manager_forbid_overrides_block .checkbox_label {
-        justify-content: flex-end;
+        justify-content: flex-start;
         min-height: var(--sb-icon-control-size);
-        padding: 0;
-        text-align: right;
+        padding-inline: 4px;
+        text-align: left;
     }
 
     #completion_prompt_manager_popup #completion_prompt_manager_forbid_overrides_block .checkbox_label span {
@@ -1541,7 +1544,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
         justify-content: center;
         gap: 10px;
         margin-top: 0;
-        padding-bottom: max(4px, env(safe-area-inset-bottom, 0px));
+        padding-bottom: 4px;
     }
 
     .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
@@ -2011,6 +2014,20 @@ input[type='range']::-moz-range-thumb {
     min-height: auto;
     line-height: 1;
     gap: 0;
+    padding-block: 0;
+}
+
+.sb-sampling-multi-card > :is(
+    #adaptive_p_block,
+    #smoothingBlock,
+    #xtc_block,
+    #dryBlock,
+    #dynatemp_block_ooba,
+    #mirostat_block_ooba,
+    #beamSearchBlock,
+    #contrastiveSearchBlock
+) > h4 .checkbox_label > input[type="checkbox"] {
+    margin-top: 0;
 }
 
 .sb-sampling-multi-card > :is(
@@ -2417,7 +2434,7 @@ input[type='range']::-moz-range-thumb {
 #range_block_openai .checkbox_label {
     width: 100%;
     flex-wrap: nowrap;
-    align-items: center;
+    align-items: flex-start;
     justify-content: flex-start;
     gap: 10px;
 }
@@ -2429,8 +2446,9 @@ input[type='range']::-moz-range-thumb {
 #range_block_openai .checkbox_label > input[type="checkbox"],
 #range_block_openai .checkbox_label > input[type="radio"] {
     flex: 0 0 auto;
-    align-self: center;
+    align-self: flex-start;
     margin: 0;
+    margin-top: 0.18em;
 }
 
 #openai_api .checkbox_label > span,
@@ -4102,7 +4120,7 @@ input[type='range']::-moz-range-thumb {
     border-radius: var(--sb-radius-md);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 70%, transparent);
-    align-items: center;
+    align-items: flex-start;
 }
 
 #STscriptToggles .checkbox_label > span,
@@ -4417,7 +4435,7 @@ input[type='range']::-moz-range-thumb {
     border-radius: var(--sb-radius-md);
     background: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 74%, transparent);
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
 }
 
@@ -4461,8 +4479,8 @@ input[type='range']::-moz-range-thumb {
 }
 
 :focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--sb-focus-ring) 90%, transparent);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sb-focus-ring) 78%, transparent);
 }
 
 :focus:not(:focus-visible) {
@@ -4643,11 +4661,11 @@ input[type='range']::-moz-range-thumb {
     #rightSendForm > div:not(.mes_stop),
     #send_form .mes_stop,
     #options_button {
-        width: var(--button-size-md);
-        min-width: var(--button-size-md);
-        height: 42px;
-        min-height: 42px;
-        max-height: 42px;
+        width: var(--sb-mobile-touch-target);
+        min-width: var(--sb-mobile-touch-target);
+        height: var(--sb-mobile-touch-target);
+        min-height: var(--sb-mobile-touch-target);
+        max-height: var(--sb-mobile-touch-target);
     }
 
     #send_textarea {

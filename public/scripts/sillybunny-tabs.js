@@ -24,6 +24,7 @@ const SB_STORAGE_KEYS = Object.freeze({
 const SB_SHORTCUT_TARGETS = Object.freeze([
     { value: 'left:presets', label: 'Presets', icon: 'fa-sliders' },
     { value: 'left:sampling', label: 'Sampling', icon: 'fa-wave-square' },
+    { value: 'left:advanced-formatting', label: 'Formatting', icon: 'fa-text-height' },
     { value: 'left:api', label: 'API', icon: 'fa-plug' },
     { value: 'left:world-info', label: 'World Info', icon: 'fa-book-atlas' },
     { value: 'left:agents', label: 'Agents', icon: 'fa-robot' },
@@ -43,6 +44,7 @@ const SB_INLINE_DRAWER_CUSTOM_PERSISTENCE_SELECTOR = '.sb-openai-settings-drawer
 
 let sbInlineDrawerPersistenceObserver = null;
 let sbInlineDrawerPersistenceQueued = false;
+let sbChatScriptModulePromise = null;
 
 function getShortcutTarget(side) {
     const stored = safeGetItem(side === 'left' ? SB_STORAGE_KEYS.shortcutLeft : SB_STORAGE_KEYS.shortcutRight);
@@ -210,6 +212,13 @@ const SB_SHELLS = Object.freeze({
         },
         embeddedTabs: [
             {
+                id: 'advanced-formatting',
+                drawerId: 'advanced-formatting-button',
+                label: 'Formatting',
+                icon: 'fa-text-height',
+                description: 'Tune context and instruction formatting tools here.',
+            },
+            {
                 id: 'api',
                 drawerId: 'sys-settings-button',
                 label: 'API',
@@ -310,7 +319,7 @@ const SB_SHELLS = Object.freeze({
 const SB_DRAWER_ROUTES = Object.freeze({
     'user-settings-button': { shell: 'right', tab: 'settings' },
     'sys-settings-button': { shell: 'left', tab: 'api' },
-    'advanced-formatting-button': { shell: 'left', tab: 'presets' },
+    'advanced-formatting-button': { shell: 'left', tab: 'advanced-formatting' },
     'WI-SP-button': { shell: 'left', tab: 'world-info' },
     'extensions-settings-button': { shell: 'right', tab: 'extensions' },
     'persona-management-button': { shell: 'right', tab: 'persona' },
@@ -375,10 +384,6 @@ const sbState = {
         boundEventSource: null,
         windowBindingsAttached: false,
     },
-    presetAdvancedFormatting: {
-        bindingRetryTimer: 0,
-        boundEventSource: null,
-    },
     shells: {},
     universalSearch: {
         row: null,
@@ -432,6 +437,8 @@ const sbState = {
     bottomChatBar: {
         chatSelect: null,
         personaBubble: null,
+        massDeleteButton: null,
+        autoNameButton: null,
         bindingRetryTimer: 0,
         boundEventSource: null,
         windowBindingsAttached: false,
@@ -1681,6 +1688,14 @@ function getSillyTavernContext() {
     }
 }
 
+function getChatScriptModule() {
+    if (!sbChatScriptModulePromise) {
+        sbChatScriptModulePromise = import('../script.js');
+    }
+
+    return sbChatScriptModulePromise;
+}
+
 function hasActiveTopBarChat(context = getSillyTavernContext()) {
     return Boolean(context && (context.groupId || (context.characterId !== undefined && context.characterId !== null)));
 }
@@ -2545,6 +2560,226 @@ async function handleDeleteChat() {
 
     await chatContext.context?.executeSlashCommandsWithOptions?.('/delchat');
     scheduleChatbarRefresh(150);
+}
+
+function setBottomChatActionBusy(button, busy) {
+    if (!(button instanceof HTMLElement)) {
+        return;
+    }
+
+    button.classList.toggle('is-busy', Boolean(busy));
+    setButtonDisabled(button, Boolean(busy));
+}
+
+async function handleAutoNameChat() {
+    const chatContext = getChatUiContext();
+    const button = getBottomChatBarState().autoNameButton;
+
+    if (!chatContext.hasChat) {
+        return;
+    }
+
+    setBottomChatActionBusy(button, true);
+    try {
+        const { autoLabelCurrentChat } = await getChatScriptModule();
+        if (typeof autoLabelCurrentChat !== 'function') {
+            throw new Error('Chat auto-name helper is unavailable.');
+        }
+
+        await autoLabelCurrentChat();
+        scheduleBottomChatBarRefresh(160);
+    } catch (error) {
+        console.error('[SillyBunny] Failed to auto-name current chat.', error);
+        globalThis.toastr?.error?.(String(error?.message || error), 'Auto-name Chat');
+    } finally {
+        setBottomChatActionBusy(button, false);
+    }
+}
+
+function getMassDeleteOlderThanDays(files, days, currentChatId) {
+    const numericDays = Number(days);
+    if (!Number.isFinite(numericDays) || numericDays <= 0) {
+        return [];
+    }
+
+    const cutoff = Date.now() - (numericDays * 24 * 60 * 60 * 1000);
+    return files.filter(chatFile => chatFile.fileName !== currentChatId && chatFile.sortTimestamp > 0 && chatFile.sortTimestamp < cutoff);
+}
+
+function showBottomChatMassDeleteDialog(files, currentChatId) {
+    return new Promise(resolve => {
+        const overlay = createElement('div', { className: 'sb-chat-delete-overlay' });
+        const dialog = createElement('div', {
+            className: 'sb-chat-delete-dialog',
+            attrs: {
+                role: 'dialog',
+                'aria-modal': 'true',
+                'aria-labelledby': 'sb-chat-delete-title',
+            },
+        });
+        const title = createElement('h3', { id: 'sb-chat-delete-title', text: 'Mass delete chats' });
+        const note = createElement('p', {
+            className: 'sb-chat-delete-note',
+            text: 'Delete saved chats for the current character or group. The open chat is protected.',
+        });
+        const list = createElement('div', { className: 'sb-chat-delete-list' });
+        const ageRow = createElement('div', { className: 'sb-chat-delete-age' });
+        const ageLabel = createElement('label', { text: 'Older than' });
+        const ageInput = createElement('input', {
+            className: 'text_pole',
+            attrs: { type: 'number', min: '1', step: '1', value: '30', inputmode: 'numeric' },
+        });
+        const dayText = createElement('span', { text: 'days' });
+        const presets = createElement('div', { className: 'sb-chat-delete-presets' });
+        const status = createElement('small', { className: 'sb-chat-delete-status' });
+        const actions = createElement('div', { className: 'sb-chat-delete-actions' });
+        const deleteSelectedButton = createElement('button', { className: 'menu_button', text: 'Delete selected', attrs: { type: 'button' } });
+        const deleteOlderButton = createElement('button', { className: 'menu_button', text: 'Delete older', attrs: { type: 'button' } });
+        const cancelButton = createElement('button', { className: 'menu_button', text: 'Cancel', attrs: { type: 'button' } });
+        const checkboxes = [];
+
+        function finish(result) {
+            document.removeEventListener('keydown', handleKeydown);
+            overlay.remove();
+            resolve(result);
+        }
+
+        function getSelectedNames() {
+            return checkboxes.filter(checkbox => checkbox.checked).map(checkbox => checkbox.value);
+        }
+
+        function updateStatus() {
+            const selectedCount = getSelectedNames().length;
+            const olderCount = getMassDeleteOlderThanDays(files, ageInput.value, currentChatId).length;
+            status.textContent = `${selectedCount} selected. ${olderCount} older than ${ageInput.value || 0} day(s).`;
+            deleteSelectedButton.disabled = selectedCount === 0;
+            deleteOlderButton.disabled = olderCount === 0;
+        }
+
+        function handleKeydown(event) {
+            if (event.key === 'Escape') {
+                finish(null);
+            }
+        }
+
+        for (const days of [7, 30, 90, 180]) {
+            const button = createElement('button', { className: 'menu_button', text: String(days), attrs: { type: 'button' } });
+            button.addEventListener('click', () => {
+                ageInput.value = String(days);
+                updateStatus();
+            });
+            presets.appendChild(button);
+        }
+
+        for (const chatFile of files) {
+            const row = createElement('label', { className: 'sb-chat-delete-row' });
+            const checkbox = createElement('input', {
+                attrs: {
+                    type: 'checkbox',
+                    value: chatFile.fileName,
+                },
+            });
+            checkbox.disabled = chatFile.fileName === currentChatId;
+            const text = createElement('span', { className: 'sb-chat-delete-row-text' });
+            const name = createElement('strong', { text: chatFile.fileName });
+            const meta = createElement('small', { text: [formatChatTimestamp(chatFile.lastMessage), chatFile.chatItems ? `${chatFile.chatItems} msg` : ''].filter(Boolean).join(' - ') });
+
+            text.append(name, meta);
+            row.append(checkbox, text);
+            list.appendChild(row);
+            if (checkbox instanceof HTMLInputElement && !checkbox.disabled) {
+                checkbox.addEventListener('change', updateStatus);
+                checkboxes.push(checkbox);
+            }
+        }
+
+        ageInput.addEventListener('input', updateStatus);
+        deleteSelectedButton.addEventListener('click', () => finish({ mode: 'selected', names: getSelectedNames() }));
+        deleteOlderButton.addEventListener('click', () => finish({ mode: 'older', days: Number(ageInput.value) }));
+        cancelButton.addEventListener('click', () => finish(null));
+        overlay.addEventListener('click', event => {
+            if (event.target === overlay) {
+                finish(null);
+            }
+        });
+
+        ageLabel.append(ageInput, dayText);
+        ageRow.append(ageLabel, presets);
+        actions.append(deleteSelectedButton, deleteOlderButton, cancelButton);
+        dialog.append(title, note, ageRow, status, list, actions);
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        document.addEventListener('keydown', handleKeydown);
+        updateStatus();
+        ageInput.focus();
+    });
+}
+
+async function deleteChatFileForContext(chatContext, fileName, chatModule) {
+    if (chatContext.group?.id) {
+        const { deleteGroupChatByName } = await import('./group-chats.js');
+        return deleteGroupChatByName(chatContext.group.id, fileName);
+    }
+
+    if (chatContext.context?.characterId !== undefined && chatContext.context?.characterId !== null) {
+        await chatModule.deleteCharacterChatByName(chatContext.context.characterId, fileName);
+        return true;
+    }
+
+    return false;
+}
+
+async function handleMassDeleteChats() {
+    const chatContext = getChatUiContext();
+    const button = getBottomChatBarState().massDeleteButton;
+
+    if (!chatContext.canBrowseChats) {
+        return;
+    }
+
+    setBottomChatActionBusy(button, true);
+    try {
+        const files = await getChatFilesForContext(chatContext);
+        const deletableFiles = files.filter(chatFile => chatFile.fileName !== chatContext.chatId);
+        if (!deletableFiles.length) {
+            globalThis.toastr?.info?.('No saved chats can be deleted for this character or group.', 'Mass Delete Chats');
+            return;
+        }
+
+        const result = await showBottomChatMassDeleteDialog(files, chatContext.chatId);
+        if (!result) {
+            return;
+        }
+
+        const names = result.mode === 'older'
+            ? getMassDeleteOlderThanDays(files, result.days, chatContext.chatId).map(chatFile => chatFile.fileName)
+            : result.names;
+
+        if (!names.length) {
+            return;
+        }
+
+        const confirmed = await chatContext.context?.Popup?.show?.confirm?.('Delete chats?', `Delete ${names.length} chat(s)? This cannot be undone.`)
+            ?? window.confirm(`Delete ${names.length} chat(s)? This cannot be undone.`);
+        if (!confirmed) {
+            return;
+        }
+
+        const chatModule = await getChatScriptModule();
+        for (const fileName of names) {
+            await deleteChatFileForContext(chatContext, fileName, chatModule);
+        }
+
+        globalThis.toastr?.success?.(`Deleted ${names.length} chat(s).`, 'Mass Delete Chats');
+        scheduleBottomChatBarRefresh(160);
+        scheduleChatbarRefresh(160);
+        await chatModule.displayPastChats?.();
+    } catch (error) {
+        console.error('[SillyBunny] Failed to mass delete chats.', error);
+        globalThis.toastr?.error?.(String(error?.message || error), 'Mass Delete Chats');
+    } finally {
+        setBottomChatActionBusy(button, false);
+    }
 }
 
 async function handleCloseChat() {
@@ -4225,72 +4460,6 @@ function prepareEmbeddedDrawer(drawerId, root = document) {
     }
 
     return { drawer, drawerContent };
-}
-
-function updatePresetAdvancedFormattingVisibility() {
-    const advancedFormattingDrawer = document.getElementById('advanced-formatting-button');
-    if (!(advancedFormattingDrawer instanceof HTMLElement)) {
-        return;
-    }
-
-    advancedFormattingDrawer.hidden = getCurrentMainApiValue() !== 'textgenerationwebui';
-}
-
-function bindPresetAdvancedFormattingVisibilityEvents() {
-    const context = getSillyTavernContext();
-    const eventSource = context?.eventSource;
-    const eventTypes = context?.eventTypes;
-
-    if (!eventSource || !eventTypes) {
-        if (!sbState.presetAdvancedFormatting.bindingRetryTimer) {
-            sbState.presetAdvancedFormatting.bindingRetryTimer = window.setTimeout(() => {
-                sbState.presetAdvancedFormatting.bindingRetryTimer = 0;
-                bindPresetAdvancedFormattingVisibilityEvents();
-                updatePresetAdvancedFormattingVisibility();
-            }, SB_INIT_RETRY_DELAY_MS);
-        }
-        return;
-    }
-
-    window.clearTimeout(sbState.presetAdvancedFormatting.bindingRetryTimer);
-    sbState.presetAdvancedFormatting.bindingRetryTimer = 0;
-
-    if (sbState.presetAdvancedFormatting.boundEventSource === eventSource) {
-        return;
-    }
-
-    const events = [
-        eventTypes.APP_READY,
-        eventTypes.MAIN_API_CHANGED,
-    ].filter(Boolean);
-
-    for (const eventName of new Set(events)) {
-        eventSource.on(eventName, updatePresetAdvancedFormattingVisibility);
-    }
-
-    sbState.presetAdvancedFormatting.boundEventSource = eventSource;
-}
-
-function embedAdvancedFormattingInPresets(originalContent) {
-    if (!(originalContent instanceof HTMLElement)) {
-        return;
-    }
-
-    const prepared = prepareEmbeddedDrawer('advanced-formatting-button', originalContent);
-    if (!prepared) {
-        return;
-    }
-
-    prepared.drawer.classList.add('sb-presets-advanced-formatting');
-
-    const insertionTarget = originalContent.querySelector('#common-gen-settings-block');
-    if (insertionTarget?.parentNode) {
-        insertionTarget.insertAdjacentElement('afterend', prepared.drawer);
-    } else {
-        originalContent.appendChild(prepared.drawer);
-    }
-
-    updatePresetAdvancedFormattingVisibility();
 }
 
 const SB_SAMPLING_BACKENDS = Object.freeze([
@@ -7777,9 +7946,6 @@ function buildShell(shellKey) {
     }).observe(shellRoot, { attributes: true, attributeFilter: ['class'] });
 
     const basePanel = createShellPanel(shellConfig.baseTab);
-    if (shellKey === 'left') {
-        embedAdvancedFormattingInPresets(originalContent);
-    }
     basePanel.scroller.appendChild(originalContent);
     registerShellTab(shellKey, shellConfig.baseTab, basePanel);
 
@@ -7832,12 +7998,6 @@ function buildShell(shellKey) {
     if (shellKey === 'right') {
         injectThemePicker();
         injectSillyTavernImportCard();
-    }
-
-    if (shellKey === 'left') {
-        $('#main_api').on('change.sbPresetAdvancedFormatting', updatePresetAdvancedFormattingVisibility);
-        bindPresetAdvancedFormattingVisibilityEvents();
-        updatePresetAdvancedFormattingVisibility();
     }
 }
 
@@ -8614,6 +8774,20 @@ function buildBottomChatBar() {
     newBtn.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i>';
     newBtn.addEventListener('click', () => handleNewChat());
 
+    const massDeleteBtn = createElement('button', {
+        className: 'sb-bottom-chat-btn',
+        attrs: { type: 'button', title: 'Mass delete chats' },
+    });
+    massDeleteBtn.innerHTML = '<i class="fa-solid fa-list-check" aria-hidden="true"></i>';
+    massDeleteBtn.addEventListener('click', () => { void handleMassDeleteChats(); });
+
+    const autoNameBtn = createElement('button', {
+        className: 'sb-bottom-chat-btn',
+        attrs: { type: 'button', title: 'Ask the LLM to name this chat' },
+    });
+    autoNameBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>';
+    autoNameBtn.addEventListener('click', () => { void handleAutoNameChat(); });
+
     const renameBtn = createElement('button', {
         className: 'sb-bottom-chat-btn',
         attrs: { type: 'button', title: 'Rename chat' },
@@ -8628,10 +8802,10 @@ function buildBottomChatBar() {
     deleteBtn.innerHTML = '<i class="fa-solid fa-trash" aria-hidden="true"></i>';
     deleteBtn.addEventListener('click', () => handleDeleteChat());
 
-    container.append(personaBubble, chatSelect, newBtn, renameBtn, deleteBtn);
+    container.append(personaBubble, chatSelect, newBtn, massDeleteBtn, autoNameBtn, renameBtn, deleteBtn);
 
     // Store references for refresh and late context binding retries.
-    Object.assign(getBottomChatBarState(), { chatSelect, personaBubble });
+    Object.assign(getBottomChatBarState(), { chatSelect, personaBubble, massDeleteButton: massDeleteBtn, autoNameButton: autoNameBtn });
 
     // Defer initial persona bubble update in case user_avatar isn't ready yet
     setTimeout(() => updatePersonaBubble(personaBubble), 100);
@@ -8670,6 +8844,9 @@ async function refreshBottomChatSelect() {
     if (!chatContext.context) {
         return;
     }
+
+    setButtonDisabled(sbState.bottomChatBar?.massDeleteButton, !chatContext.canBrowseChats);
+    setButtonDisabled(sbState.bottomChatBar?.autoNameButton, !chatContext.hasChat);
 
     const currentChatName = chatContext.chatId;
     chatSelect.replaceChildren();

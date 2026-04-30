@@ -9,6 +9,7 @@ import { getReadableBooks, getEntryContent } from '../pathfinder-tool-bridge.js'
 import { logPipelineStageStart, logPipelineStageComplete, logPipelineError } from '../activity-feed.js';
 
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
+const DEFAULT_PIPELINE_MAX_TOKENS = 32000;
 
 function logPathfinderPipeline(message, ...details) {
     console.log(`${PATHFINDER_LOG_PREFIX} ${message}`, ...details);
@@ -119,9 +120,10 @@ export async function runPipeline(pipelineId, chatMessages, maxMessages = 10, si
 
             // Get connection profile (stage-specific or default)
             const profileId = prompt.connectionProfile || settings.connectionProfile || '';
+            const maxTokens = prompt.settings?.maxTokens ?? DEFAULT_PIPELINE_MAX_TOKENS;
             logPathfinderPipeline(`Submitting pipeline stage "${prompt.name}" to sidecar model.`, {
                 profileId: profileId || 'main-model',
-                maxTokens: prompt.settings?.maxTokens ?? 1024,
+                maxTokens,
             });
 
             // Call the LLM
@@ -129,7 +131,7 @@ export async function runPipeline(pipelineId, chatMessages, maxMessages = 10, si
                 userPrompt,
                 prompt.systemPrompt,
                 profileId,
-                prompt.settings?.maxTokens ?? 1024,
+                maxTokens,
                 signal,
             );
 

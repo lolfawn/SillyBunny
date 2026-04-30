@@ -157,6 +157,10 @@
                 <input type="checkbox" id="ica--editor-pp-promptShowNotifications" />
                 <span>Show toast notifications while this prompt pass runs</span>
             </label>
+            <label class="checkbox_label">
+                <input type="checkbox" id="ica--editor-pp-runOnImpersonate" />
+                <span>Allow this prompt pass to rewrite generated impersonation text</span>
+            </label>
             <div class="ica--regex-note">The prompt pass runs after the main reply using this agent's prompt and connection profile. In <b>rewrite</b> mode it replaces the message. In <b>append</b> mode it only adds newly generated text after the original reply. Useful macros inside the prompt include <code>&#123;&#123;currentMessage&#125;&#125;</code>, <code>&#123;&#123;response&#125;&#125;</code>, and <code>&#123;&#123;original&#125;&#125;</code>.</div>
         </div>
         <label class="checkbox_label">

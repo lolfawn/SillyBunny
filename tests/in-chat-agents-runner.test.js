@@ -370,7 +370,7 @@ describe('in-chat agent post-processing runner', () => {
         }];
     }
 
-    function useImpersonateTransformAgent() {
+    function useImpersonateTransformAgent({ runOnImpersonate = false } = {}) {
         enabledAgents = [{
             id: 'agent-impersonate-transform',
             name: 'Impersonate Transform',
@@ -390,6 +390,7 @@ describe('in-chat agent post-processing runner', () => {
                 triggerKeywords: [],
                 triggerProbability: 100,
                 generationTypes: ['impersonate'],
+                runOnImpersonate,
             },
         }];
     }
@@ -920,6 +921,12 @@ describe('in-chat agent post-processing runner', () => {
         const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
         initAgentRunner();
 
+        const textarea = {
+            value: 'Draft impersonation',
+            dispatchEvent: jest.fn(),
+        };
+        document.querySelector = jest.fn(selector => selector === '#send_textarea' ? textarea : null);
+
         chat.push({
             name: 'Assistant',
             mes: '[STATUS|ready]',
@@ -938,16 +945,43 @@ describe('in-chat agent post-processing runner', () => {
 
         await eventSource.emit(eventTypes.GENERATION_STARTED, 'impersonate', {}, false);
         await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'impersonate', {}, false);
-        await eventSource.emit(eventTypes.IMPERSONATE_READY);
+        await eventSource.emit(eventTypes.IMPERSONATE_READY, 'Draft impersonation');
         await eventSource.emit(eventTypes.MESSAGE_RECEIVED, 0, 'impersonate');
         await eventSource.emit(eventTypes.CHARACTER_MESSAGE_RENDERED, 0, 'impersonate');
         await eventSource.emit(eventTypes.GENERATION_ENDED, chat.length);
         await new Promise(resolve => setTimeout(resolve, 75));
 
         expect(chat[0].mes).toBe('[STATUS|ready]');
+        expect(textarea.value).toBe('Draft impersonation');
+        expect(textarea.dispatchEvent).not.toHaveBeenCalled();
         expect(chat[0].extra.inChatAgents).toEqual(existingSnapshot);
         expect(chat[0].swipe_info[0].extra.inChatAgents).toEqual(existingSnapshot);
         expect(generateQuietPrompt).not.toHaveBeenCalled();
+        expect(saveChatDebounced).not.toHaveBeenCalled();
+    });
+
+    test('rewrites generated impersonation text when prompt transform opts in', async () => {
+        useImpersonateTransformAgent({ runOnImpersonate: true });
+        generateQuietPrompt.mockResolvedValue('<assistant_response>Polished impersonation</assistant_response>');
+
+        const { initAgentRunner } = await import('../public/scripts/extensions/in-chat-agents/agent-runner.js');
+        initAgentRunner();
+
+        const textarea = {
+            value: 'Draft impersonation',
+            dispatchEvent: jest.fn(),
+        };
+        document.querySelector = jest.fn(selector => selector === '#send_textarea' ? textarea : null);
+
+        await eventSource.emit(eventTypes.GENERATION_STARTED, 'impersonate', {}, false);
+        await eventSource.emit(eventTypes.GENERATION_AFTER_COMMANDS, 'impersonate', {}, false);
+        await eventSource.emit(eventTypes.IMPERSONATE_READY, 'Draft impersonation');
+
+        expect(generateQuietPrompt).toHaveBeenCalledTimes(1);
+        expect(generateQuietPrompt.mock.calls[0][0].quietPrompt).toContain('generated impersonation text');
+        expect(textarea.value).toBe('Polished impersonation');
+        expect(textarea.dispatchEvent).toHaveBeenCalledTimes(1);
+        expect(textarea.dispatchEvent.mock.calls[0][0].type).toBe('input');
         expect(saveChatDebounced).not.toHaveBeenCalled();
     });
 

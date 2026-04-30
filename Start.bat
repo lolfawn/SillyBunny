@@ -53,6 +53,7 @@ if "%_need_git%"=="1" if "%_auto_update%"=="1" (
 
 set NODE_ENV=production
 set NODE_NO_WARNINGS=1
+set SILLYBUNNY_LAUNCHER=1
 set "_dependency_profile=bun-production"
 if exist node_modules\eslint\package.json set "_dependency_profile=bun-development"
 bun scripts\dependency-state.js check !_dependency_profile! > nul 2>&1
@@ -72,6 +73,7 @@ if !errorlevel! neq 0 (
 )
 
 REM Check if running on ARM — Bun has CPU overhead issues on ARM (oven-sh/bun#26415)
+set "_server_runtime=bun"
 if /I "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
     where node > nul 2>&1
     if !errorlevel! equ 0 (
@@ -79,15 +81,23 @@ if /I "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
         echo [SillyBunny] ARM64 detected. Bun may use excessive CPU on this platform.
         echo [SillyBunny] Switching to Node.js automatically. Use Start.bat with SILLYBUNNY_USE_BUN=1 to override.
         echo.
-        if /I not "%SILLYBUNNY_USE_BUN%"=="1" (
-            set NODE_NO_WARNINGS=1
-            node --no-warnings server.js %*
-            goto end
-        )
+        if /I not "!SILLYBUNNY_USE_BUN!"=="1" set "_server_runtime=node"
     )
 )
 
-bun server.js %*
+:server_loop
+if "!_server_runtime!"=="node" (
+    node --no-warnings server.js %*
+) else (
+    bun server.js %*
+)
+set "_server_exit=!errorlevel!"
+if "!_server_exit!"=="75" (
+    echo.
+    echo [SillyBunny] Restarting server...
+    set SILLYBUNNY_SKIP_BROWSER_AUTO_LAUNCH=1
+    goto server_loop
+)
 
 :end
 pause

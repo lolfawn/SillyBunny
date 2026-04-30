@@ -4,7 +4,7 @@
         padding-top: max(env(safe-area-inset-top), 0px);
     }
     .safe-area-bottom {
-        padding-bottom: max(env(safe-area-inset-bottom), 0px);
+        padding-bottom: var(--sb-safe-area-bottom, env(safe-area-inset-bottom, 0px));
     }
     .safe-area-left {
         padding-left: max(env(safe-area-inset-left), 0px);
@@ -154,11 +154,11 @@
     }
 
     #send_form .mes_stop {
-        width: calc(var(--bottomFormBlockSize) - 6px);
-        min-width: calc(var(--bottomFormBlockSize) - 6px);
-        height: calc(var(--bottomFormBlockSize) - 6px);
-        min-height: calc(var(--bottomFormBlockSize) - 6px);
-        flex: 0 0 calc(var(--bottomFormBlockSize) - 6px);
+        width: var(--bottomFormBlockSize);
+        min-width: var(--bottomFormBlockSize);
+        height: var(--bottomFormBlockSize);
+        min-height: var(--bottomFormBlockSize);
+        flex: 0 0 var(--bottomFormBlockSize);
         font-size: var(--bottomFormIconSize);
         padding: 0;
         align-self: center;
@@ -205,8 +205,8 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        min-width: 36px;
-        min-height: 36px;
+        min-width: var(--sb-mobile-touch-target, 44px);
+        min-height: var(--sb-mobile-touch-target, 44px);
         font-size: calc(var(--mainFontSize) * 1.1);
     }
 
@@ -409,7 +409,7 @@
         top: 5px;
         border: 1px solid var(--SmartThemeBorderColor);
         border-radius: 0 0 1.65rem 1.65rem;
-        padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+        padding-bottom: var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
     }
 
     /* Compact bottom bar on mobile */
@@ -420,12 +420,12 @@
 
     #send_form button,
     #send_form .menu_button {
-        min-height: 36px;
+        min-height: var(--sb-mobile-touch-target, 44px);
     }
 
     /* Minimum touch targets for mobile */
     button, .menu_button, .right_menu_button, select:not(.select2-hidden-accessible) {
-        min-height: 44px;
+        min-height: var(--sb-mobile-touch-target, 44px);
     }
 
     .menu_button:is(.fa, .fa-solid, .fa-regular, .fa-brands):empty,
@@ -540,7 +540,6 @@
         border: 1px solid var(--SmartThemeBorderColor);
         backdrop-filter: blur(20px);
         max-width: 100dvw;
-        padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
     }
 
     #chat {
@@ -888,7 +887,7 @@
     body.PWA #sheld {
         padding-right: max(env(safe-area-inset-right), 2px);
         padding-left: max(env(safe-area-inset-left), 2px);
-        padding-bottom: max(env(safe-area-inset-bottom), 15px);
+        padding-bottom: var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
 
     }
 
@@ -1075,7 +1074,7 @@
     }
 
     #sb-mobile-nav-content {
-        padding: 12px 10px 16px;
+        padding: 12px 10px var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
         gap: 10px;
     }
 
@@ -1092,11 +1091,11 @@
     }
 
     #send_form .mes_stop {
-        width: calc(var(--bottomFormBlockSize) - 6px);
-        min-width: calc(var(--bottomFormBlockSize) - 6px);
-        height: calc(var(--bottomFormBlockSize) - 6px);
-        min-height: calc(var(--bottomFormBlockSize) - 6px);
-        flex: 0 0 calc(var(--bottomFormBlockSize) - 6px);
+        width: var(--bottomFormBlockSize);
+        min-width: var(--bottomFormBlockSize);
+        height: var(--bottomFormBlockSize);
+        min-height: var(--bottomFormBlockSize);
+        flex: 0 0 var(--bottomFormBlockSize);
         font-size: var(--bottomFormIconSize);
     }
 }
@@ -1110,14 +1109,14 @@
 /* Final mobile chat-bar guardrails: keep controls compact and square. */
 @media screen and (max-width: 768px) {
     :root {
-        --bottomFormBlockSize: 36px;
-        --bottomFormIconSize: 18px;
+        --bottomFormBlockSize: var(--sb-mobile-touch-target, 44px);
+        --bottomFormIconSize: 20px;
         --sb-mobile-composer-input-height: 46px;
     }
 
     :root[data-sb-compact-mode='true'] {
-        --bottomFormBlockSize: 34px;
-        --bottomFormIconSize: 17px;
+        --bottomFormBlockSize: var(--sb-mobile-touch-target, 44px);
+        --bottomFormIconSize: 18px;
         --sb-mobile-composer-input-height: 42px;
     }
 

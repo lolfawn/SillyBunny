@@ -37,6 +37,7 @@ import {
  * @property {string[]} triggerKeywords
  * @property {number} triggerProbability - 0-100
  * @property {string[]} generationTypes
+ * @property {boolean} runOnImpersonate - Allows prompt-based post passes to rewrite generated impersonation text
  */
 
 /**
@@ -567,6 +568,7 @@ export function createDefaultAgent() {
             triggerKeywords: [],
             triggerProbability: 100,
             generationTypes: ['normal', 'continue', 'impersonate'],
+            runOnImpersonate: false,
         },
         tools: [],
         settings: {},
@@ -666,6 +668,9 @@ export function normalizeAgent(rawAgent = {}) {
             generationTypes: Array.isArray(conditions.generationTypes)
                 ? conditions.generationTypes.map(type => String(type ?? '').trim()).filter(Boolean)
                 : defaults.conditions.generationTypes,
+            runOnImpersonate: Object.hasOwn(conditions, 'runOnImpersonate')
+                ? Boolean(conditions.runOnImpersonate)
+                : defaults.conditions.runOnImpersonate,
         },
         tools: Array.isArray(rawAgent.tools)
             ? rawAgent.tools.map(tool => normalizeToolDef(tool))

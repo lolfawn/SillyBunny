@@ -42,6 +42,7 @@
             "normal",
             "continue",
             "impersonate"
-        ]
+        ],
+        "runOnImpersonate": true
     }
 }
