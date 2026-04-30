@@ -4,7 +4,7 @@
 
 Date: 2026-04-30
 
-This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echoes migration notice easier to act on, restores Pathfinder retrieval from chat-attached lorebooks, and improves chat layout stability on desktop and mobile.
+This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echoes migration notice easier to act on, restores Pathfinder retrieval from chat-attached lorebooks, improves group-chat continuity, and tightens chat layout stability on desktop and mobile.
 
 ### Launchpad And Extensions
 - Added SB-GroupUtilities to Launchpad optional installs so group presence, group greetings, shared group context, and SendAs utilities can be installed from the curated starter area.
@@ -21,6 +21,30 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Fixed group speaker controls overflowing to the right when a typing indicator appears by allowing the desktop control row to wrap cleanly.
 - Added lazy/async loading hints for chat avatars and attached message images.
 - Added mobile content-visibility containment for off-screen chat messages to reduce WebKit layout and memory pressure during longer chats.
+
+### Group Chats
+- Opening the Characters drawer during a group chat now jumps to the active group edit panel instead of the main character list.
+- Group Auto Mode now re-applies the saved global toggle when opening or creating group chats, while keeping the default off until the user enables it.
+- Group DM history is included for the speaking character when returning to the main group chat, so private DM context can influence that member's next group reply without exposing it to other speakers.
+
+### Agents And Chat Naming
+- Deleting a swipe now clears pending post-generation recovery state so already-run post-generation agents do not fire again from the swipe-delete DOM update.
+- Chat auto-naming now allows longer title responses and strips reasoning wrappers before parsing, making the Persona bottom-bar wand more reliable with reasoning models.
+
+### UI Polish
+- The Bottom Bar Size slider now scales the SillyBunny chatbar and Persona bottom chat controls on mobile instead of only affecting the legacy composer sizing.
+- Background Visibility can now be raised to 100% without changing existing saved values.
+- Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
+
+### Local Commits
+- `46a191c fix(groups): open active group from character drawer`
+- `ff76c6a fix(groups): persist auto mode across chats`
+- `c7c2e5a fix(agents): clear post-generation state on swipe delete`
+- `13556b3 fix(groups): include speaker dm memory`
+- `dba3b61 fix(chat): make auto-name titles resilient`
+- `04d392b fix(ui): scale mobile bottom bar controls`
+- `135cd0a fix(ui): allow full background visibility`
+- `5cfff2a fix(ui): left align mobile label options`
 
 ## v1.5.1
 
