@@ -467,6 +467,11 @@ let isExportPopupOpen = false;
 // Saved here for performance reasons
 const messageTemplate = $('#message_template .mes');
 export const chatElement = $('#chat');
+const MOBILE_CHAT_RENDER_MEDIA_QUERY = '(max-width: 1000px)';
+const MOBILE_CHAT_RENDER_BATCH_SIZE = 8;
+const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
+let isLoadingMoreMessages = false;
+let lastShowMoreTouchEventAt = 0;
 
 let dialogueResolve = null;
 let dialogueCloseStop = false;
@@ -1501,10 +1506,41 @@ export async function replaceCurrentChat() {
     }
 }
 
+function shouldBatchMobileChatRendering() {
+    const isNarrowViewport = window.matchMedia?.(MOBILE_CHAT_RENDER_MEDIA_QUERY)?.matches;
+    return Boolean(isNarrowViewport || isMobile());
+}
+
+function getMobileChatRenderBatchSize(messageCount) {
+    if (!shouldBatchMobileChatRendering()) {
+        return messageCount;
+    }
+
+    return Math.min(MOBILE_CHAT_RENDER_BATCH_SIZE, messageCount);
+}
+
+function waitForNextFrame() {
+    return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+function insertShowMoreFragment(referenceNode, fragment) {
+    if (chatElement[0] instanceof HTMLElement) {
+        chatElement[0].insertBefore(fragment, referenceNode);
+    }
+}
+
 export async function showMoreMessages(messagesToLoad = null) {
+    if (isLoadingMoreMessages) {
+        return;
+    }
+
+    isLoadingMoreMessages = true;
+
     const firstDisplayedMesId = chatElement.children('.mes').first().attr('mesid');
     let messageId = Number(firstDisplayedMesId);
     let count = messagesToLoad || power_user.chat_truncation || Number.MAX_SAFE_INTEGER;
+    const showMoreButton = $('#show_more_messages');
+    const showMoreButtonElement = showMoreButton[0];
 
     // If there are no messages displayed, or the message somehow has no mesid, we default to one higher than last message id,
     // so the first "new" message being shown will be the last available message
@@ -1512,37 +1548,63 @@ export async function showMoreMessages(messagesToLoad = null) {
         messageId = getLastMessageId() + 1;
     }
 
-    console.debug('Inserting messages before', messageId, 'count', count, 'chat length', chat.length);
-    const prevHeight = chatElement.prop('scrollHeight');
-    const showMoreButton = $('#show_more_messages');
-    const isButtonInView = isElementInViewport(showMoreButton[0]);
+    try {
+        console.debug('Inserting messages before', messageId, 'count', count, 'chat length', chat.length);
 
-    const firstId = clamp(messageId - count, 0, Infinity);
-    const messageElements = [];
-    chat.slice(firstId, messageId).forEach((message, id) => {
-        messageElements.push(updateMessageElement(message, { messageId: firstId + id }));
-    });
-    // This could be faster: https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentElement
-    // Fallback to chatElement if the button isn't where it's expected to be.
-    if (showMoreButton[0]) {
-        showMoreButton.after(messageElements);
-    } else {
-        chatElement.prepend(messageElements);
+        const firstId = clamp(messageId - count, 0, Infinity);
+        const messages = chat.slice(firstId, messageId);
+        const batchSize = getMobileChatRenderBatchSize(messages.length);
+        const shouldYieldBetweenBatches = batchSize < messages.length;
+        const insertionReference = showMoreButtonElement instanceof HTMLElement
+            ? showMoreButtonElement.nextSibling
+            : chatElement[0]?.firstChild ?? null;
+        const shouldPreserveScroll = isElementInViewport(showMoreButtonElement);
+
+        if (showMoreButtonElement instanceof HTMLElement) {
+            showMoreButtonElement.setAttribute('aria-busy', 'true');
+        }
+
+        for (let offset = 0; offset < messages.length; offset += batchSize) {
+            const prevHeight = chatElement.prop('scrollHeight');
+            const fragment = document.createDocumentFragment();
+            const batch = messages.slice(offset, offset + batchSize);
+
+            batch.forEach((message, id) => {
+                const messageElement = updateMessageElement(message, { messageId: firstId + offset + id });
+                if (messageElement[0]) {
+                    fragment.appendChild(messageElement[0]);
+                }
+            });
+
+            // Fallback to chatElement if the button isn't where it's expected to be.
+            insertShowMoreFragment(insertionReference, fragment);
+
+            if (shouldPreserveScroll) {
+                const newHeight = chatElement.prop('scrollHeight');
+                chatElement.scrollTop(chatElement.scrollTop() + newHeight - prevHeight);
+            }
+
+            if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
+                await waitForNextFrame();
+            }
+        }
+
+        refreshSwipeButtons();
+
+        if (firstId === 0) {
+            showMoreButton.remove();
+        } else if (showMoreButtonElement instanceof HTMLElement) {
+            showMoreButtonElement.removeAttribute('aria-busy');
+        }
+
+        applyStylePins();
+        await eventSource.emit(event_types.MORE_MESSAGES_LOADED);
+    } finally {
+        if (showMoreButtonElement instanceof HTMLElement) {
+            showMoreButtonElement.removeAttribute('aria-busy');
+        }
+        isLoadingMoreMessages = false;
     }
-
-    refreshSwipeButtons();
-
-    if (firstId === 0) {
-        showMoreButton.remove();
-    }
-
-    if (isButtonInView) {
-        const newHeight = chatElement.prop('scrollHeight');
-        chatElement.scrollTop(newHeight - prevHeight);
-    }
-
-    applyStylePins();
-    await eventSource.emit(event_types.MORE_MESSAGES_LOADED);
 }
 
 export async function printMessages() {
@@ -1579,20 +1641,32 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
     const messages = targetChat.slice(startIndex);
 
     if (messages.length > 0) {
-        const newMessageElements = messages.map((message, offset) => {
-            const i = startIndex + offset;
-            const messageElement = updateMessageElement(message, { messageId: i });
+        const renderedMessageIds = lodash.range(startIndex, targetChat.length, 1);
+        const batchSize = getMobileChatRenderBatchSize(messages.length);
+        const shouldYieldBetweenBatches = batchSize < messages.length;
 
-            return messageElement[0];
-        });
+        for (let offset = 0; offset < messages.length; offset += batchSize) {
+            const newMessageElements = messages.slice(offset, offset + batchSize).map((message, batchOffset) => {
+                const i = startIndex + offset + batchOffset;
+                const messageElement = updateMessageElement(message, { messageId: i });
 
-        //The last_mes has been removed, add it to the new last message.
-        newMessageElements.at(-1).classList.add('last_mes');
+                return messageElement[0];
+            });
 
-        //Append to chat in one DOM update.
-        chatElement.append(newMessageElements);
+            if (offset + batchSize >= messages.length) {
+                //The last_mes has been removed, add it to the new last message.
+                newMessageElements.at(-1).classList.add('last_mes');
+            }
 
-        applyCharacterTagsToMessageDivs({ mesIds: lodash.range(startIndex, targetChat.length, 1) });
+            //Append each batch in one DOM update.
+            chatElement.append(newMessageElements);
+
+            if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
+                await waitForNextFrame();
+            }
+        }
+
+        applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
     }
 
     refreshSwipeButtons(false, fade);
@@ -14363,7 +14437,13 @@ jQuery(async function () {
         $('#avatar-and-name-block').slideToggle();
     });
 
-    $(document).on('mouseup touchend', '#show_more_messages', async function () {
+    $(document).on('mouseup touchend', '#show_more_messages', async function (event) {
+        if (event.type === 'touchend') {
+            lastShowMoreTouchEventAt = Date.now();
+        } else if (event.type === 'mouseup' && Date.now() - lastShowMoreTouchEventAt < SHOW_MORE_DUPLICATE_EVENT_GUARD_MS) {
+            return;
+        }
+
         await showMoreMessages();
     });
 

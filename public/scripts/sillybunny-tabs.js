@@ -7323,6 +7323,9 @@ function updateThemePickerUi() {
     }
 
     if (sliderInput instanceof HTMLInputElement) {
+        sliderInput.min = String(SB_SURFACE_TRANSPARENCY.min);
+        sliderInput.max = String(SB_SURFACE_TRANSPARENCY.max);
+        sliderInput.step = String(SB_SURFACE_TRANSPARENCY.step);
         sliderInput.value = String(sbState.surfaceTransparency);
     }
 
