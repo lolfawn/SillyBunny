@@ -238,6 +238,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * Fixed group speaker controls overflowing to the right when a typing indicator appears by allowing the desktop control row to wrap cleanly.
 * Added lazy/async loading hints for chat avatars and attached message images.
 * Added mobile content-visibility containment for off-screen chat messages to reduce WebKit layout and memory pressure during longer chats.
+* Chat rendering now uses smaller mobile batches and older-history loads ignore duplicate touch/mouse activations, reducing iOS Safari crashes and accidental auto-loading during longer chats.
 
 **Group Chats**
 * Opening the Characters drawer during a group chat now jumps to the active group edit panel instead of the main character list.
@@ -251,6 +252,8 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 **UI Polish**
 * The Bottom Bar Size slider now scales the SillyBunny chatbar and Persona bottom chat controls on mobile instead of only affecting the legacy composer sizing.
 * Background Visibility can now be raised to 100% without changing existing saved values.
+* Background Visibility now refreshes its range metadata when the Customize panel updates, so upgraded sessions keep the full 100% slider range.
+* Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 * Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
 
 **Local Commits**
@@ -262,6 +265,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * `04d392b fix(ui): scale mobile bottom bar controls`
 * `135cd0a fix(ui): allow full background visibility`
 * `5cfff2a fix(ui): left align mobile label options`
+* `15a29d9 fix(mobile): stabilize chat rendering`
 
 ### v1.5.1 (2026-04-29)
 
