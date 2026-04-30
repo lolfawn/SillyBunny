@@ -106,7 +106,7 @@ const SB_IDLE_BRAND_LABEL = 'SillyBunny';
 const SB_MOBILE_MEDIA_QUERY = '(max-width: 768px)';
 const SB_SURFACE_TRANSPARENCY = Object.freeze({
     min: 0,
-    max: 55,
+    max: 100,
     step: 5,
     defaultValue: 0,
 });
