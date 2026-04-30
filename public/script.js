@@ -9665,6 +9665,8 @@ function truncateChatLabelText(value, limit = CHAT_LABEL_TITLE_LIMIT) {
 
 function normalizeGeneratedChatLabel(value, displayName = '') {
     let title = String(value || '')
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
         .replace(/```(?:json)?/gi, '')
         .replace(/```/g, '')
         .replace(/^chat\s*(?:title|label|name)\s*[:=-]\s*/i, '')
@@ -9688,7 +9690,10 @@ function normalizeGeneratedChatLabel(value, displayName = '') {
 }
 
 function extractGeneratedChatLabel(responseText, displayName = '') {
-    const text = String(responseText || '').trim();
+    const text = String(responseText || '')
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+        .trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
 
     if (jsonMatch) {
@@ -9704,7 +9709,19 @@ function extractGeneratedChatLabel(responseText, displayName = '') {
         }
     }
 
-    return normalizeGeneratedChatLabel(text, displayName);
+    const plainTextLabel = normalizeGeneratedChatLabel(text, displayName);
+    if (plainTextLabel) {
+        return plainTextLabel;
+    }
+
+    for (const line of text.split('\n')) {
+        const normalizedLine = normalizeGeneratedChatLabel(line, displayName);
+        if (normalizedLine) {
+            return normalizedLine;
+        }
+    }
+
+    return '';
 }
 
 async function loadChatForAutoLabel(fileName, { isGroupChat, groupId, characterId, signal } = {}) {
@@ -9763,7 +9780,7 @@ ${transcript}`,
 
     const generated = await generateRaw({
         prompt,
-        responseLength: 80,
+        responseLength: 256,
         trimNames: true,
         signal,
     });
