@@ -15,7 +15,7 @@ import { commonEnumProviders, enumIcons } from './slash-commands/SlashCommandCom
 import { enumTypes, SlashCommandEnumValue } from './slash-commands/SlashCommandEnumValue.js';
 import { SlashCommandParser } from './slash-commands/SlashCommandParser.js';
 import { textgen_types, textgenerationwebui_settings } from './textgen-settings.js';
-import { applyStreamFadeIn } from './util/stream-fadein.js';
+import { applyStreamDomPatch, applyStreamFadeIn } from './util/stream-fadein.js';
 import { copyText, escapeRegex, isFalseBoolean, isTrueBoolean, setDatasetProperty, stringToRange, trimSpaces } from './utils.js';
 
 /**
@@ -397,6 +397,14 @@ export class ReasoningHandler {
     }
 
     /**
+     * Whether the current message has reasoning state or text to render.
+     * @returns {boolean}
+     */
+    hasReasoningContent() {
+        return this.state !== ReasoningState.None || Boolean(this.reasoning || this.reasoningDisplayText);
+    }
+
+    /**
      * Initializes the reasoning handler for a specific message.
      *
      * Can be used to update the DOM elements or read other reasoning states.
@@ -664,7 +672,7 @@ export class ReasoningHandler {
         if (power_user.stream_fade_in) {
             applyStreamFadeIn(this.messageReasoningContentDom, displayReasoning);
         } else {
-            this.messageReasoningContentDom.innerHTML = displayReasoning;
+            applyStreamDomPatch(this.messageReasoningContentDom, displayReasoning);
         }
 
         // Update tooltip for hidden reasoning edit

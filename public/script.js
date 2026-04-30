@@ -284,7 +284,7 @@ import { getSystemMessageByType, initSystemMessages, SAFETY_CHAT, sendSystemMess
 import { event_types, eventSource } from './scripts/events.js';
 import { initAccessibility } from './scripts/a11y.js';
 import { initQuickContextSizeEnhancer } from './scripts/quick-context-size-enhancer.js';
-import { applyStreamFadeIn } from './scripts/util/stream-fadein.js';
+import { applyStreamDomPatch, applyStreamFadeIn } from './scripts/util/stream-fadein.js';
 import { getPositiveTokenCount, updateReasoningTokenAccounting } from './scripts/reasoning-token-accounting.js';
 import { initDomHandlers } from './scripts/dom-handlers.js';
 import { SimpleMutex } from './scripts/util/SimpleMutex.js';
@@ -470,6 +470,7 @@ export const chatElement = $('#chat');
 const MOBILE_CHAT_RENDER_MEDIA_QUERY = '(max-width: 1000px)';
 const MOBILE_CHAT_RENDER_BATCH_SIZE = 8;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
+const STREAMING_FIRST_SWIPE_SYNC_INTERVAL_MS = 1000;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
 
@@ -3870,6 +3871,8 @@ class StreamingProcessor {
         this.reasoningSignature = null;
         /** @type {number} */
         this.reasoningTokens = 0;
+        /** @type {number} */
+        this.lastFirstSwipeSyncAt = 0;
     }
 
     /**
@@ -3887,7 +3890,9 @@ class StreamingProcessor {
         if (continueOnReasoning) {
             await this.reasoningHandler.process(messageId, false, this.promptReasoning);
         }
-        this.reasoningHandler.updateDom(messageId);
+        if (this.reasoningHandler.hasReasoningContent()) {
+            this.reasoningHandler.updateDom(messageId);
+        }
     }
 
     #updateMessageBlockVisibility() {
@@ -4021,7 +4026,7 @@ class StreamingProcessor {
                 if (power_user.stream_fade_in) {
                     applyStreamFadeIn(this.messageTextDom, formattedText);
                 } else {
-                    this.messageTextDom.innerHTML = formattedText;
+                    applyStreamDomPatch(this.messageTextDom, formattedText);
                 }
             }
 
@@ -4031,7 +4036,7 @@ class StreamingProcessor {
                 this.messageTimerDom.title = timePassed.timerTitle;
             }
 
-            this.setFirstSwipe(messageId);
+            this.syncFirstSwipe(messageId, isFinal, currentTime);
         }
 
         if (!scrollLock) {
@@ -4147,6 +4152,16 @@ class StreamingProcessor {
         }
     }
 
+    syncFirstSwipe(messageId, isFinal = false, currentTime = new Date()) {
+        const now = currentTime.getTime();
+        if (!isFinal && now - this.lastFirstSwipeSyncAt < STREAMING_FIRST_SWIPE_SYNC_INTERVAL_MS) {
+            return;
+        }
+
+        this.setFirstSwipe(messageId);
+        this.lastFirstSwipeSyncAt = now;
+    }
+
     onStopStreaming() {
         if (this.isCancelled) {
             return;
@@ -4187,6 +4202,7 @@ class StreamingProcessor {
                     this.timeToFirstToken = now - this.createdAt.getTime();
                 }
                 if (this.isStopped || this.abortController.signal.aborted) {
+                    this.syncFirstSwipe(this.messageId, true);
                     this.isStopped = true;
                     this.isFinished = true;
                     return this.result;
@@ -4211,6 +4227,7 @@ class StreamingProcessor {
         } catch (err) {
             const isCancelled = this.isCancelled || this.abortController.signal.aborted;
             if (!this.isFinished && isCancelled) {
+                this.syncFirstSwipe(this.messageId, true);
                 this.isStopped = true;
                 this.isFinished = true;
                 return this.result;

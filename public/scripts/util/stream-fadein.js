@@ -58,6 +58,18 @@ export function segmentTextInElement(htmlElement, htmlContent, granularity = 'wo
 }
 
 /**
+ * Apply formatted streaming content by morphing the existing message DOM in place.
+ * This keeps live rich formatting while avoiding full child teardown on every chunk.
+ * @param {HTMLElement} messageTextElement Message text element
+ * @param {string} htmlContent New HTML content to apply
+ */
+export function applyStreamDomPatch(messageTextElement, htmlContent) {
+    const targetElement = /** @type {HTMLElement} */ (messageTextElement.cloneNode());
+    targetElement.innerHTML = htmlContent;
+    morphdom(messageTextElement, targetElement);
+}
+
+/**
  * Apply stream fade-in effect to the given message text element by morphing its content.
  * @param {HTMLElement} messageTextElement Message text element
  * @param {string} htmlContent New HTML content to apply
