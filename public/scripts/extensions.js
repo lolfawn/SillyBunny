@@ -321,8 +321,26 @@ function maybeShowMoonlitEchoesMovedNotice() {
         ? t`Moonlit Echoes moved out of SillyBunny core. Your settings were left unchanged; enable the SillyBunny Moonlit Echoes Theme extension to keep Moonlit styles active.`
         : t`Moonlit Echoes moved out of SillyBunny core. Your settings were left unchanged; install the SillyBunny Moonlit Echoes Theme from Launchpad optional installs to keep Moonlit styles active.`;
 
-    toastr.warning(message, t`Moonlit Echoes moved`, { timeOut: 15000, extendedTimeOut: 10000 });
-    accountStorage.setItem(MOONLIT_ECHOES_NOTICE_STORAGE_KEY, 'true');
+    const buttonClass = 'moonlit-echoes-launchpad-button';
+    const content = `${message}<br><button type="button" class="menu_button ${buttonClass}">${t`Show in Launchpad`}</button>`;
+    toastr.warning(content, t`Moonlit Echoes moved`, {
+        timeOut: 0,
+        extendedTimeOut: 0,
+        tapToDismiss: false,
+        closeButton: true,
+        escapeHtml: false,
+        onShown() {
+            const toast = this instanceof HTMLElement ? this : this?.[0];
+            const button = toast?.querySelector?.(`.${buttonClass}`);
+            button?.addEventListener('click', async () => {
+                accountStorage.setItem(MOONLIT_ECHOES_NOTICE_STORAGE_KEY, 'true');
+                await window.SillyBunnyShell?.highlightLaunchpadItem?.(SILLYBUNNY_MOONLIT_ECHOES_EXTENSION_NAME);
+            });
+        },
+        onCloseClick() {
+            accountStorage.setItem(MOONLIT_ECHOES_NOTICE_STORAGE_KEY, 'true');
+        },
+    });
 }
 
 function showHideExtensionsMenu() {

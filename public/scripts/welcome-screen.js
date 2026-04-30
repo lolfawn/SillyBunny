@@ -82,6 +82,10 @@ const STARTER_PACK_EXTENSIONS = Object.freeze({
         id: 'third-party/SillyBunny-MoonlitEchoesTheme',
         repoUrl: 'https://github.com/platberlitz/SillyBunny-MoonlitEchoesTheme',
     }),
+    groupUtilities: Object.freeze({
+        id: 'third-party/SB-GroupUtilities',
+        repoUrl: 'https://github.com/DrMortum/SB-GroupUtilities',
+    }),
     promptInspector: Object.freeze({
         id: 'third-party/Extension-PromptInspector',
         repoUrl: 'https://github.com/SillyTavern/Extension-PromptInspector',
@@ -858,6 +862,13 @@ function buildStarterPackItems() {
                 extensionName: STARTER_PACK_EXTENSIONS.moonlitEchoes.id,
             }),
             buildExtensionStarterPackItem({
+                title: 'Group Utilities',
+                body: 'A SillyBunny-focused group-chat bundle with presence tracking, group greetings, shared group context utilities, and quick SendAs controls in one optional install.',
+                icon: 'fa-users',
+                chips: ['Extension', 'Groups', 'Presence', 'SendAs'],
+                extensionName: STARTER_PACK_EXTENSIONS.groupUtilities.id,
+            }),
+            buildExtensionStarterPackItem({
                 title: 'Prompt Inspector',
                 body: 'See the prompt stack more clearly when you need to understand what is being sent to the model, debug formatting, or compare how your setup changes the final payload.',
                 icon: 'fa-magnifying-glass',
@@ -926,6 +937,38 @@ function buildWelcomeTemplateData(chats) {
         starterPackItems: buildStarterPackItems(),
     };
 }
+
+async function highlightLaunchpadItem(extensionId) {
+    if (!extensionId) {
+        return false;
+    }
+
+    let welcomePanel = document.querySelector('.welcomePanel');
+    if (!(welcomePanel instanceof HTMLElement)) {
+        await openWelcomeScreen({ force: true });
+        welcomePanel = document.querySelector('.welcomePanel');
+    }
+
+    if (!(welcomePanel instanceof HTMLElement)) {
+        return false;
+    }
+
+    setWelcomeDeckView(welcomePanel, 'starter');
+    setWelcomeDeckCollapsed(welcomePanel, false);
+
+    const selector = `.welcomeStarterPackCard[data-launchpad-extension="${CSS.escape(extensionId)}"]`;
+    const card = welcomePanel.querySelector(selector);
+    if (!(card instanceof HTMLElement)) {
+        return false;
+    }
+
+    card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    flashHighlight($(card), 1400);
+    return true;
+}
+
+window.SillyBunnyShell = window.SillyBunnyShell || {};
+window.SillyBunnyShell.highlightLaunchpadItem = highlightLaunchpadItem;
 
 /**
  * Gets the filter bucket used by the Recent Chats tabs.

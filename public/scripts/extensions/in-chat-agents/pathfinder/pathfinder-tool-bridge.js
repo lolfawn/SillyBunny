@@ -1,5 +1,7 @@
 import { getSettings, getTree, isLorebookEnabled, canReadBook, canWriteBook } from './tree-store.js';
 
+const CHAT_LOREBOOK_METADATA_KEY = 'world_info';
+
 const PATHFINDER_LOG_PREFIX = '[Pathfinder]';
 
 function logPathfinderToolBridge(message, ...details) {
@@ -30,8 +32,67 @@ export const CONFIRMABLE_TOOLS = new Set([
 
 export function getActiveTunnelVisionBooks() {
     const s = getSettings();
-    if (!Array.isArray(s.enabledLorebooks)) return [];
-    return s.enabledLorebooks.filter(b => isLorebookEnabled(b));
+    const books = Array.isArray(s.enabledLorebooks)
+        ? s.enabledLorebooks.filter(b => isLorebookEnabled(b))
+        : [];
+
+    if (s.includeContextualLorebooks !== false) {
+        books.push(...getContextualLorebooks());
+    }
+
+    return Array.from(new Set(books.filter(Boolean)));
+}
+
+export function getContextualLorebooks() {
+    const ctx = window?.SillyTavern?.getContext?.();
+    const books = [];
+    const chatLorebook = ctx?.chatMetadata?.[CHAT_LOREBOOK_METADATA_KEY];
+    const personaLorebook = ctx?.powerUserSettings?.persona_description_lorebook;
+
+    if (chatLorebook) {
+        books.push(chatLorebook);
+    }
+
+    if (personaLorebook) {
+        books.push(personaLorebook);
+    }
+
+    for (const character of getContextCharacters(ctx)) {
+        const primaryBook = character?.data?.extensions?.world || character?.data?.character_book?.name;
+        if (primaryBook) {
+            books.push(primaryBook);
+        }
+
+        const fileName = getCharacterFileName(character);
+        const extraCharLore = ctx?.worldInfoSettings?.charLore?.find?.(entry => entry?.name === fileName);
+        if (Array.isArray(extraCharLore?.extraBooks)) {
+            books.push(...extraCharLore.extraBooks);
+        }
+    }
+
+    return Array.from(new Set(books.filter(Boolean)));
+}
+
+function getContextCharacters(ctx) {
+    if (!ctx?.characters?.length) {
+        return [];
+    }
+
+    if (ctx.groupId) {
+        const group = ctx.groups?.find?.(item => item?.id === ctx.groupId);
+        const memberAvatars = Array.isArray(group?.members) ? group.members : [];
+        return memberAvatars
+            .map(avatar => ctx.characters.find(character => character?.avatar === avatar))
+            .filter(Boolean);
+    }
+
+    const character = ctx.characters[ctx.characterId];
+    return character ? [character] : [];
+}
+
+function getCharacterFileName(character) {
+    const avatar = String(character?.avatar || '');
+    return avatar.replace(/\.[^.]+$/, '');
 }
 
 export function getReadableBooks() {

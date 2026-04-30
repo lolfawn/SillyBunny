@@ -1271,6 +1271,13 @@ body .panelControlBar {
     --swipeCounterMargin: 5px;
 }
 
+@media screen and (max-width: 1000px) {
+    #chat .mes:not(.last_mes) {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 220px;
+    }
+}
+
 /* https://stackoverflow.com/a/31819499 */
 /* This has much better performance than .transform on large chats*/
 .slide {
@@ -7289,6 +7296,7 @@ body:not(.movingUI) .drawer-content.maximized {
 .group_speaker_controls {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 4px 8px;
     background: var(--SmartThemeBlurTintColor);

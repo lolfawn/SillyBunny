@@ -56,6 +56,7 @@ These screenshots show the graphical shell UI across Workspace, Customize, Agent
 * [Project Goals](#project-goals-aka-why-we-made-this-fork)
 * [Changes Compared to SillyTavern](#changes-vs-sillytavern)
 * [Latest Update](#latest-update)
+    * [v1.5.2 (2026-04-30)](#v152-2026-04-30)
     * [v1.5.1 (2026-04-29)](#v151-2026-04-29)
 * [Upstream Information](#upstream-information)
 * [Contributors](#contributors)
@@ -217,6 +218,26 @@ SillyBunny includes some extras by default to help you get started right away:
 ---
 
 ## Latest Update
+
+### v1.5.2 (2026-04-30)
+
+This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echoes migration notice easier to act on, restores Pathfinder retrieval from chat-attached lorebooks, and improves chat layout stability on desktop and mobile.
+
+**Launchpad And Extensions**
+* Added SB-GroupUtilities to Launchpad optional installs so group presence, group greetings, shared group context, and SendAs utilities can be installed from the curated starter area.
+* Made the legacy Moonlit Echoes migration toast persistent until the user closes it or opens the Launchpad helper.
+* Added a Show in Launchpad action to the Moonlit Echoes toast that opens the Launchpad starter pack and highlights the Moonlit Echoes Theme card.
+
+**Pathfinder**
+* Pathfinder now includes active chat-bound, character, character extra, and persona lorebooks alongside manually selected lorebooks by default.
+* Added diagnostics that report manual and contextual lorebook counts so missing Pathfinder sources are easier to spot.
+* Normalized candidate entry matching and added warnings when a model returns candidate JSON that does not match any loaded lorebook entry names.
+* Added unit coverage for contextual Pathfinder lorebook merging and deduplication.
+
+**Chat UI And Mobile Performance**
+* Fixed group speaker controls overflowing to the right when a typing indicator appears by allowing the desktop control row to wrap cleanly.
+* Added lazy/async loading hints for chat avatars and attached message images.
+* Added mobile content-visibility containment for off-screen chat messages to reduce WebKit layout and memory pressure during longer chats.
 
 ### v1.5.1 (2026-04-29)
 

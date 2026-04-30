@@ -1,5 +1,5 @@
 import { getSettings, getTree, getAllEntryUids } from './tree-store.js';
-import { ALL_TOOL_NAMES, getActiveTunnelVisionBooks } from './pathfinder-tool-bridge.js';
+import { ALL_TOOL_NAMES, getActiveTunnelVisionBooks, getContextualLorebooks } from './pathfinder-tool-bridge.js';
 import { getEnabledToolAgents } from '../agent-store.js';
 import { getPathfinderRuntimeAgent } from '../agent-runner.js';
 
@@ -8,12 +8,14 @@ export async function runDiagnostics() {
     const s = getSettings();
 
     // Check enabled lorebooks
-    const books = (s.enabledLorebooks || []);
+    const manualBooks = (s.enabledLorebooks || []);
+    const contextualBooks = s.includeContextualLorebooks === false ? [] : getContextualLorebooks();
+    const books = getActiveTunnelVisionBooks();
     results['Lorebooks'] = {
         ok: books.length > 0,
         message: books.length > 0
-            ? `${books.length} lorebook(s) enabled: ${books.join(', ')}`
-            : 'No lorebooks selected - select at least one above',
+            ? `${books.length} lorebook(s) available: ${books.join(', ')}. Manual: ${manualBooks.length}; contextual: ${contextualBooks.length}.`
+            : 'No lorebooks selected or attached - select one above or attach chat/character/persona lore.',
     };
 
     // Check pipeline mode
