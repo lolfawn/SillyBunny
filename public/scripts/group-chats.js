@@ -932,6 +932,7 @@ function setAutoModeWorker() {
 }
 
 function syncGroupAutoModeToggle() {
+    applyGlobalGroupAutoModeSettings();
     $('#rm_group_automode').prop('checked', is_group_automode_enabled);
     setAutoModeWorker();
 }
