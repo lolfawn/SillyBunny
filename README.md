@@ -257,6 +257,8 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * The frontend service worker cache now rotates for 1.5.2 so iOS Safari stops reusing 1.5.1 assets with the old 55% Background Visibility cap.
 * Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 * Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
+* Header, chatbar, composer, and bottom chat surfaces now use solid SillyBunny panel layers in no-blur and high-background-visibility setups, preventing dark rectangular compositor artifacts around the top and bottom bars.
+* Rotated the SillyBunny theme, tabs, and service-worker cache keys so browsers pick up the hardened surface styling immediately.
 
 **Local Commits**
 * `46a191c fix(groups): open active group from character drawer`
@@ -272,6 +274,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * `fix(cache): refresh 1.5.2 frontend assets`
 * `fix(agents): make output history scrollable`
 * `fix(chat): reduce streaming DOM churn`
+* `fix(ui): harden shell surfaces against artifacts`
 
 ### v1.5.1 (2026-04-29)
 

@@ -63,15 +63,17 @@
     --sb-shell-shadow: 0 32px 90px color-mix(in srgb, var(--SmartThemeShadowColor) 34%, transparent);
     --sb-chat-surface-source: color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeChatTintColor) 8%);
     --sb-chat-surface-base: var(--sb-chat-surface-source);
+    --sb-fixed-surface-base: var(--sb-chat-surface-source);
     --sb-composer-surface-base: var(--sb-chat-surface-source);
     --sb-chat-surface-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-chat-surface-base)), var(--sb-chat-surface-base));
+    --sb-fixed-surface-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-fixed-surface-base)), var(--sb-fixed-surface-base));
     --sb-composer-surface-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base)), var(--sb-composer-surface-base));
     --sb-composer-input-bg: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base));
     --sb-card-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 6%, var(--SmartThemeBlurTintColor)), color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, transparent));
     --sb-button-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 84%, transparent);
     --sb-button-hover: color-mix(in srgb, var(--SmartThemeQuoteColor) 14%, transparent);
-    --sb-topbar-surface-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 88%, transparent);
-    --sb-chatbar-surface-bg: color-mix(in srgb, var(--sb-shell-main-bg) 92%, transparent);
+    --sb-topbar-surface-bg: var(--sb-fixed-surface-bg);
+    --sb-chatbar-surface-bg: var(--sb-fixed-surface-bg);
     --sb-mobile-overlay-bg: color-mix(in srgb, var(--sb-shell-main-bg) 96%, transparent);
     --sb-mobile-panel-bg: color-mix(in srgb, var(--sb-shell-surface) 96%, transparent);
     --sb-positive-fg: color-mix(in srgb, var(--SmartThemeQuoteColor) 82%, white);
@@ -118,6 +120,7 @@
 @supports (color: rgb(from black r g b / 1)) {
     :root {
         --sb-chat-surface-base: rgb(from var(--sb-chat-surface-source) r g b / calc(var(--sb-page-overlay-opacity) * 0.96));
+        --sb-fixed-surface-base: rgb(from var(--sb-chat-surface-source) r g b / 0.98);
         --sb-composer-surface-base: rgb(from var(--sb-chat-surface-source) r g b / calc(var(--sb-composer-surface-opacity) * 0.96));
     }
 }
@@ -259,7 +262,9 @@ body::before {
 #top-bar {
     position: relative;
     isolation: isolate;
-    background: transparent;
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--sb-shell-header-glow) 80%, transparent), transparent 110%),
+        var(--sb-topbar-surface-bg);
     border-bottom: 1px solid color-mix(in srgb, var(--sb-shell-border) 90%, transparent);
     box-shadow: 0 12px 28px color-mix(in srgb, var(--SmartThemeShadowColor) 16%, transparent);
     backdrop-filter: blur(24px);
@@ -703,7 +708,9 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     border-radius: var(--sb-radius-xl);
     border-color: color-mix(in srgb, var(--sb-shell-border) 92%, transparent);
     box-shadow: 0 -10px 40px color-mix(in srgb, var(--SmartThemeShadowColor) 14%, transparent);
-    background: transparent;
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent), transparent 90%),
+        var(--sb-composer-surface-bg);
     overflow: hidden;
 }
 

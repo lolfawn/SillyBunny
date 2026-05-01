@@ -471,6 +471,9 @@ body.sb-topbar-compact #sb-chatbar-layer {
     padding: var(--sb-chatbar-padding-y) var(--sb-chatbar-padding-x);
     border: 1px solid color-mix(in srgb, var(--sb-shell-border) 90%, transparent);
     border-radius: var(--sb-chatbar-radius);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 7%, transparent), transparent 26%),
+        var(--sb-chatbar-surface-bg, color-mix(in srgb, var(--sb-shell-main-bg) 92%, transparent));
     box-shadow: 0 10px 22px color-mix(in srgb, var(--SmartThemeShadowColor) 12%, transparent);
 }
 

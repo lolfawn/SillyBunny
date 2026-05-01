@@ -60,6 +60,8 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Mobile Characters now uses the same full-width native shell bounds as Workspace and Customize, with fixed scroll containment, toolbar sizing, and square character/group avatars that no longer squeeze or spill on iOS-sized viewports.
 - Removed the server-side cache buster so Safari is no longer forced through `Clear-Site-Data` cache clears on startup or avatar updates.
 - Chat composer and bottom chat controls now keep a stable readable surface when Background Visibility is raised to 100%, preventing desktop background banding through the input box.
+- Header, chatbar, composer, and bottom chat surfaces now use solid SillyBunny panel layers in no-blur and high-background-visibility setups, preventing dark rectangular compositor artifacts around the top and bottom bars.
+- Rotated the SillyBunny theme, tabs, and service-worker cache keys so browsers pick up the hardened surface styling immediately.
 
 ### Local Commits
 - `46a191c fix(groups): open active group from character drawer`
@@ -85,6 +87,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(ui): place API tab after presets`
 - `fix(mobile): normalize characters drawer shell`
 - `fix(ui): remove cache buster and stabilize composer`
+- `fix(ui): harden shell surfaces against artifacts`
 
 ## v1.5.1
 
