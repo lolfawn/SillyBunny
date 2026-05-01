@@ -54,6 +54,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
 - Rolled staging back to the `fix(ui): repair macOS character drawer lock` frontend state, removing the later cache and iOS drawer follow-ups.
 - CYOA Choices bundled regex now removes empty optional choice rows before rendering, so shorter 3-6 option blocks no longer show blank colored bars when CSS `:empty` rules are stripped or ignored.
+- Workspace tabs now place API immediately after Presets, keeping provider connection controls next to preset setup on desktop and mobile.
 
 ### Local Commits
 - `46a191c fix(groups): open active group from character drawer`
@@ -76,6 +77,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `revert: restore macOS character drawer lock state`
 - `fix(agents): remove blank cyoa choice rows`
 - `fix(mobile): stabilize iOS send taps`
+- `fix(ui): place API tab after presets`
 
 ## v1.5.1
 

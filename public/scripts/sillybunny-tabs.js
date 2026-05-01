@@ -212,18 +212,18 @@ const SB_SHELLS = Object.freeze({
         },
         embeddedTabs: [
             {
-                id: 'advanced-formatting',
-                drawerId: 'advanced-formatting-button',
-                label: 'Formatting',
-                icon: 'fa-text-height',
-                description: 'Tune context and instruction formatting tools here.',
-            },
-            {
                 id: 'api',
                 drawerId: 'sys-settings-button',
                 label: 'API',
                 icon: 'fa-plug',
                 description: 'Connect providers, select models, and manage backend-specific options here.',
+            },
+            {
+                id: 'advanced-formatting',
+                drawerId: 'advanced-formatting-button',
+                label: 'Formatting',
+                icon: 'fa-text-height',
+                description: 'Tune context and instruction formatting tools here.',
             },
             {
                 id: 'world-info',
@@ -8052,6 +8052,23 @@ function buildShell(shellKey) {
     basePanel.scroller.appendChild(originalContent);
     registerShellTab(shellKey, shellConfig.baseTab, basePanel);
 
+    const registerEmbeddedTab = (embeddedTab) => {
+        const prepared = prepareEmbeddedDrawer(embeddedTab.drawerId, originalContent);
+        if (!prepared) {
+            return;
+        }
+
+        const embeddedPanel = createShellPanel(embeddedTab);
+        embeddedPanel.scroller.appendChild(prepared.drawer);
+        registerShellTab(shellKey, embeddedTab, embeddedPanel, prepared.drawerContent);
+    };
+
+    const leadingEmbeddedTabId = shellKey === 'left' ? 'api' : null;
+    const leadingEmbeddedTab = shellConfig.embeddedTabs.find(tab => tab.id === leadingEmbeddedTabId);
+    if (leadingEmbeddedTab) {
+        registerEmbeddedTab(leadingEmbeddedTab);
+    }
+
     const samplingTab = shellConfig.customTabs.find(tab => tab.id === 'sampling');
     if (samplingTab) {
         const samplingPanel = buildSamplingPanel();
@@ -8059,14 +8076,11 @@ function buildShell(shellKey) {
     }
 
     for (const embeddedTab of shellConfig.embeddedTabs) {
-        const prepared = prepareEmbeddedDrawer(embeddedTab.drawerId, originalContent);
-        if (!prepared) {
+        if (embeddedTab.id === leadingEmbeddedTabId) {
             continue;
         }
 
-        const embeddedPanel = createShellPanel(embeddedTab);
-        embeddedPanel.scroller.appendChild(prepared.drawer);
-        registerShellTab(shellKey, embeddedTab, embeddedPanel, prepared.drawerContent);
+        registerEmbeddedTab(embeddedTab);
     }
 
     for (const customTab of shellConfig.customTabs) {
@@ -8324,8 +8338,8 @@ function buildMobileNav() {
             label: 'Quick Actions',
             items: [
                 { shell: 'left', tab: 'presets', icon: 'fa-sliders', label: 'Presets' },
-                { shell: 'left', tab: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
                 { shell: 'left', tab: 'api', icon: 'fa-plug', label: 'API' },
+                { shell: 'left', tab: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
                 { shell: 'left', tab: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
                 { shell: 'left', tab: 'agents', icon: 'fa-robot', label: 'Agents' },
             ],
