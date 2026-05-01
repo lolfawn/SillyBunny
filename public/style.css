@@ -1274,7 +1274,8 @@ body .panelControlBar {
 }
 
 @media screen and (max-width: 1000px) {
-    #chat .mes:not(.last_mes) {
+    /* Keep the live send/stream handoff fully laid out so mobile scroll anchoring stays calm. */
+    #chat .mes:not(.last_mes):not(:nth-last-child(-n + 2)) {
         content-visibility: auto;
         contain-intrinsic-size: auto 220px;
     }

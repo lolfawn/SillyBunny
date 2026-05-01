@@ -65,6 +65,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Mobile Workspace, navigation, and Characters drawers now sit closer to the top bar with tighter equal padding, keeping controls and list content visible first instead of spending screen space on empty header gaps.
 - Clean Minimal mobile shell overlays, cards, and navigation buttons now stay solid even at high Background Visibility so drawer menus match the other shell styles.
 - Mobile Quick Actions now keeps only the menu panel and buttons solid while leaving the page behind it visible, and includes the Formatting shortcut alongside Presets, API, Sampling, World Info, and Agents.
+- Mobile send now keeps the newest chat messages fully laid out during the send-to-stream handoff, preventing the viewport from jumping up to the previous message before the response begins.
 
 ### Local Commits
 - `46a191c fix(groups): open active group from character drawer`
@@ -93,6 +94,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(ui): harden shell surfaces against artifacts`
 - `fix(mobile): tighten shell drawer spacing`
 - `fix(mobile): keep quick actions focused`
+- `fix(mobile): stabilize send scroll handoff`
 
 ## v1.5.1
 
