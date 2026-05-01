@@ -52,6 +52,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 - Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
 - Rolled staging back to the `fix(ui): repair macOS character drawer lock` frontend state, removing the later cache and iOS drawer follow-ups.
+- CYOA Choices bundled regex now removes empty optional choice rows before rendering, so shorter 3-6 option blocks no longer show blank colored bars when CSS `:empty` rules are stripped or ignored.
 
 ### Local Commits
 - `46a191c fix(groups): open active group from character drawer`
@@ -72,6 +73,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(mobile): restore live streaming and drawer layout`
 - `fix(ui): repair macOS character drawer lock`
 - `revert: restore macOS character drawer lock state`
+- `fix(agents): remove blank cyoa choice rows`
 
 ## v1.5.1
 
