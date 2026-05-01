@@ -24,9 +24,9 @@ const SB_STORAGE_KEYS = Object.freeze({
 
 const SB_SHORTCUT_TARGETS = Object.freeze([
     { value: 'left:presets', label: 'Presets', icon: 'fa-sliders' },
+    { value: 'left:api', label: 'API', icon: 'fa-plug' },
     { value: 'left:sampling', label: 'Sampling', icon: 'fa-wave-square' },
     { value: 'left:advanced-formatting', label: 'Formatting', icon: 'fa-text-height' },
-    { value: 'left:api', label: 'API', icon: 'fa-plug' },
     { value: 'left:world-info', label: 'World Info', icon: 'fa-book-atlas' },
     { value: 'left:agents', label: 'Agents', icon: 'fa-robot' },
     { value: 'action:search', label: 'Search', icon: 'fa-magnifying-glass' },

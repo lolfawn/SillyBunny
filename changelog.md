@@ -55,6 +55,8 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Rolled staging back to the `fix(ui): repair macOS character drawer lock` frontend state, removing the later cache and iOS drawer follow-ups.
 - CYOA Choices bundled regex now removes empty optional choice rows before rendering, so shorter 3-6 option blocks no longer show blank colored bars when CSS `:empty` rules are stripped or ignored.
 - Workspace tabs now place API immediately after Presets, keeping provider connection controls next to preset setup on desktop and mobile.
+- Workspace shortcut options now list API immediately after Presets as well, so every mobile path into Workspace preserves the same second-tab order.
+- Mobile Characters now uses the same full-width native shell bounds as Workspace and Customize, with fixed scroll containment, toolbar sizing, and square character/group avatars that no longer squeeze or spill on iOS-sized viewports.
 
 ### Local Commits
 - `46a191c fix(groups): open active group from character drawer`
@@ -78,6 +80,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(agents): remove blank cyoa choice rows`
 - `fix(mobile): stabilize iOS send taps`
 - `fix(ui): place API tab after presets`
+- `fix(mobile): normalize characters drawer shell`
 
 ## v1.5.1
 
