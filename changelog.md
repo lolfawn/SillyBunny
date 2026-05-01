@@ -58,6 +58,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Characters drawer bulk-edit listeners now wait for the drawer DOM to settle before rebinding, avoiding stale touch targets after mobile drawer refreshes.
 - Characters drawer touch-end and touch-move handlers now use passive listeners where safe, improving iOS WebKit scroll and tap responsiveness while preserving long-press behavior.
 - Drawer and panel focus handling now uses a simpler iOS path without `preventScroll`, reducing Safari focus issues that could leave the landing page or drawer unresponsive.
+- Bumped the app-shell asset query and service-worker cache version so iOS Safari fetches the fixed frontend files instead of reusing stale drawer scripts.
 
 ### Local Commits
 - `46a191c fix(groups): open active group from character drawer`
@@ -79,6 +80,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(ui): repair macOS character drawer lock`
 - `fix(cache): use safe app shell cache bump`
 - `fix(mobile): stabilize iOS streaming and drawer`
+- `fix(cache): bump iOS frontend assets`
 
 ## v1.5.1
 
