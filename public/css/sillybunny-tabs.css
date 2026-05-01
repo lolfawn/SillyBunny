@@ -3987,17 +3987,20 @@ body.sb-shell-resizing * {
         font-size: var(--sb-topbar-compact-icon-size);
     }
 
+    #left-nav-panel.openDrawer,
+    #user-settings-block.openDrawer,
     .sb-shell-root.openDrawer,
     .sb-shell-root.fillLeft.openDrawer,
     .sb-shell-root.fillRight.openDrawer,
     #right-nav-panel.openDrawer {
+        --sb-mobile-shell-gap: 0px;
         width: calc(100vw - 16px) !important;
         max-width: calc(100vw - 16px) !important;
         left: 8px !important;
         right: 8px !important;
-        top: calc(var(--sb-topbar-layout-offset) + 8px) !important;
-        height: calc(100dvh - var(--sb-topbar-layout-offset) - 8px) !important;
-        max-height: calc(100dvh - var(--sb-topbar-layout-offset) - 8px) !important;
+        top: calc(var(--sb-topbar-layout-offset) + var(--sb-mobile-shell-gap)) !important;
+        height: calc(100dvh - var(--sb-topbar-layout-offset) - var(--sb-mobile-shell-gap)) !important;
+        max-height: calc(100dvh - var(--sb-topbar-layout-offset) - var(--sb-mobile-shell-gap)) !important;
         min-width: 0 !important;
         margin-top: 0 !important;
         border-radius: 22px 22px 0 0 !important;
@@ -4021,7 +4024,7 @@ body.sb-shell-resizing * {
     #right-nav-panel.openDrawer::after {
         content: '';
         position: absolute;
-        top: 8px;
+        top: 6px;
         left: 50%;
         z-index: 5;
         width: 42px;
@@ -4054,7 +4057,7 @@ body.sb-shell-resizing * {
         scrollbar-width: none;
         scroll-snap-type: x proximity;
         gap: 4px;
-        padding: 8px 14px 6px;
+        padding: 6px 14px 5px;
         border-right: 0;
         border-bottom: 1px solid color-mix(in srgb, var(--sb-shell-border) 80%, transparent);
     }
@@ -4089,8 +4092,8 @@ body.sb-shell-resizing * {
         width: auto;
         min-width: max-content;
         max-width: calc(100vw - 32px);
-        min-height: 46px;
-        padding: 10px 14px;
+        min-height: 44px;
+        padding: 9px 14px;
         border-radius: 12px;
         gap: 8px;
         align-items: center;
@@ -4122,7 +4125,7 @@ body.sb-shell-resizing * {
 
     .sb-shell-header {
         gap: 8px;
-        padding: max(22px, env(safe-area-inset-top, 0px)) 58px 14px 18px;
+        padding: 14px 56px 10px 16px;
     }
 
     .sb-shell-kicker {
@@ -4159,7 +4162,7 @@ body.sb-shell-resizing * {
     }
 
     .sb-shell-panel-scroller {
-        padding: 14px 14px var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
+        padding: 12px 14px var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
     }
 
     .sb-brand-title,
@@ -4264,8 +4267,11 @@ body.sb-shell-resizing * {
         display: none;
         position: fixed;
         inset: var(--sb-topbar-layout-offset) 0 0;
+        box-sizing: border-box;
+        height: calc(100dvh - var(--sb-topbar-layout-offset));
+        min-height: calc(100dvh - var(--sb-topbar-layout-offset));
         z-index: -1;
-        padding: 12px;
+        padding: 8px;
         isolation: isolate;
         background: transparent;
         backdrop-filter: none;
@@ -4311,8 +4317,11 @@ body.sb-shell-resizing * {
     #sb-mobile-chat-tools {
         position: fixed;
         inset: var(--sb-topbar-layout-offset) 0 0;
+        box-sizing: border-box;
+        height: calc(100dvh - var(--sb-topbar-layout-offset));
+        min-height: calc(100dvh - var(--sb-topbar-layout-offset));
         z-index: -1;
-        padding: 12px;
+        padding: 8px;
         visibility: hidden;
         opacity: 0;
         pointer-events: none;
@@ -4339,7 +4348,7 @@ body.sb-shell-resizing * {
     }
 
     #sb-mobile-chat-tools-panel {
-        max-height: calc(100dvh - var(--sb-topbar-layout-offset) - 48px);
+        max-height: calc(100dvh - var(--sb-topbar-layout-offset) - 32px);
         overflow-y: auto;
     }
 
@@ -4347,12 +4356,12 @@ body.sb-shell-resizing * {
         position: relative;
         isolation: isolate;
         width: min(100%, 420px);
-        max-height: calc(100dvh - var(--sb-topbar-layout-offset) - 48px);
+        max-height: calc(100dvh - var(--sb-topbar-layout-offset) - 32px);
         margin: 0 auto;
-        padding: 16px;
+        padding: 12px;
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 10px;
         overflow-y: auto;
         border-radius: 20px;
         border: 1px solid color-mix(in srgb, var(--sb-shell-border) 88%, transparent);
@@ -4376,7 +4385,7 @@ body.sb-shell-resizing * {
     .sb-mobile-section {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 8px;
     }
 
     .sb-mobile-section-title {
@@ -4392,7 +4401,7 @@ body.sb-shell-resizing * {
     .sb-mobile-section-list {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 10px;
+        gap: 8px;
     }
 
     .sb-nav-item {
@@ -4401,15 +4410,15 @@ body.sb-shell-resizing * {
         isolation: isolate;
         box-sizing: border-box;
         width: 100%;
-        min-height: 62px;
+        min-height: 54px;
         border: 1px solid color-mix(in srgb, var(--sb-shell-border) 85%, transparent);
         border-radius: var(--sb-radius-md, 16px);
         background: transparent;
-        padding: 0 18px;
+        padding: 0 14px;
         display: grid;
         grid-template-columns: 34px minmax(0, 1fr);
         align-items: center;
-        column-gap: 14px;
+        column-gap: 10px;
         justify-items: start;
         color: var(--SmartThemeBodyColor);
         font: inherit;
@@ -4468,7 +4477,7 @@ body.sb-shell-resizing * {
     .sb-shell-nav {
         justify-content: flex-start;
         gap: 4px;
-        padding: 8px 12px;
+        padding: 6px 12px;
     }
 
     .sb-shell-nav-wrapper.sb-can-scroll-left .sb-shell-nav {
@@ -4483,8 +4492,8 @@ body.sb-shell-resizing * {
         flex-basis: clamp(150px, 64vw, 204px);
         min-width: clamp(150px, 64vw, 204px);
         max-width: calc(100vw - 36px);
-        min-height: 46px;
-        padding: 9px 12px;
+        min-height: 42px;
+        padding: 8px 12px;
         gap: 6px;
         align-items: center;
     }
@@ -4504,13 +4513,13 @@ body.sb-shell-resizing * {
     }
 
     #sb-mobile-nav-content {
-        padding: 14px;
-        gap: 12px;
+        padding: 10px;
+        gap: 8px;
     }
 
     .sb-nav-item {
-        min-height: 58px;
-        padding: 0 16px;
+        min-height: 52px;
+        padding: 0 14px;
         grid-template-columns: 32px minmax(0, 1fr);
         column-gap: 12px;
     }
@@ -4556,10 +4565,10 @@ body.sb-shell-resizing * {
     .sb-shell-root.openDrawer,
     .sb-shell-root.fillLeft.openDrawer,
     .sb-shell-root.fillRight.openDrawer {
-        top: calc(var(--sb-topbar-layout-offset) + 8px) !important;
+        top: var(--sb-topbar-layout-offset) !important;
         margin-top: 0 !important;
-        height: calc(100dvh - var(--sb-topbar-layout-offset) - 8px) !important;
-        max-height: calc(100dvh - var(--sb-topbar-layout-offset) - 8px) !important;
+        height: calc(100dvh - var(--sb-topbar-layout-offset)) !important;
+        max-height: calc(100dvh - var(--sb-topbar-layout-offset)) !important;
         overflow-y: auto !important;
         padding-bottom: var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px))) !important;
         -webkit-overflow-scrolling: touch !important;
@@ -4652,7 +4661,7 @@ body.sb-shell-resizing * {
         width: 100%;
         min-width: 0;
         margin: 0;
-        padding: 20px 10px 10px;
+        padding: 10px 8px 6px;
         border-bottom: 1px solid color-mix(in srgb, var(--sb-shell-border) 76%, transparent);
         box-sizing: border-box;
     }
@@ -4695,7 +4704,7 @@ body.sb-shell-resizing * {
     #right-nav-panel.openDrawer > #rm_PinAndTabs {
         flex: 0 0 auto;
         margin: 0;
-        padding: 8px 10px 0;
+        padding: 4px 8px 0;
         min-width: 0;
         box-sizing: border-box;
     }
@@ -4707,7 +4716,7 @@ body.sb-shell-resizing * {
         max-height: none !important;
         width: 100%;
         min-width: 0;
-        padding: 0 10px var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
+        padding: 0 8px var(--sb-mobile-safe-area-bottom, max(34px, env(safe-area-inset-bottom, 0px)));
         overflow-y: auto !important;
         overflow-x: hidden !important;
         box-sizing: border-box;
@@ -4721,7 +4730,7 @@ body.sb-shell-resizing * {
     }
 
     #right-nav-panel.openDrawer #charListFixedTop {
-        padding: 0 0 8px;
+        padding: 0 0 4px;
     }
 
     #right-nav-panel.openDrawer #rm_print_characters_block {

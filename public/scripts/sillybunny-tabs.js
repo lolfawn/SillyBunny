@@ -1273,23 +1273,19 @@ function syncDesktopShellSizing() {
             continue;
         }
 
-        const { width, maxWidth } = getDesktopShellDimensions(shellKey);
+        const dimensions = getDesktopShellDimensions(shellKey);
         const bounds = getDesktopShellResizeBounds(shellKey);
 
         if (isMobileViewport()) {
-            if (shellKey === 'characters') {
-                root.style.removeProperty('width');
-                root.style.removeProperty('max-width');
-            } else {
-                root.style.setProperty('width', `${width}px`, 'important');
-                root.style.setProperty('max-width', `${maxWidth}px`, 'important');
-            }
+            root.style.removeProperty('width');
+            root.style.removeProperty('max-width');
             root.style.removeProperty('height');
             root.style.removeProperty('max-height');
             root.classList.remove('sb-shell-can-resize');
             continue;
         }
 
+        const { width } = dimensions;
         let sizeToApply = {
             width,
             height: bounds.defaultHeight,

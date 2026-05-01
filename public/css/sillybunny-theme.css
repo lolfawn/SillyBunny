@@ -1342,8 +1342,14 @@ body.bubblechat .mes[is_user='true'] .mes_block {
     :root:not([data-sb-theme]),
     :root[data-sb-theme='clean-minimal'] {
         --sb-mobile-default-surface-solid: color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, black 8%);
+        --sb-mobile-default-card-solid: color-mix(in srgb, var(--SmartThemeBlurTintColor) 88%, var(--SmartThemeBodyColor) 12%);
         --sb-mobile-default-input-solid: color-mix(in srgb, var(--SmartThemeChatTintColor) 94%, var(--SmartThemeBodyColor) 6%);
         --sb-chat-surface-source: color-mix(in srgb, var(--SmartThemeBlurTintColor) 98%, var(--SmartThemeChatTintColor) 2%);
+        --sb-shell-surface: var(--sb-mobile-default-surface-solid);
+        --sb-shell-main-bg: var(--sb-mobile-default-surface-solid);
+        --sb-shell-nav-bg: var(--sb-mobile-default-surface-solid);
+        --sb-shell-header-bg: var(--sb-mobile-default-surface-solid);
+        --sb-card-bg: var(--sb-mobile-default-card-solid);
         --sb-topbar-surface-bg: var(--sb-mobile-default-surface-solid);
         --sb-chatbar-surface-bg: var(--sb-mobile-default-surface-solid);
         --sb-mobile-overlay-bg: var(--sb-mobile-default-surface-solid);
@@ -1355,11 +1361,12 @@ body.bubblechat .mes[is_user='true'] .mes_block {
         :root:not([data-sb-theme]),
         :root[data-sb-theme='clean-minimal'] {
             --sb-mobile-default-surface-solid: rgb(from var(--SmartThemeBlurTintColor) r g b / 0.98);
+            --sb-mobile-default-card-solid: rgb(from var(--SmartThemeBlurTintColor) r g b / 0.96);
             --sb-mobile-default-input-solid: rgb(from var(--SmartThemeChatTintColor) r g b / 0.96);
-            --sb-chat-surface-source: rgb(from var(--SmartThemeBlurTintColor) r g b / calc(var(--sb-page-card-opacity) * 0.98));
-            --sb-chatbar-surface-bg: rgb(from var(--SmartThemeBlurTintColor) r g b / calc(var(--sb-shell-surface-opacity) * 0.98));
-            --sb-mobile-overlay-bg: rgb(from var(--SmartThemeBlurTintColor) r g b / calc(var(--sb-page-overlay-opacity) * 0.98));
-            --sb-mobile-panel-bg: rgb(from var(--SmartThemeBlurTintColor) r g b / calc(var(--sb-page-card-opacity) * 0.98));
+            --sb-chat-surface-source: rgb(from var(--SmartThemeBlurTintColor) r g b / 0.98);
+            --sb-chatbar-surface-bg: rgb(from var(--SmartThemeBlurTintColor) r g b / 0.98);
+            --sb-mobile-overlay-bg: rgb(from var(--SmartThemeBlurTintColor) r g b / 0.98);
+            --sb-mobile-panel-bg: rgb(from var(--SmartThemeBlurTintColor) r g b / 0.98);
         }
     }
 

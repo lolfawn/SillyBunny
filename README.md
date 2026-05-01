@@ -259,6 +259,8 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
 * Header, chatbar, composer, and bottom chat surfaces now use solid SillyBunny panel layers in no-blur and high-background-visibility setups, preventing dark rectangular compositor artifacts around the top and bottom bars.
 * Rotated the SillyBunny theme, tabs, and service-worker cache keys so browsers pick up the hardened surface styling immediately.
+* Mobile Workspace, navigation, and Characters drawers now sit closer to the top bar with tighter equal padding, keeping controls and list content visible first instead of spending screen space on empty header gaps.
+* Clean Minimal mobile shell overlays, cards, and navigation buttons now stay solid even at high Background Visibility so drawer menus match the other shell styles.
 
 **Local Commits**
 * `46a191c fix(groups): open active group from character drawer`
@@ -275,6 +277,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * `fix(agents): make output history scrollable`
 * `fix(chat): reduce streaming DOM churn`
 * `fix(ui): harden shell surfaces against artifacts`
+* `fix(mobile): tighten shell drawer spacing`
 
 ### v1.5.1 (2026-04-29)
 
