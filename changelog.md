@@ -47,6 +47,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - The frontend service worker cache now rotates for 1.5.2 so iOS Safari stops reusing 1.5.1 assets with the old 55% Background Visibility cap.
 - Characters drawer now includes an in-drawer alignment button that can lock the desktop panel flush to the right side while preserving the centered default and mobile safe-area sheet layout.
 - Mobile Characters drawer header, toolbar, sort/search row, list cards, and right-lock edge alignment now stay symmetrical on narrow viewports without cramped character metadata or a right-side gap.
+- macOS desktop browsers now apply the Characters drawer right-lock immediately, keep the locked drawer edge-flush on shorter windows, and retain drag/resize interaction when WebKit reports pointer capabilities inconsistently.
 - iOS send/regenerate/continue taps no longer force textarea refocus or trigger the mobile viewport workaround during the tap window, reducing delayed sends in Safari.
 - Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 - Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
@@ -68,6 +69,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(mobile): improve drawer and chat responsiveness`
 - `feat(ui): add character drawer right lock`
 - `fix(mobile): restore live streaming and drawer layout`
+- `fix(ui): repair macOS character drawer lock`
 
 ## v1.5.1
 

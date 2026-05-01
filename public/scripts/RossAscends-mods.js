@@ -48,6 +48,7 @@ const MOVING_UI_SHARED_KEYS = Object.freeze({
     'left-nav-panel': 'nav-panel-shared-size',
     'right-nav-panel': 'nav-panel-shared-size',
 });
+const MOVING_UI_PIXEL_STYLES = new Set(['top', 'left', 'right', 'bottom', 'height', 'width']);
 
 function getMovingUIStateKey(elementId) {
     return MOVING_UI_SHARED_KEYS[elementId] ?? elementId;
@@ -60,6 +61,45 @@ function getMovingUISiblingTargets(elementId) {
     }
 
     return Object.keys(MOVING_UI_SHARED_KEYS).filter(id => id !== elementId && MOVING_UI_SHARED_KEYS[id] === sharedKey);
+}
+
+function normalizeMovingUIStyleValue(property, value) {
+    if (value === null || value === undefined || (typeof value === 'number' && !Number.isFinite(value))) {
+        return '';
+    }
+
+    if (typeof value === 'number' && MOVING_UI_PIXEL_STYLES.has(property)) {
+        return `${value}px`;
+    }
+
+    return String(value);
+}
+
+function setMovingUIStyle($elmnt, property, value, priority = '') {
+    const element = $elmnt[0];
+    const normalizedValue = normalizeMovingUIStyleValue(property, value);
+
+    if (!normalizedValue) {
+        return;
+    }
+
+    if (element instanceof HTMLElement) {
+        element.style.setProperty(property, normalizedValue, priority);
+        return;
+    }
+
+    $elmnt.css(property, normalizedValue);
+}
+
+function setMovingUIStyles($elmnt, styles, priority = '') {
+    for (const [property, value] of Object.entries(styles)) {
+        setMovingUIStyle($elmnt, property, value, priority);
+    }
+}
+
+function parseMovingUIPixel(value, fallback = 0) {
+    const numericValue = Number.parseFloat(value);
+    return Number.isFinite(numericValue) ? numericValue : fallback;
 }
 
 var RPanelPin = document.getElementById('rm_button_panel_pin');
@@ -524,8 +564,8 @@ export function dragElement($elmnt) {
                     continue;
                 }
 
-                sibling.style.width = `${width}px`;
-                sibling.style.height = `${height}px`;
+                sibling.style.setProperty('width', `${width}px`, 'important');
+                sibling.style.setProperty('height', `${height}px`, 'important');
             }
             eventSource.emit('resizeUI', elmntName);
         }
@@ -534,10 +574,10 @@ export function dragElement($elmnt) {
 
     // Helper: Clamp element within viewport
     function clampToViewport() {
-        if (top <= 0) $elmnt.css('top', '0px');
-        else if (maxY >= winHeight) $elmnt.css('top', winHeight - maxY + top - 1 + 'px');
-        if (left <= 0) $elmnt.css('left', '0px');
-        else if (maxX >= winWidth) $elmnt.css('left', winWidth - maxX + left - 1 + 'px');
+        if (top <= 0) setMovingUIStyle($elmnt, 'top', 0, 'important');
+        else if (maxY >= winHeight) setMovingUIStyle($elmnt, 'top', winHeight - maxY + top - 1, 'important');
+        if (left <= 0) setMovingUIStyle($elmnt, 'left', 0, 'important');
+        else if (maxX >= winWidth) setMovingUIStyle($elmnt, 'left', winWidth - maxX + left - 1, 'important');
     }
 
     // Observer for style changes (position/size)
@@ -558,12 +598,13 @@ export function dragElement($elmnt) {
 
         const element = /** @type {HTMLElement} */ ($target[0]);
         const style = getComputedStyle(element);
-        height = parseInt(style.height);
-        width = parseInt(style.width);
-        top = parseInt(style.top);
-        left = parseInt(style.left);
-        right = parseInt(style.right);
-        bottom = parseInt(style.bottom);
+        const rect = element.getBoundingClientRect();
+        height = parseMovingUIPixel(style.height, rect.height);
+        width = parseMovingUIPixel(style.width, rect.width);
+        top = parseMovingUIPixel(style.top, rect.top);
+        left = parseMovingUIPixel(style.left, rect.left);
+        right = parseMovingUIPixel(style.right, window.innerWidth - rect.right);
+        bottom = parseMovingUIPixel(style.bottom, window.innerHeight - rect.bottom);
         maxX = width + left;
         maxY = height + top;
         winWidth = window.innerWidth;
@@ -580,25 +621,25 @@ export function dragElement($elmnt) {
                 const imgWidth = zoomedAvatarImage.width();
                 const imageAspectRatio = imgHeight / imgWidth;
                 if (containerAspectRatio !== imageAspectRatio) {
-                    $elmnt.css('width', $elmnt.width());
-                    $elmnt.css('height', $elmnt.width() * imageAspectRatio);
+                    setMovingUIStyle($elmnt, 'width', $elmnt.width(), 'important');
+                    setMovingUIStyle($elmnt, 'height', $elmnt.width() * imageAspectRatio, 'important');
                 }
                 if (top + $elmnt.height() >= winHeight) {
-                    $elmnt.css('height', winHeight - top - 1 + 'px');
-                    $elmnt.css('width', (winHeight - top - 1) / imageAspectRatio + 'px');
+                    setMovingUIStyle($elmnt, 'height', winHeight - top - 1, 'important');
+                    setMovingUIStyle($elmnt, 'width', (winHeight - top - 1) / imageAspectRatio, 'important');
                 }
                 if (left + $elmnt.width() >= winWidth) {
-                    $elmnt.css('width', winWidth - left - 1 + 'px');
-                    $elmnt.css('height', (winWidth - left - 1) * imageAspectRatio + 'px');
+                    setMovingUIStyle($elmnt, 'width', winWidth - left - 1, 'important');
+                    setMovingUIStyle($elmnt, 'height', (winWidth - left - 1) * imageAspectRatio, 'important');
                 }
             } else {
-                if (top + $elmnt.height() >= winHeight) $elmnt.css('height', winHeight - top - 1 + 'px');
-                if (left + $elmnt.width() >= winWidth) $elmnt.css('width', winWidth - left - 1 + 'px');
+                if (top + $elmnt.height() >= winHeight) setMovingUIStyle($elmnt, 'height', winHeight - top - 1, 'important');
+                if (left + $elmnt.width() >= winWidth) setMovingUIStyle($elmnt, 'width', winWidth - left - 1, 'important');
             }
             //if (top < topBarLastY && maxX >= topBarFirstX && left <= topBarFirstX) {
             //    $elmnt.css('width', width - 1 + 'px');
             // }
-            $elmnt.css({ left, top });
+            setMovingUIStyles($elmnt, { left, top }, 'important');
             $elmnt.off('mouseup').on('mouseup', () => {
                 if (
                     power_user.movingUIState[stateKey].width === $elmnt.width() &&
@@ -636,11 +677,13 @@ export function dragElement($elmnt) {
         pos3 = e.clientX;
         pos4 = e.clientY;
         $elmnt.attr('data-dragged', 'true');
-        $elmnt.css('left', ($elmnt.offset().left - pos1) + 'px');
-        $elmnt.css('top', ($elmnt.offset().top - pos2) + 'px');
-        $elmnt.css('margin', 'unset');
-        $elmnt.css('height', height);
-        $elmnt.css('width', width);
+        setMovingUIStyles($elmnt, {
+            left: $elmnt.offset().left - pos1,
+            top: $elmnt.offset().top - pos2,
+            margin: 'unset',
+            height,
+            width,
+        }, 'important');
     }
 
     function closeDragElement() {

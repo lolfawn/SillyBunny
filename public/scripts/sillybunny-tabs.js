@@ -145,7 +145,6 @@ const SB_CONSOLE_LOG_REFRESH_MS = 2500;
 const SB_CONSOLE_LOG_STICKY_THRESHOLD = 28;
 const SB_CHATBAR_SEARCH_DEBOUNCE = 220;
 const SB_CHAT_SEARCH_MARK_SELECTOR = 'mark[data-sb-chat-search="true"]';
-const SB_DESKTOP_SHELL_RESIZE_MEDIA_QUERY = '(hover: hover) and (pointer: fine)';
 const SB_DESKTOP_SHELL_LAYOUT = Object.freeze({
     minWidth: 600,
     maxWidth: 900,
@@ -786,6 +785,30 @@ function syncCharacterDrawerLockButton() {
     button.setAttribute('aria-label', button.title);
 }
 
+function syncCharacterDrawerLockPosition() {
+    const panel = document.getElementById('right-nav-panel');
+    if (!(panel instanceof HTMLElement)) {
+        return;
+    }
+
+    if (!sbState.characterDrawer.rightLocked || isMobileViewport()) {
+        if (panel.dataset.sbCharacterLockInline === 'right') {
+            for (const property of ['left', 'right', 'margin-left', 'margin-right']) {
+                panel.style.removeProperty(property);
+            }
+
+            delete panel.dataset.sbCharacterLockInline;
+        }
+        return;
+    }
+
+    panel.style.setProperty('left', 'auto', 'important');
+    panel.style.setProperty('right', '0px', 'important');
+    panel.style.setProperty('margin-left', '0px', 'important');
+    panel.style.setProperty('margin-right', '0px', 'important');
+    panel.dataset.sbCharacterLockInline = 'right';
+}
+
 function setCharacterDrawerRightLock(enabled, { persist = true } = {}) {
     const nextEnabled = Boolean(enabled);
     sbState.characterDrawer.rightLocked = nextEnabled;
@@ -795,6 +818,7 @@ function setCharacterDrawerRightLock(enabled, { persist = true } = {}) {
         setPersistentStorageItem(SB_STORAGE_KEYS.characterDrawerRightLocked, String(nextEnabled));
     }
 
+    syncCharacterDrawerLockPosition();
     syncCharacterDrawerLockButton();
 }
 
@@ -998,8 +1022,16 @@ function isMobileViewport() {
     return window.matchMedia(SB_MOBILE_MEDIA_QUERY).matches;
 }
 
+function isTouchOnlyDesktopViewport() {
+    const hasHover = window.matchMedia('(hover: hover), (any-hover: hover)').matches;
+    const hasFinePointer = window.matchMedia('(pointer: fine), (any-pointer: fine)').matches;
+    const isTouchMac = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+
+    return isTouchMac || (navigator.maxTouchPoints > 0 && !hasHover && !hasFinePointer);
+}
+
 function canResizeDesktopShells() {
-    return !isMobileViewport() && window.matchMedia(SB_DESKTOP_SHELL_RESIZE_MEDIA_QUERY).matches;
+    return !isMobileViewport() && !isTouchOnlyDesktopViewport();
 }
 
 function isDesktopResizableShell(shellKey) {
@@ -1112,7 +1144,7 @@ function getDesktopShellDimensions(shellKey = '') {
     const viewportHeight = window.innerHeight;
     const maxShellWidth = shellKey === 'right' ? Math.min(SB_DESKTOP_SHELL_LAYOUT.maxWidth, 760) : SB_DESKTOP_SHELL_LAYOUT.maxWidth;
 
-    if (isMobileViewport() || viewportHeight <= SB_DESKTOP_SHELL_LAYOUT.fullWidthMaxHeight) {
+    if (isMobileViewport() || (viewportHeight <= SB_DESKTOP_SHELL_LAYOUT.fullWidthMaxHeight && shellKey !== 'characters')) {
         return {
             width: viewportWidth,
             maxWidth: viewportWidth,
@@ -1280,6 +1312,8 @@ function syncDesktopShellSizing() {
         applyDesktopShellSize(root, sizeToApply);
         root.classList.toggle('sb-shell-can-resize', resizingEnabled);
     }
+
+    syncCharacterDrawerLockPosition();
 }
 
 function getResizableShellRoot(shellKey) {
@@ -1290,8 +1324,28 @@ function getResizableShellRoot(shellKey) {
     return document.getElementById(getShellConfig(shellKey).rootPanelId);
 }
 
+function isPrimaryShellResizeStart(event) {
+    if (event && 'isPrimary' in event && event.isPrimary === false) {
+        return false;
+    }
+
+    return event?.button === undefined || event.button === 0 || event.pointerType === 'touch';
+}
+
+function bindShellResizeHandle(handle, shellKey) {
+    stopProxyPointerPropagation(handle);
+    handle.addEventListener('pointerdown', event => beginShellResize(shellKey, event));
+    handle.addEventListener('mousedown', event => {
+        if (event.defaultPrevented || sbState.shellSizing.activeResize) {
+            return;
+        }
+
+        beginShellResize(shellKey, event);
+    });
+}
+
 function beginShellResize(shellKey, event) {
-    if (!canResizeDesktopShells() || !isDesktopResizableShell(shellKey) || event.button !== 0) {
+    if (!canResizeDesktopShells() || !isDesktopResizableShell(shellKey) || !isPrimaryShellResizeStart(event)) {
         return;
     }
 
@@ -1322,34 +1376,42 @@ function beginShellResize(shellKey, event) {
     root.classList.add('sb-shell-resize-active');
     setShellSizeOverride(shellKey, startSize, { persist: false });
 
+    const pointerId = typeof event.pointerId === 'number' ? event.pointerId : null;
+    const moveEventName = pointerId === null ? 'mousemove' : 'pointermove';
+    const upEventName = pointerId === null ? 'mouseup' : 'pointerup';
+    const cancelEventName = pointerId === null ? 'mouseleave' : 'pointercancel';
+
     const cleanup = () => {
-        if (handle && typeof handle.releasePointerCapture === 'function') {
+        if (pointerId !== null && handle && typeof handle.releasePointerCapture === 'function') {
             try {
-                handle.releasePointerCapture(event.pointerId);
+                handle.releasePointerCapture(pointerId);
             } catch {
                 // Ignore pointer capture cleanup failures.
             }
         }
 
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointerup', onPointerUp);
-        window.removeEventListener('pointercancel', onPointerUp);
+        window.removeEventListener(moveEventName, onPointerMove);
+        window.removeEventListener(upEventName, onPointerUp);
+        window.removeEventListener(cancelEventName, onPointerUp);
         document.body.classList.remove('sb-shell-resizing');
         root.classList.remove('sb-shell-resize-active');
 
-        if (sbState.shellSizing.activeResize?.pointerId === event.pointerId) {
+        if (sbState.shellSizing.activeResize?.pointerId === pointerId) {
             sbState.shellSizing.activeResize = null;
         }
     };
 
     const onPointerMove = moveEvent => {
-        if (moveEvent.pointerId !== event.pointerId) {
+        if (pointerId !== null && moveEvent.pointerId !== pointerId) {
             return;
         }
 
         moveEvent.preventDefault();
+        const widthDelta = shellKey === 'characters' && sbState.characterDrawer.rightLocked
+            ? event.clientX - moveEvent.clientX
+            : moveEvent.clientX - event.clientX;
         const nextSize = clampShellSize({
-            width: startSize.width + (moveEvent.clientX - event.clientX),
+            width: startSize.width + widthDelta,
             height: startSize.height + (moveEvent.clientY - event.clientY),
         }, bounds);
 
@@ -1362,7 +1424,7 @@ function beginShellResize(shellKey, event) {
     };
 
     const onPointerUp = endEvent => {
-        if (endEvent.pointerId !== event.pointerId) {
+        if (pointerId !== null && endEvent.pointerId !== pointerId) {
             return;
         }
 
@@ -1374,21 +1436,21 @@ function beginShellResize(shellKey, event) {
 
     sbState.shellSizing.activeResize = {
         shellKey,
-        pointerId: event.pointerId,
+        pointerId,
         cleanup,
     };
 
-    if (handle && typeof handle.setPointerCapture === 'function') {
+    if (pointerId !== null && handle && typeof handle.setPointerCapture === 'function') {
         try {
-            handle.setPointerCapture(event.pointerId);
+            handle.setPointerCapture(pointerId);
         } catch {
             // Ignore pointer capture failures.
         }
     }
 
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener(moveEventName, onPointerMove);
+    window.addEventListener(upEventName, onPointerUp);
+    window.addEventListener(cancelEventName, onPointerUp);
 }
 
 function ensureShellReady(shellKey) {
@@ -4006,8 +4068,7 @@ function ensureCharacterResizeHandle() {
         },
     });
 
-    stopProxyPointerPropagation(handle);
-    handle.addEventListener('pointerdown', event => beginShellResize('characters', event));
+    bindShellResizeHandle(handle, 'characters');
     panel.appendChild(handle);
     return handle;
 }
@@ -7943,8 +8004,7 @@ function buildShell(shellKey) {
 
     closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
     closeButton.addEventListener('click', () => closeShell(shellKey));
-    stopProxyPointerPropagation(resizeHandle);
-    resizeHandle.addEventListener('pointerdown', event => beginShellResize(shellKey, event));
+    bindShellResizeHandle(resizeHandle, shellKey);
 
     header.append(closeButton, eyebrow, title, subtitle, shellDescription);
     main.append(header, panelBody);
