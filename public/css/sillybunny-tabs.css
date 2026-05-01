@@ -1286,7 +1286,7 @@ body:not(.movingUI) .drawer-content.maximized {
 
 :root[data-sb-character-drawer-lock="right"] #right-nav-panel.openDrawer {
     left: auto !important;
-    right: clamp(14px, 2vw, 28px) !important;
+    right: 0 !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
     transform-origin: right center;
