@@ -193,46 +193,6 @@ if (cliArgs.listen) {
 
 app.use(setUserDataMiddleware);
 
-const FRONTEND_NETWORK_FIRST_ASSETS = new Set([
-    '/',
-    '/index.html',
-    '/script.js',
-    '/sw.js',
-    '/manifest.json',
-    '/style.css',
-    '/css/mobile-styles.css',
-    '/css/sillybunny-tabs.css',
-    '/css/sillybunny-theme.css',
-    '/css/toggle-dependent.css',
-]);
-
-function isFrontendNetworkFirstAsset(pathname) {
-    return FRONTEND_NETWORK_FIRST_ASSETS.has(pathname)
-        || (pathname.startsWith('/scripts/') && (pathname.endsWith('.js') || pathname.endsWith('.mjs')))
-        || (pathname.startsWith('/css/') && pathname.endsWith('.css'));
-}
-
-function applyFrontendAssetResponseHeaders(res, pathname) {
-    if (isFrontendNetworkFirstAsset(pathname)) {
-        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-    }
-}
-
-function applyFrontendAssetCacheHeaders(req, res, next) {
-    if (req.method === 'GET') {
-        applyFrontendAssetResponseHeaders(res, req.path);
-    }
-
-    next();
-}
-
-function setPublicStaticHeaders(res, filePath) {
-    const relativePath = `/${path.relative(path.join(serverDirectory, 'public'), filePath).replaceAll(path.sep, '/')}`;
-    applyFrontendAssetResponseHeaders(res, relativePath);
-}
-
-app.use(applyFrontendAssetCacheHeaders);
-
 // CSRF Protection //
 function applyCsrfTokenHeaders(res) {
     res.set({
@@ -299,12 +259,7 @@ app.get('/', cacheBuster.middleware, (request, response) => {
         return response.redirect(redirectUrl);
     }
 
-    return response.sendFile('index.html', {
-        root: path.join(serverDirectory, 'public'),
-        headers: {
-            'Cache-Control': 'no-cache, must-revalidate',
-        },
-    });
+    return response.sendFile('index.html', { root: path.join(serverDirectory, 'public') });
 });
 
 // Callback endpoint for OAuth PKCE flows (e.g. OpenRouter)
@@ -324,9 +279,7 @@ app.get('/login', loginPageMiddleware);
 // Host frontend assets
 const webpackMiddleware = getWebpackServeMiddleware();
 app.use(webpackMiddleware);
-app.use(express.static(path.join(serverDirectory, 'public'), {
-    setHeaders: setPublicStaticHeaders,
-}));
+app.use(express.static(path.join(serverDirectory, 'public'), {}));
 
 // Public API
 app.use('/api/users', usersPublicRouter);

@@ -1,17 +1,16 @@
-const SB_SW_CACHE_VERSION = 'sillybunny-cache-v20260501d';
+const SB_SW_CACHE_VERSION = 'sillybunny-cache-v20260501e';
 const SB_STATIC_CACHE = `${SB_SW_CACHE_VERSION}-static`;
 const SB_SHELL_CACHE = `${SB_SW_CACHE_VERSION}-shell`;
-const SB_SKIP_WAITING_MESSAGE = 'SILLYBUNNY_SKIP_WAITING';
 
 const SB_STALE_WHILE_REVALIDATE_PREFIXES = Object.freeze([
     '/lib/',
+    '/css/',
     '/img/',
     '/webfonts/',
 ]);
 
 const SB_NETWORK_FIRST_EXTENSIONS = Object.freeze([
     '.html',
-    '.css',
     '.js',
     '.mjs',
 ]);
@@ -66,8 +65,7 @@ async function networkFirst(request) {
     const cache = await caches.open(SB_SHELL_CACHE);
 
     try {
-        const freshRequest = new Request(request, { cache: 'reload' });
-        const response = await fetch(freshRequest);
+        const response = await fetch(request);
         await putCache(cache, request, response).catch((error) => {
             console.debug('SillyBunny service worker skipped shell cache update.', error);
         });
@@ -85,12 +83,6 @@ async function networkFirst(request) {
 
 self.addEventListener('install', () => {
     self.skipWaiting();
-});
-
-self.addEventListener('message', (event) => {
-    if (event.data?.type === SB_SKIP_WAITING_MESSAGE) {
-        self.skipWaiting();
-    }
 });
 
 self.addEventListener('activate', (event) => {

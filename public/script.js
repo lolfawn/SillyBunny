@@ -439,12 +439,6 @@ export let firstRun = false;
 export let settingsReady = false;
 let currentVersion = '0.0.0';
 const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.5.2';
-const SILLYBUNNY_FRONTEND_ASSET_REVISION = '20260501d';
-const SILLYBUNNY_FRONTEND_ASSET_REVISION_KEY = 'sillybunny-frontend-asset-revision';
-const SILLYBUNNY_FRONTEND_AUTO_CLEAR_TOKEN_KEY = 'sillybunny-frontend-auto-clear-token';
-const SILLYBUNNY_SERVICE_WORKER_RELOAD_KEY = 'sillybunny-service-worker-reload';
-const SILLYBUNNY_SERVICE_WORKER_SKIP_WAITING_MESSAGE = 'SILLYBUNNY_SKIP_WAITING';
-let isReloadingForServiceWorkerUpdate = false;
 
 export let displayVersion = SILLYBUNNY_UI_VERSION;
 
@@ -734,46 +728,10 @@ function registerSillyBunnyServiceWorker() {
         return;
     }
 
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (isReloadingForServiceWorkerUpdate) {
-            return;
-        }
-
-        const pendingReload = sessionStorage.getItem(SILLYBUNNY_SERVICE_WORKER_RELOAD_KEY);
-        if (!pendingReload) {
-            return;
-        }
-
-        isReloadingForServiceWorkerUpdate = true;
-        sessionStorage.removeItem(SILLYBUNNY_SERVICE_WORKER_RELOAD_KEY);
-        reloadFrontendFromNetwork();
-    });
-
-    const activateWaitingServiceWorker = (worker) => {
-        if (!worker) {
-            return;
-        }
-
-        sessionStorage.setItem(SILLYBUNNY_SERVICE_WORKER_RELOAD_KEY, '1');
-        worker.postMessage({ type: SILLYBUNNY_SERVICE_WORKER_SKIP_WAITING_MESSAGE });
-    };
-
-    const register = async () => {
-        try {
-            const registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
-            activateWaitingServiceWorker(registration.waiting);
-            registration.addEventListener('updatefound', () => {
-                const nextWorker = registration.installing;
-                nextWorker?.addEventListener('statechange', () => {
-                    if (nextWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        activateWaitingServiceWorker(nextWorker);
-                    }
-                });
-            });
-            await registration.update();
-        } catch (error) {
+    const register = () => {
+        navigator.serviceWorker.register('/sw.js').catch((error) => {
             console.warn('Failed to register SillyBunny service worker.', error);
-        }
+        });
     };
 
     if (document.readyState === 'complete') {
@@ -8645,13 +8603,12 @@ export async function getSettings(initLoaderHandle = null) {
         // power_user.experimental_macro_engine
         initMacros();
 
-        const isVersionChanged = settings.currentVersion !== currentVersion;
-        if (await maybeAutoClearCacheOnVersionChange(isVersionChanged)) {
-            return;
-        }
-
         if (data.enable_extensions) {
             const enableAutoUpdate = Boolean(data.enable_extensions_auto_update);
+            const isVersionChanged = settings.currentVersion !== currentVersion;
+            if (await maybeAutoClearCacheOnVersionChange(isVersionChanged)) {
+                return;
+            }
             await loadExtensionSettings(settings, isVersionChanged, enableAutoUpdate);
             await eventSource.emit(event_types.EXTENSION_SETTINGS_LOADED);
             applyPowerUserSettings();
@@ -8779,21 +8736,6 @@ export async function clearFrontendCache({ skipConfirmation = false, saveBeforeC
         }
     }
 
-    if ('serviceWorker' in navigator) {
-        try {
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(registrations.map(async (registration) => {
-                await registration.update().catch((error) => {
-                    console.debug('Failed to update service worker before unregistering.', error);
-                });
-                await registration.unregister();
-            }));
-        } catch (error) {
-            console.error('Failed to reset service worker registrations', error);
-            cacheErrors.push(error);
-        }
-    }
-
     const droppedStores = await Promise.allSettled(
         FRONTEND_CACHE_INSTANCE_NAMES.map(cacheName => localforage.dropInstance({ name: cacheName })),
     );
@@ -8823,13 +8765,6 @@ export async function clearFrontendCache({ skipConfirmation = false, saveBeforeC
 
 if (typeof window !== 'undefined') {
     window.SillyBunnyClearFrontendCache = clearFrontendCache;
-    window.SillyBunnyFrontendAssetRevision = SILLYBUNNY_FRONTEND_ASSET_REVISION;
-}
-
-function reloadFrontendFromNetwork() {
-    const url = new URL(window.location.href);
-    url.searchParams.set('sb-cache-bust', `${SILLYBUNNY_FRONTEND_ASSET_REVISION}-${Date.now()}`);
-    window.location.replace(url.toString());
 }
 
 async function clearAllCacheAndReload() {
@@ -8840,24 +8775,19 @@ async function clearAllCacheAndReload() {
     }
 
     toastr.success(t`Cache cleared. Reloading SillyBunny...`, t`Cache cleared`);
-    window.setTimeout(reloadFrontendFromNetwork, 450);
+    window.setTimeout(() => window.location.reload(), 450);
     return true;
 }
 
 async function maybeAutoClearCacheOnVersionChange(isVersionChanged) {
-    const storedFrontendRevision = localStorage.getItem(SILLYBUNNY_FRONTEND_ASSET_REVISION_KEY);
-    const isFrontendRevisionChanged = storedFrontendRevision !== SILLYBUNNY_FRONTEND_ASSET_REVISION;
-
-    if (!isVersionChanged && !isFrontendRevisionChanged) {
-        localStorage.removeItem(SILLYBUNNY_FRONTEND_AUTO_CLEAR_TOKEN_KEY);
+    if (!isVersionChanged || !power_user.auto_clear_cache_on_update) {
         return false;
     }
 
-    const autoClearToken = `${currentVersion}:${SILLYBUNNY_FRONTEND_ASSET_REVISION}`;
-    const alreadyAttemptedAutoClear = localStorage.getItem(SILLYBUNNY_FRONTEND_AUTO_CLEAR_TOKEN_KEY) === autoClearToken;
-
-    if (!power_user.auto_clear_cache_on_update || alreadyAttemptedAutoClear) {
-        localStorage.setItem(SILLYBUNNY_FRONTEND_ASSET_REVISION_KEY, SILLYBUNNY_FRONTEND_ASSET_REVISION);
+    // Prevent cache clear loop on fresh instances by checking if settings exist
+    const hasExistingSettings = localStorage.getItem('settings') !== null;
+    if (!hasExistingSettings) {
+        console.log('[Cache] Skipping auto-clear on fresh instance');
         return false;
     }
 
@@ -8870,11 +8800,8 @@ async function maybeAutoClearCacheOnVersionChange(isVersionChanged) {
         return false;
     }
 
-    localStorage.setItem(SILLYBUNNY_FRONTEND_AUTO_CLEAR_TOKEN_KEY, autoClearToken);
-    localStorage.setItem(SILLYBUNNY_FRONTEND_ASSET_REVISION_KEY, SILLYBUNNY_FRONTEND_ASSET_REVISION);
-
     toastr.info(t`SillyBunny updated. Clearing cached UI data and reloading...`, t`Update detected`);
-    window.setTimeout(reloadFrontendFromNetwork, 450);
+    window.setTimeout(() => window.location.reload(true), 450);
     return true;
 }
 

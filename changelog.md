@@ -29,9 +29,6 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Streaming messages now patch rich formatted DOM in place and reduce repeated swipe metadata cloning, easing WebKit pressure during long generations without flattening the live UI.
 - Streaming messages now restore direct live formatted DOM updates when stream fade-in is disabled, so mobile WebKit shows colors and other formatting while text is still arriving instead of waiting until generation ends.
 - Agent output history popups now use a scrollable desktop layout so long diffs no longer push Undo and Redo controls below the viewport.
-- Frontend updates now use a SillyBunny asset revision separate from the package version, reset stale service workers during cache clears, and reload through a cache-busted URL so iOS Safari picks up committed UI fixes after updates.
-- The service worker now fetches app-owned CSS through the same network-first path as HTML and JavaScript, while static libraries, images, and fonts remain available from the faster revalidation cache.
-- App shell CSS, JavaScript, manifest, and service worker files now send revalidation-friendly cache headers so WebKit browsers have fewer chances to reuse old frontend files after a pull or restart.
 
 ### Group Chats
 - Opening the Characters drawer during a group chat now jumps to the active group edit panel instead of the main character list.
@@ -48,6 +45,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Background Visibility can now be raised to 100% without changing existing saved values.
 - Background Visibility now refreshes its range metadata when the Customize panel updates, so upgraded sessions keep the full 100% slider range.
 - The frontend service worker cache now rotates for 1.5.2 so iOS Safari stops reusing 1.5.1 assets with the old 55% Background Visibility cap.
+- Replaced the over-aggressive iOS cache refresh with a safer app-shell asset query bump and service-worker cache rotation, avoiding forced reload loops that could leave the landing page unclickable.
 - Characters drawer now includes an in-drawer alignment button that can lock the desktop panel flush to the right side while preserving the centered default and mobile safe-area sheet layout.
 - Mobile Characters drawer header, toolbar, sort/search row, list cards, and right-lock edge alignment now stay symmetrical on narrow viewports without cramped character metadata or a right-side gap.
 - macOS desktop browsers now apply the Characters drawer right-lock immediately, keep the locked drawer edge-flush on shorter windows, and retain drag/resize interaction when WebKit reports pointer capabilities inconsistently.
@@ -73,7 +71,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `feat(ui): add character drawer right lock`
 - `fix(mobile): restore live streaming and drawer layout`
 - `fix(ui): repair macOS character drawer lock`
-- `fix(cache): force fresh iOS frontend assets`
+- `fix(cache): use safe app shell cache bump`
 
 ## v1.5.1
 
