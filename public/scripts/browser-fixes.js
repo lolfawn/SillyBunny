@@ -107,8 +107,11 @@ function applyBrowserFixes() {
 
     if (isMobile()) {
         const viewport = window.visualViewport;
+        const isIOSWebKit = /iPad|iPhone|iPod/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         let viewportFixScheduled = false;
         let lastViewportHeight = Math.round(viewport?.height || window.innerHeight || 0);
+        let lastSendInteractionAt = 0;
+        let lastSendFocusedAt = 0;
 
         const updateViewportBaseline = () => {
             lastViewportHeight = Math.round(viewport?.height || window.innerHeight || 0);
@@ -121,6 +124,11 @@ function applyBrowserFixes() {
             // editing text. That can break replacement/correction targets and
             // make accepted suggestions append at the end of the field instead.
             if (!force && isEditableFocusTarget(document.activeElement)) {
+                return;
+            }
+
+            if (!force && isIOSWebKit && (Date.now() - lastSendInteractionAt < 500 || Date.now() - lastSendFocusedAt < 500)) {
+                updateViewportBaseline();
                 return;
             }
 
@@ -154,6 +162,20 @@ function applyBrowserFixes() {
 
         viewport?.addEventListener('resize', fixFunkyPositioning, { passive: true });
         window.addEventListener('resize', fixFunkyPositioning, { passive: true });
+        document.addEventListener('pointerdown', (event) => {
+            if (event.target instanceof HTMLElement && event.target.closest('#send_but')) {
+                lastSendInteractionAt = Date.now();
+                updateViewportBaseline();
+            }
+        }, { passive: true, capture: true });
+        const handleFocusIn = (event) => {
+            updateViewportBaseline();
+            if (event.target instanceof HTMLElement && event.target.closest('#send_textarea')) {
+                lastSendFocusedAt = Date.now();
+            }
+        };
+
+        document.addEventListener('focusin', handleFocusIn, true);
         window.addEventListener('orientationchange', () => {
             updateViewportBaseline();
             applyPositionFix({ force: true });
@@ -163,7 +185,6 @@ function applyBrowserFixes() {
                 updateViewportBaseline();
             }
         });
-        document.addEventListener('focusin', updateViewportBaseline, true);
         document.addEventListener('focusout', () => requestAnimationFrame(updateViewportBaseline), true);
     }
 

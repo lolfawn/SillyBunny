@@ -969,6 +969,8 @@ body .panelControlBar {
     border-radius: var(--avatar-roundness, 8px);
     font-weight: 600;
     text-shadow: none !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #mes_continue {
@@ -2996,6 +2998,8 @@ input[type="file"] {
 
 .bulk_select_checkbox {
     align-self: center;
+    justify-self: center;
+    margin: 0;
 }
 
 #rm_print_characters_block .text_block {
@@ -3054,6 +3058,8 @@ input[type="file"] {
 
 #rm_button_bar .menu_button {
     width: calc(var(--mainFontSize) * 1.7);
+    min-width: calc(var(--mainFontSize) * 1.7);
+    min-height: calc(var(--mainFontSize) * 1.7);
     aspect-ratio: 1;
     margin: 0;
 }

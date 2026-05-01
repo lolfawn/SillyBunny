@@ -14,14 +14,18 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 ### Pathfinder
 - Pathfinder now includes active chat-bound, character, character extra, and persona lorebooks alongside manually selected lorebooks by default.
 - Added diagnostics that report manual and contextual lorebook counts so missing Pathfinder sources are easier to spot.
+- Pathfinder diagnostics now validate the enabled runtime tool set against registered ToolManager tools, preventing false warnings when the active enabled tools are already registered.
 - Normalized candidate entry matching and added warnings when a model returns candidate JSON that does not match any loaded lorebook entry names.
 - Added unit coverage for contextual Pathfinder lorebook merging and deduplication.
 
 ### Chat UI And Mobile Performance
 - Fixed group speaker controls overflowing to the right when a typing indicator appears by allowing the desktop control row to wrap cleanly.
+- Characters drawer controls now fit narrow mobile viewports with safe-area gutters, 44 px touch targets, aligned bulk-select checkboxes, and a two-column grid view that avoids cramped text.
 - Added lazy/async loading hints for chat avatars and attached message images.
 - Added mobile content-visibility containment for off-screen chat messages to reduce WebKit layout and memory pressure during longer chats.
 - Chat rendering now uses smaller mobile batches and older-history loads ignore duplicate touch/mouse activations, reducing iOS Safari crashes and accidental auto-loading during longer chats.
+- Mobile message block updates now batch through a short timer plus animation frame, reducing DOM churn from regex/HTML post-processing while keeping generation updates immediate.
+- New message media scrolling now watches only visible media in the latest message and caps the wait at 300 ms, making long chats feel less sticky on mobile.
 - Streaming messages now patch rich formatted DOM in place and reduce repeated swipe metadata cloning, easing WebKit pressure during long generations without flattening the live UI.
 - Agent output history popups now use a scrollable desktop layout so long diffs no longer push Undo and Redo controls below the viewport.
 
@@ -40,6 +44,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Background Visibility can now be raised to 100% without changing existing saved values.
 - Background Visibility now refreshes its range metadata when the Customize panel updates, so upgraded sessions keep the full 100% slider range.
 - The frontend service worker cache now rotates for 1.5.2 so iOS Safari stops reusing 1.5.1 assets with the old 55% Background Visibility cap.
+- iOS send/regenerate/continue taps no longer force textarea refocus or trigger the mobile viewport workaround during the tap window, reducing delayed sends in Safari.
 - Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 - Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
 
@@ -57,6 +62,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(cache): refresh 1.5.2 frontend assets`
 - `fix(agents): make output history scrollable`
 - `fix(chat): reduce streaming DOM churn`
+- `fix(mobile): improve drawer and chat responsiveness`
 
 ## v1.5.1
 

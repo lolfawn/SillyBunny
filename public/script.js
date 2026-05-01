@@ -469,10 +469,16 @@ const messageTemplate = $('#message_template .mes');
 export const chatElement = $('#chat');
 const MOBILE_CHAT_RENDER_MEDIA_QUERY = '(max-width: 1000px)';
 const MOBILE_CHAT_RENDER_BATCH_SIZE = 8;
+const MOBILE_MESSAGE_UPDATE_DELAY_MS = 24;
+const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 const STREAMING_FIRST_SWIPE_SYNC_INTERVAL_MS = 1000;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
+let pendingMobileMessageUpdateFrame = 0;
+let pendingMobileMessageUpdateTimer = 0;
+/** @type {Map<number, { message: object, rerenderMessage: boolean }>} */
+const pendingMobileMessageUpdates = new Map();
 
 let dialogueResolve = null;
 let dialogueCloseStop = false;
@@ -1512,6 +1518,10 @@ function shouldBatchMobileChatRendering() {
     return Boolean(isNarrowViewport || isMobile());
 }
 
+function shouldDeferMobileMessageUpdates() {
+    return Boolean(shouldBatchMobileChatRendering() && !is_send_press);
+}
+
 function getMobileChatRenderBatchSize(messageCount) {
     if (!shouldBatchMobileChatRendering()) {
         return messageCount;
@@ -1522,6 +1532,33 @@ function getMobileChatRenderBatchSize(messageCount) {
 
 function waitForNextFrame() {
     return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+function flushPendingMobileMessageUpdates() {
+    pendingMobileMessageUpdateFrame = 0;
+    pendingMobileMessageUpdateTimer = 0;
+    const updates = [...pendingMobileMessageUpdates.entries()];
+    pendingMobileMessageUpdates.clear();
+
+    for (const [messageId, { message, rerenderMessage }] of updates) {
+        applyMessageBlockUpdate(messageId, message, { rerenderMessage });
+    }
+}
+
+function queueMobileMessageBlockUpdate(messageId, message, { rerenderMessage }) {
+    pendingMobileMessageUpdates.set(messageId, {
+        message,
+        rerenderMessage: pendingMobileMessageUpdates.get(messageId)?.rerenderMessage || rerenderMessage,
+    });
+
+    if (pendingMobileMessageUpdateFrame || pendingMobileMessageUpdateTimer) {
+        return;
+    }
+
+    pendingMobileMessageUpdateTimer = window.setTimeout(() => {
+        pendingMobileMessageUpdateTimer = 0;
+        pendingMobileMessageUpdateFrame = requestAnimationFrame(flushPendingMobileMessageUpdates);
+    }, MOBILE_MESSAGE_UPDATE_DELAY_MS);
 }
 
 function insertShowMoreFragment(referenceNode, fragment) {
@@ -1679,31 +1716,35 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
 
 export function scrollOnMediaLoad() {
     const started = Date.now();
-    const media = chatElement.find('.mes_block img, .mes_block video, .mes_block audio').toArray();
+    const media = chatElement.find('.last_mes .mes_block img, .last_mes .mes_block video, .last_mes .mes_block audio').toArray()
+        .filter(element => element instanceof HTMLElement && (isElementInViewport(element) || isElementInViewport(element.closest('.last_mes'))));
     let mediaLoaded = 0;
+
+    if (media.length === 0) {
+        return;
+    }
 
     for (const currentElement of media) {
         if (currentElement instanceof HTMLImageElement) {
             if (currentElement.complete) {
                 incrementAndCheck();
             } else {
-                currentElement.addEventListener('load', incrementAndCheck);
-                currentElement.addEventListener('error', incrementAndCheck);
+                currentElement.addEventListener('load', incrementAndCheck, { once: true });
+                currentElement.addEventListener('error', incrementAndCheck, { once: true });
             }
         }
         if (currentElement instanceof HTMLMediaElement) {
             if (currentElement.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
                 incrementAndCheck();
             } else {
-                currentElement.addEventListener('loadeddata', incrementAndCheck);
-                currentElement.addEventListener('error', incrementAndCheck);
+                currentElement.addEventListener('loadeddata', incrementAndCheck, { once: true });
+                currentElement.addEventListener('error', incrementAndCheck, { once: true });
             }
         }
     }
 
     function incrementAndCheck() {
-        const MAX_DELAY = 1000; // 1 second
-        if ((Date.now() - started) > MAX_DELAY) {
+        if ((Date.now() - started) > MOBILE_MEDIA_SCROLL_MAX_DELAY_MS) {
             return;
         }
         mediaLoaded++;
@@ -2186,15 +2227,12 @@ export function refreshMessageModelIcons() {
     });
 }
 
-/**
- * Re-renders a message block with updated content.
- * @param {number} messageId Message ID
- * @param {object} message Message object
- * @param {object} [options={}] Optional arguments
- * @param {boolean} [options.rerenderMessage=true] Whether to re-render the message content (inside <c>.mes_text</c>)
- */
-export function updateMessageBlock(messageId, message, { rerenderMessage = true } = {}) {
+function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } = {}) {
     const messageElement = chatElement.find(`[mesid="${messageId}"]`);
+    if (messageElement.length === 0) {
+        return;
+    }
+
     if (rerenderMessage) {
         const text = message?.extra?.display_text ?? message.mes;
         messageElement.find('.mes_text').html(messageFormatting(text, message.name, message.is_system, message.is_user, messageId, {}, false));
@@ -2205,6 +2243,22 @@ export function updateMessageBlock(messageId, message, { rerenderMessage = true 
 
     addCopyToCodeBlocks(messageElement);
     appendMediaToMessage(message, messageElement);
+}
+
+/**
+ * Re-renders a message block with updated content.
+ * @param {number} messageId Message ID
+ * @param {object} message Message object
+ * @param {object} [options={}] Optional arguments
+ * @param {boolean} [options.rerenderMessage=true] Whether to re-render the message content (inside <c>.mes_text</c>)
+ */
+export function updateMessageBlock(messageId, message, { rerenderMessage = true } = {}) {
+    if (shouldDeferMobileMessageUpdates()) {
+        queueMobileMessageBlockUpdate(messageId, message, { rerenderMessage });
+        return;
+    }
+
+    applyMessageBlockUpdate(messageId, message, { rerenderMessage });
 }
 
 /**
@@ -12974,12 +13028,13 @@ jQuery(async function () {
     $(document).on('click', '.api_loading', () => cancelStatusCheck('Canceled because connecting was manually canceled'));
 
     //////////INPUT BAR FOCUS-KEEPING LOGIC/////////////
+    const isIOSFocusSensitiveBrowser = /iPad|iPhone|iPod/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     let S_TAPreviouslyFocused = false;
     $('#send_textarea').on('focusin focus click', () => {
         S_TAPreviouslyFocused = true;
     });
     $('#send_but, #option_regenerate, #option_continue, #mes_continue, #mes_impersonate').on('click', () => {
-        if (S_TAPreviouslyFocused) {
+        if (S_TAPreviouslyFocused && !isIOSFocusSensitiveBrowser) {
             $('#send_textarea').trigger('focus');
         }
     });

@@ -1213,8 +1213,13 @@ function syncDesktopShellSizing() {
         const bounds = getDesktopShellResizeBounds(shellKey);
 
         if (isMobileViewport()) {
-            root.style.setProperty('width', `${width}px`, 'important');
-            root.style.setProperty('max-width', `${maxWidth}px`, 'important');
+            if (shellKey === 'characters') {
+                root.style.removeProperty('width');
+                root.style.removeProperty('max-width');
+            } else {
+                root.style.setProperty('width', `${width}px`, 'important');
+                root.style.setProperty('max-width', `${maxWidth}px`, 'important');
+            }
             root.style.removeProperty('height');
             root.style.removeProperty('max-height');
             root.classList.remove('sb-shell-can-resize');

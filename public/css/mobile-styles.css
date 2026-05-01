@@ -50,6 +50,200 @@
         align-items: center;
     }
 
+    #right-nav-panel.openDrawer,
+    #right-nav-panel.sb-shell-root.fillRight.openDrawer {
+        min-width: 0 !important;
+        width: auto !important;
+        max-width: none !important;
+        left: max(8px, env(safe-area-inset-left, 0px)) !important;
+        right: max(8px, env(safe-area-inset-right, 0px)) !important;
+        box-sizing: border-box;
+    }
+
+    #right-nav-panel.openDrawer > .scrollableInner,
+    #right-nav-panel.openDrawer > .scrollableInnerFull,
+    #right-nav-panel.openDrawer .sb-shell-panel-scroller {
+        min-width: 0;
+        overflow-x: hidden;
+    }
+
+    #rm_characters_block {
+        min-width: 0;
+    }
+
+    #charListFixedTop {
+        padding: 0 0 8px;
+    }
+
+    #rm_button_bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    #rm_buttons_container {
+        display: contents;
+    }
+
+    #rm_button_bar .menu_button,
+    #rm_button_bar .right_menu_button {
+        width: 44px;
+        min-width: 44px;
+        max-width: 44px;
+        height: 44px;
+        min-height: 44px;
+        max-height: 44px;
+        flex: 0 0 44px;
+        padding: 0 !important;
+        justify-self: center;
+    }
+
+    #character_sort_order {
+        flex: 1 1 calc(100% - 50px);
+        min-width: 0;
+        width: 100%;
+        height: 44px;
+        margin: 0;
+        justify-self: stretch;
+    }
+
+    #rm_button_search {
+        flex: 0 0 44px;
+    }
+
+    #form_character_search_form {
+        margin-top: 8px;
+    }
+
+    #character_search_bar {
+        min-height: 44px;
+        font-size: max(16px, var(--mainFontSize));
+    }
+
+    #rm_print_characters_pagination {
+        gap: 8px;
+        padding: 6px 0;
+    }
+
+    #rm_print_characters_pagination .menu_button,
+    #rm_print_characters_pagination .paginationjs-pages ul li a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        min-width: 44px;
+        height: 44px;
+        min-height: 44px;
+        padding: 0 !important;
+        box-sizing: border-box;
+    }
+
+    #rm_print_characters_pagination .paginationjs {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    #rm_print_characters_pagination .paginationjs-pages ul {
+        gap: 6px;
+        margin: 0;
+    }
+
+    #rm_print_characters_pagination .paginationjs-size-changer select {
+        min-height: 44px;
+        margin: 0;
+    }
+
+    #rm_print_characters_pagination .paginationjs-nav {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding-inline: 6px;
+        text-align: center;
+    }
+
+    #rm_print_characters_block {
+        gap: 6px;
+        padding-inline: 0;
+        min-width: 0;
+    }
+
+    #rm_print_characters_block .character_select,
+    #rm_print_characters_block .group_select,
+    #rm_print_characters_block .bogus_folder_select {
+        min-height: 58px;
+        border-radius: 14px;
+        box-sizing: border-box;
+    }
+
+    #rm_print_characters_block.bulk_select > .character_select {
+        display: grid;
+        grid-template-columns: minmax(var(--sb-checkbox-size, 1rem), auto) var(--avatar-base-width) minmax(0, 1fr) !important;
+        gap: 8px;
+    }
+
+    #rm_print_characters_block.bulk_select > .character_select > .bulk_select_checkbox {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        align-self: center;
+        justify-self: center;
+        margin: 0;
+    }
+
+    #rm_print_characters_block.bulk_select > .character_select > .avatar {
+        grid-column: 2;
+    }
+
+    #rm_print_characters_block.bulk_select > .character_select > .character_select_container {
+        grid-column: 3;
+        min-width: 0;
+    }
+
+    body.charListGrid #rm_print_characters_block {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        justify-content: stretch;
+        align-content: flex-start;
+        gap: 8px;
+    }
+
+    body.charListGrid #rm_print_characters_block .bogus_folder_select,
+    body.charListGrid #rm_print_characters_block .character_select,
+    body.charListGrid #rm_print_characters_block .group_select,
+    #user_avatar_block.gridView .avatar-container {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        min-height: 112px;
+        align-items: center !important;
+        justify-content: flex-start;
+        padding: 10px 8px;
+    }
+
+    body.charListGrid #rm_print_characters_block .bogus_folder_select .ch_name,
+    body.charListGrid #rm_print_characters_block .bogus_folder_select .bogus_folder_counter,
+    body.charListGrid #rm_print_characters_block .character_select .ch_name,
+    body.charListGrid #rm_print_characters_block .group_select .ch_name,
+    body.charListGrid #rm_print_characters_block .group_select .group_select_counter,
+    #user_avatar_block.gridView .avatar-container .ch_name,
+    #user_avatar_block.gridView .avatar-container .bogus_folder_counter,
+    #user_avatar_block.gridView .avatar-container .group_select_counter,
+    #user_avatar_block.gridView .avatar-container .ch_additional_info {
+        max-width: 100%;
+    }
+
+    body.charListGrid #rm_print_characters_block .bogus_folder_select .character_select_container,
+    body.charListGrid #rm_print_characters_block .character_select .character_select_container,
+    body.charListGrid #rm_print_characters_block .group_select .group_select_container,
+    #user_avatar_block.gridView .avatar-container .character_select_container,
+    #user_avatar_block.gridView .avatar-container .group_select_container {
+        max-width: 100%;
+    }
+
     #send_form.compact #leftSendForm,
     #send_form.compact #rightSendForm {
         flex-wrap: nowrap;
@@ -1464,4 +1658,17 @@
         background: color-mix(in srgb, var(--SmartThemeBodyColor) 8%, transparent) !important;
     }
 
+}
+
+@media screen and (max-width: 1000px) {
+    #right-nav-panel.openDrawer,
+    #right-nav-panel.sb-shell-root.fillRight.openDrawer {
+        left: max(8px, env(safe-area-inset-left, 0px)) !important;
+        right: max(8px, env(safe-area-inset-right, 0px)) !important;
+        width: auto !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        margin-inline: 0 !important;
+        box-sizing: border-box;
+    }
 }
