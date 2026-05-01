@@ -53,6 +53,12 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 - Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
 
+### iOS WebKit Fixes
+- Streaming chat messages now use direct live HTML updates even when stream fade-in is enabled, preventing raw tags from appearing during generation on iOS WebKit.
+- Characters drawer bulk-edit listeners now wait for the drawer DOM to settle before rebinding, avoiding stale touch targets after mobile drawer refreshes.
+- Characters drawer touch-end and touch-move handlers now use passive listeners where safe, improving iOS WebKit scroll and tap responsiveness while preserving long-press behavior.
+- Drawer and panel focus handling now uses a simpler iOS path without `preventScroll`, reducing Safari focus issues that could leave the landing page or drawer unresponsive.
+
 ### Local Commits
 - `46a191c fix(groups): open active group from character drawer`
 - `ff76c6a fix(groups): persist auto mode across chats`
@@ -72,6 +78,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(mobile): restore live streaming and drawer layout`
 - `fix(ui): repair macOS character drawer lock`
 - `fix(cache): use safe app shell cache bump`
+- `fix(mobile): stabilize iOS streaming and drawer`
 
 ## v1.5.1
 

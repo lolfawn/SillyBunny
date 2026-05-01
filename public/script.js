@@ -284,7 +284,6 @@ import { getSystemMessageByType, initSystemMessages, SAFETY_CHAT, sendSystemMess
 import { event_types, eventSource } from './scripts/events.js';
 import { initAccessibility } from './scripts/a11y.js';
 import { initQuickContextSizeEnhancer } from './scripts/quick-context-size-enhancer.js';
-import { applyStreamFadeIn } from './scripts/util/stream-fadein.js';
 import { getPositiveTokenCount, updateReasoningTokenAccounting } from './scripts/reasoning-token-accounting.js';
 import { initDomHandlers } from './scripts/dom-handlers.js';
 import { SimpleMutex } from './scripts/util/SimpleMutex.js';
@@ -4074,11 +4073,8 @@ class StreamingProcessor {
                 false,
             );
             if (this.messageTextDom instanceof HTMLElement) {
-                if (power_user.stream_fade_in) {
-                    applyStreamFadeIn(this.messageTextDom, formattedText);
-                } else {
-                    this.messageTextDom.innerHTML = formattedText;
-                }
+                // SillyBunny: direct streaming updates keep rich HTML rendering reliable on iOS WebKit.
+                this.messageTextDom.innerHTML = formattedText;
             }
 
             const timePassed = formatGenerationTimer(this.timeStarted, currentTime, currentTokenCount, this.reasoningHandler.getDuration(), this.timeToFirstToken);
@@ -10479,6 +10475,10 @@ export function selectRightMenuWithAnimation(selectedMenuId) {
     });
 }
 
+function isIOSWebKitPlatform() {
+    return /iPad|iPhone|iPod/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 function focusUiSurface(target) {
     if (!(target instanceof HTMLElement)) {
         return;
@@ -10491,6 +10491,11 @@ function focusUiSurface(target) {
 
     window.requestAnimationFrame(() => {
         if (document.body.contains(target)) {
+            if (isIOSWebKitPlatform()) {
+                target.focus();
+                return;
+            }
+
             target.focus({ preventScroll: true });
         }
     });
@@ -13015,7 +13020,7 @@ jQuery(async function () {
     $(document).on('click', '.api_loading', () => cancelStatusCheck('Canceled because connecting was manually canceled'));
 
     //////////INPUT BAR FOCUS-KEEPING LOGIC/////////////
-    const isIOSFocusSensitiveBrowser = /iPad|iPhone|iPod/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isIOSFocusSensitiveBrowser = isIOSWebKitPlatform();
     let S_TAPreviouslyFocused = false;
     $('#send_textarea').on('focusin focus click', () => {
         S_TAPreviouslyFocused = true;
