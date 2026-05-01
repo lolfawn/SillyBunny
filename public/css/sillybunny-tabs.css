@@ -771,6 +771,16 @@ body:not(.movingUI) .drawer-content.maximized {
     top: var(--sb-topbar-layout-offset) !important;
 }
 
+#CharListButtonAndHotSwaps {
+    align-items: center;
+    gap: 8px;
+}
+
+#HotSwapWrapper {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
 #movingDivs > .drawer-content {
     max-height: calc(100dvh - calc(var(--sb-topbar-layout-offset) + var(--bottomFormBlockSize))) !important;
 }
@@ -1274,6 +1284,14 @@ body:not(.movingUI) .drawer-content.maximized {
     transform-origin: center;
 }
 
+:root[data-sb-character-drawer-lock="right"] #right-nav-panel.openDrawer {
+    left: auto !important;
+    right: clamp(14px, 2vw, 28px) !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    transform-origin: right center;
+}
+
 .sb-shell-root.openDrawer .sb-shell-nav-wrapper {
     animation: sbShellContentReveal 280ms ease both;
 }
@@ -1606,8 +1624,30 @@ body.sb-shell-resizing * {
 
 .sb-character-close {
     display: none;
-    margin-left: auto;
     flex: 0 0 auto;
+}
+
+.sb-character-right-lock {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    margin-left: 8px;
+}
+
+.sb-character-close {
+    margin-left: 0;
+}
+
+.sb-character-right-lock + .sb-character-close {
+    margin-left: 0;
+}
+
+.sb-character-right-lock.is-active {
+    color: var(--color-primary, var(--sb-accent));
+    border-color: color-mix(in srgb, var(--color-primary, var(--sb-accent)) 34%, transparent);
+    background: color-mix(in srgb, var(--sb-button-hover) 92%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary, var(--sb-accent)) 18%, transparent);
 }
 
 #sb_character_editor_exit {
@@ -3626,6 +3666,14 @@ body.sb-shell-resizing * {
         right: 0 !important;
         border-radius: 0 !important;
     }
+
+    :root[data-sb-character-drawer-lock="right"] #right-nav-panel.openDrawer {
+        left: auto !important;
+        right: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        transform-origin: right center;
+    }
 }
 
 @media screen and (max-width: 768px) {
@@ -3923,6 +3971,14 @@ body.sb-shell-resizing * {
         margin-top: 0 !important;
         border-radius: 22px 22px 0 0 !important;
         animation: sbMobileShellSheetIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both !important;
+        transform-origin: center bottom;
+    }
+
+    :root[data-sb-character-drawer-lock="right"] #right-nav-panel.openDrawer {
+        left: 8px !important;
+        right: 8px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
         transform-origin: center bottom;
     }
 

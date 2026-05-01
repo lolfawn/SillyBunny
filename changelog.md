@@ -44,6 +44,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Background Visibility can now be raised to 100% without changing existing saved values.
 - Background Visibility now refreshes its range metadata when the Customize panel updates, so upgraded sessions keep the full 100% slider range.
 - The frontend service worker cache now rotates for 1.5.2 so iOS Safari stops reusing 1.5.1 assets with the old 55% Background Visibility cap.
+- Characters drawer now includes an in-drawer alignment button that can lock the desktop panel to the right side while preserving the centered default and mobile safe-area sheet layout.
 - iOS send/regenerate/continue taps no longer force textarea refocus or trigger the mobile viewport workaround during the tap window, reducing delayed sends in Safari.
 - Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 - Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
@@ -63,6 +64,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(agents): make output history scrollable`
 - `fix(chat): reduce streaming DOM churn`
 - `fix(mobile): improve drawer and chat responsiveness`
+- `feat(ui): add character drawer right lock`
 
 ## v1.5.1
 

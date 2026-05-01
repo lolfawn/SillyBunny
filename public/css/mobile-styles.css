@@ -48,6 +48,7 @@
 
     #CharListButtonAndHotSwaps {
         align-items: center;
+        gap: 6px;
     }
 
     #right-nav-panel.openDrawer,
@@ -58,6 +59,13 @@
         left: max(8px, env(safe-area-inset-left, 0px)) !important;
         right: max(8px, env(safe-area-inset-right, 0px)) !important;
         box-sizing: border-box;
+    }
+
+    :root[data-sb-character-drawer-lock="right"] #right-nav-panel.openDrawer {
+        left: max(8px, env(safe-area-inset-left, 0px)) !important;
+        right: max(8px, env(safe-area-inset-right, 0px)) !important;
+        margin-inline: 0 !important;
+        transform-origin: center bottom;
     }
 
     #right-nav-panel.openDrawer > .scrollableInner,
@@ -1670,5 +1678,12 @@
         min-width: 0 !important;
         margin-inline: 0 !important;
         box-sizing: border-box;
+    }
+
+    :root[data-sb-character-drawer-lock="right"] #right-nav-panel.openDrawer {
+        left: max(8px, env(safe-area-inset-left, 0px)) !important;
+        right: max(8px, env(safe-area-inset-right, 0px)) !important;
+        margin-inline: 0 !important;
+        transform-origin: center bottom;
     }
 }

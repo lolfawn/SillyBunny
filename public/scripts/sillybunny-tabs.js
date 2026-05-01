@@ -3,6 +3,7 @@ const SB_STORAGE_KEYS = Object.freeze({
     rightTab: 'sb-right-tab',
     leftShellSize: 'sb-left-shell-size',
     rightShellSize: 'sb-right-shell-size',
+    characterDrawerRightLocked: 'sb-character-drawer-right-locked',
     theme: 'sb-theme',
     surfaceTransparency: 'sb-surface-transparency',
     topbarScaleDesktop: 'sb-topbar-scale-desktop',
@@ -400,6 +401,9 @@ const sbState = {
         },
         activeResize: null,
     },
+    characterDrawer: {
+        rightLocked: normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.characterDrawerRightLocked), false),
+    },
     chatbar: {
         desktop: null,
         sidebar: null,
@@ -655,6 +659,10 @@ function restorePersistedTopbarState() {
     sbState.chatbar.visible = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.chatbarVisible), sbState.chatbar.visible);
     sbState.chatbar.topbarOffset = normalizeTopbarOffset(safeGetItem(SB_STORAGE_KEYS.topbarOffset));
     sbState.compactMode = normalizeStoredBoolean(safeGetItem(SB_STORAGE_KEYS.compactMode), sbState.compactMode);
+    sbState.characterDrawer.rightLocked = normalizeStoredBoolean(
+        getPersistentStorageItem(SB_STORAGE_KEYS.characterDrawerRightLocked),
+        sbState.characterDrawer.rightLocked,
+    );
 }
 
 function clampTopbarOffset(offset) {
@@ -764,6 +772,30 @@ function setCompactMode(enabled, { persist = true } = {}) {
     }
 
     updateThemePickerUi();
+}
+
+function syncCharacterDrawerLockButton() {
+    const button = document.getElementById('sb-character-right-lock');
+    if (!(button instanceof HTMLButtonElement)) {
+        return;
+    }
+
+    const isRightLocked = Boolean(sbState.characterDrawer.rightLocked);
+    setButtonPressed(button, isRightLocked);
+    button.title = isRightLocked ? 'Keep Characters centered' : 'Lock Characters to right';
+    button.setAttribute('aria-label', button.title);
+}
+
+function setCharacterDrawerRightLock(enabled, { persist = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    sbState.characterDrawer.rightLocked = nextEnabled;
+    document.documentElement.dataset.sbCharacterDrawerLock = nextEnabled ? 'right' : 'center';
+
+    if (persist) {
+        setPersistentStorageItem(SB_STORAGE_KEYS.characterDrawerRightLocked, String(nextEnabled));
+    }
+
+    syncCharacterDrawerLockButton();
 }
 
 function createElement(tagName, { id = '', className = '', text = '', html = '', attrs = {} } = {}) {
@@ -3981,7 +4013,7 @@ function ensureCharacterResizeHandle() {
 }
 
 function toggleCharacterPanel() {
-    injectCharacterCloseButton();
+    injectCharacterDrawerControls();
     ensureCharacterResizeHandle();
     const shouldOpenActiveCharacterEditor = hasActiveCharacterChat();
 
@@ -8373,33 +8405,59 @@ function closeMobileNav() {
     setMobileNavOpenState(false);
 }
 
-function injectCharacterCloseButton() {
+function injectCharacterDrawerControls() {
     const target = document.getElementById('CharListButtonAndHotSwaps');
-    if (!(target instanceof HTMLElement) || target.querySelector('#sb-character-mobile-close')) {
+    if (!(target instanceof HTMLElement)) {
         return;
     }
 
-    const button = createElement('button', {
-        id: 'sb-character-mobile-close',
-        className: 'sb-character-close menu_button menu_button_icon',
-        attrs: {
-            type: 'button',
-            title: 'Close Characters',
-            'aria-label': 'Close Characters',
-        },
-    });
+    let lockButton = target.querySelector('#sb-character-right-lock');
+    if (!(lockButton instanceof HTMLButtonElement)) {
+        lockButton = createElement('button', {
+            id: 'sb-character-right-lock',
+            className: 'sb-character-right-lock menu_button menu_button_icon',
+            attrs: {
+                type: 'button',
+                title: 'Lock Characters to right',
+                'aria-label': 'Lock Characters to right',
+                'aria-pressed': 'false',
+            },
+        });
 
-    button.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
-    button.addEventListener('click', () => {
-        if (['character_edit', 'create'].includes(getCharacterPanelMenuType())) {
-            showCharacterListView();
-            syncChatbarVisibilityState();
-            return;
-        }
+        lockButton.innerHTML = '<i class="fa-solid fa-align-right" aria-hidden="true"></i>';
+        lockButton.addEventListener('click', () => {
+            setCharacterDrawerRightLock(!sbState.characterDrawer.rightLocked);
+            syncDesktopShellSizing();
+        });
+        target.appendChild(lockButton);
+    }
 
-        closeCharacterPanel();
-    });
-    target.appendChild(button);
+    let closeButton = target.querySelector('#sb-character-mobile-close');
+    if (!(closeButton instanceof HTMLButtonElement)) {
+        closeButton = createElement('button', {
+            id: 'sb-character-mobile-close',
+            className: 'sb-character-close menu_button menu_button_icon',
+            attrs: {
+                type: 'button',
+                title: 'Close Characters',
+                'aria-label': 'Close Characters',
+            },
+        });
+
+        closeButton.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+        closeButton.addEventListener('click', () => {
+            if (['character_edit', 'create'].includes(getCharacterPanelMenuType())) {
+                showCharacterListView();
+                syncChatbarVisibilityState();
+                return;
+            }
+
+            closeCharacterPanel();
+        });
+        target.appendChild(closeButton);
+    }
+
+    syncCharacterDrawerLockButton();
 }
 
 function bindCharacterEditorExitButton() {
@@ -9227,11 +9285,12 @@ function initAll() {
     buildShell('right');
     buildMobileNav();
     buildMobileChatTools();
-    injectCharacterCloseButton();
+    injectCharacterDrawerControls();
     bindCharacterEditorExitButton();
     setShellTheme(sbState.theme, { persist: false });
     setSurfaceTransparency(sbState.surfaceTransparency, { persist: false });
     setCompactMode(sbState.compactMode, { persist: false });
+    setCharacterDrawerRightLock(sbState.characterDrawer.rightLocked, { persist: false });
     setTopbarScale('desktop', sbState.topbarScale.desktop, { persist: false });
     setTopbarScale('mobile', sbState.topbarScale.mobile, { persist: false });
     setBottomBarScale(sbState.bottomBarScale, { persist: false });
