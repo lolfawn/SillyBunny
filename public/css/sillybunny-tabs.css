@@ -3975,8 +3975,10 @@ body.sb-shell-resizing * {
     }
 
     :root[data-sb-character-drawer-lock="right"] #right-nav-panel.openDrawer {
-        left: 8px !important;
-        right: 8px !important;
+        left: max(8px, env(safe-area-inset-left, 0px)) !important;
+        right: 0 !important;
+        width: auto !important;
+        max-width: none !important;
         margin-left: 0 !important;
         margin-right: 0 !important;
         transform-origin: center bottom;

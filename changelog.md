@@ -27,6 +27,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Mobile message block updates now batch through a short timer plus animation frame, reducing DOM churn from regex/HTML post-processing while keeping generation updates immediate.
 - New message media scrolling now watches only visible media in the latest message and caps the wait at 300 ms, making long chats feel less sticky on mobile.
 - Streaming messages now patch rich formatted DOM in place and reduce repeated swipe metadata cloning, easing WebKit pressure during long generations without flattening the live UI.
+- Streaming messages now restore direct live formatted DOM updates when stream fade-in is disabled, so mobile WebKit shows colors and other formatting while text is still arriving instead of waiting until generation ends.
 - Agent output history popups now use a scrollable desktop layout so long diffs no longer push Undo and Redo controls below the viewport.
 
 ### Group Chats
@@ -45,6 +46,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Background Visibility now refreshes its range metadata when the Customize panel updates, so upgraded sessions keep the full 100% slider range.
 - The frontend service worker cache now rotates for 1.5.2 so iOS Safari stops reusing 1.5.1 assets with the old 55% Background Visibility cap.
 - Characters drawer now includes an in-drawer alignment button that can lock the desktop panel flush to the right side while preserving the centered default and mobile safe-area sheet layout.
+- Mobile Characters drawer header, toolbar, sort/search row, list cards, and right-lock edge alignment now stay symmetrical on narrow viewports without cramped character metadata or a right-side gap.
 - iOS send/regenerate/continue taps no longer force textarea refocus or trigger the mobile viewport workaround during the tap window, reducing delayed sends in Safari.
 - Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 - Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
@@ -65,6 +67,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(chat): reduce streaming DOM churn`
 - `fix(mobile): improve drawer and chat responsiveness`
 - `feat(ui): add character drawer right lock`
+- `fix(mobile): restore live streaming and drawer layout`
 
 ## v1.5.1
 
