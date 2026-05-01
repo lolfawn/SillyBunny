@@ -10490,14 +10490,26 @@ function focusUiSurface(target) {
     }
 
     window.requestAnimationFrame(() => {
-        if (document.body.contains(target)) {
-            if (isIOSWebKitPlatform()) {
-                target.focus();
-                return;
-            }
-
-            target.focus({ preventScroll: true });
+        if (!document.body.contains(target)) {
+            return;
         }
+
+        const styles = getComputedStyle(target);
+        const canReceiveSurfaceFocus = target.getClientRects().length > 0
+            && styles.display !== 'none'
+            && styles.visibility !== 'hidden'
+            && styles.pointerEvents !== 'none';
+
+        if (!canReceiveSurfaceFocus) {
+            return;
+        }
+
+        if (isIOSWebKitPlatform()) {
+            target.focus();
+            return;
+        }
+
+        target.focus({ preventScroll: true });
     });
 }
 
@@ -14152,6 +14164,7 @@ jQuery(async function () {
             '.text_pole',
             '#toast-container',
             '.select2-results',
+            '[data-sb-proxy-button="true"]',
         ];
 
         for (const id of forbiddenTargets) {

@@ -59,6 +59,9 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Characters drawer touch-end and touch-move handlers now use passive listeners where safe, improving iOS WebKit scroll and tap responsiveness while preserving long-press behavior.
 - Drawer and panel focus handling now uses a simpler iOS path without `preventScroll`, reducing Safari focus issues that could leave the landing page or drawer unresponsive.
 - Bumped the app-shell asset query and service-worker cache version so iOS Safari fetches the fixed frontend files instead of reusing stale drawer scripts.
+- Characters drawer opening now uses the managed drawer state directly instead of replaying the hidden legacy navbar toggle, reducing WebKit tap/state desync on mobile.
+- Surface focus now skips hidden or inert drawers, preventing Home/close-chat actions from focusing the closed Characters panel on iOS Safari.
+- Top-bar proxy controls are ignored by the legacy drawer auto-close touch handler so proxy taps do not collapse freshly opened drawers.
 
 ### Local Commits
 - `46a191c fix(groups): open active group from character drawer`
@@ -81,6 +84,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(cache): use safe app shell cache bump`
 - `fix(mobile): stabilize iOS streaming and drawer`
 - `fix(cache): bump iOS frontend assets`
+- `fix(mobile): harden iOS character drawer navigation`
 
 ## v1.5.1
 
