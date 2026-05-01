@@ -490,6 +490,7 @@ let crop_data = undefined;
 let is_delete_mode = false;
 let fav_ch_checked = false;
 let scrollLock = false;
+let scrollLockImmunityUntil = 0;
 export let abortStatusCheck = new AbortController();
 export let charDragDropHandler = null;
 export let chatDragDropHandler = null;
@@ -3980,6 +3981,8 @@ class StreamingProcessor {
             this.markUIGenStarted();
         }
         hideSwipeButtons({ hideCounters: true });
+        scrollLock = false;
+        scrollLockImmunityUntil = Date.now() + 500;
         scrollChatToBottom({ waitForFrame: true });
         return messageId;
     }
@@ -4225,7 +4228,6 @@ class StreamingProcessor {
         if (this.messageId == -1) {
             this.messageId = await this.onStartStreaming(this.firstMessageText);
             await delay(1); // delay for message to be rendered
-            scrollLock = false;
         }
 
         // Stopping strings are expensive to calculate, especially with macros enabled. To remove stopping strings
@@ -13157,6 +13159,10 @@ jQuery(async function () {
     const chatScrollHandler = function () {
         if (power_user.waifuMode) {
             scrollLock = true;
+            return;
+        }
+
+        if (Date.now() < scrollLockImmunityUntil) {
             return;
         }
 
