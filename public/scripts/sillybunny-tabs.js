@@ -8336,6 +8336,7 @@ function buildMobileNav() {
                 { shell: 'left', tab: 'presets', icon: 'fa-sliders', label: 'Presets' },
                 { shell: 'left', tab: 'api', icon: 'fa-plug', label: 'API' },
                 { shell: 'left', tab: 'sampling', icon: 'fa-wave-square', label: 'Sampling' },
+                { shell: 'left', tab: 'advanced-formatting', icon: 'fa-text-height', label: 'Formatting' },
                 { shell: 'left', tab: 'world-info', icon: 'fa-book-atlas', label: 'World Info' },
                 { shell: 'left', tab: 'agents', icon: 'fa-robot', label: 'Agents' },
             ],

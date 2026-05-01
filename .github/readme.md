@@ -263,6 +263,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * Rotated the SillyBunny theme, tabs, and service-worker cache keys so browsers pick up the hardened surface styling immediately.
 * Mobile Workspace, navigation, and Characters drawers now sit closer to the top bar with tighter equal padding, keeping controls and list content visible first instead of spending screen space on empty header gaps.
 * Clean Minimal mobile shell overlays, cards, and navigation buttons now stay solid even at high Background Visibility so drawer menus match the other shell styles.
+* Mobile Quick Actions now keeps only the menu panel and buttons solid while leaving the page behind it visible, and includes the Formatting shortcut alongside Presets, API, Sampling, World Info, and Agents.
 
 **Local Commits**
 * `46a191c fix(groups): open active group from character drawer`
@@ -280,6 +281,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 * `fix(chat): reduce streaming DOM churn`
 * `fix(ui): harden shell surfaces against artifacts`
 * `fix(mobile): tighten shell drawer spacing`
+* `fix(mobile): keep quick actions focused`
 
 ### v1.5.1 (2026-04-29)
 

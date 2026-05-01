@@ -4288,10 +4288,8 @@ body.sb-shell-resizing * {
         inset: 0;
         z-index: -1;
         pointer-events: none;
-        background:
-            linear-gradient(180deg, color-mix(in srgb, var(--sb-shell-header-glow) 62%, transparent), transparent 28%),
-            var(--sb-mobile-overlay-bg, color-mix(in srgb, var(--sb-shell-main-bg) 96%, #040806));
-        opacity: var(--sb-shell-overlay-opacity);
+        background: transparent;
+        opacity: 0;
     }
 
     #sb-mobile-nav.sb-nav-open[aria-hidden='false'] {
@@ -4300,8 +4298,8 @@ body.sb-shell-resizing * {
         visibility: visible;
         pointer-events: auto;
         z-index: 3600;
-        backdrop-filter: blur(22px);
-        -webkit-backdrop-filter: blur(22px);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
 
     #sb-mobile-nav[hidden],
