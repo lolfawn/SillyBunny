@@ -58,6 +58,8 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Workspace tabs now place API immediately after Presets, keeping provider connection controls next to preset setup on desktop and mobile.
 - Workspace shortcut options now list API immediately after Presets as well, so every mobile path into Workspace preserves the same second-tab order.
 - Mobile Characters now uses the same full-width native shell bounds as Workspace and Customize, with fixed scroll containment, toolbar sizing, and square character/group avatars that no longer squeeze or spill on iOS-sized viewports.
+- Removed the server-side cache buster so Safari is no longer forced through `Clear-Site-Data` cache clears on startup or avatar updates.
+- Chat composer and bottom chat controls now keep a stable readable surface when Background Visibility is raised to 100%, preventing desktop background banding through the input box.
 
 ### Local Commits
 - `46a191c fix(groups): open active group from character drawer`
@@ -82,6 +84,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(mobile): stabilize iOS send taps`
 - `fix(ui): place API tab after presets`
 - `fix(mobile): normalize characters drawer shell`
+- `fix(ui): remove cache buster and stabilize composer`
 
 ## v1.5.1
 

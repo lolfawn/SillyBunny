@@ -25,7 +25,6 @@ import { getUserDirectories } from '../users.js';
 import { getChatInfo } from './chats.js';
 import { ByafParser } from '../byaf.js';
 import { CharXParser, persistCharXAssets } from '../charx.js';
-import cacheBuster from '../middleware/cacheBuster.js';
 
 // With 100 MB limit it would take roughly 3000 characters to reach this limit
 const memoryCacheCapacity = getConfigValue('performance.memoryCacheCapacity', '100mb');
@@ -1122,9 +1121,6 @@ router.post('/edit', validateAvatarUrlMiddleware, async function (request, respo
             invalidateThumbnail(request.user.directories, 'avatar', request.body.avatar_url);
             await writeCharacterData(newAvatarPath, char, targetFile, request, crop);
             fs.unlinkSync(newAvatarPath);
-
-            // Bust cache to reload the new avatar
-            cacheBuster.bust(request, response);
         }
 
         return response.sendStatus(200);
@@ -1164,8 +1160,7 @@ router.post('/edit-avatar', validateAvatarUrlMiddleware, async function (request
         // Remove uploaded temp file
         fs.unlinkSync(uploadPath);
 
-        // Reset images caches
-        cacheBuster.bust(request, response);
+        // Reset thumbnail cache
         invalidateThumbnail(request.user.directories, 'avatar', request.body.avatar_url);
 
         return response.sendStatus(200);

@@ -3012,7 +3012,7 @@ body.sb-shell-resizing * {
     padding: calc(6px * var(--sb-bottom-bar-scale)) calc(12px * var(--sb-bottom-bar-scale));
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor) 72%, transparent);
     border-radius: var(--sb-radius-xl, 22px);
-    background: var(--sb-chat-surface-bg, var(--sb-composer-surface-bg, color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeChatTintColor) 8%)));
+    background: var(--sb-composer-surface-bg, var(--sb-chat-surface-bg, color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, var(--SmartThemeChatTintColor) 8%)));
     box-shadow: 0 10px 26px color-mix(in srgb, var(--SmartThemeShadowColor) 12%, transparent);
     min-height: calc(34px * var(--sb-bottom-bar-scale));
     overflow: hidden;

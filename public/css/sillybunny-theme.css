@@ -65,7 +65,8 @@
     --sb-chat-surface-base: var(--sb-chat-surface-source);
     --sb-composer-surface-base: var(--sb-chat-surface-source);
     --sb-chat-surface-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-chat-surface-base)), var(--sb-chat-surface-base));
-    --sb-composer-surface-bg: var(--sb-chat-surface-bg);
+    --sb-composer-surface-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base)), var(--sb-composer-surface-base));
+    --sb-composer-input-bg: color-mix(in srgb, var(--SmartThemeBodyColor) 4%, var(--sb-composer-surface-base));
     --sb-card-bg: linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 6%, var(--SmartThemeBlurTintColor)), color-mix(in srgb, var(--SmartThemeBlurTintColor) 92%, transparent));
     --sb-button-bg: color-mix(in srgb, var(--SmartThemeBlurTintColor) 84%, transparent);
     --sb-button-hover: color-mix(in srgb, var(--SmartThemeQuoteColor) 14%, transparent);
@@ -95,6 +96,7 @@
     --sb-page-card-opacity: 1;
     --sb-page-control-opacity: 1;
     --sb-page-overlay-opacity: 1;
+    --sb-composer-surface-opacity: 1;
     --sb-message-radius: 22px;
 }
 
@@ -116,7 +118,7 @@
 @supports (color: rgb(from black r g b / 1)) {
     :root {
         --sb-chat-surface-base: rgb(from var(--sb-chat-surface-source) r g b / calc(var(--sb-page-overlay-opacity) * 0.96));
-        --sb-composer-surface-base: rgb(from var(--sb-chat-surface-source) r g b / calc(var(--sb-page-card-opacity) * 0.96));
+        --sb-composer-surface-base: rgb(from var(--sb-chat-surface-source) r g b / calc(var(--sb-composer-surface-opacity) * 0.96));
     }
 }
 
@@ -714,8 +716,8 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     pointer-events: none;
     background:
         linear-gradient(180deg, color-mix(in srgb, var(--SmartThemeBodyColor) 4%, transparent), transparent 90%),
-        var(--sb-chat-surface-bg);
-    opacity: var(--sb-page-card-opacity);
+        var(--sb-composer-surface-bg);
+    opacity: 1;
 }
 
 #nonQRFormItems {
@@ -962,7 +964,7 @@ select.text_pole:where(:not([multiple]):not([size]):not(.select2-hidden-accessib
     padding: var(--input-padding-y, 14px) var(--input-padding-x, 16px);
     line-height: 1.56;
     border-radius: var(--sb-radius-md);
-    background: color-mix(in srgb, var(--SmartThemeBodyColor) 3%, transparent);
+    background: var(--sb-composer-input-bg);
     color: var(--SmartThemeBodyColor);
     caret-color: var(--color-primary, var(--sb-accent));
     font-size: calc(var(--mainFontSize) * 0.98);
@@ -1363,7 +1365,7 @@ body.bubblechat .mes[is_user='true'] .mes_block {
 
     :root:not([data-sb-theme]) #send_form,
     :root[data-sb-theme='clean-minimal'] #send_form {
-        background: var(--sb-chat-surface-bg) !important;
+        background: var(--sb-composer-surface-bg) !important;
         border-color: color-mix(in srgb, var(--SmartThemeBorderColor) 86%, transparent) !important;
         backdrop-filter: blur(12px) saturate(110%);
         -webkit-backdrop-filter: blur(12px) saturate(110%);

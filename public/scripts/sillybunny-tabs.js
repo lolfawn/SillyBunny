@@ -1701,7 +1701,6 @@ function setSurfaceTransparency(value, { persist = true } = {}) {
     const cardOpacity = Math.min(1, surfaceOpacity + 0.12);
     const controlOpacity = Math.min(1, surfaceOpacity + 0.22);
     const overlayOpacity = Math.min(1, surfaceOpacity + 0.08);
-
     sbState.surfaceTransparency = nextTransparency;
 
     document.documentElement.style.setProperty('--sb-shell-surface-opacity', '1');
@@ -1712,6 +1711,7 @@ function setSurfaceTransparency(value, { persist = true } = {}) {
     document.documentElement.style.setProperty('--sb-page-card-opacity', cardOpacity.toFixed(2));
     document.documentElement.style.setProperty('--sb-page-control-opacity', controlOpacity.toFixed(2));
     document.documentElement.style.setProperty('--sb-page-overlay-opacity', overlayOpacity.toFixed(2));
+    document.documentElement.style.setProperty('--sb-composer-surface-opacity', '1');
 
     if (persist) {
         safeSetItem(SB_STORAGE_KEYS.surfaceTransparency, String(nextTransparency));
