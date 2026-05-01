@@ -295,6 +295,7 @@ import { addChatBackupsBrowser } from './scripts/chat-backups.js';
 import { onboardingExperimentalMacroEngine } from './scripts/macros/engine/MacroDiagnostics.js';
 import { compressRequest, setRequestCompressionConfig } from './scripts/request-compression.js';
 import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker } from './scripts/swipe-picker.js';
+import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
 
 // API OBJECT FOR EXTERNAL WIRING
 globalThis.SillyTavern = {
@@ -13015,7 +13016,7 @@ jQuery(async function () {
     $(document).on('click', '.api_loading', () => cancelStatusCheck('Canceled because connecting was manually canceled'));
 
     //////////INPUT BAR FOCUS-KEEPING LOGIC/////////////
-    const isIOSFocusSensitiveBrowser = /iPad|iPhone|iPod/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isIOSFocusSensitiveBrowser = isIOSWebKitPlatform();
     let S_TAPreviouslyFocused = false;
     $('#send_textarea').on('focusin focus click', () => {
         S_TAPreviouslyFocused = true;
@@ -13066,9 +13067,10 @@ jQuery(async function () {
     });
 
     const userInputGenerateMutex = new SimpleMutex(sendTextareaMessage);
-    $('#send_but').on('click', async function () {
+    const sendButtonElement = document.getElementById('send_but');
+    bindIOSFastTapSendButton(sendButtonElement, async () => {
         await userInputGenerateMutex.update();
-    });
+    }, { isIOS: isIOSFocusSensitiveBrowser });
 
     //menu buttons setup
 
