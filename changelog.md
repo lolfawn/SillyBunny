@@ -45,23 +45,13 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Background Visibility can now be raised to 100% without changing existing saved values.
 - Background Visibility now refreshes its range metadata when the Customize panel updates, so upgraded sessions keep the full 100% slider range.
 - The frontend service worker cache now rotates for 1.5.2 so iOS Safari stops reusing 1.5.1 assets with the old 55% Background Visibility cap.
-- Replaced the over-aggressive iOS cache refresh with a safer app-shell asset query bump and service-worker cache rotation, avoiding forced reload loops that could leave the landing page unclickable.
 - Characters drawer now includes an in-drawer alignment button that can lock the desktop panel flush to the right side while preserving the centered default and mobile safe-area sheet layout.
 - Mobile Characters drawer header, toolbar, sort/search row, list cards, and right-lock edge alignment now stay symmetrical on narrow viewports without cramped character metadata or a right-side gap.
 - macOS desktop browsers now apply the Characters drawer right-lock immediately, keep the locked drawer edge-flush on shorter windows, and retain drag/resize interaction when WebKit reports pointer capabilities inconsistently.
 - iOS send/regenerate/continue taps no longer force textarea refocus or trigger the mobile viewport workaround during the tap window, reducing delayed sends in Safari.
 - Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 - Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
-
-### iOS WebKit Fixes
-- Streaming chat messages now use direct live HTML updates even when stream fade-in is enabled, preventing raw tags from appearing during generation on iOS WebKit.
-- Characters drawer bulk-edit listeners now wait for the drawer DOM to settle before rebinding, avoiding stale touch targets after mobile drawer refreshes.
-- Characters drawer touch-end and touch-move handlers now use passive listeners where safe, improving iOS WebKit scroll and tap responsiveness while preserving long-press behavior.
-- Drawer and panel focus handling now uses a simpler iOS path without `preventScroll`, reducing Safari focus issues that could leave the landing page or drawer unresponsive.
-- Bumped the app-shell asset query and service-worker cache version so iOS Safari fetches the fixed frontend files instead of reusing stale drawer scripts.
-- Characters drawer opening now uses the managed drawer state directly instead of replaying the hidden legacy navbar toggle, reducing WebKit tap/state desync on mobile.
-- Surface focus now skips hidden or inert drawers, preventing Home/close-chat actions from focusing the closed Characters panel on iOS Safari.
-- Top-bar proxy controls are ignored by the legacy drawer auto-close touch handler so proxy taps do not collapse freshly opened drawers.
+- Rolled staging back to the `fix(ui): repair macOS character drawer lock` frontend state, removing the later cache and iOS drawer follow-ups.
 
 ### Local Commits
 - `46a191c fix(groups): open active group from character drawer`
@@ -81,10 +71,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `feat(ui): add character drawer right lock`
 - `fix(mobile): restore live streaming and drawer layout`
 - `fix(ui): repair macOS character drawer lock`
-- `fix(cache): use safe app shell cache bump`
-- `fix(mobile): stabilize iOS streaming and drawer`
-- `fix(cache): bump iOS frontend assets`
-- `fix(mobile): harden iOS character drawer navigation`
+- `revert: restore macOS character drawer lock state`
 
 ## v1.5.1
 

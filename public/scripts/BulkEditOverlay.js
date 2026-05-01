@@ -393,7 +393,6 @@ class BulkEditOverlay {
     #stateChangeCallbacks = [];
     #selectedCharacters = [];
     #bulkTagPopupHandler = new BulkTagPopupHandler();
-    #pageLoadBindFrame = null;
 
     /**
      * @typedef {object} LastSelected - An object noting the last selected character and its state.
@@ -499,11 +498,6 @@ class BulkEditOverlay {
      * Remove event listeners added by onPageLoad
      */
     onPageUnload = () => {
-        if (this.#pageLoadBindFrame !== null) {
-            cancelAnimationFrame(this.#pageLoadBindFrame);
-            this.#pageLoadBindFrame = null;
-        }
-
         const elements = this.#getEnabledElements();
         elements.forEach(element => {
             element.removeEventListener('touchstart', this.handleHold);
@@ -523,19 +517,15 @@ class BulkEditOverlay {
         this.onPageUnload();
         this.browseState();
 
-        this.#pageLoadBindFrame = requestAnimationFrame(() => {
-            this.#pageLoadBindFrame = null;
+        const elements = this.#getEnabledElements();
+        elements.forEach(element => element.addEventListener('touchstart', this.handleHold));
+        elements.forEach(element => element.addEventListener('mousedown', this.handleHold));
+        elements.forEach(element => element.addEventListener('contextmenu', this.handleDefaultContextMenu));
 
-            const elements = this.#getEnabledElements();
-            elements.forEach(element => element.addEventListener('touchstart', this.handleHold, { passive: false }));
-            elements.forEach(element => element.addEventListener('mousedown', this.handleHold));
-            elements.forEach(element => element.addEventListener('contextmenu', this.handleDefaultContextMenu));
-
-            elements.forEach(element => element.addEventListener('touchend', this.handleLongPressEnd, { passive: true }));
-            elements.forEach(element => element.addEventListener('mouseup', this.handleLongPressEnd));
-            elements.forEach(element => element.addEventListener('dragend', this.handleLongPressEnd));
-            elements.forEach(element => element.addEventListener('touchmove', this.handleLongPressEnd, { passive: true }));
-        });
+        elements.forEach(element => element.addEventListener('touchend', this.handleLongPressEnd));
+        elements.forEach(element => element.addEventListener('mouseup', this.handleLongPressEnd));
+        elements.forEach(element => element.addEventListener('dragend', this.handleLongPressEnd));
+        elements.forEach(element => element.addEventListener('touchmove', this.handleLongPressEnd));
 
         // Cohee: It only triggers when clicking on a margin between the elements?
         // Feel free to fix or remove this, I'm not sure how to.

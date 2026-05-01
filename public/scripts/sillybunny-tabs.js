@@ -4099,21 +4099,18 @@ function toggleCharacterPanel() {
     const host = document.getElementById('rightNavHolder');
     if (host) host.style.overflow = 'visible';
 
-    forceDrawerState('right-nav-panel', true, '#rightNavDrawerIcon');
-    syncChatbarVisibilityState();
-    syncDesktopShellSizing();
+    triggerDrawerToggle('#rightNavHolder > .drawer-toggle');
 
+    // Fallback: if the jQuery drawer-toggle handler didn't fire, force-open
     window.requestAnimationFrame(() => {
         if (!isCharacterPanelOpen()) {
             forceDrawerState('right-nav-panel', true, '#rightNavDrawerIcon');
         }
 
-        const didOpenActiveCharacterEditor = shouldOpenActiveCharacterEditor && showActiveCharacterEditor();
-        if (!didOpenActiveCharacterEditor) {
-            resetCharacterPanelView();
+        if (shouldOpenActiveCharacterEditor) {
+            showActiveCharacterEditor();
         }
 
-        globalThis.jQuery?.('#rm_print_characters_block')?.trigger?.('scroll');
         syncChatbarVisibilityState();
         syncDesktopShellSizing();
     });
