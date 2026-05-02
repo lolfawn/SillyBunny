@@ -842,9 +842,9 @@ function buildStarterPackItems() {
             }),
             buildExtensionStarterPackItem({
                 title: 'Guided Generations',
-                body: 'Adds structured generation controls to your chats, letting you guide the AI with specific instructions for each response to get more consistent and directed output.',
+                body: 'A SillyBunny-compatible fork that adds structured generation controls to your chats, letting you guide the AI with specific instructions for each response.',
                 icon: 'fa-compass',
-                chips: ['Extension', 'Generation', 'Opt-in'],
+                chips: ['Extension', 'Generation', 'SillyBunny fork'],
                 extensionName: STARTER_PACK_EXTENSIONS.guidedGenerations.id,
             }),
             buildExtensionStarterPackItem({

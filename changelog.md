@@ -10,6 +10,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Added SB-GroupUtilities to Launchpad optional installs so group presence, group greetings, shared group context, and SendAs utilities can be installed from the curated starter area.
 - Made the legacy Moonlit Echoes migration toast persistent until the user closes it or opens the Launchpad helper.
 - Added a Show in Launchpad action to the Moonlit Echoes toast that opens the Launchpad starter pack and highlights the Moonlit Echoes Theme card.
+- Added a Guided Generations fork notice that directs existing users to the SillyBunny-compatible fork in Launchpad.
 
 ### Pathfinder
 - Pathfinder now includes active chat-bound, character, character extra, and persona lorebooks alongside manually selected lorebooks by default.
@@ -103,6 +104,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(mobile): render sends before WebKit handoff`
 - `fix(mobile): render group sends before setup`
 - `fix(mobile): anchor swipe scroll to chat bottom`
+- `fix(extensions): point Guided Generations users to fork`
 
 ## v1.5.1
 
