@@ -12178,18 +12178,17 @@ export async function swipe(event, direction, { source, repeated, message = chat
 
     function getMessageBottomHeight(thisMesDiv) {
         const thisMesRect = thisMesDiv[0].getBoundingClientRect();
-        //Scroll position + Chat height = Bottom of chat height.
-        const chatBottom = chatElement.scrollTop() - chatElement.height();
-        //Message offset from viewport top + height = Bottom of message offset.
-        const messageBottom = thisMesRect.top + thisMesDiv.height();
-        // Bottom of chat + Bottom of message offset = target scroll position.
-        const scrollHeight = (chatBottom + messageBottom);
-        return scrollHeight;
+        const chatRect = chatElement[0].getBoundingClientRect();
+        return Math.max(0, chatElement.scrollTop() + thisMesRect.bottom - chatRect.bottom);
     }
 
     function expandNewMessage(thisMesDiv) {
         //Only scroll if the view is not near the bottom.
         const is_animation_scroll = (chatElement.scrollTop() >= (chatElement.prop('scrollHeight') - chatElement.outerHeight()) - 10);
+        if (is_animation_scroll && shouldBatchMobileChatRendering()) {
+            scrollLock = false;
+            scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
+        }
 
         let new_height = thisMesDivHeight - (thisMesTextHeight - thisMesText[0].scrollHeight);
         if (new_height < 103) new_height = 103;
