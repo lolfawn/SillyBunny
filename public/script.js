@@ -472,6 +472,7 @@ const MOBILE_CHAT_RENDER_MEDIA_QUERY = '(max-width: 1000px)';
 const MOBILE_CHAT_RENDER_BATCH_SIZE = 8;
 const MOBILE_MESSAGE_UPDATE_DELAY_MS = 24;
 const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
+const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1000;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
@@ -3147,6 +3148,16 @@ export function scrollChatToBottom({ waitForFrame } = {}) {
     // https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame#return_value
     // https://gist.github.com/paulirish/5d52fb081b3570c81e3a#file-what-forces-layout-md
     requestId = requestAnimationFrame(() => doScroll());
+}
+
+function keepMobileSendScrollAnchored() {
+    if (!shouldBatchMobileChatRendering()) {
+        return;
+    }
+
+    scrollLock = false;
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
+    scrollChatToBottom({ waitForFrame: true });
 }
 
 /**
@@ -6350,6 +6361,7 @@ export async function sendMessageAsUser(messageText, messageBias, insertAt = nul
         chat.push(message);
         const chat_id = (chat.length - 1);
         await eventSource.emit(event_types.MESSAGE_SENT, chat_id);
+        keepMobileSendScrollAnchored();
         addOneMessage(message);
         await eventSource.emit(event_types.USER_MESSAGE_RENDERED, chat_id);
         await saveChatConditional();

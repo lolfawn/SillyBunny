@@ -51,6 +51,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - iOS send/regenerate/continue taps no longer force textarea refocus or trigger the mobile viewport workaround during the tap window, reducing delayed sends in Safari.
 - iOS Safari send taps now use a touch-first handler that keeps the composer focused and suppresses delayed synthetic clicks, preventing slow sends and keyboard-driven scroll jumps.
 - Fixed iOS Safari send button causing scroll jump to previous message top and disabling auto-scroll during response generation.
+- Mobile send now starts scroll-lock immunity as soon as the user message is appended, preventing the viewport from snapping to the previous message before streaming begins.
 - Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
 - Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
 - Rolled staging back to the `fix(ui): repair macOS character drawer lock` frontend state, removing the later cache and iOS drawer follow-ups.
@@ -95,6 +96,7 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - `fix(mobile): tighten shell drawer spacing`
 - `fix(mobile): keep quick actions focused`
 - `fix(mobile): stabilize send scroll handoff`
+- `fix(mobile): keep send scroll anchored after user message`
 
 ## v1.5.1
 
