@@ -1867,11 +1867,10 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
     }
 
     try {
-        await unshallowGroupMembers(selected_group);
-
         throwIfAborted();
         hideSwipeButtons();
         is_group_generating = true;
+        setSendButtonState(true);
         setCharacterName('');
         setCharacterId(undefined);
         const userInput = String($('#send_textarea').val());
@@ -1953,21 +1952,33 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             activatedMembers = activatedMembers.filter(chid => allowedMemberSet.has(characters[chid]?.avatar));
         }
 
-        if (activatedMembers.length === 0) {
-            if (byAutoMode || !userInput) {
-                return Promise.resolve();
-            }
-
-            // Send user message as is
-            const bias = getBiasStrings(userInput, type);
-            await sendMessageAsUser(userInput, bias.messageBias);
-            await saveChatConditional();
-            $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles: true }));
-        }
-
         const canUseMultiSpeakerTurn = byAutoMode || (params && Array.isArray(params.force_chids)) || (isWholeGroupAddress && isUserInput);
         const shouldForceSingleSpeaker = !canUseMultiSpeakerTurn && !['quiet', 'swipe', 'continue', 'impersonate'].includes(type);
         activatedMembers = limitGroupSpeakersForControl(activatedMembers, shouldForceSingleSpeaker);
+        const shouldRenderUserMessage = Boolean(userInput) && !byAutoMode && !['quiet', 'swipe', 'continue', 'impersonate'].includes(type);
+        let didRenderUserMessage = false;
+
+        if (shouldRenderUserMessage) {
+            if (activatedMembers.length > 0) {
+                setCharacterId(activatedMembers[0]);
+            }
+
+            const bias = getBiasStrings(userInput, type);
+            if (bias.messageBias && !userInput.replace(/\{\{[\s\S]*?\}\}/gm, '').trim()) {
+                sendSystemMessage(system_message_types.GENERIC, ' ', { bias: bias.messageBias });
+            } else {
+                await sendMessageAsUser(userInput, bias.messageBias);
+            }
+            didRenderUserMessage = true;
+            $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles: true }));
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+
+        if (activatedMembers.length === 0) {
+            return Promise.resolve();
+        }
+
+        await unshallowGroupMembers(selected_group);
         groupChatQueueOrder = new Map();
 
         if (power_user.show_group_chat_queue) {
@@ -1997,6 +2008,7 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             const mergedParams = { ...(params || {}) };
             mergedParams.quiet_prompt = [mergedParams.quiet_prompt, contextPrompt].filter(Boolean).join('\n');
             mergedParams.quietToLoud = true;
+            mergedParams.suppressUserMessage = didRenderUserMessage || mergedParams.suppressUserMessage;
             if (type === 'dm' || isGroupDmChatMetadata()) {
                 setPendingGeneratedMessageExtra(getGroupDmExtra(characters[chId]?.avatar, 'user'));
             }
