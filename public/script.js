@@ -472,8 +472,8 @@ const MOBILE_CHAT_RENDER_MEDIA_QUERY = '(max-width: 1000px)';
 const MOBILE_CHAT_RENDER_BATCH_SIZE = 8;
 const MOBILE_MESSAGE_UPDATE_DELAY_MS = 24;
 const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
-const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1000;
-const MOBILE_SEND_SCROLL_SETTLE_MS = 120;
+const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1500;
+const MOBILE_SEND_SCROLL_SETTLE_MS = 200;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
@@ -1659,6 +1659,8 @@ export async function printMessages() {
 
     await redisplayChat({ startIndex, fade: false });
 
+    // Wait for next frame to ensure batch rendering completes
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     scrollChatToBottom({ waitForFrame: true });
     delay(debounce_timeout.short).then(() => scrollOnMediaLoad());
 }
@@ -6385,7 +6387,7 @@ export async function sendMessageAsUser(messageText, messageBias, insertAt = nul
     } else {
         chat.push(message);
         const chat_id = (chat.length - 1);
-        addOneMessage(message);
+        addOneMessage(message, { scroll: false });
         keepMobileSendScrollAnchored({ settle: true });
         await eventSource.emit(event_types.MESSAGE_SENT, chat_id);
         await eventSource.emit(event_types.USER_MESSAGE_RENDERED, chat_id);

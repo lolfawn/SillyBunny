@@ -54,6 +54,8 @@ This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echo
 - Fixed iOS Safari send button causing scroll jump to previous message top and disabling auto-scroll during response generation.
 - Mobile send now starts scroll-lock immunity as soon as the user message is appended, preventing the viewport from snapping to the previous message before streaming begins.
 - Mobile sends now render the user message before server ping and settle the bottom scroll after the message is in the DOM, reducing WebKit send delay and snap-back during the send handoff.
+- Fixed iOS Safari message send delay and scroll snap issues by eliminating redundant scroll operations, extending scroll-lock immunity window to 1500ms, and deferring chat initialization scroll until batch rendering completes.
+- Chat initialization now waits for batch rendering to complete before scrolling to bottom, preventing the jump-to-top-then-snap-to-bottom behavior on iOS Safari.
 - Group chat sends now render the user message before group member preparation and slower send listeners, so mobile WebKit no longer waits on group setup before showing the sent message.
 - Mobile swipe navigation now uses container-relative bottom anchoring and disables browser scroll anchoring on the chat scroller, preventing WebKit from snapping to the previous message during swipe changes.
 - Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
