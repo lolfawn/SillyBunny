@@ -221,69 +221,52 @@ SillyBunny includes some extras by default to help you get started right away:
 
 ### v1.5.2 (2026-04-30)
 
-This update adds the Group Utilities bundle to Launchpad, makes the Moonlit Echoes migration notice easier to act on, restores Pathfinder retrieval from chat-attached lorebooks, improves group-chat continuity, and tightens chat layout stability on desktop and mobile.
+This update brings Group Utilities into Launchpad, improves Moonlit Echoes and Guided Generations migration paths, restores Pathfinder access to contextual lorebooks, fixes group-chat continuity, and focuses heavily on mobile Safari chat stability.
 
 **Launchpad And Extensions**
-* Added SB-GroupUtilities to Launchpad optional installs so group presence, group greetings, shared group context, and SendAs utilities can be installed from the curated starter area.
-* Made the legacy Moonlit Echoes migration toast persistent until the user closes it or opens the Launchpad helper.
-* Added a Show in Launchpad action to the Moonlit Echoes toast that opens the Launchpad starter pack and highlights the Moonlit Echoes Theme card.
+* Added SB-GroupUtilities to Launchpad optional installs, covering group presence, group greetings, shared group context, and SendAs utilities.
+* Made the legacy Moonlit Echoes migration toast persistent until dismissed or opened, with a Show in Launchpad action that highlights the Moonlit Echoes Theme card.
+* Added a Guided Generations fork notice that directs existing users to the SillyBunny-compatible fork in Launchpad.
+* Updated bundled SillyBunny extension version labels to 1.5.2.
 
 **Pathfinder**
 * Pathfinder now includes active chat-bound, character, character extra, and persona lorebooks alongside manually selected lorebooks by default.
-* Added diagnostics that report manual and contextual lorebook counts so missing Pathfinder sources are easier to spot.
-* Normalized candidate entry matching and added warnings when a model returns candidate JSON that does not match any loaded lorebook entry names.
+* Added diagnostics for manual/contextual lorebook counts and registered ToolManager tools, reducing false missing-source and enabled-tool warnings.
+* Normalized candidate entry matching and added warnings when candidate JSON does not match loaded lorebook entry names.
 * Added unit coverage for contextual Pathfinder lorebook merging and deduplication.
 
-**Chat UI And Mobile Performance**
-* Fixed group speaker controls overflowing to the right when a typing indicator appears by allowing the desktop control row to wrap cleanly.
-* Added lazy/async loading hints for chat avatars and attached message images.
-* Added mobile content-visibility containment for off-screen chat messages to reduce WebKit layout and memory pressure during longer chats.
-* Chat rendering now uses smaller mobile batches and older-history loads ignore duplicate touch/mouse activations, reducing iOS Safari crashes and accidental auto-loading during longer chats.
-* Streaming messages now patch rich formatted DOM in place and reduce repeated swipe metadata cloning, easing WebKit pressure during long generations without flattening the live UI.
-* Agent output history popups now use a scrollable desktop layout so long diffs no longer push Undo and Redo controls below the viewport.
-
-**Group Chats**
-* Opening the Characters drawer during a group chat now jumps to the active group edit panel instead of the main character list.
+**Group Chats And Agents**
+* Opening the Characters drawer during a group chat now jumps to the active group edit panel.
 * Group Auto Mode now re-applies the saved global toggle when opening or creating group chats, while keeping the default off until the user enables it.
-* Group DM history is included for the speaking character when returning to the main group chat, so private DM context can influence that member's next group reply without exposing it to other speakers.
+* Group DM history is included for the speaking character when returning to the main group chat without exposing private context to other speakers.
+* Deleting a swipe clears pending post-generation recovery state so already-run post-generation agents do not fire again.
+* Agent output history popups now use a scrollable desktop layout so long diffs keep Undo and Redo controls in view.
 
-**Agents And Chat Naming**
-* Deleting a swipe now clears pending post-generation recovery state so already-run post-generation agents do not fire again from the swipe-delete DOM update.
+**Chat Naming And Workspace**
 * Chat auto-naming now allows longer title responses and strips reasoning wrappers before parsing, making the Persona bottom-bar wand more reliable with reasoning models.
 * Persona bottom-bar Auto-label Chat now uses structured title output when available and falls back to raw title parsing, preventing false `No message generated` errors.
+* Workspace tabs and mobile shortcut options now place API immediately after Presets.
+* CYOA Choices bundled regex now removes empty optional choice rows before rendering.
 
-**UI Polish**
+**Mobile Chat Stability**
+* Added lazy/async loading hints for chat avatars and attached message images.
+* Chat rendering now uses smaller mobile batches, ignores duplicate older-history touch/mouse activations, and contains off-screen messages to reduce WebKit layout and memory pressure.
+* Mobile message updates now batch regex/HTML post-processing while keeping generation updates immediate.
+* Streaming replies now patch formatted DOM in place, restore live formatted updates when stream fade-in is disabled, and reduce repeated swipe metadata cloning.
+* Send flows now render user messages before slow handoffs, server ping, or group setup, then hold bottom scroll position to avoid iOS Safari send delays and snap-backs.
+* Swipe navigation now anchors relative to the chat bottom and disables browser scroll anchoring on the chat scroller.
+* New-message media scrolling now watches only visible media in the latest message and caps waits at 300 ms.
+
+**Shell And Mobile UI**
+* Fixed group speaker controls overflowing to the right when a typing indicator appears by allowing the desktop control row to wrap cleanly.
 * The Bottom Bar Size slider now scales the SillyBunny chatbar and Persona bottom chat controls on mobile instead of only affecting the legacy composer sizing.
-* Background Visibility can now be raised to 100% without changing existing saved values.
-* Background Visibility now refreshes its range metadata when the Customize panel updates, so upgraded sessions keep the full 100% slider range.
-* The frontend service worker cache now rotates for 1.5.2 so iOS Safari stops reusing 1.5.1 assets with the old 55% Background Visibility cap.
-* Bundled SillyBunny extension version labels now report 1.5.2 in the Extensions UI.
+* Background Visibility now supports 100%, refreshes upgraded slider metadata, and keeps composer/chatbar surfaces readable at high visibility.
+* Header, chatbar, composer, bottom chat surfaces, and Clean Minimal mobile drawer/menu panels now use solid layers in no-blur or high-visibility setups to prevent compositor artifacts.
+* Mobile Workspace, navigation, Characters, and Quick Actions drawers now have tighter, more consistent spacing, safer bounds, and solid focused panels while keeping page context visible where intended.
+* Characters drawer right-lock alignment now applies immediately on macOS desktop browsers and stays edge-flush on shorter windows without losing drag/resize behavior.
+* Mobile Characters drawer layouts now use native shell bounds, safe-area gutters, aligned controls, and square avatars that avoid squeezing on narrow iOS-sized viewports.
 * Mobile Top Bar Label option cards are left-aligned so checkbox, title, and helper text read cleanly in one-column settings layouts.
-* Header, chatbar, composer, and bottom chat surfaces now use solid SillyBunny panel layers in no-blur and high-background-visibility setups, preventing dark rectangular compositor artifacts around the top and bottom bars.
 * Rotated the SillyBunny theme, tabs, and service-worker cache keys so browsers pick up the hardened surface styling immediately.
-* Mobile Workspace, navigation, and Characters drawers now sit closer to the top bar with tighter equal padding, keeping controls and list content visible first instead of spending screen space on empty header gaps.
-* Clean Minimal mobile shell overlays, cards, and navigation buttons now stay solid even at high Background Visibility so drawer menus match the other shell styles.
-* Mobile Quick Actions now keeps only the menu panel and buttons solid while leaving the page behind it visible, and includes the Formatting shortcut alongside Presets, API, Sampling, World Info, and Agents.
-* Mobile send now keeps the newest chat messages fully laid out during the send-to-stream handoff, preventing the viewport from jumping up to the previous message before the response begins.
-
-**Local Commits**
-* `46a191c fix(groups): open active group from character drawer`
-* `ff76c6a fix(groups): persist auto mode across chats`
-* `c7c2e5a fix(agents): clear post-generation state on swipe delete`
-* `13556b3 fix(groups): include speaker dm memory`
-* `dba3b61 fix(chat): make auto-name titles resilient`
-* `04d392b fix(ui): scale mobile bottom bar controls`
-* `135cd0a fix(ui): allow full background visibility`
-* `5cfff2a fix(ui): left align mobile label options`
-* `15a29d9 fix(mobile): stabilize chat rendering`
-* `fix(chat): stabilize bottom bar auto-labeling`
-* `fix(cache): refresh 1.5.2 frontend assets`
-* `fix(agents): make output history scrollable`
-* `fix(chat): reduce streaming DOM churn`
-* `fix(ui): harden shell surfaces against artifacts`
-* `fix(mobile): tighten shell drawer spacing`
-* `fix(mobile): keep quick actions focused`
-* `fix(mobile): stabilize send scroll handoff`
 
 ### v1.5.1 (2026-04-29)
 
