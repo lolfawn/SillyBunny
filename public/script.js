@@ -473,6 +473,7 @@ const MOBILE_CHAT_RENDER_BATCH_SIZE = 8;
 const MOBILE_MESSAGE_UPDATE_DELAY_MS = 24;
 const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
 const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1000;
+const MOBILE_SEND_SCROLL_SETTLE_MS = 120;
 const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
 let isLoadingMoreMessages = false;
 let lastShowMoreTouchEventAt = 0;
@@ -3150,7 +3151,7 @@ export function scrollChatToBottom({ waitForFrame } = {}) {
     requestId = requestAnimationFrame(() => doScroll());
 }
 
-function keepMobileSendScrollAnchored() {
+function keepMobileSendScrollAnchored({ settle = false } = {}) {
     if (!shouldBatchMobileChatRendering()) {
         return;
     }
@@ -3158,6 +3159,19 @@ function keepMobileSendScrollAnchored() {
     scrollLock = false;
     scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
     scrollChatToBottom({ waitForFrame: true });
+
+    if (!settle) {
+        return;
+    }
+
+    setTimeout(() => {
+        if (Date.now() >= scrollLockImmunityUntil) {
+            return;
+        }
+
+        scrollLock = false;
+        scrollChatToBottom({ waitForFrame: true });
+    }, MOBILE_SEND_SCROLL_SETTLE_MS);
 }
 
 /**
@@ -4739,6 +4753,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     // OpenAI doesn't need instruct mode. Use OAI main prompt instead.
     const isInstruct = power_user.instruct.enabled && main_api !== 'openai';
     const isImpersonate = type == 'impersonate';
+    const shouldConsumeUserInput = type !== 'regenerate' && type !== 'swipe' && type !== 'quiet' && !isImpersonate && !dryRun && !depth;
 
     if (!(dryRun || depth || type == 'regenerate' || type == 'swipe' || type == 'quiet')) {
         const interruptedByCommand = await processCommands(String($('#send_textarea').val()));
@@ -4765,15 +4780,6 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     }
 
     if (!dryRun) {
-        // Ping server to make sure it is still alive
-        const pingResult = await pingServer();
-
-        if (!pingResult) {
-            unblockGeneration(type);
-            toastr.error(t`Verify that the server is running and accessible.`, t`ST Server cannot be reached`);
-            throw new Error('Server unreachable');
-        }
-
         // Hide swipes if not in a dry run.
         hideSwipeButtons();
         // If generated any message, set the flag to indicate it can't be recreated again.
@@ -4829,7 +4835,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     const lastMessage = chat[chat.length - 1];
 
     let textareaText;
-    if (type !== 'regenerate' && type !== 'swipe' && type !== 'quiet' && !isImpersonate && !dryRun && !depth) {
+    if (shouldConsumeUserInput) {
         is_send_press = true;
         textareaText = String($('#send_textarea').val());
         $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles: true }));
@@ -4864,6 +4870,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     }
 
     let { messageBias, promptBias, isUserPromptBias } = getBiasStrings(textareaText, type);
+    let renderedUserMessage = false;
 
     //*********************************
     //PRE FORMATING STRING
@@ -4885,9 +4892,26 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         } else {
             await sendMessageAsUser(textareaText, messageBias);
         }
+        renderedUserMessage = true;
     } else if (textareaText == '' && !automatic_trigger && !dryRun && [undefined, 'normal'].includes(type) && main_api == 'openai' && oai_settings.send_if_empty.trim().length > 0 && !depth) {
         // Use send_if_empty if set and the user message is empty. Only when sending messages normally
         await sendMessageAsUser(oai_settings.send_if_empty.trim(), messageBias);
+        renderedUserMessage = true;
+    }
+
+    if (renderedUserMessage && shouldBatchMobileChatRendering()) {
+        await waitForNextFrame();
+    }
+
+    if (!dryRun) {
+        // Ping after rendering the local user message so slow WebKit networking cannot delay the visible send.
+        const pingResult = await pingServer();
+
+        if (!pingResult) {
+            unblockGeneration(type);
+            toastr.error(t`Verify that the server is running and accessible.`, t`ST Server cannot be reached`);
+            throw new Error('Server unreachable');
+        }
     }
 
     let {
@@ -6361,8 +6385,8 @@ export async function sendMessageAsUser(messageText, messageBias, insertAt = nul
         chat.push(message);
         const chat_id = (chat.length - 1);
         await eventSource.emit(event_types.MESSAGE_SENT, chat_id);
-        keepMobileSendScrollAnchored();
         addOneMessage(message);
+        keepMobileSendScrollAnchored({ settle: true });
         await eventSource.emit(event_types.USER_MESSAGE_RENDERED, chat_id);
         await saveChatConditional();
     }
