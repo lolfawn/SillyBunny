@@ -295,6 +295,7 @@ import { addChatBackupsBrowser } from './scripts/chat-backups.js';
 import { onboardingExperimentalMacroEngine } from './scripts/macros/engine/MacroDiagnostics.js';
 import { compressRequest, setRequestCompressionConfig } from './scripts/request-compression.js';
 import { canJumpToSwipeForMessage, canOpenSwipePickerForMessage, initSwipePicker } from './scripts/swipe-picker.js';
+import { bindIOSFastTapSendButton, isIOSWebKitPlatform } from './scripts/mobile-send-button.js';
 
 // API OBJECT FOR EXTERNAL WIRING
 globalThis.SillyTavern = {
@@ -438,7 +439,7 @@ export let isChatSaving = false;
 export let firstRun = false;
 export let settingsReady = false;
 let currentVersion = '0.0.0';
-const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.5.1';
+const SILLYBUNNY_UI_VERSION = 'SillyBunny v1.5.2';
 
 export let displayVersion = SILLYBUNNY_UI_VERSION;
 
@@ -455,7 +456,7 @@ export const default_avatar = 'img/ai4.png';
 export const system_avatar = 'img/sillybunny-pixel-logo.png';
 export const comment_avatar = 'img/quill.png';
 export const default_user_avatar = 'img/user-default.png';
-export let CLIENT_VERSION = 'SillyBunny:v1.5.1:platberlitz'; // For Horde header
+export let CLIENT_VERSION = 'SillyBunny:v1.5.2:platberlitz'; // For Horde header
 let optionsPopper = Popper.createPopper(document.getElementById('options_button'), document.getElementById('options'), {
     placement: 'top-start',
 });
@@ -467,6 +468,19 @@ let isExportPopupOpen = false;
 // Saved here for performance reasons
 const messageTemplate = $('#message_template .mes');
 export const chatElement = $('#chat');
+const MOBILE_CHAT_RENDER_MEDIA_QUERY = '(max-width: 1000px)';
+const MOBILE_CHAT_RENDER_BATCH_SIZE = 8;
+const MOBILE_MESSAGE_UPDATE_DELAY_MS = 24;
+const MOBILE_MEDIA_SCROLL_MAX_DELAY_MS = 300;
+const MOBILE_SEND_SCROLL_IMMUNITY_MS = 1500;
+const MOBILE_SEND_SCROLL_SETTLE_MS = 200;
+const SHOW_MORE_DUPLICATE_EVENT_GUARD_MS = 750;
+let isLoadingMoreMessages = false;
+let lastShowMoreTouchEventAt = 0;
+let pendingMobileMessageUpdateFrame = 0;
+let pendingMobileMessageUpdateTimer = 0;
+/** @type {Map<number, { message: object, rerenderMessage: boolean }>} */
+const pendingMobileMessageUpdates = new Map();
 
 let dialogueResolve = null;
 let dialogueCloseStop = false;
@@ -478,6 +492,7 @@ let crop_data = undefined;
 let is_delete_mode = false;
 let fav_ch_checked = false;
 let scrollLock = false;
+let scrollLockImmunityUntil = 0;
 export let abortStatusCheck = new AbortController();
 export let charDragDropHandler = null;
 export let chatDragDropHandler = null;
@@ -1501,10 +1516,72 @@ export async function replaceCurrentChat() {
     }
 }
 
+function shouldBatchMobileChatRendering() {
+    const isNarrowViewport = window.matchMedia?.(MOBILE_CHAT_RENDER_MEDIA_QUERY)?.matches;
+    return Boolean(isNarrowViewport || isMobile());
+}
+
+function shouldDeferMobileMessageUpdates() {
+    return Boolean(shouldBatchMobileChatRendering() && !is_send_press);
+}
+
+function getMobileChatRenderBatchSize(messageCount) {
+    if (!shouldBatchMobileChatRendering()) {
+        return messageCount;
+    }
+
+    return Math.min(MOBILE_CHAT_RENDER_BATCH_SIZE, messageCount);
+}
+
+function waitForNextFrame() {
+    return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+function flushPendingMobileMessageUpdates() {
+    pendingMobileMessageUpdateFrame = 0;
+    pendingMobileMessageUpdateTimer = 0;
+    const updates = [...pendingMobileMessageUpdates.entries()];
+    pendingMobileMessageUpdates.clear();
+
+    for (const [messageId, { message, rerenderMessage }] of updates) {
+        applyMessageBlockUpdate(messageId, message, { rerenderMessage });
+    }
+}
+
+function queueMobileMessageBlockUpdate(messageId, message, { rerenderMessage }) {
+    pendingMobileMessageUpdates.set(messageId, {
+        message,
+        rerenderMessage: pendingMobileMessageUpdates.get(messageId)?.rerenderMessage || rerenderMessage,
+    });
+
+    if (pendingMobileMessageUpdateFrame || pendingMobileMessageUpdateTimer) {
+        return;
+    }
+
+    pendingMobileMessageUpdateTimer = window.setTimeout(() => {
+        pendingMobileMessageUpdateTimer = 0;
+        pendingMobileMessageUpdateFrame = requestAnimationFrame(flushPendingMobileMessageUpdates);
+    }, MOBILE_MESSAGE_UPDATE_DELAY_MS);
+}
+
+function insertShowMoreFragment(referenceNode, fragment) {
+    if (chatElement[0] instanceof HTMLElement) {
+        chatElement[0].insertBefore(fragment, referenceNode);
+    }
+}
+
 export async function showMoreMessages(messagesToLoad = null) {
+    if (isLoadingMoreMessages) {
+        return;
+    }
+
+    isLoadingMoreMessages = true;
+
     const firstDisplayedMesId = chatElement.children('.mes').first().attr('mesid');
     let messageId = Number(firstDisplayedMesId);
     let count = messagesToLoad || power_user.chat_truncation || Number.MAX_SAFE_INTEGER;
+    const showMoreButton = $('#show_more_messages');
+    const showMoreButtonElement = showMoreButton[0];
 
     // If there are no messages displayed, or the message somehow has no mesid, we default to one higher than last message id,
     // so the first "new" message being shown will be the last available message
@@ -1512,37 +1589,63 @@ export async function showMoreMessages(messagesToLoad = null) {
         messageId = getLastMessageId() + 1;
     }
 
-    console.debug('Inserting messages before', messageId, 'count', count, 'chat length', chat.length);
-    const prevHeight = chatElement.prop('scrollHeight');
-    const showMoreButton = $('#show_more_messages');
-    const isButtonInView = isElementInViewport(showMoreButton[0]);
+    try {
+        console.debug('Inserting messages before', messageId, 'count', count, 'chat length', chat.length);
 
-    const firstId = clamp(messageId - count, 0, Infinity);
-    const messageElements = [];
-    chat.slice(firstId, messageId).forEach((message, id) => {
-        messageElements.push(updateMessageElement(message, { messageId: firstId + id }));
-    });
-    // This could be faster: https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentElement
-    // Fallback to chatElement if the button isn't where it's expected to be.
-    if (showMoreButton[0]) {
-        showMoreButton.after(messageElements);
-    } else {
-        chatElement.prepend(messageElements);
+        const firstId = clamp(messageId - count, 0, Infinity);
+        const messages = chat.slice(firstId, messageId);
+        const batchSize = getMobileChatRenderBatchSize(messages.length);
+        const shouldYieldBetweenBatches = batchSize < messages.length;
+        const insertionReference = showMoreButtonElement instanceof HTMLElement
+            ? showMoreButtonElement.nextSibling
+            : chatElement[0]?.firstChild ?? null;
+        const shouldPreserveScroll = isElementInViewport(showMoreButtonElement);
+
+        if (showMoreButtonElement instanceof HTMLElement) {
+            showMoreButtonElement.setAttribute('aria-busy', 'true');
+        }
+
+        for (let offset = 0; offset < messages.length; offset += batchSize) {
+            const prevHeight = chatElement.prop('scrollHeight');
+            const fragment = document.createDocumentFragment();
+            const batch = messages.slice(offset, offset + batchSize);
+
+            batch.forEach((message, id) => {
+                const messageElement = updateMessageElement(message, { messageId: firstId + offset + id });
+                if (messageElement[0]) {
+                    fragment.appendChild(messageElement[0]);
+                }
+            });
+
+            // Fallback to chatElement if the button isn't where it's expected to be.
+            insertShowMoreFragment(insertionReference, fragment);
+
+            if (shouldPreserveScroll) {
+                const newHeight = chatElement.prop('scrollHeight');
+                chatElement.scrollTop(chatElement.scrollTop() + newHeight - prevHeight);
+            }
+
+            if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
+                await waitForNextFrame();
+            }
+        }
+
+        refreshSwipeButtons();
+
+        if (firstId === 0) {
+            showMoreButton.remove();
+        } else if (showMoreButtonElement instanceof HTMLElement) {
+            showMoreButtonElement.removeAttribute('aria-busy');
+        }
+
+        applyStylePins();
+        await eventSource.emit(event_types.MORE_MESSAGES_LOADED);
+    } finally {
+        if (showMoreButtonElement instanceof HTMLElement) {
+            showMoreButtonElement.removeAttribute('aria-busy');
+        }
+        isLoadingMoreMessages = false;
     }
-
-    refreshSwipeButtons();
-
-    if (firstId === 0) {
-        showMoreButton.remove();
-    }
-
-    if (isButtonInView) {
-        const newHeight = chatElement.prop('scrollHeight');
-        chatElement.scrollTop(newHeight - prevHeight);
-    }
-
-    applyStylePins();
-    await eventSource.emit(event_types.MORE_MESSAGES_LOADED);
 }
 
 export async function printMessages() {
@@ -1556,6 +1659,8 @@ export async function printMessages() {
 
     await redisplayChat({ startIndex, fade: false });
 
+    // Wait for next frame to ensure batch rendering completes
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     scrollChatToBottom({ waitForFrame: true });
     delay(debounce_timeout.short).then(() => scrollOnMediaLoad());
 }
@@ -1579,20 +1684,32 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
     const messages = targetChat.slice(startIndex);
 
     if (messages.length > 0) {
-        const newMessageElements = messages.map((message, offset) => {
-            const i = startIndex + offset;
-            const messageElement = updateMessageElement(message, { messageId: i });
+        const renderedMessageIds = lodash.range(startIndex, targetChat.length, 1);
+        const batchSize = getMobileChatRenderBatchSize(messages.length);
+        const shouldYieldBetweenBatches = batchSize < messages.length;
 
-            return messageElement[0];
-        });
+        for (let offset = 0; offset < messages.length; offset += batchSize) {
+            const newMessageElements = messages.slice(offset, offset + batchSize).map((message, batchOffset) => {
+                const i = startIndex + offset + batchOffset;
+                const messageElement = updateMessageElement(message, { messageId: i });
 
-        //The last_mes has been removed, add it to the new last message.
-        newMessageElements.at(-1).classList.add('last_mes');
+                return messageElement[0];
+            });
 
-        //Append to chat in one DOM update.
-        chatElement.append(newMessageElements);
+            if (offset + batchSize >= messages.length) {
+                //The last_mes has been removed, add it to the new last message.
+                newMessageElements.at(-1).classList.add('last_mes');
+            }
 
-        applyCharacterTagsToMessageDivs({ mesIds: lodash.range(startIndex, targetChat.length, 1) });
+            //Append each batch in one DOM update.
+            chatElement.append(newMessageElements);
+
+            if (shouldYieldBetweenBatches && offset + batchSize < messages.length) {
+                await waitForNextFrame();
+            }
+        }
+
+        applyCharacterTagsToMessageDivs({ mesIds: renderedMessageIds });
     }
 
     refreshSwipeButtons(false, fade);
@@ -1604,31 +1721,35 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
 
 export function scrollOnMediaLoad() {
     const started = Date.now();
-    const media = chatElement.find('.mes_block img, .mes_block video, .mes_block audio').toArray();
+    const media = chatElement.find('.last_mes .mes_block img, .last_mes .mes_block video, .last_mes .mes_block audio').toArray()
+        .filter(element => element instanceof HTMLElement && (isElementInViewport(element) || isElementInViewport(element.closest('.last_mes'))));
     let mediaLoaded = 0;
+
+    if (media.length === 0) {
+        return;
+    }
 
     for (const currentElement of media) {
         if (currentElement instanceof HTMLImageElement) {
             if (currentElement.complete) {
                 incrementAndCheck();
             } else {
-                currentElement.addEventListener('load', incrementAndCheck);
-                currentElement.addEventListener('error', incrementAndCheck);
+                currentElement.addEventListener('load', incrementAndCheck, { once: true });
+                currentElement.addEventListener('error', incrementAndCheck, { once: true });
             }
         }
         if (currentElement instanceof HTMLMediaElement) {
             if (currentElement.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
                 incrementAndCheck();
             } else {
-                currentElement.addEventListener('loadeddata', incrementAndCheck);
-                currentElement.addEventListener('error', incrementAndCheck);
+                currentElement.addEventListener('loadeddata', incrementAndCheck, { once: true });
+                currentElement.addEventListener('error', incrementAndCheck, { once: true });
             }
         }
     }
 
     function incrementAndCheck() {
-        const MAX_DELAY = 1000; // 1 second
-        if ((Date.now() - started) > MAX_DELAY) {
+        if ((Date.now() - started) > MOBILE_MEDIA_SCROLL_MAX_DELAY_MS) {
             return;
         }
         mediaLoaded++;
@@ -2111,15 +2232,12 @@ export function refreshMessageModelIcons() {
     });
 }
 
-/**
- * Re-renders a message block with updated content.
- * @param {number} messageId Message ID
- * @param {object} message Message object
- * @param {object} [options={}] Optional arguments
- * @param {boolean} [options.rerenderMessage=true] Whether to re-render the message content (inside <c>.mes_text</c>)
- */
-export function updateMessageBlock(messageId, message, { rerenderMessage = true } = {}) {
+function applyMessageBlockUpdate(messageId, message, { rerenderMessage = true } = {}) {
     const messageElement = chatElement.find(`[mesid="${messageId}"]`);
+    if (messageElement.length === 0) {
+        return;
+    }
+
     if (rerenderMessage) {
         const text = message?.extra?.display_text ?? message.mes;
         messageElement.find('.mes_text').html(messageFormatting(text, message.name, message.is_system, message.is_user, messageId, {}, false));
@@ -2130,6 +2248,22 @@ export function updateMessageBlock(messageId, message, { rerenderMessage = true 
 
     addCopyToCodeBlocks(messageElement);
     appendMediaToMessage(message, messageElement);
+}
+
+/**
+ * Re-renders a message block with updated content.
+ * @param {number} messageId Message ID
+ * @param {object} message Message object
+ * @param {object} [options={}] Optional arguments
+ * @param {boolean} [options.rerenderMessage=true] Whether to re-render the message content (inside <c>.mes_text</c>)
+ */
+export function updateMessageBlock(messageId, message, { rerenderMessage = true } = {}) {
+    if (shouldDeferMobileMessageUpdates()) {
+        queueMobileMessageBlockUpdate(messageId, message, { rerenderMessage });
+        return;
+    }
+
+    applyMessageBlockUpdate(messageId, message, { rerenderMessage });
 }
 
 /**
@@ -3019,6 +3153,29 @@ export function scrollChatToBottom({ waitForFrame } = {}) {
     requestId = requestAnimationFrame(() => doScroll());
 }
 
+function keepMobileSendScrollAnchored({ settle = false } = {}) {
+    if (!shouldBatchMobileChatRendering()) {
+        return;
+    }
+
+    scrollLock = false;
+    scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
+    scrollChatToBottom({ waitForFrame: true });
+
+    if (!settle) {
+        return;
+    }
+
+    setTimeout(() => {
+        if (Date.now() >= scrollLockImmunityUntil) {
+            return;
+        }
+
+        scrollLock = false;
+        scrollChatToBottom({ waitForFrame: true });
+    }, MOBILE_SEND_SCROLL_SETTLE_MS);
+}
+
 /**
  * @deprecated Function is not needed anymore, as the new signature of substituteParams is more flexible.
  *
@@ -3813,7 +3970,9 @@ class StreamingProcessor {
         if (continueOnReasoning) {
             await this.reasoningHandler.process(messageId, false, this.promptReasoning);
         }
-        this.reasoningHandler.updateDom(messageId);
+        if (this.reasoningHandler.hasReasoningContent()) {
+            this.reasoningHandler.updateDom(messageId);
+        }
     }
 
     #updateMessageBlockVisibility() {
@@ -3849,6 +4008,8 @@ class StreamingProcessor {
             this.markUIGenStarted();
         }
         hideSwipeButtons({ hideCounters: true });
+        scrollLock = false;
+        scrollLockImmunityUntil = Date.now() + 500;
         scrollChatToBottom({ waitForFrame: true });
         return messageId;
     }
@@ -4094,7 +4255,6 @@ class StreamingProcessor {
         if (this.messageId == -1) {
             this.messageId = await this.onStartStreaming(this.firstMessageText);
             await delay(1); // delay for message to be rendered
-            scrollLock = false;
         }
 
         // Stopping strings are expensive to calculate, especially with macros enabled. To remove stopping strings
@@ -4113,6 +4273,7 @@ class StreamingProcessor {
                     this.timeToFirstToken = now - this.createdAt.getTime();
                 }
                 if (this.isStopped || this.abortController.signal.aborted) {
+                    this.setFirstSwipe(this.messageId);
                     this.isStopped = true;
                     this.isFinished = true;
                     return this.result;
@@ -4137,6 +4298,7 @@ class StreamingProcessor {
         } catch (err) {
             const isCancelled = this.isCancelled || this.abortController.signal.aborted;
             if (!this.isFinished && isCancelled) {
+                this.setFirstSwipe(this.messageId);
                 this.isStopped = true;
                 this.isFinished = true;
                 return this.result;
@@ -4530,6 +4692,7 @@ function removeLastMessage() {
  * @property {string} [quietName] Name to use for the quiet prompt (defaults to "System:")
  * @property {number} [depth] Recursion depth for the generation. Used to prevent infinite loops in tool calls.
  * @property {JsonSchema} [jsonSchema] JSON schema to use for the structured generation. Usually requires a special instruction.
+ * @property {boolean} [suppressUserMessage] Whether the visible user message was already rendered by a caller.
  */
 
 /**
@@ -4574,7 +4737,7 @@ function consumePendingUserMessageExtra(message) {
     pendingUserMessageExtra = null;
 }
 
-export async function Generate(type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, jsonSchema = null, depth = 0 } = {}, dryRun = false) {
+export async function Generate(type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, jsonSchema = null, depth = 0, suppressUserMessage = false } = {}, dryRun = false) {
     console.log('Generate entered');
     setGenerationProgress(0);
     generation_started = new Date();
@@ -4593,6 +4756,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     // OpenAI doesn't need instruct mode. Use OAI main prompt instead.
     const isInstruct = power_user.instruct.enabled && main_api !== 'openai';
     const isImpersonate = type == 'impersonate';
+    const shouldConsumeUserInput = type !== 'regenerate' && type !== 'swipe' && type !== 'quiet' && !isImpersonate && !dryRun && !depth && !suppressUserMessage;
 
     if (!(dryRun || depth || type == 'regenerate' || type == 'swipe' || type == 'quiet')) {
         const interruptedByCommand = await processCommands(String($('#send_textarea').val()));
@@ -4619,15 +4783,6 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     }
 
     if (!dryRun) {
-        // Ping server to make sure it is still alive
-        const pingResult = await pingServer();
-
-        if (!pingResult) {
-            unblockGeneration(type);
-            toastr.error(t`Verify that the server is running and accessible.`, t`ST Server cannot be reached`);
-            throw new Error('Server unreachable');
-        }
-
         // Hide swipes if not in a dry run.
         hideSwipeButtons();
         // If generated any message, set the flag to indicate it can't be recreated again.
@@ -4683,7 +4838,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     const lastMessage = chat[chat.length - 1];
 
     let textareaText;
-    if (type !== 'regenerate' && type !== 'swipe' && type !== 'quiet' && !isImpersonate && !dryRun && !depth) {
+    if (shouldConsumeUserInput) {
         is_send_press = true;
         textareaText = String($('#send_textarea').val());
         $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles: true }));
@@ -4718,6 +4873,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     }
 
     let { messageBias, promptBias, isUserPromptBias } = getBiasStrings(textareaText, type);
+    let renderedUserMessage = false;
 
     //*********************************
     //PRE FORMATING STRING
@@ -4739,9 +4895,26 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         } else {
             await sendMessageAsUser(textareaText, messageBias);
         }
-    } else if (textareaText == '' && !automatic_trigger && !dryRun && [undefined, 'normal'].includes(type) && main_api == 'openai' && oai_settings.send_if_empty.trim().length > 0 && !depth) {
+        renderedUserMessage = true;
+    } else if (textareaText == '' && !automatic_trigger && !dryRun && [undefined, 'normal'].includes(type) && main_api == 'openai' && oai_settings.send_if_empty.trim().length > 0 && !depth && !suppressUserMessage) {
         // Use send_if_empty if set and the user message is empty. Only when sending messages normally
         await sendMessageAsUser(oai_settings.send_if_empty.trim(), messageBias);
+        renderedUserMessage = true;
+    }
+
+    if (renderedUserMessage && shouldBatchMobileChatRendering()) {
+        await waitForNextFrame();
+    }
+
+    if (!dryRun) {
+        // Ping after rendering the local user message so slow WebKit networking cannot delay the visible send.
+        const pingResult = await pingServer();
+
+        if (!pingResult) {
+            unblockGeneration(type);
+            toastr.error(t`Verify that the server is running and accessible.`, t`ST Server cannot be reached`);
+            throw new Error('Server unreachable');
+        }
     }
 
     let {
@@ -5721,7 +5894,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                     clearStreamingProcessorIfCurrent(activeStreamingProcessor);
                     depth = depth + 1;
                     await ToolManager.saveFunctionToolInvocations(invocationResult.invocations);
-                    return Generate('normal', { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, depth }, dryRun);
+                    return Generate('normal', { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, depth, suppressUserMessage }, dryRun);
                 }
             }
 
@@ -5847,7 +6020,7 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
 
                 depth = depth + 1;
                 await ToolManager.saveFunctionToolInvocations(invocationResult.invocations);
-                return Generate('normal', { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, depth }, dryRun);
+                return Generate('normal', { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, quietName, depth, suppressUserMessage }, dryRun);
             }
         }
 
@@ -6214,8 +6387,9 @@ export async function sendMessageAsUser(messageText, messageBias, insertAt = nul
     } else {
         chat.push(message);
         const chat_id = (chat.length - 1);
+        addOneMessage(message, { scroll: false });
+        keepMobileSendScrollAnchored({ settle: true });
         await eventSource.emit(event_types.MESSAGE_SENT, chat_id);
-        addOneMessage(message);
         await eventSource.emit(event_types.USER_MESSAGE_RENDERED, chat_id);
         await saveChatConditional();
     }
@@ -9512,6 +9686,24 @@ const CHAT_LABEL_FILENAME_LIMIT = 120;
 const CHAT_LABEL_MAX_MESSAGES = 14;
 const CHAT_LABEL_HEAD_MESSAGES = 4;
 const CHAT_LABEL_MAX_MESSAGE_CHARS = 650;
+const CHAT_LABEL_JSON_SCHEMA = Object.freeze({
+    name: 'chat_label',
+    description: 'A concise title for a saved chat.',
+    strict: true,
+    value: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['title'],
+        properties: {
+            title: {
+                type: 'string',
+                description: 'A concise title for the chat.',
+                minLength: 1,
+                maxLength: CHAT_LABEL_TITLE_LIMIT,
+            },
+        },
+    },
+});
 const CHAT_LABEL_TIMESTAMP_PATTERN = '\\d{4}-\\d{2}-\\d{2}@\\d{2}h\\d{2}m\\d{2}s\\d{3}ms';
 let chatHistoryToolsAbortController = null;
 
@@ -9665,6 +9857,8 @@ function truncateChatLabelText(value, limit = CHAT_LABEL_TITLE_LIMIT) {
 
 function normalizeGeneratedChatLabel(value, displayName = '') {
     let title = String(value || '')
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
         .replace(/```(?:json)?/gi, '')
         .replace(/```/g, '')
         .replace(/^chat\s*(?:title|label|name)\s*[:=-]\s*/i, '')
@@ -9688,7 +9882,10 @@ function normalizeGeneratedChatLabel(value, displayName = '') {
 }
 
 function extractGeneratedChatLabel(responseText, displayName = '') {
-    const text = String(responseText || '').trim();
+    const text = String(responseText || '')
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+        .trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
 
     if (jsonMatch) {
@@ -9704,7 +9901,44 @@ function extractGeneratedChatLabel(responseText, displayName = '') {
         }
     }
 
-    return normalizeGeneratedChatLabel(text, displayName);
+    const plainTextLabel = normalizeGeneratedChatLabel(text, displayName);
+    if (plainTextLabel) {
+        return plainTextLabel;
+    }
+
+    for (const line of text.split('\n')) {
+        const normalizedLine = normalizeGeneratedChatLabel(line, displayName);
+        if (normalizedLine) {
+            return normalizedLine;
+        }
+    }
+
+    return '';
+}
+
+async function generateChatAutoLabelResponse(prompt, displayName, signal) {
+    const generated = await generateRaw({
+        prompt,
+        responseLength: 256,
+        trimNames: false,
+        jsonSchema: CHAT_LABEL_JSON_SCHEMA,
+        signal,
+    });
+
+    return extractGeneratedChatLabel(generated, displayName);
+}
+
+async function generatePlainChatAutoLabelResponse(prompt, displayName, signal) {
+    const api = main_api;
+    const data = await generateRawData({
+        prompt,
+        api,
+        responseLength: 256,
+        signal,
+    });
+    const generated = typeof data === 'string' ? data : extractMessageFromData(data, api);
+
+    return extractGeneratedChatLabel(generated, displayName);
 }
 
 async function loadChatForAutoLabel(fileName, { isGroupChat, groupId, characterId, signal } = {}) {
@@ -9761,18 +9995,42 @@ ${transcript}`,
         },
     ];
 
-    const generated = await generateRaw({
-        prompt,
-        responseLength: 80,
-        trimNames: true,
-        signal,
-    });
-    const label = extractGeneratedChatLabel(generated, displayName);
-    if (!label) {
-        throw new Error('The model did not return a usable chat label.');
+    let generationError = null;
+
+    if (main_api === 'openai') {
+        try {
+            const structuredLabel = await generateChatAutoLabelResponse(prompt, displayName, signal);
+            if (structuredLabel) {
+                return structuredLabel;
+            }
+        } catch (error) {
+            if (isChatHistoryToolAbort(error)) {
+                throw error;
+            }
+
+            generationError = error;
+            console.debug('Structured chat label generation failed; retrying without schema.', error);
+        }
     }
 
-    return label;
+    try {
+        const plainLabel = await generatePlainChatAutoLabelResponse(prompt, displayName, signal);
+        if (plainLabel) {
+            return plainLabel;
+        }
+    } catch (error) {
+        if (isChatHistoryToolAbort(error)) {
+            throw error;
+        }
+
+        generationError = error;
+    }
+
+    if (generationError && String(generationError?.message || generationError) !== 'No message generated') {
+        throw generationError;
+    }
+
+    throw new Error('The model did not return a usable chat label.');
 }
 
 async function buildAutoLabeledChatFileName(label, { displayName, isGroupChat, existingNames, oldFileName } = {}) {
@@ -11922,18 +12180,17 @@ export async function swipe(event, direction, { source, repeated, message = chat
 
     function getMessageBottomHeight(thisMesDiv) {
         const thisMesRect = thisMesDiv[0].getBoundingClientRect();
-        //Scroll position + Chat height = Bottom of chat height.
-        const chatBottom = chatElement.scrollTop() - chatElement.height();
-        //Message offset from viewport top + height = Bottom of message offset.
-        const messageBottom = thisMesRect.top + thisMesDiv.height();
-        // Bottom of chat + Bottom of message offset = target scroll position.
-        const scrollHeight = (chatBottom + messageBottom);
-        return scrollHeight;
+        const chatRect = chatElement[0].getBoundingClientRect();
+        return Math.max(0, chatElement.scrollTop() + thisMesRect.bottom - chatRect.bottom);
     }
 
     function expandNewMessage(thisMesDiv) {
         //Only scroll if the view is not near the bottom.
         const is_animation_scroll = (chatElement.scrollTop() >= (chatElement.prop('scrollHeight') - chatElement.outerHeight()) - 10);
+        if (is_animation_scroll && shouldBatchMobileChatRendering()) {
+            scrollLock = false;
+            scrollLockImmunityUntil = Math.max(scrollLockImmunityUntil, Date.now() + MOBILE_SEND_SCROLL_IMMUNITY_MS);
+        }
 
         let new_height = thisMesDivHeight - (thisMesTextHeight - thisMesText[0].scrollHeight);
         if (new_height < 103) new_height = 103;
@@ -12799,12 +13056,13 @@ jQuery(async function () {
     $(document).on('click', '.api_loading', () => cancelStatusCheck('Canceled because connecting was manually canceled'));
 
     //////////INPUT BAR FOCUS-KEEPING LOGIC/////////////
+    const isIOSFocusSensitiveBrowser = isIOSWebKitPlatform();
     let S_TAPreviouslyFocused = false;
     $('#send_textarea').on('focusin focus click', () => {
         S_TAPreviouslyFocused = true;
     });
     $('#send_but, #option_regenerate, #option_continue, #mes_continue, #mes_impersonate').on('click', () => {
-        if (S_TAPreviouslyFocused) {
+        if (S_TAPreviouslyFocused && !isIOSFocusSensitiveBrowser) {
             $('#send_textarea').trigger('focus');
         }
     });
@@ -12849,9 +13107,10 @@ jQuery(async function () {
     });
 
     const userInputGenerateMutex = new SimpleMutex(sendTextareaMessage);
-    $('#send_but').on('click', async function () {
+    const sendButtonElement = document.getElementById('send_but');
+    bindIOSFastTapSendButton(sendButtonElement, async () => {
         await userInputGenerateMutex.update();
-    });
+    }, { isIOS: isIOSFocusSensitiveBrowser });
 
     //menu buttons setup
 
@@ -12938,6 +13197,10 @@ jQuery(async function () {
     const chatScrollHandler = function () {
         if (power_user.waifuMode) {
             scrollLock = true;
+            return;
+        }
+
+        if (Date.now() < scrollLockImmunityUntil) {
             return;
         }
 
@@ -14346,7 +14609,13 @@ jQuery(async function () {
         $('#avatar-and-name-block').slideToggle();
     });
 
-    $(document).on('mouseup touchend', '#show_more_messages', async function () {
+    $(document).on('mouseup touchend', '#show_more_messages', async function (event) {
+        if (event.type === 'touchend') {
+            lastShowMoreTouchEventAt = Date.now();
+        } else if (event.type === 'mouseup' && Date.now() - lastShowMoreTouchEventAt < SHOW_MORE_DUPLICATE_EVENT_GUARD_MS) {
+            return;
+        }
+
         await showMoreMessages();
     });
 

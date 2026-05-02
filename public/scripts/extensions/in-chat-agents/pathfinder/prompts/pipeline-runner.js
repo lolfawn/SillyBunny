@@ -331,6 +331,30 @@ function formatCandidateEntries(candidates, context, settings) {
     return formatted.join('\n\n');
 }
 
+function normalizeEntryName(name) {
+    return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function resolveEntryName(name, entriesByName) {
+    if (typeof name !== 'string') {
+        return null;
+    }
+
+    const trimmed = name.trim();
+    if (entriesByName.has(trimmed)) {
+        return trimmed;
+    }
+
+    const normalized = normalizeEntryName(trimmed);
+    for (const knownName of entriesByName.keys()) {
+        if (normalizeEntryName(knownName) === normalized) {
+            return knownName;
+        }
+    }
+
+    return null;
+}
+
 /**
  * Substitute template variables
  * @param {string} template
@@ -384,13 +408,33 @@ function parseOutput(response, format, entriesByName) {
                 }
 
                 // Validate entries exist
-                const validEntries = entries.filter(name =>
-                    typeof name === 'string' && entriesByName.has(name),
-                );
+                const validEntries = [];
+                const missingEntries = [];
+                for (const name of entries) {
+                    const resolvedName = resolveEntryName(name, entriesByName);
+                    if (resolvedName) {
+                        validEntries.push(resolvedName);
+                    } else if (typeof name === 'string') {
+                        missingEntries.push(name);
+                    }
+                }
                 logPathfinderPipeline('Pipeline JSON output parsed successfully.', {
                     requestedEntries: entries.length,
                     validEntries: validEntries.length,
+                    missingEntries,
                 });
+
+                if (entries.length > 0 && validEntries.length === 0) {
+                    console.warn(`${PATHFINDER_LOG_PREFIX} Pipeline JSON returned candidates, but none matched loaded lorebook entries.`, {
+                        requestedEntries: entries,
+                        knownEntryCount: entriesByName.size,
+                        knownEntries: Array.from(entriesByName.keys()).slice(0, 50),
+                    });
+                    reasoning = [
+                        reasoning,
+                        `Pathfinder warning: model returned ${entries.length} candidate(s), but none matched the ${entriesByName.size} loaded lorebook entry names.`,
+                    ].filter(Boolean).join('\n\n');
+                }
 
                 return { entries: validEntries, reasoning };
             } catch (e) {

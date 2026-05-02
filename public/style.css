@@ -872,6 +872,7 @@ body .panelControlBar {
     overflow-x: hidden;
     padding-bottom: 0;
     overflow-y: scroll;
+    overflow-anchor: none;
     display: flex;
     bottom: 10px;
     backdrop-filter: blur(var(--SmartThemeBlurStrength));
@@ -969,6 +970,8 @@ body .panelControlBar {
     border-radius: var(--avatar-roundness, 8px);
     font-weight: 600;
     text-shadow: none !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #mes_continue {
@@ -1269,6 +1272,14 @@ body .panelControlBar {
 .mes {
     --swipeCounterHeight: 15px;
     --swipeCounterMargin: 5px;
+}
+
+@media screen and (max-width: 1000px) {
+    /* Keep the live send/stream handoff fully laid out so mobile scroll anchoring stays calm. */
+    #chat .mes:not(.last_mes):not(:nth-last-child(-n + 2)) {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 220px;
+    }
 }
 
 /* https://stackoverflow.com/a/31819499 */
@@ -2989,6 +3000,8 @@ input[type="file"] {
 
 .bulk_select_checkbox {
     align-self: center;
+    justify-self: center;
+    margin: 0;
 }
 
 #rm_print_characters_block .text_block {
@@ -3047,6 +3060,8 @@ input[type="file"] {
 
 #rm_button_bar .menu_button {
     width: calc(var(--mainFontSize) * 1.7);
+    min-width: calc(var(--mainFontSize) * 1.7);
+    min-height: calc(var(--mainFontSize) * 1.7);
     aspect-ratio: 1;
     margin: 0;
 }
@@ -7231,8 +7246,18 @@ body:not(.movingUI) .drawer-content.maximized {
     background: color-mix(in srgb, var(--SmartThemeQuoteColor, #8b8) 14%, transparent);
 }
 
+.popup:has(.ica-transform-history) .popup-content {
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.ica-transform-history {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 .ica-transform-history-entry {
-    margin-bottom: 12px;
     padding: 12px;
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 55%, transparent);
     border-radius: 10px;
@@ -7259,6 +7284,9 @@ body:not(.movingUI) .drawer-content.maximized {
     line-height: 1.55;
     font-family: var(--monoFontFamily, monospace);
     font-size: calc(var(--mainFontSize) * 0.84);
+    max-height: min(48vh, 520px);
+    max-height: min(48dvh, 520px);
+    overflow-y: auto;
 }
 
 .ica-transform-diff-part--ins {
@@ -7289,6 +7317,7 @@ body:not(.movingUI) .drawer-content.maximized {
 .group_speaker_controls {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 4px 8px;
     background: var(--SmartThemeBlurTintColor);

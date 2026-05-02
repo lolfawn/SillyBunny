@@ -122,6 +122,23 @@
       "maxDepth": null
     },
     {
+      "id": "9fa2958c-215f-4fef-9a3e-804c0846f4fb",
+      "scriptName": "Remove Empty Choice Rows",
+      "findRegex": "/<div class=\\\"pura-choice\\\" style=\\\"[^\\\"]*\\\">\\s*<\\/div>/g",
+      "replaceString": "",
+      "trimStrings": [],
+      "placement": [
+        2
+      ],
+      "disabled": false,
+      "markdownOnly": true,
+      "promptOnly": false,
+      "runOnEdit": true,
+      "substituteRegex": 0,
+      "minDepth": null,
+      "maxDepth": null
+    },
+    {
       "id": "1c892238-de70-40bf-8394-97dd68d8eaff",
       "scriptName": "Trim Choices",
       "findRegex": "\\[CHOICES\\]\\n*(\\d+\\..*?)(?:\\n+(\\d+\\..*?))?(?:\\n+(\\d+\\..*?))?(?:\\n+(\\d+\\..*?))?(?:\\n+(\\d+\\..*?))?(?:\\n+(\\d+\\..*?))?(?:\\n+(\\d+\\..*?))?\\s*(?:\\[\\/CHOICES\\])?(?=\\n|$)",

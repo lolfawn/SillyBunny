@@ -305,7 +305,7 @@
                 </div>
                 <div class="welcomeGuideGrid welcomeStarterPackGrid">
                     {{#each starterPackItems.preInstalled}}
-                        <article class="welcomeGuideCard welcomeStarterPackCard">
+                        <article class="welcomeGuideCard welcomeStarterPackCard" data-launchpad-extension="{{actionValue}}">
                             <div class="welcomeStarterPackHeader">
                                 <div class="welcomeGuideCardHeader">
                                     <i class="fa-solid {{icon}}"></i>
@@ -342,7 +342,7 @@
                 </div>
                 <div class="welcomeGuideGrid welcomeStarterPackGrid">
                     {{#each starterPackItems.optional}}
-                        <article class="welcomeGuideCard welcomeStarterPackCard">
+                        <article class="welcomeGuideCard welcomeStarterPackCard" data-launchpad-extension="{{actionValue}}">
                             <div class="welcomeStarterPackHeader">
                                 <div class="welcomeGuideCardHeader">
                                     <i class="fa-solid {{icon}}"></i>

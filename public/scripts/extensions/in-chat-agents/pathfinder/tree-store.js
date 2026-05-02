@@ -25,6 +25,7 @@ export const SETTING_DEFAULTS = {
     ephemeralResults: true,
     sidecarEnabled: false,
     enabledLorebooks: [],
+    includeContextualLorebooks: true,
     autoUseAttachedLorebook: false,
     bookPermissions: {},
     confirmTools: {},

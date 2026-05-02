@@ -10,7 +10,6 @@ import { getImages, tryParse } from '../util.js';
 import { getFileNameValidationFunction } from '../middleware/validateFileName.js';
 import { applyAvatarCropResize } from './characters.js';
 import { invalidateThumbnail } from './thumbnails.js';
-import cacheBuster from '../middleware/cacheBuster.js';
 
 export const router = express.Router();
 
@@ -47,10 +46,9 @@ router.post('/upload', getFileNameValidationFunction('overwrite_name'), async (r
         const rawImg = await Jimp.read(pathToUpload);
         const image = await applyAvatarCropResize(rawImg, crop);
 
-        // Remove previous thumbnail and bust cache if overwriting
+        // Remove previous thumbnail if overwriting
         if (request.body.overwrite_name) {
             invalidateThumbnail(request.user.directories, 'persona', sanitize(request.body.overwrite_name));
-            cacheBuster.bust(request, response);
         }
 
         const filename = sanitize(request.body.overwrite_name || `${Date.now()}.png`);

@@ -403,6 +403,59 @@ function withGroupPrivateDmFilter(speakerAvatar, callback) {
     }
 }
 
+async function withGroupPrivateDmMemory(group, speakerAvatar, callback) {
+    const dmMessages = isGroupDmChatMetadata() ? [] : await getGroupDmMemoryMessages(group, speakerAvatar);
+    chat.splice(0, 0, ...dmMessages);
+
+    try {
+        return await withGroupPrivateDmFilter(speakerAvatar, callback);
+    } finally {
+        if (dmMessages.length) {
+            const injected = new Set(dmMessages);
+            for (let index = chat.length - 1; index >= 0; index--) {
+                if (injected.has(chat[index])) {
+                    chat.splice(index, 1);
+                }
+            }
+        }
+    }
+}
+
+async function getGroupDmMemoryMessages(group, speakerAvatar) {
+    const avatar = String(speakerAvatar || '');
+    if (!group || !avatar || !Array.isArray(group.chats)) {
+        return [];
+    }
+
+    const messages = [];
+    for (const chatId of group.chats) {
+        const data = await loadGroupChat(chatId);
+        const metadata = data?.[0]?.chat_metadata;
+        if (!isGroupDmChatMetadata(metadata) || !isGroupDmParticipant(avatar, metadata)) {
+            continue;
+        }
+
+        for (const message of data.slice(1)) {
+            if (!message || message.is_system) {
+                continue;
+            }
+
+            const clone = structuredClone(message);
+            const isUserMessage = Boolean(clone.is_user);
+            clone.extra = {
+                ...(clone.extra || {}),
+                is_group_dm: true,
+                dm_from: clone.extra?.dm_from || (isUserMessage ? 'user' : avatar),
+                dm_to: clone.extra?.dm_to || (isUserMessage ? avatar : 'user'),
+            };
+            clone.title = clone.title || 'Private DM';
+            messages.push(clone);
+        }
+    }
+
+    return messages;
+}
+
 function getSelectedGroupSpeakerChid(group) {
     if (!selectedGroupSpeakerAvatar) {
         return -1;
@@ -932,6 +985,7 @@ function setAutoModeWorker() {
 }
 
 function syncGroupAutoModeToggle() {
+    applyGlobalGroupAutoModeSettings();
     $('#rm_group_automode').prop('checked', is_group_automode_enabled);
     setAutoModeWorker();
 }
@@ -1813,11 +1867,10 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
     }
 
     try {
-        await unshallowGroupMembers(selected_group);
-
         throwIfAborted();
         hideSwipeButtons();
         is_group_generating = true;
+        setSendButtonState(true);
         setCharacterName('');
         setCharacterId(undefined);
         const userInput = String($('#send_textarea').val());
@@ -1899,21 +1952,33 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             activatedMembers = activatedMembers.filter(chid => allowedMemberSet.has(characters[chid]?.avatar));
         }
 
-        if (activatedMembers.length === 0) {
-            if (byAutoMode || !userInput) {
-                return Promise.resolve();
-            }
-
-            // Send user message as is
-            const bias = getBiasStrings(userInput, type);
-            await sendMessageAsUser(userInput, bias.messageBias);
-            await saveChatConditional();
-            $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles: true }));
-        }
-
         const canUseMultiSpeakerTurn = byAutoMode || (params && Array.isArray(params.force_chids)) || (isWholeGroupAddress && isUserInput);
         const shouldForceSingleSpeaker = !canUseMultiSpeakerTurn && !['quiet', 'swipe', 'continue', 'impersonate'].includes(type);
         activatedMembers = limitGroupSpeakersForControl(activatedMembers, shouldForceSingleSpeaker);
+        const shouldRenderUserMessage = Boolean(userInput) && !byAutoMode && !['quiet', 'swipe', 'continue', 'impersonate'].includes(type);
+        let didRenderUserMessage = false;
+
+        if (shouldRenderUserMessage) {
+            if (activatedMembers.length > 0) {
+                setCharacterId(activatedMembers[0]);
+            }
+
+            const bias = getBiasStrings(userInput, type);
+            if (bias.messageBias && !userInput.replace(/\{\{[\s\S]*?\}\}/gm, '').trim()) {
+                sendSystemMessage(system_message_types.GENERIC, ' ', { bias: bias.messageBias });
+            } else {
+                await sendMessageAsUser(userInput, bias.messageBias);
+            }
+            didRenderUserMessage = true;
+            $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles: true }));
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+
+        if (activatedMembers.length === 0) {
+            return Promise.resolve();
+        }
+
+        await unshallowGroupMembers(selected_group);
         groupChatQueueOrder = new Map();
 
         if (power_user.show_group_chat_queue) {
@@ -1943,15 +2008,16 @@ async function generateGroupWrapper(byAutoMode, type = null, params = {}) {
             const mergedParams = { ...(params || {}) };
             mergedParams.quiet_prompt = [mergedParams.quiet_prompt, contextPrompt].filter(Boolean).join('\n');
             mergedParams.quietToLoud = true;
+            mergedParams.suppressUserMessage = didRenderUserMessage || mergedParams.suppressUserMessage;
             if (type === 'dm' || isGroupDmChatMetadata()) {
                 setPendingGeneratedMessageExtra(getGroupDmExtra(characters[chId]?.avatar, 'user'));
             }
-            textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => withGroupPrivateDmFilter(characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...mergedParams })));
+            textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => withGroupPrivateDmMemory(group, characters[chId]?.avatar, () => Generate(generateType, { automatic_trigger: byAutoMode, ...mergedParams })));
             let messageChunk = textResult?.messageChunk;
 
             if (messageChunk) {
                 while (shouldAutoContinue(messageChunk, type === 'impersonate')) {
-                    textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => Generate('continue', { automatic_trigger: byAutoMode, ...mergedParams }));
+                    textResult = await runWithGroupMemberModelOverride(group, characters[chId]?.avatar, () => withGroupPrivateDmMemory(group, characters[chId]?.avatar, () => Generate('continue', { automatic_trigger: byAutoMode, ...mergedParams })));
                     messageChunk = textResult?.messageChunk;
                 }
             }

@@ -2644,6 +2644,17 @@ async function onMessageSwiped(data) {
     void data;
 }
 
+function onMessageSwipeDeleted(data) {
+    if (internalPromptTransformDepth > 0) {
+        return;
+    }
+
+    pendingGenerationSnapshot = null;
+    clearLatestAssistantPostProcessingFallback();
+    clearPostGenerationRecoveryCheck();
+    clearDeferredPostProcessing(Number(data?.messageId));
+}
+
 /**
  * Handles CHAT_COMPLETION_SETTINGS_READY for tool-category agents.
  * Converts registered tools to Anthropic format when needed,
@@ -2829,6 +2840,10 @@ export function initAgentRunner() {
 
     if (event_types.MESSAGE_SWIPED) {
         eventSource.on(event_types.MESSAGE_SWIPED, onMessageSwiped);
+    }
+
+    if (event_types.MESSAGE_SWIPE_DELETED) {
+        eventSource.on(event_types.MESSAGE_SWIPE_DELETED, onMessageSwipeDeleted);
     }
 
     if (event_types.CHAT_COMPLETION_SETTINGS_READY) {

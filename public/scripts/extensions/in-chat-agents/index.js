@@ -103,6 +103,8 @@ const BUNDLED_REGEX_POST_DEFAULT_EXCLUDED_TEMPLATE_IDS = new Set();
 const BUNDLED_PROMPT_TRANSFORM_IMPERSONATE_TEMPLATE_IDS = new Set([
     'tpl-prose-polisher',
 ]);
+const CYOA_CHOICES_TEMPLATE_ID = 'tpl-cyoa-choices';
+const CYOA_CHOICES_EMPTY_ROW_CLEANUP_SCRIPT_ID = '9fa2958c-215f-4fef-9a3e-804c0846f4fb';
 
 const REGEX_PLACEMENT_LABELS = {
     [AGENT_REGEX_PLACEMENT.AI_OUTPUT]: 'AI Output',
@@ -421,6 +423,51 @@ async function migrateBundledRegexScriptsToSavedAgents() {
         agent.sourceTemplateId = agent.sourceTemplateId || template.id;
         await saveAgent(agent);
     }
+}
+
+function hasCyoaChoiceEmptyRowCleanup(agent) {
+    return getAgentRegexScripts(agent).some(script =>
+        script.id === CYOA_CHOICES_EMPTY_ROW_CLEANUP_SCRIPT_ID
+        || String(script.scriptName ?? '').trim().toLowerCase() === 'remove empty choice rows',
+    );
+}
+
+function shouldMigrateCyoaChoiceRegexCleanup(agent, template) {
+    if (!template || shouldSkipBundledTemplateMigrations(agent)) {
+        return false;
+    }
+
+    if (String(template?.id ?? '').trim() !== CYOA_CHOICES_TEMPLATE_ID) {
+        return false;
+    }
+
+    if (String(agent?.name ?? '').trim() !== String(template?.name ?? '').trim()) {
+        return false;
+    }
+
+    if (String(agent?.prompt ?? '').trim() !== String(template?.prompt ?? '').trim()) {
+        return false;
+    }
+
+    return !hasCyoaChoiceEmptyRowCleanup(agent);
+}
+
+async function migrateCyoaChoiceRegexCleanupToSavedAgents() {
+    let migratedCount = 0;
+
+    for (const agent of getAgents()) {
+        const template = findTemplateForAgent(agent);
+        if (!shouldMigrateCyoaChoiceRegexCleanup(agent, template)) {
+            continue;
+        }
+
+        agent.regexScripts = structuredClone(template.regexScripts);
+        agent.sourceTemplateId = agent.sourceTemplateId || template.id;
+        await saveAgent(agent);
+        migratedCount++;
+    }
+
+    return migratedCount;
 }
 
 async function migrateBundledTemplateMetadataToSavedAgents() {
@@ -2455,7 +2502,12 @@ async function openPromptTransformHistoryPopup(messageIndex) {
         }
     });
 
-    await new Popup(html, POPUP_TYPE.TEXT, '', { wide: true }).show();
+    await new Popup(html, POPUP_TYPE.TEXT, '', {
+        wide: true,
+        large: true,
+        allowVerticalScrolling: true,
+        leftAlign: true,
+    }).show();
 }
 
 // ===================== Pathfinder Editor =====================
@@ -2861,6 +2913,11 @@ async function refinePromptWithAI(currentPrompt, category, phase, connectionProf
 
     await ensureDefaultBundledAgents();
     await migrateBundledRegexScriptsToSavedAgents();
+    const migratedCyoaChoiceRegexCount = await migrateCyoaChoiceRegexCleanupToSavedAgents();
+    if (migratedCyoaChoiceRegexCount > 0) {
+        toastr.success(`Updated ${migratedCyoaChoiceRegexCount} bundled CYOA choice regex script${migratedCyoaChoiceRegexCount !== 1 ? 's' : ''}.`);
+    }
+
     const migratedTemplateMetadataCount = await migrateBundledTemplateMetadataToSavedAgents();
     if (migratedTemplateMetadataCount > 0) {
         toastr.success(`Updated ${migratedTemplateMetadataCount} bundled agent credit${migratedTemplateMetadataCount !== 1 ? 's' : ''}.`);

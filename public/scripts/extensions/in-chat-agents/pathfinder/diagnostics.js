@@ -1,19 +1,46 @@
 import { getSettings, getTree, getAllEntryUids } from './tree-store.js';
-import { ALL_TOOL_NAMES, getActiveTunnelVisionBooks } from './pathfinder-tool-bridge.js';
+import { ALL_TOOL_NAMES, getActiveTunnelVisionBooks, getContextualLorebooks } from './pathfinder-tool-bridge.js';
 import { getEnabledToolAgents } from '../agent-store.js';
 import { getPathfinderRuntimeAgent } from '../agent-runner.js';
+
+function getRegisteredPathfinderTools(ToolManager) {
+    return ALL_TOOL_NAMES.filter(name =>
+        ToolManager?.tools?.find(t => t.name === name),
+    );
+}
+
+function getEnabledPathfinderTools(pathfinderAgent, registeredTools = []) {
+    if (!pathfinderAgent) {
+        return [];
+    }
+
+    const agentTools = Array.isArray(pathfinderAgent?.tools) ? pathfinderAgent.tools : [];
+    const agentToolNames = agentTools.map(tool => tool.name).filter(name => ALL_TOOL_NAMES.includes(name));
+    const enabledAgentToolNames = agentTools
+        .filter(tool => tool.enabled !== false)
+        .map(tool => tool.name)
+        .filter(name => ALL_TOOL_NAMES.includes(name));
+
+    if (enabledAgentToolNames.length > 0 || agentToolNames.length > 0) {
+        return Array.from(new Set(enabledAgentToolNames));
+    }
+
+    return registeredTools.filter(name => ALL_TOOL_NAMES.includes(name));
+}
 
 export async function runDiagnostics() {
     const results = {};
     const s = getSettings();
 
     // Check enabled lorebooks
-    const books = (s.enabledLorebooks || []);
+    const manualBooks = (s.enabledLorebooks || []);
+    const contextualBooks = s.includeContextualLorebooks === false ? [] : getContextualLorebooks();
+    const books = getActiveTunnelVisionBooks();
     results['Lorebooks'] = {
         ok: books.length > 0,
         message: books.length > 0
-            ? `${books.length} lorebook(s) enabled: ${books.join(', ')}`
-            : 'No lorebooks selected - select at least one above',
+            ? `${books.length} lorebook(s) available: ${books.join(', ')}. Manual: ${manualBooks.length}; contextual: ${contextualBooks.length}.`
+            : 'No lorebooks selected or attached - select one above or attach chat/character/persona lore.',
     };
 
     // Check pipeline mode
@@ -61,21 +88,19 @@ export async function runDiagnostics() {
     if (s.sidecarEnabled) {
         const enabledAgents = getEnabledToolAgents();
         const pathfinderAgent = getPathfinderRuntimeAgent(enabledAgents);
-        const enabledPathfinderTools = (pathfinderAgent?.tools ?? []).filter(tool => tool.enabled !== false);
-        const registeredTools = ALL_TOOL_NAMES.filter(name =>
-            ToolManager?.tools?.find(t => t.name === name),
-        );
+        const registeredTools = getRegisteredPathfinderTools(ToolManager);
+        const enabledPathfinderToolNames = getEnabledPathfinderTools(pathfinderAgent, registeredTools);
 
-        if (registeredTools.length === ALL_TOOL_NAMES.length) {
+        if (enabledPathfinderToolNames.length > 0 && enabledPathfinderToolNames.every(name => registeredTools.includes(name))) {
             if (isToolCallingSupported) {
                 results['Tool Registration'] = {
                     ok: true,
-                    message: `All ${ALL_TOOL_NAMES.length} tools registered and active`,
+                    message: `All ${enabledPathfinderToolNames.length} enabled Pathfinder tool(s) registered and active`,
                 };
             } else {
                 results['Tool Registration'] = {
                     ok: false,
-                    message: `${registeredTools.length} tools registered, but tool calling is not supported for the current API/settings. Enable "Function Calling" in OpenAI settings and ensure the current model supports tools.`,
+                    message: `${registeredTools.length} Pathfinder tool(s) registered, but tool calling is not supported for the current API/settings. Enable "Function Calling" in OpenAI settings and ensure the current model supports tools.`,
                 };
             }
         } else if (!pathfinderAgent) {
@@ -83,7 +108,12 @@ export async function runDiagnostics() {
                 ok: false,
                 message: 'Tool mode is enabled, but the Pathfinder tool agent is not active right now. Enable Pathfinder as a tool agent, then reopen settings or reload agents.',
             };
-        } else if (enabledPathfinderTools.length === 0) {
+        } else if (enabledPathfinderToolNames.length === 0) {
+            console.debug('[Pathfinder] Diagnostics found no enabled Pathfinder tools.', {
+                agentTools: pathfinderAgent?.tools ?? [],
+                registeredTools,
+                sidecarEnabled: s.sidecarEnabled,
+            });
             results['Tool Registration'] = {
                 ok: false,
                 message: 'Tool mode is enabled, but every Pathfinder tool toggle is off. Re-enable at least one Pathfinder tool in Tool Settings.',
@@ -98,7 +128,7 @@ export async function runDiagnostics() {
         } else {
             results['Tool Registration'] = {
                 ok: false,
-                message: `Partial: ${registeredTools.length}/${enabledPathfinderTools.length} enabled Pathfinder tools registered. Some Pathfinder tool toggles may be disabled or not yet refreshed.`,
+                message: `Partial: ${registeredTools.length}/${enabledPathfinderToolNames.length} enabled Pathfinder tools registered. Some Pathfinder tool toggles may be disabled or not yet refreshed.`,
             };
         }
     } else {
